@@ -577,7 +577,7 @@ tasks:
     id: TASK-07
     title: 'Cover the end-to-end OAuth flow, rejection and rate limiting'
     type: Test
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-06
     body: |
@@ -616,15 +616,21 @@ tasks:
       14. No browser, Dusk, Playwright or viewport suites — `settings.testing` is `NORMAL`
 
       ## Completion Criteria
-      - [ ] All cases above pass
-      - [ ] Every rejection case asserts `assertGuest()` **and** an empty `users` table
-      - [ ] The rate-limit case asserts `429`
-      - [ ] Pint and Larastan level 5 clean
+      - [x] All cases above pass
+      - [x] Every rejection case asserts `assertGuest()` **and** an empty `users` table
+      - [x] The rate-limit case asserts `429`
+      - [x] Pint and Larastan level 5 clean
 
       ## Git Deliverables
       - Commit: `test(US-002): TASK-07 cover the Strava OAuth flow, rejection and rate limiting`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 12a59457812cab5c0507c63216e8005407a65955
+      short_sha: 12a5945
+      subject: 'test(US-002): TASK-07 cover the Strava OAuth flow, rejection and rate limiting'
+      committed_at: '2026-09-05T19:32:28+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/12a59457812cab5c0507c63216e8005407a65955'
   -
     id: TASK-08
     title: 'Add transparent token refresh and the reconnect state'
@@ -904,4 +910,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:31:01+00:00'
+updated_at: '2026-09-05T17:32:28+00:00'

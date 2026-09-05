@@ -66,4 +66,19 @@ class UserFactory extends Factory
             'strava_token_expires_at' => now()->subHour(),
         ]);
     }
+
+    /**
+     * Indicate that the token expires inside the refresh safety margin.
+     *
+     * Not yet expired, but close enough that it must be refreshed before use —
+     * this is the branch that distinguishes the margin from a hard expiry.
+     */
+    public function stravaTokenExpiringSoon(): static
+    {
+        $margin = (int) config('strava.token_refresh_margin_seconds');
+
+        return $this->stravaConnected()->state(fn (array $attributes): array => [
+            'strava_token_expires_at' => now()->addSeconds(max(1, intdiv($margin, 2))),
+        ]);
+    }
 }

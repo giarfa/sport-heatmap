@@ -5,7 +5,9 @@ use App\Http\Controllers\Strava\StravaCallbackController;
 use App\Http\Controllers\Strava\StravaRedirectController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', DashboardController::class)->name('dashboard');
+Route::get('/', DashboardController::class)
+    ->middleware('strava.fresh')
+    ->name('dashboard');
 
 /*
  * Both OAuth routes are throttled, not just the callback: the redirect route is
