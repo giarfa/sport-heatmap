@@ -74,11 +74,15 @@ Strava account.
    STRAVA_CLIENT_ID=123456
    STRAVA_CLIENT_SECRET=your-client-secret
    STRAVA_REDIRECT_URI=https://sport-heatmap.test/auth/strava/callback
-   STRAVA_ALLOWED_ATHLETE_IDS=10000001
+   STRAVA_ALLOWED_ATHLETE_IDS=replace-with-your-own-athlete-id
    ```
 
 Only athletes listed in `STRAVA_ALLOWED_ATHLETE_IDS` may connect. Anyone else who completes the
 Strava authorization is rejected, which is what keeps this instance private.
+
+> **Put your own athlete id there and nobody else's.** The allowlist is the only access control
+> in this product; copying an example id verbatim would authorize a stranger. Non-numeric entries
+> are discarded, so a blank or malformed value allows nobody rather than everybody.
 
 ## Environment variables
 
@@ -87,7 +91,7 @@ Strava authorization is rejected, which is what keeps this instance private.
 | `STRAVA_CLIENT_ID` | Client ID of your Strava API application | `123456` |
 | `STRAVA_CLIENT_SECRET` | Client secret of that application — secret, never committed | `2f9c…` |
 | `STRAVA_REDIRECT_URI` | OAuth callback URL; its host must match the callback domain registered with Strava | `https://sport-heatmap.test/auth/strava/callback` |
-| `STRAVA_ALLOWED_ATHLETE_IDS` | Comma-separated allowlist of Strava athlete ids permitted to connect. Blank means nobody. | `10000001,10000002` |
+| `STRAVA_ALLOWED_ATHLETE_IDS` | Comma-separated allowlist of Strava athlete ids permitted to connect. Numeric entries only; blank means nobody. | your own athlete id |
 | `STRAVA_SYNC_HOUR` | Local hour (0–23) at which the daily sync runs | `3` |
 | `STRAVA_SYNC_TIMEZONE` | Timezone that `STRAVA_SYNC_HOUR` is expressed in | `Europe/Rome` |
 
@@ -121,18 +125,16 @@ Run it manually:
 php artisan strava:sync
 ```
 
-Run it on a schedule. The application schedules itself daily at `STRAVA_SYNC_HOUR` in
-`STRAVA_SYNC_TIMEZONE`; the host only needs Laravel's one-minute scheduler tick:
+Run it on a schedule. Once the sync command lands it will register itself to run daily at
+`STRAVA_SYNC_HOUR` in `STRAVA_SYNC_TIMEZONE`; the host only ever needs Laravel's one-minute
+scheduler tick, so this cron entry can be installed now and never touched again:
 
 ```cron
 * * * * * cd /path/to/sport-heatmap && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-Verify what is registered with:
-
-```bash
-php artisan schedule:list
-```
+`php artisan schedule:list` shows what is currently registered — today it reports no scheduled
+tasks, because the sync command does not exist yet.
 
 ## Tests and quality
 

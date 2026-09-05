@@ -27,14 +27,16 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read Collection<int, Activity> $activities
  */
+/*
+ * The Strava identity and token columns are deliberately NOT mass-assignable:
+ * strava_athlete_id is the key the access allowlist is checked against, so a
+ * request body must never be able to rewrite it or plant OAuth tokens. The
+ * OAuth callback assigns them explicitly.
+ */
 #[Fillable([
     'name',
     'email',
     'password',
-    'strava_athlete_id',
-    'strava_access_token',
-    'strava_refresh_token',
-    'strava_token_expires_at',
 ])]
 #[Hidden([
     'password',

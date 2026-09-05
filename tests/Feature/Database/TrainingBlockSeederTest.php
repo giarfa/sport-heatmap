@@ -17,6 +17,14 @@ class TrainingBlockSeederTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Zero-based positions of the shaped weeks inside the 16-week block, mirroring the
+     * seeder's own constants.
+     */
+    private const ILLNESS_WEEK_POSITION = 9;
+
+    private const PEAK_WEEK_POSITION = 12;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -30,10 +38,16 @@ class TrainingBlockSeederTest extends TestCase
         $this->assertNotNull(User::sole()->strava_athlete_id);
     }
 
+    /**
+     * A volume sanity check, not a spec. The seeder can construct 52-94 activities
+     * (13 normal weeks of 3-6 runs, 3 double-run days, 1 illness run, 8 peak runs and
+     * 1-4 runs in the partial current week), so the bounds have to cover that whole
+     * range or the suite goes red at random.
+     */
     public function test_it_seeds_enough_activities_to_exercise_the_dashboard(): void
     {
-        $this->assertGreaterThanOrEqual(60, Activity::count());
-        $this->assertLessThanOrEqual(90, Activity::count());
+        $this->assertGreaterThanOrEqual(50, Activity::count());
+        $this->assertLessThanOrEqual(95, Activity::count());
     }
 
     public function test_the_block_spans_sixteen_consecutive_iso_weeks_ending_with_the_current_one(): void
@@ -67,20 +81,32 @@ class TrainingBlockSeederTest extends TestCase
         );
     }
 
+    /**
+     * Position 9 of the 16-week block is the illness week. Asserting the position — not
+     * merely that "some week is low" — is what catches the shaping regressing onto the
+     * wrong week.
+     */
     public function test_the_illness_week_sits_well_below_the_block_median(): void
     {
-        $weeks = $this->weeklyDistances();
+        $totals = $this->weeklyDistances()->values();
 
-        $this->assertLessThan($weeks->median() / 2, $weeks->min());
+        $this->assertSame($totals->min(), $totals[self::ILLNESS_WEEK_POSITION]);
+        $this->assertLessThan($totals->median() / 2, $totals[self::ILLNESS_WEEK_POSITION]);
     }
 
+    /**
+     * Position 12 of the 16-week block is the peak week, and it must be a strict
+     * maximum so the intensity scale has an unambiguous top.
+     */
     public function test_the_peak_week_is_the_highest_volume_week_of_the_block(): void
     {
-        $weeks = $this->weeklyDistances();
+        $totals = $this->weeklyDistances()->values();
 
-        $sorted = $weeks->sortDesc()->values();
+        $this->assertSame($totals->max(), $totals[self::PEAK_WEEK_POSITION]);
 
-        $this->assertGreaterThan($sorted[1], $sorted[0]);
+        $runnersUp = $totals->sortDesc()->values();
+
+        $this->assertGreaterThan($runnersUp[1], $runnersUp[0]);
     }
 
     public function test_no_activity_is_dated_in_the_future(): void

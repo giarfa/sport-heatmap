@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -31,6 +32,12 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // Every user this product creates has a null password, so restoring the NOT
+        // NULL constraint would abort the rollback halfway through and leave a
+        // half-reverted schema behind. Backfill first: an empty string is not a valid
+        // hash, so it can never authenticate.
+        DB::table('users')->whereNull('password')->update(['password' => '']);
+
         Schema::table('users', function (Blueprint $table) {
             $table->dropUnique(['strava_athlete_id']);
 

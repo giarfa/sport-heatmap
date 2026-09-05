@@ -29,10 +29,19 @@ class TrainingBlockSeeder extends Seeder
      *
      * @var array<int, int>
      */
-    private const DOUBLE_RUN_WEEK_INDEXES = [2, 6, 12];
+    private const DOUBLE_RUN_WEEK_INDEXES = [2, 6, 10];
 
     public function run(): void
     {
+        // This seeder fabricates an athlete and a few dozen activities. Running it
+        // against a real database — `db:seed --force` is routine in deploy scripts —
+        // would inject a demo account into production data.
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command->warn('TrainingBlockSeeder skipped: demo data is only seeded in local and testing environments.');
+
+            return;
+        }
+
         $athlete = User::factory()->stravaConnected()->create([
             'name' => 'Demo Athlete',
             'email' => 'athlete@sport-heatmap.test',

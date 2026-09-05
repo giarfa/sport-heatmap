@@ -7,9 +7,17 @@
  * config:cache has run. Resolve them through config('strava.*') instead.
  */
 
+/*
+ * The allowlist fails closed. env() coerces values like "true" or "null" into PHP
+ * scalars, and casting those to string would yield entries such as "1" that
+ * authorize an athlete nobody intended — so a non-string value is discarded
+ * outright, and only all-digit entries survive the filter.
+ */
+$rawAllowedAthleteIds = env('STRAVA_ALLOWED_ATHLETE_IDS', '');
+
 $allowedAthleteIds = array_values(array_filter(
-    array_map('trim', explode(',', (string) env('STRAVA_ALLOWED_ATHLETE_IDS', ''))),
-    static fn (string $athleteId): bool => $athleteId !== '',
+    array_map('trim', explode(',', is_string($rawAllowedAthleteIds) ? $rawAllowedAthleteIds : '')),
+    static fn (string $athleteId): bool => $athleteId !== '' && ctype_digit($athleteId),
 ));
 
 /**

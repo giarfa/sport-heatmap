@@ -611,12 +611,12 @@ tasks:
       9. Note for the reviewer: the manual test handoff from the plan's Test Strategy — following the README end to end on a clean clone — is a human step and is not covered by the suite.
 
       ## Completion Criteria
-      - [ ] `php artisan larapilot:quality` passes (Pint + Larastan level 5, no lowered level, no new baseline)
-      - [ ] `php artisan test --compact` fully green
-      - [ ] `php artisan migrate:fresh --seed` succeeds from clean
-      - [ ] All 13 acceptance criteria verified against the working tree
-      - [ ] `.env` and `database/database.sqlite` untracked; working tree clean
-      - [ ] One Conventional Commit per task on the feature branch; local PR description updated
+      - [x] `php artisan larapilot:quality` passes (Pint + Larastan level 5, no lowered level, no new baseline)
+      - [x] `php artisan test --compact` fully green
+      - [x] `php artisan migrate:fresh --seed` succeeds from clean
+      - [x] All 13 acceptance criteria verified against the working tree
+      - [x] `.env` and `database/database.sqlite` untracked; working tree clean
+      - [x] One Conventional Commit per task on the feature branch; local PR description updated
 
       ## Test Data
       - N/A — verification only; no schema or factory changes expected
@@ -626,7 +626,13 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalise local PR description toward `develop`
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:40:36+00:00'
+    commit:
+      sha: 1193bea9075649f00faba4a1a0d59ab862da8498
+      short_sha: 1193bea
+      subject: 'chore(US-001): TASK-10 apply quality gate fixes'
+      committed_at: '2026-09-05T18:41:55+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1193bea9075649f00faba4a1a0d59ab862da8498'
+updated_at: '2026-09-05T16:42:04+00:00'
