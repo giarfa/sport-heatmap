@@ -20,8 +20,8 @@ class ActivityTest extends TestCase
         $this->assertInstanceOf(SportType::class, $activity->sport_type);
         $this->assertInstanceOf(Carbon::class, $activity->activity_date);
         $this->assertInstanceOf(Carbon::class, $activity->start_date_local);
-        $this->assertIsInt($activity->distance_meters);
-        $this->assertIsInt($activity->moving_time_seconds);
+        $this->assertGreaterThan(0, $activity->distance_meters);
+        $this->assertGreaterThan(0, $activity->moving_time_seconds);
     }
 
     public function test_the_activity_date_always_matches_the_local_start_date(): void

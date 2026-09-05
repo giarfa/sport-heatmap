@@ -7,7 +7,19 @@ use Database\Factories\SyncRunFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property Carbon $started_at
+ * @property Carbon|null $finished_at
+ * @property SyncRunStatus $status
+ * @property int $activities_upserted
+ * @property int $activities_deleted
+ * @property string|null $error_message
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ */
 #[Fillable([
     'started_at',
     'finished_at',

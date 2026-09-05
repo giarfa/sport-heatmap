@@ -566,11 +566,11 @@ tasks:
       7. Validate the YAML parses (`php -r` with a YAML parse, `yamllint`, or `actionlint` if available) before committing — a malformed workflow fails silently on the forge.
 
       ## Completion Criteria
-      - [ ] `.github/workflows/ci.yml` runs on push and on PRs to `develop` and `main`
-      - [ ] Pint, Larastan level 5, PHPUnit, `composer audit` and the Vite build all run as distinct steps
-      - [ ] PHP 8.4 with SQLite extensions
-      - [ ] **No deploy stage present**
-      - [ ] YAML validated
+      - [x] `.github/workflows/ci.yml` runs on push and on PRs to `develop` and `main`
+      - [x] Pint, Larastan level 5, PHPUnit, `composer audit` and the Vite build all run as distinct steps
+      - [x] PHP 8.4 with SQLite extensions
+      - [x] **No deploy stage present**
+      - [x] YAML validated
 
       ## Test Data
       - N/A — CI configuration only
@@ -580,9 +580,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`) — note the workflow will only actually execute once a remote exists and the branch is pushed
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-08
+    commit:
+      sha: 2fd0fcb5b7172b39b4513d07947faeb2a1a8598f
+      short_sha: 2fd0fcb
+      subject: 'ci(US-001): TASK-09 add test, Pint and Larastan workflow'
+      committed_at: '2026-09-05T18:40:35+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/2fd0fcb5b7172b39b4513d07947faeb2a1a8598f'
   -
     id: TASK-10
     title: 'Full verification pass: quality gate and clean-clone check'
@@ -623,4 +629,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:40:15+00:00'
+updated_at: '2026-09-05T16:40:36+00:00'

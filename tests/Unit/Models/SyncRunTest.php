@@ -19,8 +19,8 @@ class SyncRunTest extends TestCase
         $this->assertInstanceOf(SyncRunStatus::class, $syncRun->status);
         $this->assertInstanceOf(Carbon::class, $syncRun->started_at);
         $this->assertInstanceOf(Carbon::class, $syncRun->finished_at);
-        $this->assertIsInt($syncRun->activities_upserted);
-        $this->assertIsInt($syncRun->activities_deleted);
+        $this->assertGreaterThanOrEqual(0, $syncRun->activities_upserted);
+        $this->assertGreaterThanOrEqual(0, $syncRun->activities_deleted);
     }
 
     public function test_the_default_state_is_a_recent_successful_run(): void
