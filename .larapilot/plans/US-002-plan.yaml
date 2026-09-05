@@ -381,7 +381,7 @@ tasks:
     id: TASK-04
     title: 'Add the athlete allowlist gate and the ConnectStravaAthlete action'
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-02
     body: |
@@ -414,20 +414,26 @@ tasks:
       3. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] `AthleteAllowlist::allows()` is strict and fails closed on an empty allowlist
-      - [ ] `ConnectStravaAthlete` runs inside a transaction and assigns Strava columns explicitly, never via mass assignment
-      - [ ] Reconnecting the same athlete updates the existing row instead of creating a second user
-      - [ ] Neither class performs an allowlist check *after* a write — the caller checks first (TASK-06)
-      - [ ] Pint and Larastan level 5 clean
+      - [x] `AthleteAllowlist::allows()` is strict and fails closed on an empty allowlist
+      - [x] `ConnectStravaAthlete` runs inside a transaction and assigns Strava columns explicitly, never via mass assignment
+      - [x] Reconnecting the same athlete updates the existing row instead of creating a second user
+      - [x] Neither class performs an allowlist check *after* a write — the caller checks first (TASK-06)
+      - [x] Pint and Larastan level 5 clean
 
       ## Test Data
-      - [ ] No factory or seeder change needed — `UserFactory::stravaConnected()` from US-001 already covers the reconnect fixture
-      - [ ] No migration, model attribute or relationship change in this task
+      - [x] No factory or seeder change needed — `UserFactory::stravaConnected()` from US-001 already covers the reconnect fixture
+      - [x] No migration, model attribute or relationship change in this task
 
       ## Git Deliverables
       - Commit: `feat(US-002): TASK-04 add athlete allowlist gate and ConnectStravaAthlete action`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 3404ba254b3af1d9e4008c541b18b55ea1379f42
+      short_sha: 3404ba2
+      subject: 'feat(US-002): TASK-04 add athlete allowlist gate and ConnectStravaAthlete action'
+      committed_at: '2026-09-05T19:29:05+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3404ba254b3af1d9e4008c541b18b55ea1379f42'
   -
     id: TASK-05
     title: 'Cover the allowlist gate and athlete persistence'
@@ -886,4 +892,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:28:22+00:00'
+updated_at: '2026-09-05T17:29:05+00:00'
