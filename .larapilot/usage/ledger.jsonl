@@ -3,3 +3,4 @@
 {"id":"7cc17631f04cedb1","ts":"2026-09-05T16:01:36+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"planning","tokens":22000,"minutes":9,"skill":"larapilot-spec","spec":null,"note":"Backlog bootstrap: 6 specs, 3 epics, 29 points","estimated":true}
 {"id":"ab889892c4a30a4b","ts":"2026-09-05T16:28:08+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"planning","tokens":48000,"minutes":9,"skill":"larapilot-plan","spec":"US-001","note":null,"estimated":true}
 {"id":"b9d353379062e7b8","ts":"2026-09-05T16:52:25+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"feature","tokens":185000,"minutes":22,"skill":"larapilot-implement","spec":"US-001","note":null,"estimated":true}
+{"id":"d53193579b01fc77","ts":"2026-09-05T16:59:53+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"feature","tokens":12000,"minutes":3,"skill":"larapilot-review","spec":"US-001","note":null,"estimated":true}
