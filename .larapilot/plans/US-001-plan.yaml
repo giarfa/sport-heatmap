@@ -214,26 +214,32 @@ tasks:
       7. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Migration adds `strava_athlete_id` (unique), `strava_access_token` (TEXT), `strava_refresh_token` (TEXT), `strava_token_expires_at`
-      - [ ] `users.password` is nullable and `down()` reverses the migration cleanly
-      - [ ] `User` casts both tokens as `encrypted` and hides them from serialization
-      - [ ] `UserFactory` has `stravaConnected()` and `stravaTokenExpired()` states producing valid records
-      - [ ] `php artisan migrate:fresh --seed` succeeds
-      - [ ] Pint clean
+      - [x] Migration adds `strava_athlete_id` (unique), `strava_access_token` (TEXT), `strava_refresh_token` (TEXT), `strava_token_expires_at`
+      - [x] `users.password` is nullable and `down()` reverses the migration cleanly
+      - [x] `User` casts both tokens as `encrypted` and hides them from serialization
+      - [x] `UserFactory` has `stravaConnected()` and `stravaTokenExpired()` states producing valid records
+      - [x] `php artisan migrate:fresh --seed` succeeds
+      - [x] Pint clean
 
       ## Test Data
-      - [ ] `database/factories/UserFactory.php` updated in **this same task** as the migration and model
-      - [ ] Default state and both Strava states produce persistable users
-      - [ ] Seeder wiring is handled in TASK-06 (`TrainingBlockSeeder`); `DatabaseSeeder` must still run green after this task
+      - [x] `database/factories/UserFactory.php` updated in **this same task** as the migration and model
+      - [x] Default state and both Strava states produce persistable users
+      - [x] Seeder wiring is handled in TASK-06 (`TrainingBlockSeeder`); `DatabaseSeeder` must still run green after this task
 
       ## Git Deliverables
       - Commit: `feat(US-001): TASK-02 extend users with Strava identity and token columns`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-01
+    commit:
+      sha: 4d62f8208570f0bd116365073e76f68fccb05c9f
+      short_sha: 4d62f82
+      subject: 'feat(US-001): TASK-02 extend users with Strava identity and token columns'
+      committed_at: '2026-09-05T18:33:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4d62f8208570f0bd116365073e76f68fccb05c9f'
   -
     id: TASK-03
     title: 'Add Activity model, migration, SportType enum and factory'
@@ -581,4 +587,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:32:31+00:00'
+updated_at: '2026-09-05T16:33:31+00:00'
