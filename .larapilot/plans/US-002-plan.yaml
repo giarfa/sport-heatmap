@@ -832,7 +832,7 @@ tasks:
     id: TASK-11
     title: 'Cover the signed-out connect screen and layout accessibility contract'
     type: Test
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-10
     body: |
@@ -862,14 +862,20 @@ tasks:
       5. No browser, Dusk, Playwright or viewport suites
 
       ## Completion Criteria
-      - [ ] All cases above pass
-      - [ ] The manual test handoff notes are written down for `larapilot-review`
-      - [ ] Pint and Larastan level 5 clean
+      - [x] All cases above pass
+      - [x] The manual test handoff notes are written down for `larapilot-review`
+      - [x] Pint and Larastan level 5 clean
 
       ## Git Deliverables
       - Commit: `test(US-002): TASK-11 cover the signed-out connect screen and layout contract`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 4c58467db1e17c1e57a9ccd98da25f994d445e5a
+      short_sha: 4c58467
+      subject: 'test(US-002): TASK-11 cover the signed-out connect screen and layout contract'
+      committed_at: '2026-09-05T19:36:15+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4c58467db1e17c1e57a9ccd98da25f994d445e5a'
   -
     id: TASK-12
     title: 'Document the Strava setup and close the quality gate'
@@ -928,4 +934,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:35:47+00:00'
+updated_at: '2026-09-05T17:36:15+00:00'

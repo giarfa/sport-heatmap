@@ -78,11 +78,37 @@ Strava account.
    ```
 
 Only athletes listed in `STRAVA_ALLOWED_ATHLETE_IDS` may connect. Anyone else who completes the
-Strava authorization is rejected, which is what keeps this instance private.
+Strava authorization is rejected **before** any token, user record, or session is created — the
+allowlist is checked against the athlete id Strava returns with the token exchange, and nothing at
+all is written until it passes.
 
 > **Put your own athlete id there and nobody else's.** The allowlist is the only access control
 > in this product; copying an example id verbatim would authorize a stranger. Non-numeric entries
 > are discarded, so a blank or malformed value allows nobody rather than everybody.
+
+### Signing in
+
+Visit the app signed out and press **Connect with Strava**. That is the whole flow — there is no
+password, no registration, and no other way in.
+
+A few things worth knowing before the first attempt:
+
+- **The callback domain is the setting that fails confusingly.** Strava's *Authorization Callback
+  Domain* is a bare host — no scheme, no path, no port. If it does not match the host in
+  `STRAVA_REDIRECT_URI`, Strava rejects the callback with an opaque error rather than a useful one.
+  Under Herd that host is your HTTPS `.test` domain, e.g. `sport-heatmap.test`.
+- **The app only ever requests `activity:read_all`.** The scope is a literal in
+  `config/strava.php`, not an environment value, so no deployment can widen it. Nothing is ever
+  written back to Strava.
+- **Sign-in creates a synthetic email address.** Strava exposes no email under this scope and
+  `users.email` is `NOT NULL UNIQUE`, so the account is created as
+  `athlete-{id}@strava.invalid`. `.invalid` is the RFC 2606 reserved TLD — that address can never
+  resolve, and the app never sends anything to it.
+- **Tokens are refreshed transparently.** The access token is renewed from the refresh token when
+  it has expired or is within `STRAVA_TOKEN_REFRESH_MARGIN` seconds of expiring. Strava rotates the
+  refresh token on every refresh and both halves are stored, encrypted at rest.
+- **If you revoke the app on Strava**, the next visit shows the connect screen in a reconnect
+  state rather than an error. Press the button again to reconnect.
 
 ## Environment variables
 
@@ -92,6 +118,7 @@ Strava authorization is rejected, which is what keeps this instance private.
 | `STRAVA_CLIENT_SECRET` | Client secret of that application — secret, never committed | `2f9c…` |
 | `STRAVA_REDIRECT_URI` | OAuth callback URL; its host must match the callback domain registered with Strava | `https://sport-heatmap.test/auth/strava/callback` |
 | `STRAVA_ALLOWED_ATHLETE_IDS` | Comma-separated allowlist of Strava athlete ids permitted to connect. Numeric entries only; blank means nobody. | your own athlete id |
+| `STRAVA_TOKEN_REFRESH_MARGIN` | Seconds before expiry at which the access token is refreshed pre-emptively | `300` |
 | `STRAVA_SYNC_HOUR` | Local hour (0–23) at which the daily sync runs | `3` |
 | `STRAVA_SYNC_TIMEZONE` | Timezone that `STRAVA_SYNC_HOUR` is expressed in | `Europe/Rome` |
 
@@ -116,8 +143,9 @@ without ever connecting to Strava.
 The sync pulls your recent Strava activities and upserts them into `activities`. It records
 every attempt in `sync_runs`, which is what the dashboard's sync-status indicator reads.
 
-> **Not implemented yet.** The sync command and the Strava OAuth flow land in a later spec.
-> This section documents how they will be operated, so the scheduling setup is in place first.
+> **The sync command is not implemented yet** — it lands in a later spec. The Strava OAuth
+> connection it depends on is in place. This section documents how the sync will be operated, so
+> the scheduling setup can be done once and left alone.
 
 Run it manually:
 
