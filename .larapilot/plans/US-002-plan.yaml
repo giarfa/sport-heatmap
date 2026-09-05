@@ -756,7 +756,7 @@ tasks:
     id: TASK-10
     title: 'Build the mobile-first layout shell and style the connect and rejection screens'
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-06
     body: |
@@ -807,13 +807,13 @@ tasks:
       8. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] Both screens match `states.html` states 1 and 2 in structure, copy and colour
-      - [ ] Every page renders `noindex, nofollow`, a working skip link, header/main/footer landmarks and exactly one `<h1>`
-      - [ ] Interactive controls are ≥ 44 × 44 px with a visible `:focus-visible` ring
-      - [ ] Light and dark both render correctly from `prefers-color-scheme`; no persisted toggle (US-004)
-      - [ ] No intensity-ramp tokens were added — that surface belongs to US-005
-      - [ ] `npm run build` succeeds; no horizontal scroll at 375 / 768 / 1280 px
-      - [ ] Pint and Larastan level 5 clean
+      - [x] Both screens match `states.html` states 1 and 2 in structure, copy and colour
+      - [x] Every page renders `noindex, nofollow`, a working skip link, header/main/footer landmarks and exactly one `<h1>`
+      - [x] Interactive controls are ≥ 44 × 44 px with a visible `:focus-visible` ring
+      - [x] Light and dark both render correctly from `prefers-color-scheme`; no persisted toggle (US-004)
+      - [x] No intensity-ramp tokens were added — that surface belongs to US-005
+      - [x] `npm run build` succeeds; no horizontal scroll at 375 / 768 / 1280 px
+      - [x] Pint and Larastan level 5 clean
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -822,6 +822,12 @@ tasks:
       - Commit: `feat(US-002): TASK-10 add the mobile-first layout shell and style the connect screens`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 91e7b0a58b0fb7a9b6d6eeded6dfff464af92fe3
+      short_sha: 91e7b0a
+      subject: 'feat(US-002): TASK-10 add the mobile-first layout shell and style the connect screens'
+      committed_at: '2026-09-05T19:35:47+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/91e7b0a58b0fb7a9b6d6eeded6dfff464af92fe3'
   -
     id: TASK-11
     title: 'Cover the signed-out connect screen and layout accessibility contract'
@@ -922,4 +928,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:34:04+00:00'
+updated_at: '2026-09-05T17:35:47+00:00'

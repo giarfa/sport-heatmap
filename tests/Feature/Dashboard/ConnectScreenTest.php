@@ -1,0 +1,107 @@
+<?php
+
+namespace Tests\Feature\Dashboard;
+
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
+use Tests\TestCase;
+
+/**
+ * The signed-out entry point, plus the layout invariants that US-004, US-005 and
+ * US-006 will build on and could quietly break.
+ */
+class ConnectScreenTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::preventStrayRequests();
+    }
+
+    public function test_a_signed_out_visit_renders_the_connect_screen_rather_than_an_error(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertViewIs('strava.connect');
+        $response->assertSee('Connect with Strava');
+        $response->assertSee(route('strava.redirect'), escape: false);
+    }
+
+    public function test_a_connected_athlete_gets_the_dashboard(): void
+    {
+        $response = $this->actingAs(User::factory()->stravaConnected()->create())->get('/');
+
+        $response->assertOk();
+        $response->assertViewIs('dashboard');
+    }
+
+    public function test_the_connect_screen_states_the_scope_and_the_read_only_promise(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertSee('activity:read_all');
+        $response->assertSee('nothing is ever posted on your behalf', escape: false);
+    }
+
+    public function test_every_screen_is_marked_noindex(): void
+    {
+        foreach ($this->bothScreens() as $label => $response) {
+            $this->assertStringContainsString(
+                '<meta name="robots" content="noindex, nofollow">',
+                $response->getContent() ?: '',
+                "The {$label} screen must not be indexable.",
+            );
+        }
+    }
+
+    public function test_every_screen_carries_a_skip_link_and_exactly_one_heading(): void
+    {
+        foreach ($this->bothScreens() as $label => $response) {
+            $html = $response->getContent() ?: '';
+
+            $this->assertStringContainsString('href="#main"', $html, "The {$label} screen needs a skip link.");
+            $this->assertStringContainsString('id="main"', $html, "The {$label} screen needs a main landmark.");
+            $this->assertSame(
+                1,
+                substr_count($html, '<h1'),
+                "The {$label} screen must have exactly one <h1>.",
+            );
+        }
+    }
+
+    public function test_the_rejection_screen_names_the_athlete_it_turned_away(): void
+    {
+        $response = $this->view('strava.rejected', ['reason' => 'allowlist', 'athleteId' => '9999999']);
+
+        $response->assertSee('This instance is private');
+        $response->assertSee('9999999', escape: false);
+    }
+
+    public function test_the_rejection_screen_explains_a_missing_scope(): void
+    {
+        $response = $this->view('strava.rejected', [
+            'reason' => 'scope',
+            'requiredScope' => 'activity:read_all',
+        ]);
+
+        $response->assertSee('Read access is required');
+        $response->assertSee('activity:read_all');
+    }
+
+    /**
+     * @return array<string, TestResponse>
+     */
+    private function bothScreens(): array
+    {
+        return [
+            'connect' => $this->get('/'),
+            'dashboard' => $this->actingAs(User::factory()->stravaConnected()->create())->get('/'),
+        ];
+    }
+}
