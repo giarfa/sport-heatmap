@@ -327,7 +327,7 @@ tasks:
     id: TASK-03
     title: 'Cover the StravaOAuth service against a faked Strava'
     type: Test
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-02
     body: |
@@ -363,14 +363,20 @@ tasks:
       7. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`
 
       ## Completion Criteria
-      - [ ] All cases above pass
-      - [ ] `Http::preventStrayRequests()` is active, so an unfaked endpoint fails the test rather than hitting Strava
-      - [ ] Pint and Larastan level 5 clean
+      - [x] All cases above pass
+      - [x] `Http::preventStrayRequests()` is active, so an unfaked endpoint fails the test rather than hitting Strava
+      - [x] Pint and Larastan level 5 clean
 
       ## Git Deliverables
       - Commit: `test(US-002): TASK-03 cover StravaOAuth authorize, exchange and refresh`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 75da1445f6857d11c56324e430ea50aaaa40f5be
+      short_sha: 75da144
+      subject: 'test(US-002): TASK-03 cover StravaOAuth authorize, exchange and refresh'
+      committed_at: '2026-09-05T19:28:21+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/75da1445f6857d11c56324e430ea50aaaa40f5be'
   -
     id: TASK-04
     title: 'Add the athlete allowlist gate and the ConnectStravaAthlete action'
@@ -880,4 +886,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:27:44+00:00'
+updated_at: '2026-09-05T17:28:22+00:00'
