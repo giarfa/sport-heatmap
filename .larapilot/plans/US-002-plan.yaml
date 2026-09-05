@@ -635,7 +635,7 @@ tasks:
     id: TASK-08
     title: 'Add transparent token refresh and the reconnect state'
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-06
     body: |
@@ -677,23 +677,29 @@ tasks:
       5. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] A valid, comfortably unexpired token results in **zero** HTTP requests
-      - [ ] An expired token, and a token inside the safety margin, both trigger exactly one refresh
-      - [ ] The rotated refresh token is persisted — the next refresh still works
-      - [ ] A dead refresh token renders the connect screen in reconnect state, `200`, athlete logged out — not a 500
-      - [ ] `UserFactory::stravaTokenExpiringSoon()` exists and `php artisan migrate:fresh --seed` still succeeds
-      - [ ] No token value appears in any log line
-      - [ ] Pint and Larastan level 5 clean
+      - [x] A valid, comfortably unexpired token results in **zero** HTTP requests
+      - [x] An expired token, and a token inside the safety margin, both trigger exactly one refresh
+      - [x] The rotated refresh token is persisted — the next refresh still works
+      - [x] A dead refresh token renders the connect screen in reconnect state, `200`, athlete logged out — not a 500
+      - [x] `UserFactory::stravaTokenExpiringSoon()` exists and `php artisan migrate:fresh --seed` still succeeds
+      - [x] No token value appears in any log line
+      - [x] Pint and Larastan level 5 clean
 
       ## Test Data
-      - [ ] `database/factories/UserFactory.php` updated with the `stravaTokenExpiringSoon()` state, in this same task
-      - [ ] Seeders unchanged — `TrainingBlockSeeder` already produces a Strava-connected athlete; re-verify `migrate:fresh --seed`
-      - [ ] No migration or schema change
+      - [x] `database/factories/UserFactory.php` updated with the `stravaTokenExpiringSoon()` state, in this same task
+      - [x] Seeders unchanged — `TrainingBlockSeeder` already produces a Strava-connected athlete; re-verify `migrate:fresh --seed`
+      - [x] No migration or schema change
 
       ## Git Deliverables
       - Commit: `feat(US-002): TASK-08 refresh Strava tokens transparently and add the reconnect state`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: d4c4844a7bb9a75438811c9220e133fa1104f75b
+      short_sha: d4c4844
+      subject: 'feat(US-002): TASK-08 refresh Strava tokens transparently and add the reconnect state'
+      committed_at: '2026-09-05T19:33:25+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d4c4844a7bb9a75438811c9220e133fa1104f75b'
   -
     id: TASK-09
     title: 'Cover token refresh and the reconnect failure mode'
@@ -910,4 +916,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:32:28+00:00'
+updated_at: '2026-09-05T17:33:25+00:00'
