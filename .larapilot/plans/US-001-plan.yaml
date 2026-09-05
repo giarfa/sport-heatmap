@@ -421,26 +421,32 @@ tasks:
       8. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] `php artisan migrate:fresh --seed` succeeds from a clean database
-      - [ ] Exactly one demo athlete, with a Strava athlete id
-      - [ ] 16 consecutive ISO weeks of activities ending with the current in-progress week
-      - [ ] Illness week, peak week and partial current week all present and distinguishable
-      - [ ] No activity dated after today; no orphan foreign keys
-      - [ ] At least one successful recent `SyncRun`
+      - [x] `php artisan migrate:fresh --seed` succeeds from a clean database
+      - [x] Exactly one demo athlete, with a Strava athlete id
+      - [x] 16 consecutive ISO weeks of activities ending with the current in-progress week
+      - [x] Illness week, peak week and partial current week all present and distinguishable
+      - [x] No activity dated after today; no orphan foreign keys
+      - [x] At least one successful recent `SyncRun`
 
       ## Test Data
-      - [ ] `database/seeders/TrainingBlockSeeder.php` composes `User`, `Activity` and `SyncRun` factories — no attribute definitions duplicated from the factories
-      - [ ] `DatabaseSeeder` calls it and no longer creates the stray default `Test User`
-      - [ ] Volumes exercise the UI: ~60–90 activities across the window, not an empty table and not random orphans
+      - [x] `database/seeders/TrainingBlockSeeder.php` composes `User`, `Activity` and `SyncRun` factories — no attribute definitions duplicated from the factories
+      - [x] `DatabaseSeeder` calls it and no longer creates the stray default `Test User`
+      - [x] Volumes exercise the UI: ~60–90 activities across the window, not an empty table and not random orphans
 
       ## Git Deliverables
       - Commit: `feat(US-001): TASK-06 seed a realistic 16-week training block`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-05
+    commit:
+      sha: 97d4662bb5fa6f0992ac853261940d7ac10f35eb
+      short_sha: 97d4662
+      subject: 'feat(US-001): TASK-06 seed a realistic 16-week training block'
+      committed_at: '2026-09-05T18:38:16+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/97d4662bb5fa6f0992ac853261940d7ac10f35eb'
   -
     id: TASK-07
     title: 'Test seeder shape and the no-public-signup guard'
@@ -605,4 +611,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:36:23+00:00'
+updated_at: '2026-09-05T16:38:16+00:00'
