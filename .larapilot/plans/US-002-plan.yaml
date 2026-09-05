@@ -485,7 +485,7 @@ tasks:
     id: TASK-06
     title: 'Wire the OAuth routes, controllers, guards and rate limiter'
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-03
       - TASK-05
@@ -552,13 +552,13 @@ tasks:
       8. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] The five rejection gates run before any write, in the order above
-      - [ ] Both OAuth routes carry `throttle:strava-oauth`
-      - [ ] Successful login regenerates the session id
-      - [ ] `GET /` returns 200 with the connect view for a guest and the dashboard view for the athlete
-      - [ ] `welcome.blade.php` is deleted and no route references it
-      - [ ] `NoPublicSignupTest` still passes — no registration route was introduced
-      - [ ] Pint and Larastan level 5 clean
+      - [x] The five rejection gates run before any write, in the order above
+      - [x] Both OAuth routes carry `throttle:strava-oauth`
+      - [x] Successful login regenerates the session id
+      - [x] `GET /` returns 200 with the connect view for a guest and the dashboard view for the athlete
+      - [x] `welcome.blade.php` is deleted and no route references it
+      - [x] `NoPublicSignupTest` still passes — no registration route was introduced
+      - [x] Pint and Larastan level 5 clean
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -567,6 +567,12 @@ tasks:
       - Commit: `feat(US-002): TASK-06 add Strava OAuth routes, controllers, guards and rate limiting`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 60b0c614d680e729770cae9e425569425b05f239
+      short_sha: 60b0c61
+      subject: 'feat(US-002): TASK-06 add Strava OAuth routes, controllers, guards and rate limiting'
+      committed_at: '2026-09-05T19:31:00+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/60b0c614d680e729770cae9e425569425b05f239'
   -
     id: TASK-07
     title: 'Cover the end-to-end OAuth flow, rejection and rate limiting'
@@ -898,4 +904,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:29:51+00:00'
+updated_at: '2026-09-05T17:31:01+00:00'
