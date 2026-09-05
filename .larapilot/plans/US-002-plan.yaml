@@ -704,7 +704,7 @@ tasks:
     id: TASK-09
     title: 'Cover token refresh and the reconnect failure mode'
     type: Test
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-08
     body: |
@@ -737,15 +737,21 @@ tasks:
       4. No browser, Dusk, Playwright or viewport suites — `settings.testing` is `NORMAL`
 
       ## Completion Criteria
-      - [ ] All cases above pass
-      - [ ] The reconnect case asserts a `200` and the absence of a server error, so a regression to a 500 fails the build
-      - [ ] The valid-token case asserts `Http::assertNothingSent()`
-      - [ ] Pint and Larastan level 5 clean
+      - [x] All cases above pass
+      - [x] The reconnect case asserts a `200` and the absence of a server error, so a regression to a 500 fails the build
+      - [x] The valid-token case asserts `Http::assertNothingSent()`
+      - [x] Pint and Larastan level 5 clean
 
       ## Git Deliverables
       - Commit: `test(US-002): TASK-09 cover token refresh and the reconnect failure mode`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 0fa043497119183212ace396baacbb66162e43b4
+      short_sha: 0fa0434
+      subject: 'test(US-002): TASK-09 cover token refresh and the reconnect failure mode'
+      committed_at: '2026-09-05T19:34:04+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0fa043497119183212ace396baacbb66162e43b4'
   -
     id: TASK-10
     title: 'Build the mobile-first layout shell and style the connect and rejection screens'
@@ -916,4 +922,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:33:25+00:00'
+updated_at: '2026-09-05T17:34:04+00:00'

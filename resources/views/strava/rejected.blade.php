@@ -1,37 +1,42 @@
-@php($reason = $reason ?? 'allowlist')
-@php($athleteId = $athleteId ?? null)
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex, nofollow">
-    <title>Not connected — Sport Heatmap</title>
-</head>
-<body>
-    <a href="#main">Skip to content</a>
-    <main id="main">
-        @if ($reason === 'scope')
-            <h1>Read access is required</h1>
-            <p>
-                Sport Heatmap needs the <code>{{ $requiredScope ?? 'activity:read_all' }}</code> permission to read
-                your activities. It was not granted, so no session was created and nothing was stored.
+@extends('layouts.app')
+
+@section('title', 'Not connected — Sport Heatmap')
+
+@section('content')
+    <div class="card mx-auto max-w-sm p-6 text-center">
+        <div class="mx-auto grid h-10 w-10 place-items-center rounded-full"
+             style="background: var(--warn-bg); color: var(--warn-ink);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M15 9l-6 6M9 9l6 6"/>
+            </svg>
+        </div>
+
+        @if (($reason ?? 'allowlist') === 'scope')
+            <h1 class="mt-3 text-base font-semibold">Read access is required</h1>
+            <p class="mt-1.5 text-sm" style="color: var(--ink-muted);">
+                Sport Heatmap needs the
+                <code style="color: var(--ink);">{{ $requiredScope ?? 'activity:read_all' }}</code>
+                permission to read your activities. It was not granted, so no session was created
+                and nothing was stored.
             </p>
-        @elseif ($reason === 'exchange')
-            <h1>Strava could not be reached</h1>
-            <p>
-                Strava did not complete the authorization. Nothing was created and nothing was stored —
-                try again in a moment.
+        @elseif (($reason ?? 'allowlist') === 'exchange')
+            <h1 class="mt-3 text-base font-semibold">Strava could not be reached</h1>
+            <p class="mt-1.5 text-sm" style="color: var(--ink-muted);">
+                Strava did not complete the authorization. Nothing was created and nothing was
+                stored — try again in a moment.
             </p>
         @else
-            <h1>This instance is private</h1>
-            <p>
-                Athlete <span>#{{ $athleteId }}</span> is not on this instance's allowlist,
-                so no session was created and nothing was stored.
+            <h1 class="mt-3 text-base font-semibold">This instance is private</h1>
+            <p class="mt-1.5 text-sm" style="color: var(--ink-muted);">
+                Athlete <span class="font-medium" style="color: var(--ink);">#{{ $athleteId ?? 'unknown' }}</span>
+                is not on this instance's allowlist, so no session was created and nothing was stored.
             </p>
         @endif
 
-        <a href="{{ route('dashboard') }}">Back</a>
-    </main>
-</body>
-</html>
+        <a href="{{ route('dashboard') }}"
+           class="mt-4 inline-flex h-11 items-center justify-center rounded-lg border px-4 text-sm font-medium"
+           style="border-color: var(--hairline); color: var(--ink);">Back</a>
+    </div>
+@endsection
