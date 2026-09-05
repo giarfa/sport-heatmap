@@ -1,0 +1,865 @@
+code: US-002
+plan_body: |
+  ## Technical Solution
+
+  US-002 makes Strava the only identity provider: no password login, no registration, no second athlete.
+  The OAuth callback is the single place a session can be created, so it is also the single place the
+  access decision is made.
+
+  **Flow.** `GET /` renders the connect screen for a guest and the dashboard for the signed-in athlete —
+  never an error, never a redirect loop. "Connect with Strava" hits `GET /auth/strava/redirect`, which
+  mints a CSRF `state`, stores it in the session, and sends the browser to Strava's `/oauth/authorize`
+  with `response_type=code` and `scope=activity:read_all`. Strava returns to `GET /auth/strava/callback`,
+  which runs a fixed gate order:
+
+  1. `error=access_denied` in the query (the athlete pressed Cancel on Strava) → back to the connect
+     screen with a neutral message. Nothing persisted.
+  2. `state` missing, or not `hash_equals` the session value → 403. Nothing persisted.
+  3. Granted `scope` does not contain `activity:read_all` (the athlete unticked the permission box) →
+     403 rejection screen naming the missing scope. Nothing persisted.
+  4. Exchange the authorization code for tokens. Strava's token response carries the `athlete` object
+     inline, so the athlete id is known **before** anything is written.
+  5. **Allowlist check** against `config('strava.allowed_athlete_ids')`. Not on it → 403 rejection screen
+     naming the athlete id. Nothing persisted: no user row, no tokens, no session.
+  6. Only now: persist user and tokens inside a transaction, regenerate the session, log in, redirect to
+     the dashboard.
+
+  Steps 1–5 touch no database and no auth guard, which is what makes the "nothing persisted" acceptance
+  criterion assertable by counting rows after the attempt rather than by inspecting intent.
+
+  **Components** — all new in this spec:
+
+  | Class | Responsibility |
+  | --- | --- |
+  | `App\Data\StravaTokens` | readonly DTO: access token, refresh token, expiry, athlete id, athlete name, granted scopes |
+  | `App\Services\Strava\StravaOAuth` | authorize URL, code exchange, refresh — the only class that talks to Strava's OAuth endpoints |
+  | `App\Support\Strava\AthleteAllowlist` | `allows(string $athleteId): bool` over `config('strava.allowed_athlete_ids')` |
+  | `App\Actions\Strava\ConnectStravaAthlete` | transaction: find-or-create the user by athlete id, assign tokens explicitly, return the user |
+  | `App\Actions\Strava\EnsureFreshAccessToken` | returns a usable access token, refreshing and persisting when expired or inside the safety margin |
+  | `App\Http\Middleware\EnsureFreshStravaToken` | applies the above to authenticated requests; no-op for guests |
+  | `App\Exceptions\Strava\StravaOAuthException` | the token endpoint returned non-2xx or a malformed body |
+  | `App\Exceptions\Strava\StravaReconnectRequiredException` | the refresh token is dead — renderable, becomes the reconnect screen |
+
+  **Why hand-rolled, not Socialite** — this resolves the open decision the spec handed to planning.
+  `laravel/socialite` v5.31 itself allows Guzzle `^8.0`, but it hard-requires `league/oauth1-client ^1.11`,
+  which caps at Guzzle `^7`. `composer require laravel/socialite socialiteproviders/strava -W` therefore
+  resolves by **downgrading `guzzlehttp/guzzle` 8.1.0 → 7.15.5** (plus `psr7` and `promises`) and
+  installing eight packages, including OAuth **1** plumbing this product never calls. Strava is
+  authorization-code OAuth2 only: one redirect, one token POST, one refresh POST. `StravaOAuth` does that
+  on Laravel's `Http` facade in well under a hundred lines, the app stays on Guzzle 8 for US-003's
+  `StravaClient`, and the `state` guard is six lines of `Str::random` plus `hash_equals`.
+  **This spec adds no new dependencies.**
+
+  **Token refresh.** `EnsureFreshAccessToken` is the seam US-003's `StravaClient` will call before every
+  API request. It refreshes when `strava_token_expires_at` is past **or** within
+  `config('strava.token_refresh_margin_seconds')` (default 300), then persists the rotated pair — Strava
+  rotates the refresh token on every refresh, so storing only the access token would break the *next*
+  refresh — and returns the access token. A `400`/`401` from the refresh endpoint means the athlete
+  revoked access on Strava's side: it raises `StravaReconnectRequiredException`, which renders as the
+  connect screen in a reconnect state rather than a 500. Wiring it as middleware on the dashboard route
+  gives US-002 an HTTP surface to assert that against, and it costs zero requests while the token is valid.
+
+  **Security** (Lars):
+
+  - `state` CSRF guard on every callback; `session()->regenerate()` on login to close session fixation.
+  - Both OAuth routes behind a named limiter (`throttle:strava-oauth`, 10/min per IP). The AC requires it
+    on the callback; the redirect route is included because it is the cheaper one to hammer.
+  - Scope pinned to a fixed `config('strava.scope')` constant, not an env value, so no write scope can be
+    requested by editing an environment file.
+  - Tokens land on the `encrypted` casts from US-001, and the Strava columns stay out of `$fillable`, so
+    the callback assigns them explicitly. Client id and secret are read only through `config('strava.*')`
+    and never logged; token endpoint failures log the HTTP status, never the response body.
+  - Strava returns no email address under `activity:read_all`, so the required `users.email` column is
+    filled with a synthetic `athlete-{id}@strava.invalid` — unique per athlete, documented in the README,
+    never mailed. `.invalid` is the RFC 2606 reserved TLD, so it can never resolve.
+
+  ## Decisions resolved in planning
+
+  | Question | Decision | Owner |
+  | --- | --- | --- |
+  | Socialite vs hand-rolled OAuth (the spec's open decision) | **Hand-rolled** on the `Http` facade, zero new dependencies — Socialite forces a Guzzle 8 → 7 downgrade via `league/oauth1-client` | Andrew, Lars, user |
+  | Branch base — `develop` holds only the skeleton commit while US-001 (DONE) sits unmerged, 18 commits ahead | **TASK-00 merges US-001 into `develop`** (`--no-ff`, local only), then branches US-002 from `develop` | Sarah, user |
+  | Persisted light/dark toggle | **Deferred to US-004.** US-002 ships the layout shell honouring `prefers-color-scheme`; the toggle button and its persistence belong with the screen it lives on | Elise, Joe |
+  | Logout / disconnect | **Out of scope.** FR-012 (disconnect and purge) is a Should in Future Phases; US-002 adds no logout route | Mark |
+  | "Powered by Strava" attribution | **US-004** owns FR-008. US-002's only Strava mark is the orange connect button, which the brand guidelines expect on exactly that control | Elise |
+
+  ## Git & Branching
+
+  - Mode: `GITFLOW` — branch and atomic commits, **no automatic push**, PR description prepared locally.
+  - Pre-step (TASK-00): merge `feature/US-001-foundation-schema-setup` into `develop` with `--no-ff`.
+    `develop` currently holds only the skeleton commit and US-002 depends on the US-001 schema; without
+    this, every later feature branch inherits a stale base and stacks 18 unrelated commits into its diff.
+  - Branch: `feature/US-002-strava-oauth-connect` from `develop`.
+  - Per task: one Conventional Commit, `type(US-002): TASK-NN summary`. Never batch tasks into one commit.
+  - Push and remote PR: **skip** unless the user asks in-session.
+  - Merge to `develop` only after `larapilot-review`.
+
+  ## Test Data Strategy
+
+  No new Eloquent models and no schema change: US-001 already ships the `strava_*` columns, the
+  `encrypted` casts, and `UserFactory::stravaConnected()` / `stravaTokenExpired()`.
+
+  - **One factory state to add:** `UserFactory::stravaTokenExpiringSoon()` — expiry inside the refresh
+    safety margin but not yet past, so the margin branch has a named fixture instead of a magic
+    `now()->addSeconds(60)` inline in a test.
+  - **Seeders: unchanged.** `DatabaseSeeder` deliberately creates no generic user, and
+    `TrainingBlockSeeder` already produces a Strava-connected athlete with a 16-week block — that is the
+    fixture the dashboard is developed against. Verify `php artisan migrate:fresh --seed` still succeeds
+    after TASK-00's merge.
+  - **Never** commit a real Strava token, athlete id, client id, or client secret to a factory, seeder,
+    test, or `.env.example`. Tests use `Http::fake()` and `Config::set()`.
+
+  ## Test Strategy
+
+  - Bar: `NORMAL` — PHPUnit feature and unit tests. **No** Playwright, Dusk, Pest browser, or viewport
+    matrix; responsive behaviour gets a manual smoke handoff instead.
+  - Every Strava HTTP call is faked with `Http::fake()`, plus `Http::preventStrayRequests()` in the OAuth
+    tests so an unfaked endpoint fails loudly rather than reaching the network.
+  - Test tasks interleave with implementation (TASK-03 after TASK-02, TASK-05 after TASK-04, and so on) —
+    never stacked at the end.
+
+  Anne's required cases, mapped to the acceptance criteria:
+
+  | Acceptance criterion | Test |
+  | --- | --- |
+  | Only `activity:read_all` is ever requested | Authorize URL query contains `scope=activity:read_all` and matches no `write` substring |
+  | Allowlist checked before anything is created | Non-allowlisted callback → `assertGuest()`, `users` count unchanged, token columns empty |
+  | Rejection screen, nothing persisted | 403 + rejection view + the assertions above |
+  | Tokens through `encrypted` casts | The raw `users` row read via the query builder is not the plaintext token; the model attribute is |
+  | Transparent refresh | Expired token and inside-margin token each trigger exactly one refresh request and persist the rotated pair; a valid token triggers none |
+  | Refresh failure → reconnect, not 500 | Faked `401` on the refresh endpoint → reconnect screen, `assertGuest()`, no unhandled exception |
+  | Callback is rate limited | Exceeding the limiter returns `429` |
+  | Signed-out dashboard renders the connect screen | `GET /` as a guest → `200` + connect view, not a redirect and not a 500 |
+
+  Also covered beyond the ACs, because the callback is the only route that mints a session: `state`
+  mismatch and missing `state` → 403; `error=access_denied` → connect screen; granted scope missing
+  `activity:read_all` → 403; the session id changes on successful login.
+
+  **Manual test handoff** (`NORMAL` bar, no browser automation): connect and rejection screens at 375 px,
+  768 px and 1280 px against `states.html` states 1 and 2; keyboard-only tab to the connect button and
+  confirm the focus ring; both screens under `prefers-color-scheme: dark`.
+
+  ## Scope seams — what US-002 deliberately does not build
+
+  - The heatmap grid, the intensity ramp tokens, the sync status chip, the "Powered by Strava" footer and
+    the theme toggle — **US-004, US-005, US-006**. US-002 ships `layouts/app.blade.php` and the base
+    surface/ink/accent tokens as the shell those specs fill in, plus a placeholder dashboard body that
+    US-004 replaces.
+  - `StravaClient`, pagination, retry/backoff and the sync command — **US-003**, which consumes
+    `EnsureFreshAccessToken` from this spec.
+  - Disconnect and purge (FR-012), manual re-sync (FR-010) — Future Phases.
+tasks:
+  -
+    id: TASK-00
+    title: 'Merge US-001 into develop and bootstrap the US-002 feature branch'
+    type: Impl
+    status: TODO
+    dependencies: {}
+    body: |
+      ## Description
+      Restore the Gitflow invariant before any US-002 code exists. `develop` currently holds only
+      `d4cc541 chore: initial Laravel 13 skeleton with Larapilot artifacts`, while US-001 — approved and DONE —
+      sits unmerged on `feature/US-001-foundation-schema-setup`, 18 commits ahead. US-002 depends on that
+      schema, so merge US-001 into `develop` first, then branch from `develop`. Local only: `git_mode` is
+      `GITFLOW`, which never pushes.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `git checkout develop`
+      2. `git merge --no-ff feature/US-001-foundation-schema-setup -m "Merge US-001: foundation schema setup into develop"` — fast-forward is possible here, but `--no-ff` keeps the spec boundary visible in history
+      3. `php artisan migrate:fresh --seed` and `php artisan test` on `develop` — confirm the merged base is green before branching off it
+      4. `git checkout -b feature/US-002-strava-oauth-connect`
+      5. Draft the internal PR title and body toward `develop` — title `US-002: Connect Strava and sign in`; body links `.larapilot/plans/US-002-plan.yaml` and lists the planned tasks. Keep it local
+      6. Anchor the branch: `git commit --allow-empty -m "chore(US-002): TASK-00 bootstrap feature branch"`
+
+      ## Completion Criteria
+      - [ ] `develop` contains the US-001 schema (`git log develop --oneline | head` shows the merge commit)
+      - [ ] `php artisan test` passes on `develop` after the merge
+      - [ ] Branch `feature/US-002-strava-oauth-connect` exists locally, branched from the merged `develop`
+      - [ ] PR title/body drafted toward `develop` (remote PR not opened)
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Merge commit on `develop`: `Merge US-001: foundation schema setup into develop`
+      - Commit: `chore(US-002): TASK-00 bootstrap feature branch` (empty commit)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally — open the remote PR only if the user requests a push
+  -
+    id: TASK-01
+    title: 'Extend the Strava config surface with scope, endpoints and refresh margin'
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-00
+    body: |
+      ## Description
+      US-001 shipped `config/strava.php` with credentials, the athlete allowlist and the sync schedule. Add
+      the four keys the OAuth flow needs. `scope` is a **fixed literal, not an env value** — pinning it in
+      code is what makes "no write scope is ever requested" a property of the repository rather than of
+      whatever `.env` happens to be deployed (Lars).
+
+      ## Files Involved
+      - config/strava.php
+      - .env.example
+      - tests/Feature/Config/StravaConfigTest.php
+
+      ## Steps
+      1. Add to `config/strava.php`, following the existing commented-section style:
+         - `'scope' => 'activity:read_all'` — literal, with a comment stating that read-only is a product
+           invariant and that no `write`/`activity:write` scope is ever requested (FR-001)
+         - `'authorize_url' => 'https://www.strava.com/oauth/authorize'`
+         - `'token_url' => 'https://www.strava.com/oauth/token'`
+         - `'token_refresh_margin_seconds' => (int) env('STRAVA_TOKEN_REFRESH_MARGIN', 300)` — how long
+           before expiry a token is treated as already expired
+      2. Extend the `@var array{...}` shape docblock on `$config` with the four new keys — Larastan level 5
+         reads it
+      3. Add `STRAVA_TOKEN_REFRESH_MARGIN=300` to `.env.example` under the existing Strava block, with a
+         one-line comment. Do **not** add real credential values
+      4. Write `tests/Feature/Config/StravaConfigTest.php`: `scope` is exactly `activity:read_all`; `scope`
+         contains no `write`; both endpoint URLs are `https://` on `strava.com`; the refresh margin defaults
+         to 300 and casts a string env value to `int`
+      5. `php artisan test --filter=StravaConfigTest`
+      6. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] `config('strava.scope')` returns `activity:read_all` and is not env-driven
+      - [ ] `config('strava.authorize_url')` / `config('strava.token_url')` resolve to the official endpoints
+      - [ ] `config('strava.token_refresh_margin_seconds')` is an int, default 300
+      - [ ] `.env.example` documents `STRAVA_TOKEN_REFRESH_MARGIN` and still carries no real secrets
+      - [ ] `StravaConfigTest` passes; Pint and Larastan level 5 clean
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-002): TASK-01 add OAuth scope, endpoints and refresh margin to Strava config`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-02
+    title: 'Add the StravaTokens DTO and the StravaOAuth service'
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-01
+    body: |
+      ## Description
+      The single class that speaks to Strava's OAuth endpoints, plus the readonly DTO that carries a token
+      set across the boundary so no array shape from Strava leaks into controllers or Eloquent (John).
+      Hand-rolled on Laravel's `Http` facade — no new Composer dependencies (see the plan's
+      "Why hand-rolled, not Socialite").
+
+      ## Files Involved
+      - app/Data/StravaTokens.php
+      - app/Services/Strava/StravaOAuth.php
+      - app/Exceptions/Strava/StravaOAuthException.php
+
+      ## Steps
+      1. `php artisan make:class Data/StravaTokens` — a `final readonly class` with promoted constructor
+         properties: `string $accessToken`, `string $refreshToken`, `CarbonImmutable $expiresAt`,
+         `?string $athleteId`, `?string $athleteName`, `array $scopes` (PHPDoc `array<int, string>`).
+         Two named constructors:
+         - `fromExchangeResponse(array $payload, string $grantedScope): self` — Strava's exchange response
+           embeds the `athlete` object, so `athleteId` is `(string) $payload['athlete']['id']` and
+           `athleteName` is firstname + lastname trimmed; `scopes` is `explode(',', $grantedScope)`
+         - `fromRefreshResponse(array $payload, self $previous): self` — the refresh response carries **no**
+           athlete object, so carry the athlete id, name and scopes forward from `$previous`
+         - `expiresAt` comes from the `expires_at` **unix timestamp** Strava returns, not `expires_in`
+         - Add `hasScope(string $scope): bool`
+      2. `php artisan make:class Exceptions/Strava/StravaOAuthException` extending `RuntimeException`, with
+         static factories `tokenEndpointFailed(int $status)` and `malformedTokenResponse(string $missingKey)`.
+         The messages carry the **status and the missing key only** — never the response body, which holds
+         live tokens
+      3. `php artisan make:class Services/Strava/StravaOAuth` with three methods, all reading
+         `config('strava.*')` and never `env()`:
+         - `authorizationUrl(string $state): string` — `config('strava.authorize_url')` plus
+           `http_build_query` of `client_id`, `redirect_uri`, `response_type=code`, `approval_prompt=auto`,
+           `scope` (from config), `state`
+         - `exchangeAuthorizationCode(string $code, string $grantedScope): StravaTokens` —
+           `Http::asForm()->post(config('strava.token_url'), [...'grant_type' => 'authorization_code'])`
+         - `refreshAccessToken(StravaTokens $current): StravaTokens` — same endpoint,
+           `grant_type=refresh_token`; **returns the rotated refresh token**, because Strava issues a new one
+           on every refresh and keeping the old one breaks the next call
+      4. In both POST methods: on `$response->failed()` throw `StravaOAuthException::tokenEndpointFailed()`;
+         assert `access_token`, `refresh_token` and `expires_at` are present or throw
+         `malformedTokenResponse()`. Do not call `->throw()` — the wrapped exception is what the callback and
+         the refresh middleware branch on
+      5. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] `StravaTokens` is `final readonly`, fully typed, with an `array<int, string>` PHPDoc on `$scopes`
+      - [ ] `StravaOAuth::authorizationUrl()` embeds the config scope and the caller's `state`
+      - [ ] Both token calls return a `StravaTokens` or throw `StravaOAuthException` — never a raw array, never a 500 from an unhandled Guzzle exception
+      - [ ] The refresh path returns Strava's rotated refresh token, not the one passed in
+      - [ ] No client secret, access token or response body reaches a log line or an exception message
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-002): TASK-02 add StravaTokens DTO and StravaOAuth service`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-03
+    title: 'Cover the StravaOAuth service against a faked Strava'
+    type: Test
+    status: TODO
+    dependencies:
+      - TASK-02
+    body: |
+      ## Description
+      Anne: the read-only scope guarantee and the refresh-token rotation are the two things in this service
+      that fail silently if they regress. Both get an assertion here, against `Http::fake()` — no test in
+      this spec ever reaches the network.
+
+      ## Files Involved
+      - tests/Feature/Strava/StravaOAuthTest.php
+
+      ## Steps
+      1. `php artisan make:test --phpunit Strava/StravaOAuthTest`
+      2. `setUp`: `Config::set('strava.client_id' / 'client_secret' / 'redirect_uri')` to fixtures;
+         `Http::preventStrayRequests()`
+      3. Authorize URL cases:
+         - contains `scope=activity%3Aread_all`, `response_type=code`, the configured `redirect_uri`, and the
+           `state` passed in
+         - `assertStringNotContainsString('write', $url)` — the read-only invariant, asserted rather than assumed
+      4. Exchange cases:
+         - a faked 200 with `access_token`, `refresh_token`, `expires_at` and an `athlete` object maps onto
+           `StravaTokens`, including athlete id as a **string** and `expiresAt` from the unix `expires_at`
+         - the request body sent to `/oauth/token` carries `grant_type=authorization_code` and the code
+         - a faked 400 throws `StravaOAuthException`, and the exception message contains neither the client
+           secret nor any token value
+         - a faked 200 missing `refresh_token` throws `StravaOAuthException`
+      5. Refresh cases:
+         - a faked 200 returns the **rotated** refresh token and the new expiry, and carries the athlete id
+           forward from the previous DTO (the refresh response has no athlete object)
+         - the request body carries `grant_type=refresh_token`
+         - a faked 401 throws `StravaOAuthException`
+      6. `php artisan test --filter=StravaOAuthTest`
+      7. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`
+
+      ## Completion Criteria
+      - [ ] All cases above pass
+      - [ ] `Http::preventStrayRequests()` is active, so an unfaked endpoint fails the test rather than hitting Strava
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Git Deliverables
+      - Commit: `test(US-002): TASK-03 cover StravaOAuth authorize, exchange and refresh`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-04
+    title: 'Add the athlete allowlist gate and the ConnectStravaAthlete action'
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-02
+    body: |
+      ## Description
+      The access decision and the only write path in the flow, split from the controller so both are unit
+      testable and so the "allowlist first, persistence second" ordering is structural rather than a comment.
+
+      ## Files Involved
+      - app/Support/Strava/AthleteAllowlist.php
+      - app/Actions/Strava/ConnectStravaAthlete.php
+
+      ## Steps
+      1. `php artisan make:class Support/Strava/AthleteAllowlist` with `allows(string $athleteId): bool` —
+         `in_array($athleteId, config('strava.allowed_athlete_ids'), strict: true)`. Strict comparison
+         matters: the config filter in US-001 keeps only all-digit **strings**, and a loose compare would let
+         `0` match. An empty allowlist returns `false` for everything — the gate fails closed
+      2. `php artisan make:class Actions/Strava/ConnectStravaAthlete` with
+         `__invoke(StravaTokens $tokens): User`, wrapped in `DB::transaction`:
+         - look the user up by `strava_athlete_id`; reuse it on reconnect, instantiate a new `User` on first
+           connect — never a second row for the same athlete
+         - assign `strava_athlete_id`, `strava_access_token`, `strava_refresh_token` and
+           `strava_token_expires_at` **explicitly**: US-001 keeps these out of `$fillable` on purpose, so no
+           `fill()` / `create()` / `updateOrCreate()` shortcut here
+         - `name` from `$tokens->athleteName`, falling back to `'Athlete '.$tokens->athleteId` when Strava
+           returns a blank name
+         - `email`: only when absent, `sprintf('athlete-%s@strava.invalid', $tokens->athleteId)`. Strava does
+           not expose an email under `activity:read_all` and the column is `NOT NULL UNIQUE`; `.invalid` is
+           the RFC 2606 reserved TLD, so the address can never resolve. Add a comment saying exactly this
+         - set `email_verified_at` on creation — there is no verification flow to run
+      3. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] `AthleteAllowlist::allows()` is strict and fails closed on an empty allowlist
+      - [ ] `ConnectStravaAthlete` runs inside a transaction and assigns Strava columns explicitly, never via mass assignment
+      - [ ] Reconnecting the same athlete updates the existing row instead of creating a second user
+      - [ ] Neither class performs an allowlist check *after* a write — the caller checks first (TASK-06)
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Test Data
+      - [ ] No factory or seeder change needed — `UserFactory::stravaConnected()` from US-001 already covers the reconnect fixture
+      - [ ] No migration, model attribute or relationship change in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-002): TASK-04 add athlete allowlist gate and ConnectStravaAthlete action`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-05
+    title: 'Cover the allowlist gate and athlete persistence'
+    type: Test
+    status: TODO
+    dependencies:
+      - TASK-04
+    body: |
+      ## Description
+      Anne: assert the two properties the acceptance criteria rest on — the gate fails closed, and tokens are
+      ciphertext at rest.
+
+      ## Files Involved
+      - tests/Unit/Support/Strava/AthleteAllowlistTest.php
+      - tests/Feature/Strava/ConnectStravaAthleteTest.php
+
+      ## Steps
+      1. `php artisan make:test --phpunit --unit Support/Strava/AthleteAllowlistTest`:
+         - a listed athlete id is allowed
+         - an unlisted athlete id is rejected
+         - an **empty** allowlist rejects every id, including `'0'` and `''` — fail closed
+         - a numeric-prefix near-miss (`'123'` against a list holding `'1234'`) is rejected
+      2. `php artisan make:test --phpunit Strava/ConnectStravaAthleteTest`:
+         - first connect creates exactly one user carrying the athlete id, the tokens and the expiry
+         - reconnecting the same athlete id updates that row and leaves `User::count()` at 1
+         - **encryption at rest**: read the raw row with `DB::table('users')->first()` and assert
+           `strava_access_token` does not equal the plaintext, while `$user->strava_access_token` does — this
+           is the acceptance criterion about `encrypted` casts, asserted rather than assumed
+         - the synthetic email matches `athlete-{id}@strava.invalid` and is not overwritten on reconnect
+         - `password` stays `null` — there is no password login in this product
+      3. `php artisan test --filter=AthleteAllowlist` and `--filter=ConnectStravaAthlete`
+
+      ## Completion Criteria
+      - [ ] All cases above pass
+      - [ ] The encryption-at-rest assertion reads the raw row through the query builder, bypassing the cast
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Git Deliverables
+      - Commit: `test(US-002): TASK-05 cover allowlist gate and athlete persistence`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-06
+    title: 'Wire the OAuth routes, controllers, guards and rate limiter'
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-03
+      - TASK-05
+    body: |
+      ## Description
+      The HTTP surface: the redirect that starts the flow, the callback that ends it, and the dashboard route
+      that renders the connect screen to a guest. Blade views land here as **minimal semantic stubs** carrying
+      the required copy; TASK-10 styles them to the mockup. Splitting it this way keeps every task
+      independently green — the controllers never reference a view that does not exist yet.
+
+      ## Files Involved
+      - routes/web.php
+      - app/Http/Controllers/Strava/StravaRedirectController.php
+      - app/Http/Controllers/Strava/StravaCallbackController.php
+      - app/Http/Controllers/DashboardController.php
+      - app/Providers/AppServiceProvider.php
+      - resources/views/strava/connect.blade.php
+      - resources/views/strava/rejected.blade.php
+      - resources/views/dashboard.blade.php
+      - resources/views/welcome.blade.php (delete)
+
+      ## Steps
+      1. `AppServiceProvider::boot()` — register the named limiter:
+         `RateLimiter::for('strava-oauth', fn (Request $request) => Limit::perMinute(10)->by($request->ip()))`
+      2. `routes/web.php`:
+         - `GET /` → `DashboardController` , name `dashboard`
+         - `GET /auth/strava/redirect` → `StravaRedirectController`, name `strava.redirect`,
+           middleware `throttle:strava-oauth`
+         - `GET /auth/strava/callback` → `StravaCallbackController`, name `strava.callback`,
+           middleware `throttle:strava-oauth`
+         - delete the closure returning `welcome`, and delete `resources/views/welcome.blade.php`
+      3. `StravaRedirectController` (invokable): `Str::random(40)` into `session('strava.oauth_state')`, then
+         `redirect()->away($stravaOAuth->authorizationUrl($state))`
+      4. `StravaCallbackController` (invokable) — the gates run in this exact order, and **nothing is written
+         until gate 5 passes**:
+         1. `$request->query('error') === 'access_denied'` → redirect to `dashboard` with a neutral
+            `status` flash. Nothing persisted
+         2. `state` missing, or `! hash_equals((string) session()->pull('strava.oauth_state', ''), (string) $request->query('state'))`
+            → `abort(403)`. Pull the state either way so it is single-use
+         3. the granted `scope` query parameter does not contain `activity:read_all` →
+            `response()->view('strava.rejected', ['reason' => 'scope'], 403)`
+         4. `$stravaOAuth->exchangeAuthorizationCode($code, $grantedScope)` — wrap
+            `StravaOAuthException` and render the rejection view with a failure reason, status 503; do not
+            let it become a 500
+         5. `! $allowlist->allows($tokens->athleteId)` →
+            `response()->view('strava.rejected', ['athleteId' => $tokens->athleteId, 'reason' => 'allowlist'], 403)`.
+            **This is the acceptance criterion**: no token, no user row, no session has been created at this point
+         6. `$user = $connectStravaAthlete($tokens);` then `Auth::login($user, remember: true)`,
+            `$request->session()->regenerate()`, `redirect()->intended(route('dashboard'))`
+      5. `DashboardController` (invokable): `Auth::check()` → `view('dashboard')`; guest → `view('strava.connect')`.
+         Returns `200` in both cases — never a redirect, never an error (acceptance criterion)
+      6. Stub views, semantics only, styling in TASK-10. Copy per `states.html` states 1 and 2 (Marika):
+         - `strava/connect.blade.php` — one `<h1>`, the body line "Connect Strava to build your 16-week
+           heatmap. Read-only access to your activities — nothing is ever posted on your behalf.", a link to
+           `route('strava.redirect')` labelled "Connect with Strava", and the footnote "Requests the
+           `activity:read_all` scope." Accepts an optional `$reconnect` flag rendering a `role="alert"`
+           banner — TASK-08 uses it
+         - `strava/rejected.blade.php` — "This instance is private" plus "Athlete #{id} is not on this
+           instance's allowlist, so no session was created and nothing was stored.", and a Back link to
+           `route('dashboard')`
+         - `dashboard.blade.php` — placeholder body, replaced by the grid in US-004
+      7. `php artisan route:list --except-vendor` — confirm three routes, correct names, throttle applied,
+         and still no route whose URI mentions `register` (the existing `NoPublicSignupTest` guards this)
+      8. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] The five rejection gates run before any write, in the order above
+      - [ ] Both OAuth routes carry `throttle:strava-oauth`
+      - [ ] Successful login regenerates the session id
+      - [ ] `GET /` returns 200 with the connect view for a guest and the dashboard view for the athlete
+      - [ ] `welcome.blade.php` is deleted and no route references it
+      - [ ] `NoPublicSignupTest` still passes — no registration route was introduced
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-002): TASK-06 add Strava OAuth routes, controllers, guards and rate limiting`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-07
+    title: 'Cover the end-to-end OAuth flow, rejection and rate limiting'
+    type: Test
+    status: TODO
+    dependencies:
+      - TASK-06
+    body: |
+      ## Description
+      Anne: the acceptance criteria for this spec are mostly negative — what must *not* happen when the wrong
+      athlete completes the flow. Assert them by counting rows after the attempt, not by trusting the branch.
+
+      ## Files Involved
+      - tests/Feature/Strava/StravaConnectFlowTest.php
+
+      ## Steps
+      1. `php artisan make:test --phpunit Strava/StravaConnectFlowTest`, `RefreshDatabase`,
+         `Http::preventStrayRequests()`, allowlist set via `Config::set('strava.allowed_athlete_ids', ['4821196'])`
+      2. Redirect route: `GET /auth/strava/redirect` issues a redirect to `www.strava.com/oauth/authorize`
+         carrying `scope=activity%3Aread_all` and a `state`, and stores that state in the session
+      3. **Happy path** — allowlisted athlete: seed the session state, fake the token endpoint with an athlete
+         id on the allowlist, `GET /auth/strava/callback?code=…&state=…&scope=read,activity:read_all` →
+         redirect to `/`, `assertAuthenticated()`, exactly one user carrying the athlete id and both tokens,
+         and the session id changed
+      4. **Rejection** — non-allowlisted athlete, the spec's headline criterion: same flow with an athlete id
+         **off** the list → `403`, the rejection view, and then
+         `assertGuest()`, `$this->assertDatabaseCount('users', 0)`, and `assertDatabaseEmpty('users')` so the
+         claim "no session exists, no tokens are stored, and no user record is written" is asserted against
+         empty tables rather than inferred
+      5. `state` mismatch → `403`, `assertGuest()`, no user row
+      6. `state` missing entirely → `403`
+      7. State is single-use: replaying the same callback twice → the second attempt is `403`
+      8. `error=access_denied` → redirect to `/`, `assertGuest()`, no user row, no request sent to the token
+         endpoint (`Http::assertNothingSent()`)
+      9. Granted scope missing `activity:read_all` → `403`, rejection view, no token exchange attempted
+      10. Token endpoint returns 400 → `503` and the rejection view, **not** a 500, `assertGuest()`, no user row
+      11. **Rate limiting**: hit `/auth/strava/callback` past the limiter and assert `429`
+      12. Reconnect: an already-connected allowlisted athlete completing the flow again updates the row and
+          leaves `User::count()` at 1
+      13. `php artisan test --filter=StravaConnectFlowTest`
+      14. No browser, Dusk, Playwright or viewport suites — `settings.testing` is `NORMAL`
+
+      ## Completion Criteria
+      - [ ] All cases above pass
+      - [ ] Every rejection case asserts `assertGuest()` **and** an empty `users` table
+      - [ ] The rate-limit case asserts `429`
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Git Deliverables
+      - Commit: `test(US-002): TASK-07 cover the Strava OAuth flow, rejection and rate limiting`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-08
+    title: 'Add transparent token refresh and the reconnect state'
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-06
+    body: |
+      ## Description
+      The seam US-003's `StravaClient` will call before every Strava request, plus the failure mode: when the
+      refresh token is dead the athlete gets an explicit reconnect screen, never a 500. Wiring it as
+      middleware on the dashboard route gives US-002 an HTTP surface to demonstrate that against; it sends
+      zero requests while the stored token is still valid.
+
+      ## Files Involved
+      - app/Actions/Strava/EnsureFreshAccessToken.php
+      - app/Exceptions/Strava/StravaReconnectRequiredException.php
+      - app/Http/Middleware/EnsureFreshStravaToken.php
+      - bootstrap/app.php
+      - routes/web.php
+      - database/factories/UserFactory.php
+
+      ## Steps
+      1. `php artisan make:class Exceptions/Strava/StravaReconnectRequiredException` extending
+         `RuntimeException`, with a `render(Request $request): Response` method: log the athlete out, invalidate
+         and regenerate the session token, and return `response()->view('strava.connect', ['reconnect' => true], 200)`
+         — the `$reconnect` flag TASK-06 built into the view. Rendering the connect screen rather than
+         redirecting keeps the reason visible in one round trip
+      2. `php artisan make:class Actions/Strava/EnsureFreshAccessToken` with `__invoke(User $user): string`:
+         - no `strava_refresh_token` on the user → throw `StravaReconnectRequiredException`
+         - `strava_token_expires_at` is null, past, or within `config('strava.token_refresh_margin_seconds')`
+           of now → refresh; otherwise return the stored access token **without any HTTP call**
+         - on refresh: call `StravaOAuth::refreshAccessToken()`, persist the **rotated** access *and* refresh
+           tokens plus the new expiry, and return the new access token
+         - catch `StravaOAuthException` and rethrow as `StravaReconnectRequiredException`, so callers have one
+           failure type to handle. Log at warning level with the athlete id and HTTP status — never the tokens
+      3. `php artisan make:middleware EnsureFreshStravaToken` — no-op for guests; for an authenticated user
+         invoke the action and continue. Register the alias `strava.fresh` in `bootstrap/app.php`
+         (`->withMiddleware(fn (Middleware $middleware) => $middleware->alias([...]))`) and attach it to the
+         `dashboard` route in `routes/web.php`
+      4. Add `UserFactory::stravaTokenExpiringSoon()` — builds on `stravaConnected()` with
+         `strava_token_expires_at` inside the refresh margin but not yet past, so TASK-09 has a named fixture
+         for the margin branch instead of an inline magic offset
+      5. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] A valid, comfortably unexpired token results in **zero** HTTP requests
+      - [ ] An expired token, and a token inside the safety margin, both trigger exactly one refresh
+      - [ ] The rotated refresh token is persisted — the next refresh still works
+      - [ ] A dead refresh token renders the connect screen in reconnect state, `200`, athlete logged out — not a 500
+      - [ ] `UserFactory::stravaTokenExpiringSoon()` exists and `php artisan migrate:fresh --seed` still succeeds
+      - [ ] No token value appears in any log line
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Test Data
+      - [ ] `database/factories/UserFactory.php` updated with the `stravaTokenExpiringSoon()` state, in this same task
+      - [ ] Seeders unchanged — `TrainingBlockSeeder` already produces a Strava-connected athlete; re-verify `migrate:fresh --seed`
+      - [ ] No migration or schema change
+
+      ## Git Deliverables
+      - Commit: `feat(US-002): TASK-08 refresh Strava tokens transparently and add the reconnect state`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-09
+    title: 'Cover token refresh and the reconnect failure mode'
+    type: Test
+    status: TODO
+    dependencies:
+      - TASK-08
+    body: |
+      ## Description
+      Anne: two of the spec's four required test scenarios live here — an expired token triggers a refresh,
+      and a refresh failure surfaces as a reconnect state rather than a 500.
+
+      ## Files Involved
+      - tests/Feature/Strava/EnsureFreshAccessTokenTest.php
+      - tests/Feature/Strava/ReconnectStateTest.php
+
+      ## Steps
+      1. `php artisan make:test --phpunit Strava/EnsureFreshAccessTokenTest`, using the US-001 factory states:
+         - `stravaConnected()` (expiry six hours out) → returns the stored token and `Http::assertNothingSent()`
+         - `stravaTokenExpired()` → exactly one request to `/oauth/token` with `grant_type=refresh_token`;
+           the user row now holds the new access **and** refresh tokens and the new expiry
+         - `stravaTokenExpiringSoon()` → refreshes as well, proving the safety margin is honoured and not just
+           the hard expiry
+         - a user with a null `strava_token_expires_at` → refreshes
+         - a user with no refresh token → `StravaReconnectRequiredException`, no HTTP request sent
+         - faked `401` on refresh → `StravaReconnectRequiredException`, and the stored tokens are left
+           untouched rather than half-written
+      2. `php artisan make:test --phpunit Strava/ReconnectStateTest` — the HTTP surface:
+         - `stravaTokenExpired()` user with a faked `401` on refresh visits `GET /` → `200`, connect screen,
+           the reconnect alert is present, `assertGuest()`, **not** a 500
+         - `stravaTokenExpired()` user with a successful faked refresh visits `GET /` → `200`, dashboard,
+           still authenticated, tokens updated in the database
+         - a guest visiting `GET /` sends no Strava request at all — the middleware is a no-op for guests
+      3. `php artisan test --filter=EnsureFreshAccessToken` and `--filter=ReconnectState`
+      4. No browser, Dusk, Playwright or viewport suites — `settings.testing` is `NORMAL`
+
+      ## Completion Criteria
+      - [ ] All cases above pass
+      - [ ] The reconnect case asserts a `200` and the absence of a server error, so a regression to a 500 fails the build
+      - [ ] The valid-token case asserts `Http::assertNothingSent()`
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Git Deliverables
+      - Commit: `test(US-002): TASK-09 cover token refresh and the reconnect failure mode`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-10
+    title: 'Build the mobile-first layout shell and style the connect and rejection screens'
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-06
+    body: |
+      ## Description
+      Elise + Joe: promote the TASK-06 stubs to the visual contract in
+      `.larapilot/mockups/heatmap-dashboard/states.html` states 1 and 2, on a shared layout that US-004,
+      US-005 and US-006 then fill in. Mobile first — the design origin is 375 px; desktop is progressive
+      enhancement.
+
+      ## Files Involved
+      - resources/views/layouts/app.blade.php
+      - resources/views/strava/connect.blade.php
+      - resources/views/strava/rejected.blade.php
+      - resources/views/dashboard.blade.php
+      - resources/css/app.css
+      - public/favicon.svg
+
+      ## Steps
+      1. `resources/css/app.css` — replace the `Instrument Sans` `@theme` font with **Inter** (400/500/600/700
+         via `fonts.bunny.net`, per the mockup README), and add the base surface tokens as CSS custom
+         properties on `:root` with a `@media (prefers-color-scheme: dark)` override, exactly as the mockup
+         does: card surface `#ffffff` / `#0f172a`, ink and ink-muted, hairline, accent `#4338ca` / `#a5b4fc`
+         (focus rings and links **only**, never a data colour), and the warn pair used by the rejection icon.
+         **Do not add the five intensity-ramp levels here** — they are US-005's, and the README's validator
+         is the gate on them
+      2. `resources/views/layouts/app.blade.php`:
+         - `<html lang="en">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`,
+           `<meta name="robots" content="noindex, nofollow">` (Emma: private instance, every page)
+         - `<link rel="icon" href="/favicon.svg" type="image/svg+xml">`, Inter preconnect + stylesheet, `@vite`
+         - skip link to `#main`, visible on focus; `header` / `main id="main"` / `footer` landmarks;
+           exactly one `<h1>` per page, supplied by the child view
+         - `:focus-visible` outline — 2 px accent, 2 px offset — on every interactive element
+         - Header carries the logo only. **No nav, no hamburger, deliberately**: one screen, one user, per the
+           mockup README's navigation contract. The sync chip (US-006) and theme toggle (US-004) slot in later
+      3. Copy `.larapilot/mockups/heatmap-dashboard/favicon.svg` to `public/favicon.svg`. Copy `logo.svg` to
+         `public/images/brand/logo.svg` and reference it in the header — its wordmark uses `currentColor`, so
+         one file serves both themes
+      4. Style `strava/connect.blade.php` to state 1: centred card, `max-w-sm`, the four-cell ramp glyph, the
+         heading "See your training at a glance", the read-only reassurance line, and a full-width
+         **44 px-high** "Connect with Strava" button in Strava orange `#fc4c02`. That orange is the *only*
+         Strava mark in this spec and appears on exactly this control, which is what the brand guidelines
+         expect — it is never used as a data colour. Keep the `$reconnect` banner as `role="alert"`
+      5. Style `strava/rejected.blade.php` to state 2: warn-tinted circle icon marked `aria-hidden`, the
+         heading "This instance is private", the athlete id in the body copy, and a 44 px "Back" control
+      6. `dashboard.blade.php` — minimal placeholder on the same layout, replaced by the grid in US-004
+      7. `npm run build`, then smoke-check both screens at **375 px, 768 px and 1280 px**: no horizontal
+         scroll, the card stays legible, the button keeps its 44 px target. Check both colour schemes
+      8. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] Both screens match `states.html` states 1 and 2 in structure, copy and colour
+      - [ ] Every page renders `noindex, nofollow`, a working skip link, header/main/footer landmarks and exactly one `<h1>`
+      - [ ] Interactive controls are ≥ 44 × 44 px with a visible `:focus-visible` ring
+      - [ ] Light and dark both render correctly from `prefers-color-scheme`; no persisted toggle (US-004)
+      - [ ] No intensity-ramp tokens were added — that surface belongs to US-005
+      - [ ] `npm run build` succeeds; no horizontal scroll at 375 / 768 / 1280 px
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-002): TASK-10 add the mobile-first layout shell and style the connect screens`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-11
+    title: 'Cover the signed-out connect screen and layout accessibility contract'
+    type: Test
+    status: TODO
+    dependencies:
+      - TASK-10
+    body: |
+      ## Description
+      Anne: the last acceptance criterion — a signed-out visit renders the connect screen, not an error —
+      plus the layout invariants that US-004, US-005 and US-006 will build on and could quietly break.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/ConnectScreenTest.php
+
+      ## Steps
+      1. `php artisan make:test --phpunit Dashboard/ConnectScreenTest`
+      2. Cases:
+         - a guest `GET /` → `200`, view `strava.connect`, the page contains "Connect with Strava" and links
+           to `route('strava.redirect')`. Explicitly **not** a redirect and **not** a 500
+         - an authenticated `stravaConnected()` athlete `GET /` → `200`, view `dashboard`
+         - both responses carry `<meta name="robots" content="noindex, nofollow">`
+         - both responses contain the skip link to `#main` and exactly one `<h1>`
+         - the connect screen states the `activity:read_all` scope and the read-only reassurance — the copy is
+           part of the contract, not decoration
+         - the rejection view renders the athlete id it is given
+      3. `php artisan test --filter=ConnectScreenTest`
+      4. Manual test handoff — record in the task notes for review, since `settings.testing` is `NORMAL` and
+         no browser automation is planned: connect and rejection screens at 375 / 768 / 1280 px against
+         `states.html`; keyboard-only tab to the connect button with a visible focus ring; both screens under
+         `prefers-color-scheme: dark`
+      5. No browser, Dusk, Playwright or viewport suites
+
+      ## Completion Criteria
+      - [ ] All cases above pass
+      - [ ] The manual test handoff notes are written down for `larapilot-review`
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Git Deliverables
+      - Commit: `test(US-002): TASK-11 cover the signed-out connect screen and layout contract`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+  -
+    id: TASK-12
+    title: 'Document the Strava setup and close the quality gate'
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-07
+      - TASK-09
+      - TASK-11
+    body: |
+      ## Description
+      Albert's baseline documentation for this spec, plus the full-suite gate before handoff. The README has
+      to be enough for a cold clone to register a Strava application and sign in — the OAuth redirect URI is
+      the one setting that fails confusingly when it is wrong.
+
+      ## Files Involved
+      - README.md
+      - CHANGELOG.md (new)
+      - .larapilot/plans/US-002-plan.yaml (PR description notes only — no manual edits to workflow YAML)
+
+      ## Steps
+      1. README — add a **Strava setup** section covering:
+         - registering the application at `https://www.strava.com/settings/api`, and that the Authorization
+           Callback Domain there must match the host in `STRAVA_REDIRECT_URI` (under Herd, the HTTPS `.test`
+           domain) or Strava rejects the callback with an opaque error
+         - every `STRAVA_*` env key, including the allowlist format (comma-separated athlete ids; non-numeric
+           entries are discarded and an empty list rejects everyone) and `STRAVA_TOKEN_REFRESH_MARGIN`
+         - how to find your own numeric Strava athlete id
+         - that the app requests `activity:read_all` only and never write access
+         - that sign-in creates a synthetic `athlete-{id}@strava.invalid` address because Strava exposes no
+           email under this scope, and that nothing is ever sent to it
+      2. Create `CHANGELOG.md` at the repo root in Keep a Changelog format with an `## [Unreleased]` section:
+         under `### Added`, Strava OAuth sign-in with athlete allowlist and transparent token refresh; under
+         `### Security`, allowlist enforced before any persistence, rate-limited OAuth routes, encrypted
+         token storage. This is the file's first appearance in the repo
+      3. `php artisan larapilot:quality` — Pint clean, Larastan level 5 clean
+      4. `php artisan test` — the **whole** suite, not a filter, including the US-001 tests inherited through
+         TASK-00's merge
+      5. `php artisan migrate:fresh --seed` one last time on a clean database
+      6. Finalise the local internal PR description toward `develop`: title `US-002: Connect Strava and sign
+         in`, body listing TASK-00 … TASK-12, the resolved Socialite decision with its Guzzle rationale, and
+         the manual test handoff from TASK-11. **Do not push** — `git_mode` is `GITFLOW`
+
+      ## Completion Criteria
+      - [ ] README documents Strava app registration, the callback-domain trap, every `STRAVA_*` key and the synthetic email
+      - [ ] `CHANGELOG.md` exists with a populated `Unreleased` section
+      - [ ] `php artisan larapilot:quality` passes
+      - [ ] `php artisan test` passes in full
+      - [ ] `php artisan migrate:fresh --seed` succeeds
+      - [ ] The internal PR description is drafted locally and the branch has not been pushed
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: final local PR description toward `develop`
+updated_at: '2026-09-05T17:13:20+00:00'

@@ -5,7 +5,7 @@ epic:
   title: 'Foundation & Strava connection'
 priority: CRITICAL
 points: 5
-status: TODO
+status: 'IN PROGRESS'
 body: |
   #### US-002: Connect Strava and sign in
 
@@ -48,3 +48,11 @@ body: |
   `laravel/socialite` + `socialiteproviders/strava` (two new dependencies, pending user approval) and a
   hand-rolled authorization-code exchange on Laravel's HTTP client (~60 lines, zero dependencies).
   Resolve it in planning; do not add packages without approval.
+status_history:
+  -
+    status: PLANNED
+    at: '2026-09-05T17:13:20+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-09-05T17:25:43+00:00'
+rework: false
