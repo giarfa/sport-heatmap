@@ -24,9 +24,13 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read User $user
  */
+/*
+ * user_id is deliberately not mass-assignable: activity ownership must come from the
+ * relation the sync is writing through ($user->activities()->updateOrCreate(...)), never
+ * from an attribute array that a request could reach.
+ */
 #[Fillable([
     'strava_activity_id',
-    'user_id',
     'sport_type',
     'name',
     'distance_meters',

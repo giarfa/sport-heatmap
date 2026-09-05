@@ -8,7 +8,7 @@ restricted to an explicit allowlist of athlete ids.
 
 ## Requirements
 
-- **PHP 8.4** and **Composer**
+- **PHP 8.3 or newer** and **Composer** — `composer.json` requires `^8.3`; CI runs 8.4
 - **Node.js 20+** and npm
 - **SQLite** (bundled with PHP on macOS)
 - **[Laravel Herd](https://herd.laravel.com/)** on macOS
@@ -144,5 +144,6 @@ php artisan larapilot:quality     # Laravel Pint + Larastan (level 5)
 vendor/bin/pint                   # apply formatting
 ```
 
-CI runs the same gates — Pint, Larastan, PHPUnit, `composer audit` and the Vite build — on every
-push and pull request to `develop` and `main`.
+CI runs the same gates — Pint, Larastan, PHPUnit, `composer audit` and the Vite build — on pushes
+to `develop` and `main`, and on every pull request targeting them. Pushing a feature branch does
+not trigger CI on its own; opening the PR does.
