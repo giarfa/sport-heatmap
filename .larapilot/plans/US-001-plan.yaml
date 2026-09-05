@@ -518,12 +518,12 @@ tasks:
       9. Re-read the document as someone who has never seen the project: every command must be runnable in order, with no implied step.
 
       ## Completion Criteria
-      - [ ] Herd setup documented with a `.test` domain; no Sail or Docker instructions anywhere
-      - [ ] Strava application registration documented — `activity:read_all` scope, callback domain, credential placement
-      - [ ] Every `STRAVA_*` env key documented
-      - [ ] Manual sync invocation and the `* * * * * php artisan schedule:run` cron entry both present
-      - [ ] Seeding and test/quality commands documented
-      - [ ] A fresh clone can be brought up following the README alone
+      - [x] Herd setup documented with a `.test` domain; no Sail or Docker instructions anywhere
+      - [x] Strava application registration documented — `activity:read_all` scope, callback domain, credential placement
+      - [x] Every `STRAVA_*` env key documented
+      - [x] Manual sync invocation and the `* * * * * php artisan schedule:run` cron entry both present
+      - [x] Seeding and test/quality commands documented
+      - [x] A fresh clone can be brought up following the README alone
 
       ## Test Data
       - N/A — documentation only
@@ -533,9 +533,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-07
+    commit:
+      sha: 528243a42c4c90731b7e98a650a08212fedb07d3
+      short_sha: 528243a
+      subject: 'docs(US-001): TASK-08 add baseline README with Herd and Strava setup'
+      committed_at: '2026-09-05T18:40:14+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/528243a42c4c90731b7e98a650a08212fedb07d3'
   -
     id: TASK-09
     title: 'Add the CI workflow: tests, Pint and Larastan'
@@ -617,4 +623,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:39:22+00:00'
+updated_at: '2026-09-05T16:40:15+00:00'
