@@ -120,11 +120,11 @@ tasks:
       7. Anchor commit: `chore(US-001): TASK-00 bootstrap feature branch` (empty commit allowed).
 
       ## Completion Criteria
-      - [ ] `.gitignore` excludes `/database/database.sqlite`
-      - [ ] `main` has an initial commit containing the skeleton; `.env` is **not** tracked
-      - [ ] `develop` exists locally
-      - [ ] `feature/US-001-foundation-schema-setup` exists locally and is checked out
-      - [ ] PR title/body drafted toward `develop` (remote not opened)
+      - [x] `.gitignore` excludes `/database/database.sqlite`
+      - [x] `main` has an initial commit containing the skeleton; `.env` is **not** tracked
+      - [x] `develop` exists locally
+      - [x] `feature/US-001-foundation-schema-setup` exists locally and is checked out
+      - [x] PR title/body drafted toward `develop` (remote not opened)
 
       ## Test Data
       - N/A — git only
@@ -135,8 +135,14 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally — open remote only if the user requests push
     type: Impl
-    status: TODO
+    status: DONE
     dependencies: {}
+    commit:
+      sha: 99f3679dfc25be1d59113b90740ede2c7e4e9a9a
+      short_sha: 99f3679
+      subject: 'chore(US-001): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-05T18:31:09+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/99f3679dfc25be1d59113b90740ede2c7e4e9a9a'
   -
     id: TASK-01
     title: 'Strava configuration surface: .env.example keys and config/strava.php'
@@ -569,4 +575,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:27:58+00:00'
+updated_at: '2026-09-05T16:31:10+00:00'
