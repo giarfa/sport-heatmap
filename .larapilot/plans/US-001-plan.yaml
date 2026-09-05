@@ -120,11 +120,11 @@ tasks:
       7. Anchor commit: `chore(US-001): TASK-00 bootstrap feature branch` (empty commit allowed).
 
       ## Completion Criteria
-      - [ ] `.gitignore` excludes `/database/database.sqlite`
-      - [ ] `main` has an initial commit containing the skeleton; `.env` is **not** tracked
-      - [ ] `develop` exists locally
-      - [ ] `feature/US-001-foundation-schema-setup` exists locally and is checked out
-      - [ ] PR title/body drafted toward `develop` (remote not opened)
+      - [x] `.gitignore` excludes `/database/database.sqlite`
+      - [x] `main` has an initial commit containing the skeleton; `.env` is **not** tracked
+      - [x] `develop` exists locally
+      - [x] `feature/US-001-foundation-schema-setup` exists locally and is checked out
+      - [x] PR title/body drafted toward `develop` (remote not opened)
 
       ## Test Data
       - N/A — git only
@@ -135,8 +135,14 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally — open remote only if the user requests push
     type: Impl
-    status: TODO
+    status: DONE
     dependencies: {}
+    commit:
+      sha: 99f3679dfc25be1d59113b90740ede2c7e4e9a9a
+      short_sha: 99f3679
+      subject: 'chore(US-001): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-05T18:31:09+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/99f3679dfc25be1d59113b90740ede2c7e4e9a9a'
   -
     id: TASK-01
     title: 'Strava configuration surface: .env.example keys and config/strava.php'
@@ -163,11 +169,11 @@ tasks:
       5. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] `.env.example` lists client id, client secret, redirect URI, allowlisted athlete ids, sync hour and sync timezone, all with empty or safe placeholder values
-      - [ ] No real credential value is committed anywhere
-      - [ ] `config/strava.php` exposes every key; `allowed_athlete_ids` is an array and is empty (not `['']`) when the env var is blank
-      - [ ] `php artisan config:show strava` resolves without error
-      - [ ] Pint clean
+      - [x] `.env.example` lists client id, client secret, redirect URI, allowlisted athlete ids, sync hour and sync timezone, all with empty or safe placeholder values
+      - [x] No real credential value is committed anywhere
+      - [x] `config/strava.php` exposes every key; `allowed_athlete_ids` is an array and is empty (not `['']`) when the env var is blank
+      - [x] `php artisan config:show strava` resolves without error
+      - [x] Pint clean
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -177,9 +183,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-00
+    commit:
+      sha: ae9eb1d90ccf941e41ff10d4dd637bed0acc9b2a
+      short_sha: ae9eb1d
+      subject: 'feat(US-001): TASK-01 add Strava configuration keys and config file'
+      committed_at: '2026-09-05T18:32:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ae9eb1d90ccf941e41ff10d4dd637bed0acc9b2a'
   -
     id: TASK-02
     title: 'Extend users with Strava identity and token columns'
@@ -202,26 +214,32 @@ tasks:
       7. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Migration adds `strava_athlete_id` (unique), `strava_access_token` (TEXT), `strava_refresh_token` (TEXT), `strava_token_expires_at`
-      - [ ] `users.password` is nullable and `down()` reverses the migration cleanly
-      - [ ] `User` casts both tokens as `encrypted` and hides them from serialization
-      - [ ] `UserFactory` has `stravaConnected()` and `stravaTokenExpired()` states producing valid records
-      - [ ] `php artisan migrate:fresh --seed` succeeds
-      - [ ] Pint clean
+      - [x] Migration adds `strava_athlete_id` (unique), `strava_access_token` (TEXT), `strava_refresh_token` (TEXT), `strava_token_expires_at`
+      - [x] `users.password` is nullable and `down()` reverses the migration cleanly
+      - [x] `User` casts both tokens as `encrypted` and hides them from serialization
+      - [x] `UserFactory` has `stravaConnected()` and `stravaTokenExpired()` states producing valid records
+      - [x] `php artisan migrate:fresh --seed` succeeds
+      - [x] Pint clean
 
       ## Test Data
-      - [ ] `database/factories/UserFactory.php` updated in **this same task** as the migration and model
-      - [ ] Default state and both Strava states produce persistable users
-      - [ ] Seeder wiring is handled in TASK-06 (`TrainingBlockSeeder`); `DatabaseSeeder` must still run green after this task
+      - [x] `database/factories/UserFactory.php` updated in **this same task** as the migration and model
+      - [x] Default state and both Strava states produce persistable users
+      - [x] Seeder wiring is handled in TASK-06 (`TrainingBlockSeeder`); `DatabaseSeeder` must still run green after this task
 
       ## Git Deliverables
       - Commit: `feat(US-001): TASK-02 extend users with Strava identity and token columns`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-01
+    commit:
+      sha: 4d62f8208570f0bd116365073e76f68fccb05c9f
+      short_sha: 4d62f82
+      subject: 'feat(US-001): TASK-02 extend users with Strava identity and token columns'
+      committed_at: '2026-09-05T18:33:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4d62f8208570f0bd116365073e76f68fccb05c9f'
   -
     id: TASK-03
     title: 'Add Activity model, migration, SportType enum and factory'
@@ -248,27 +266,33 @@ tasks:
       9. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] `activities` has every column from the acceptance criteria with the stated types
-      - [ ] Composite index `(user_id, activity_date)` created in the same migration
-      - [ ] `SportType` backed enum with exactly `Run`, `TrailRun`, `VirtualRun`; cast on the model
-      - [ ] `user_id` foreign key cascades on delete; `User::activities()` relation present
-      - [ ] `ActivityFactory` produces coherent records where `activity_date` matches `start_date_local` and pace is plausible
-      - [ ] `php artisan migrate:fresh --seed` succeeds
-      - [ ] Pint clean
+      - [x] `activities` has every column from the acceptance criteria with the stated types
+      - [x] Composite index `(user_id, activity_date)` created in the same migration
+      - [x] `SportType` backed enum with exactly `Run`, `TrailRun`, `VirtualRun`; cast on the model
+      - [x] `user_id` foreign key cascades on delete; `User::activities()` relation present
+      - [x] `ActivityFactory` produces coherent records where `activity_date` matches `start_date_local` and pace is plausible
+      - [x] `php artisan migrate:fresh --seed` succeeds
+      - [x] Pint clean
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` created in **this same task** as the migration and model
-      - [ ] States `trailRun()`, `virtualRun()`, `onDate()` defined for the seeder and later specs to reuse
-      - [ ] Seeder composition happens in TASK-06
+      - [x] `database/factories/ActivityFactory.php` created in **this same task** as the migration and model
+      - [x] States `trailRun()`, `virtualRun()`, `onDate()` defined for the seeder and later specs to reuse
+      - [x] Seeder composition happens in TASK-06
 
       ## Git Deliverables
       - Commit: `feat(US-001): TASK-03 add Activity model with SportType enum and factory`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-02
+    commit:
+      sha: df72a5f941ae81063193ba8cb895524a1941a159
+      short_sha: df72a5f
+      subject: 'feat(US-001): TASK-03 add Activity model with SportType enum and factory'
+      committed_at: '2026-09-05T18:34:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/df72a5f941ae81063193ba8cb895524a1941a159'
   -
     id: TASK-04
     title: 'Add SyncRun model, migration and factory'
@@ -292,25 +316,31 @@ tasks:
       7. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] `sync_runs` has `started_at`, `finished_at`, `status`, `activities_upserted`, `activities_deleted`, `error_message`
-      - [ ] `SyncRunStatus` enum cast on the model
-      - [ ] `SyncRunFactory` default is a successful recent run; `failed()`, `running()` and `stale()` states defined
-      - [ ] `php artisan migrate:fresh --seed` succeeds
-      - [ ] Pint clean
+      - [x] `sync_runs` has `started_at`, `finished_at`, `status`, `activities_upserted`, `activities_deleted`, `error_message`
+      - [x] `SyncRunStatus` enum cast on the model
+      - [x] `SyncRunFactory` default is a successful recent run; `failed()`, `running()` and `stale()` states defined
+      - [x] `php artisan migrate:fresh --seed` succeeds
+      - [x] Pint clean
 
       ## Test Data
-      - [ ] `database/factories/SyncRunFactory.php` created in **this same task** as the migration and model
-      - [ ] States cover the three outcomes FR-007 must render, plus the 48-hour stale case
-      - [ ] Seeder composition happens in TASK-06
+      - [x] `database/factories/SyncRunFactory.php` created in **this same task** as the migration and model
+      - [x] States cover the three outcomes FR-007 must render, plus the 48-hour stale case
+      - [x] Seeder composition happens in TASK-06
 
       ## Git Deliverables
       - Commit: `feat(US-001): TASK-04 add SyncRun model with status enum and factory`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-03
+    commit:
+      sha: 8c8837b5d2398a0d0e45a56ea1cef1c02e70dced
+      short_sha: 8c8837b
+      subject: 'feat(US-001): TASK-04 add SyncRun model with status enum and factory'
+      committed_at: '2026-09-05T18:35:10+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/8c8837b5d2398a0d0e45a56ea1cef1c02e70dced'
   -
     id: TASK-05
     title: 'Test schema, casts and factories'
@@ -343,20 +373,26 @@ tasks:
       11. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`.
 
       ## Completion Criteria
-      - [ ] Tests pass locally under PHPUnit
-      - [ ] Encrypted tokens verified against the **raw** database value, not only the model accessor
-      - [ ] `daily_mileage` absence asserted
-      - [ ] Composite index presence asserted
-      - [ ] Every factory state covered
+      - [x] Tests pass locally under PHPUnit
+      - [x] Encrypted tokens verified against the **raw** database value, not only the model accessor
+      - [x] `daily_mileage` absence asserted
+      - [x] Composite index presence asserted
+      - [x] Every factory state covered
 
       ## Git Deliverables
       - Commit: `test(US-001): TASK-05 cover schema, casts and factories`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Test
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-04
+    commit:
+      sha: de483f076ca0b56714cb2b802bf9ce0a9c48a012
+      short_sha: de483f0
+      subject: 'test(US-001): TASK-05 cover schema, casts and factories'
+      committed_at: '2026-09-05T18:36:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/de483f076ca0b56714cb2b802bf9ce0a9c48a012'
   -
     id: TASK-06
     title: 'Seed a realistic 16-week training block'
@@ -385,26 +421,32 @@ tasks:
       8. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] `php artisan migrate:fresh --seed` succeeds from a clean database
-      - [ ] Exactly one demo athlete, with a Strava athlete id
-      - [ ] 16 consecutive ISO weeks of activities ending with the current in-progress week
-      - [ ] Illness week, peak week and partial current week all present and distinguishable
-      - [ ] No activity dated after today; no orphan foreign keys
-      - [ ] At least one successful recent `SyncRun`
+      - [x] `php artisan migrate:fresh --seed` succeeds from a clean database
+      - [x] Exactly one demo athlete, with a Strava athlete id
+      - [x] 16 consecutive ISO weeks of activities ending with the current in-progress week
+      - [x] Illness week, peak week and partial current week all present and distinguishable
+      - [x] No activity dated after today; no orphan foreign keys
+      - [x] At least one successful recent `SyncRun`
 
       ## Test Data
-      - [ ] `database/seeders/TrainingBlockSeeder.php` composes `User`, `Activity` and `SyncRun` factories — no attribute definitions duplicated from the factories
-      - [ ] `DatabaseSeeder` calls it and no longer creates the stray default `Test User`
-      - [ ] Volumes exercise the UI: ~60–90 activities across the window, not an empty table and not random orphans
+      - [x] `database/seeders/TrainingBlockSeeder.php` composes `User`, `Activity` and `SyncRun` factories — no attribute definitions duplicated from the factories
+      - [x] `DatabaseSeeder` calls it and no longer creates the stray default `Test User`
+      - [x] Volumes exercise the UI: ~60–90 activities across the window, not an empty table and not random orphans
 
       ## Git Deliverables
       - Commit: `feat(US-001): TASK-06 seed a realistic 16-week training block`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-05
+    commit:
+      sha: 97d4662bb5fa6f0992ac853261940d7ac10f35eb
+      short_sha: 97d4662
+      subject: 'feat(US-001): TASK-06 seed a realistic 16-week training block'
+      committed_at: '2026-09-05T18:38:16+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/97d4662bb5fa6f0992ac853261940d7ac10f35eb'
   -
     id: TASK-07
     title: 'Test seeder shape and the no-public-signup guard'
@@ -432,18 +474,24 @@ tasks:
       5. No browser, E2E or viewport suites — `settings.testing` is `NORMAL`.
 
       ## Completion Criteria
-      - [ ] Tests pass locally under PHPUnit
-      - [ ] Seeder shape asserted: 16 weeks, illness week, peak week, no future-dated activity, date consistency
-      - [ ] Absence of any registration route asserted
+      - [x] Tests pass locally under PHPUnit
+      - [x] Seeder shape asserted: 16 weeks, illness week, peak week, no future-dated activity, date consistency
+      - [x] Absence of any registration route asserted
 
       ## Git Deliverables
       - Commit: `test(US-001): TASK-07 cover seeder shape and no-public-signup guard`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Test
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-06
+    commit:
+      sha: ae946950dfca9bac2031e37dbc53ad2e7d02e8b0
+      short_sha: ae94695
+      subject: 'test(US-001): TASK-07 cover seeder shape and no-public-signup guard'
+      committed_at: '2026-09-05T18:39:22+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ae946950dfca9bac2031e37dbc53ad2e7d02e8b0'
   -
     id: TASK-08
     title: 'Write the baseline README'
@@ -470,12 +518,12 @@ tasks:
       9. Re-read the document as someone who has never seen the project: every command must be runnable in order, with no implied step.
 
       ## Completion Criteria
-      - [ ] Herd setup documented with a `.test` domain; no Sail or Docker instructions anywhere
-      - [ ] Strava application registration documented — `activity:read_all` scope, callback domain, credential placement
-      - [ ] Every `STRAVA_*` env key documented
-      - [ ] Manual sync invocation and the `* * * * * php artisan schedule:run` cron entry both present
-      - [ ] Seeding and test/quality commands documented
-      - [ ] A fresh clone can be brought up following the README alone
+      - [x] Herd setup documented with a `.test` domain; no Sail or Docker instructions anywhere
+      - [x] Strava application registration documented — `activity:read_all` scope, callback domain, credential placement
+      - [x] Every `STRAVA_*` env key documented
+      - [x] Manual sync invocation and the `* * * * * php artisan schedule:run` cron entry both present
+      - [x] Seeding and test/quality commands documented
+      - [x] A fresh clone can be brought up following the README alone
 
       ## Test Data
       - N/A — documentation only
@@ -485,9 +533,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-07
+    commit:
+      sha: 528243a42c4c90731b7e98a650a08212fedb07d3
+      short_sha: 528243a
+      subject: 'docs(US-001): TASK-08 add baseline README with Herd and Strava setup'
+      committed_at: '2026-09-05T18:40:14+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/528243a42c4c90731b7e98a650a08212fedb07d3'
   -
     id: TASK-09
     title: 'Add the CI workflow: tests, Pint and Larastan'
@@ -512,11 +566,11 @@ tasks:
       7. Validate the YAML parses (`php -r` with a YAML parse, `yamllint`, or `actionlint` if available) before committing — a malformed workflow fails silently on the forge.
 
       ## Completion Criteria
-      - [ ] `.github/workflows/ci.yml` runs on push and on PRs to `develop` and `main`
-      - [ ] Pint, Larastan level 5, PHPUnit, `composer audit` and the Vite build all run as distinct steps
-      - [ ] PHP 8.4 with SQLite extensions
-      - [ ] **No deploy stage present**
-      - [ ] YAML validated
+      - [x] `.github/workflows/ci.yml` runs on push and on PRs to `develop` and `main`
+      - [x] Pint, Larastan level 5, PHPUnit, `composer audit` and the Vite build all run as distinct steps
+      - [x] PHP 8.4 with SQLite extensions
+      - [x] **No deploy stage present**
+      - [x] YAML validated
 
       ## Test Data
       - N/A — CI configuration only
@@ -526,9 +580,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`) — note the workflow will only actually execute once a remote exists and the branch is pushed
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-08
+    commit:
+      sha: 2fd0fcb5b7172b39b4513d07947faeb2a1a8598f
+      short_sha: 2fd0fcb
+      subject: 'ci(US-001): TASK-09 add test, Pint and Larastan workflow'
+      committed_at: '2026-09-05T18:40:35+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/2fd0fcb5b7172b39b4513d07947faeb2a1a8598f'
   -
     id: TASK-10
     title: 'Full verification pass: quality gate and clean-clone check'
@@ -551,12 +611,12 @@ tasks:
       9. Note for the reviewer: the manual test handoff from the plan's Test Strategy — following the README end to end on a clean clone — is a human step and is not covered by the suite.
 
       ## Completion Criteria
-      - [ ] `php artisan larapilot:quality` passes (Pint + Larastan level 5, no lowered level, no new baseline)
-      - [ ] `php artisan test --compact` fully green
-      - [ ] `php artisan migrate:fresh --seed` succeeds from clean
-      - [ ] All 13 acceptance criteria verified against the working tree
-      - [ ] `.env` and `database/database.sqlite` untracked; working tree clean
-      - [ ] One Conventional Commit per task on the feature branch; local PR description updated
+      - [x] `php artisan larapilot:quality` passes (Pint + Larastan level 5, no lowered level, no new baseline)
+      - [x] `php artisan test --compact` fully green
+      - [x] `php artisan migrate:fresh --seed` succeeds from clean
+      - [x] All 13 acceptance criteria verified against the working tree
+      - [x] `.env` and `database/database.sqlite` untracked; working tree clean
+      - [x] One Conventional Commit per task on the feature branch; local PR description updated
 
       ## Test Data
       - N/A — verification only; no schema or factory changes expected
@@ -566,7 +626,13 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalise local PR description toward `develop`
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:27:58+00:00'
+    commit:
+      sha: 1193bea9075649f00faba4a1a0d59ab862da8498
+      short_sha: 1193bea
+      subject: 'chore(US-001): TASK-10 apply quality gate fixes'
+      committed_at: '2026-09-05T18:41:55+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1193bea9075649f00faba4a1a0d59ab862da8498'
+updated_at: '2026-09-05T16:42:04+00:00'

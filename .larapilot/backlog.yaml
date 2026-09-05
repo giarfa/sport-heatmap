@@ -7,7 +7,7 @@ specs:
       title: 'Foundation & Strava connection'
     priority: HIGH
     points: 3
-    status: 'IN PROGRESS'
+    status: DONE
     body: |
       #### US-001: Project foundation, schema and local setup
 
@@ -29,35 +29,43 @@ specs:
       **Documentation** (Albert: baseline only), **Development & delivery**. Enabling work — no FR of its own.
 
       **Acceptance Criteria**
-      - [ ] `README.md` documents Laravel Herd setup with a `.test` domain — **no Sail, no Docker scaffolding**,
+      - [x] `README.md` documents Laravel Herd setup with a `.test` domain — **no Sail, no Docker scaffolding**,
             per the PRD's recorded local dev choice
-      - [ ] README documents registering the Strava application: required scope `activity:read_all`, the
+      - [x] README documents registering the Strava application: required scope `activity:read_all`, the
             authorization callback domain (the Herd HTTPS `.test` URL in development), and where the client
             credentials go
-      - [ ] README documents running the sync manually and the scheduler cron entry
+      - [x] README documents running the sync manually and the scheduler cron entry
             (`* * * * * php artisan schedule:run`)
-      - [ ] `.env.example` lists every required key — Strava client id and secret, the allowlisted athlete ids,
+      - [x] `.env.example` lists every required key — Strava client id and secret, the allowlisted athlete ids,
             the daily sync hour and its timezone — with no real values committed
-      - [ ] Migration extends `users` with `strava_athlete_id` (unique), `strava_access_token`,
+      - [x] Migration extends `users` with `strava_athlete_id` (unique), `strava_access_token`,
             `strava_refresh_token`, `strava_token_expires_at`; both token columns are `TEXT` because the
             `encrypted` cast produces unpredictable length; `password` becomes nullable
-      - [ ] Migration creates `activities` — `strava_activity_id` (unique), `user_id`, `sport_type`, `name`,
+      - [x] Migration creates `activities` — `strava_activity_id` (unique), `user_id`, `sport_type`, `name`,
             `distance_meters` (integer), `moving_time_seconds` (integer), `start_date_local`, `activity_date` (date)
             — with an index on `(user_id, activity_date)`
-      - [ ] Migration creates `sync_runs` — `started_at`, `finished_at`, `status`, `activities_upserted`,
+      - [x] Migration creates `sync_runs` — `started_at`, `finished_at`, `status`, `activities_upserted`,
             `activities_deleted`, `error_message`
-      - [ ] **No `daily_mileage` aggregate table** — the PRD explicitly rejects it; the grid aggregates on read
-      - [ ] Factories exist for `User`, `Activity` and `SyncRun`
-      - [ ] A seeder produces a realistic 16-week block including a near-empty illness week, a peak week, and a
+      - [x] **No `daily_mileage` aggregate table** — the PRD explicitly rejects it; the grid aggregates on read
+      - [x] Factories exist for `User`, `Activity` and `SyncRun`
+      - [x] A seeder produces a realistic 16-week block including a near-empty illness week, a peak week, and a
             partial current week, so the dashboard can be built and reviewed without touching Strava
-      - [ ] `php artisan larapilot:quality` passes (Pint + Larastan level 5+)
-      - [ ] CI workflow runs tests, Pint and Larastan on push; **no deploy stage** — the PRD records the deploy
+      - [x] `php artisan larapilot:quality` passes (Pint + Larastan level 5+)
+      - [x] CI workflow runs tests, Pint and Larastan on push; **no deploy stage** — the PRD records the deploy
             target as "not defined yet"
-      - [ ] No registration routes and no public signup are scaffolded
+      - [x] No registration routes and no public signup are scaffolded
     status_history:
       - { status: PLANNED, at: '2026-09-05T16:27:58+00:00' }
       - { status: 'IN PROGRESS', at: '2026-09-05T16:30:29+00:00' }
+      - { status: REVIEW, at: '2026-09-05T16:52:22+00:00' }
+      - { status: DONE, at: '2026-09-05T16:59:48+00:00' }
     rework: false
+    merge_commit:
+      sha: 5b8bb2db1324782f0ded3a2cc15f3605309fc82b
+      short_sha: 5b8bb2d
+      subject: "fix(US-001): address Robert's second-pass review findings"
+      committed_at: '2026-09-05T18:53:52+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5b8bb2db1324782f0ded3a2cc15f3605309fc82b'
   -
     code: US-002
     title: 'Connect Strava and sign in'
