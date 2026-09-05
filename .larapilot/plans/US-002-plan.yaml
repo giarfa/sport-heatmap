@@ -438,7 +438,7 @@ tasks:
     id: TASK-05
     title: 'Cover the allowlist gate and athlete persistence'
     type: Test
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-04
     body: |
@@ -467,14 +467,20 @@ tasks:
       3. `php artisan test --filter=AthleteAllowlist` and `--filter=ConnectStravaAthlete`
 
       ## Completion Criteria
-      - [ ] All cases above pass
-      - [ ] The encryption-at-rest assertion reads the raw row through the query builder, bypassing the cast
-      - [ ] Pint and Larastan level 5 clean
+      - [x] All cases above pass
+      - [x] The encryption-at-rest assertion reads the raw row through the query builder, bypassing the cast
+      - [x] Pint and Larastan level 5 clean
 
       ## Git Deliverables
       - Commit: `test(US-002): TASK-05 cover allowlist gate and athlete persistence`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 6a35ae344e490e2d1859655b72c25ab2cd504894
+      short_sha: 6a35ae3
+      subject: 'test(US-002): TASK-05 cover allowlist gate and athlete persistence'
+      committed_at: '2026-09-05T19:29:51+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6a35ae344e490e2d1859655b72c25ab2cd504894'
   -
     id: TASK-06
     title: 'Wire the OAuth routes, controllers, guards and rate limiter'
@@ -892,4 +898,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:29:05+00:00'
+updated_at: '2026-09-05T17:29:51+00:00'
