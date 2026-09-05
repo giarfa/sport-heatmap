@@ -1,0 +1,39 @@
+{
+    "agents": [
+        "claude_code",
+        "cursor",
+        "codex",
+        "copilot",
+        "junie",
+        "kiro",
+        "grok_build"
+    ],
+    "cloud": false,
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch": false,
+    "packages": [
+        "andreapollastri/larapilot"
+    ],
+    "sail": false,
+    "skills": [
+        "infer-conventions",
+        "laravel-best-practices",
+        "tailwindcss-development",
+        "larapilot-autopilot",
+        "larapilot-backstage",
+        "larapilot-bug",
+        "larapilot-design",
+        "larapilot-feature",
+        "larapilot-frontend-companion",
+        "larapilot-implement",
+        "larapilot-inception",
+        "larapilot-plan",
+        "larapilot-review",
+        "larapilot-settings",
+        "larapilot-ship",
+        "larapilot-spec",
+        "larapilot-tracker",
+        "larapilot-usage"
+    ]
+}

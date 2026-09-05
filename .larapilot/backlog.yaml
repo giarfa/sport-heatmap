@@ -1,0 +1,312 @@
+specs:
+  -
+    code: US-001
+    title: 'Project foundation, schema and local setup'
+    epic:
+      code: EP-001
+      title: 'Foundation & Strava connection'
+    priority: HIGH
+    points: 3
+    status: 'IN PROGRESS'
+    body: |
+      #### US-001: Project foundation, schema and local setup
+
+      **Epic:** EP-001 | **Priority:** HIGH | **Points:** 3 | **Status:** TODO
+      **Blocked by:** -
+
+      **User Story**
+      As the runner,
+      I want a clean local setup with the data model and realistic seed data in place,
+      so that I can register a Strava application, run the project on Herd, and build the dashboard
+      against believable data before any real sync exists.
+
+      **Demonstrates**
+      A fresh clone comes up on Herd following the README alone, `php artisan db:seed` produces a full
+      16-week training block, and `php artisan larapilot:quality` passes.
+
+      **Traces to**
+      PRD `## Technical Architecture` → **Data model**, **Stack** (Local dev: Laravel Herd),
+      **Documentation** (Albert: baseline only), **Development & delivery**. Enabling work — no FR of its own.
+
+      **Acceptance Criteria**
+      - [ ] `README.md` documents Laravel Herd setup with a `.test` domain — **no Sail, no Docker scaffolding**,
+            per the PRD's recorded local dev choice
+      - [ ] README documents registering the Strava application: required scope `activity:read_all`, the
+            authorization callback domain (the Herd HTTPS `.test` URL in development), and where the client
+            credentials go
+      - [ ] README documents running the sync manually and the scheduler cron entry
+            (`* * * * * php artisan schedule:run`)
+      - [ ] `.env.example` lists every required key — Strava client id and secret, the allowlisted athlete ids,
+            the daily sync hour and its timezone — with no real values committed
+      - [ ] Migration extends `users` with `strava_athlete_id` (unique), `strava_access_token`,
+            `strava_refresh_token`, `strava_token_expires_at`; both token columns are `TEXT` because the
+            `encrypted` cast produces unpredictable length; `password` becomes nullable
+      - [ ] Migration creates `activities` — `strava_activity_id` (unique), `user_id`, `sport_type`, `name`,
+            `distance_meters` (integer), `moving_time_seconds` (integer), `start_date_local`, `activity_date` (date)
+            — with an index on `(user_id, activity_date)`
+      - [ ] Migration creates `sync_runs` — `started_at`, `finished_at`, `status`, `activities_upserted`,
+            `activities_deleted`, `error_message`
+      - [ ] **No `daily_mileage` aggregate table** — the PRD explicitly rejects it; the grid aggregates on read
+      - [ ] Factories exist for `User`, `Activity` and `SyncRun`
+      - [ ] A seeder produces a realistic 16-week block including a near-empty illness week, a peak week, and a
+            partial current week, so the dashboard can be built and reviewed without touching Strava
+      - [ ] `php artisan larapilot:quality` passes (Pint + Larastan level 5+)
+      - [ ] CI workflow runs tests, Pint and Larastan on push; **no deploy stage** — the PRD records the deploy
+            target as "not defined yet"
+      - [ ] No registration routes and no public signup are scaffolded
+    status_history:
+      - { status: PLANNED, at: '2026-09-05T16:27:58+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-09-05T16:30:29+00:00' }
+    rework: false
+  -
+    code: US-002
+    title: 'Connect Strava and sign in'
+    epic:
+      code: EP-001
+      title: 'Foundation & Strava connection'
+    priority: CRITICAL
+    points: 5
+    status: TODO
+    body: |
+      #### US-002: Connect Strava and sign in
+
+      **Epic:** EP-001 | **Priority:** CRITICAL | **Points:** 5 | **Status:** TODO
+      **Blocked by:** US-001
+
+      **User Story**
+      As the runner,
+      I want to sign in to the dashboard by authorising Strava once,
+      so that there is no separate password to manage and the app can read my activities on my behalf —
+      while nobody else who happens to have a Strava account can get in.
+
+      **Demonstrates**
+      Visiting the dashboard signed out shows the connect screen; completing the Strava flow as the
+      allowlisted athlete lands on the dashboard authenticated; completing it as any other athlete is
+      rejected with nothing persisted.
+
+      **Traces to**
+      `FR-001` — **MoSCoW: Must**. PRD `### Security` (Lars), `### Privacy & legal` (Violet).
+      Visual contract: `.larapilot/mockups/heatmap-dashboard/states.html` states 1 and 2.
+
+      **Acceptance Criteria**
+      - [ ] "Connect with Strava" starts the official OAuth2 authorization-code flow requesting **only**
+            `activity:read_all` — no write scope is ever requested
+      - [ ] On callback the athlete id is checked against the `.env` allowlist **before** any token, user row,
+            or session is created
+      - [ ] A non-allowlisted athlete sees an explicit rejection screen and **no session exists, no tokens are
+            stored, and no user record is written** — verified by asserting empty tables after the attempt
+      - [ ] Access and refresh tokens are persisted through Eloquent `encrypted` casts; client id and secret
+            live only in `.env` and never reach the database or the repository
+      - [ ] The access token is refreshed transparently from the refresh token when it is expired or within the
+            configured safety margin of expiring, before any Strava call
+      - [ ] The OAuth callback route is rate-limited
+      - [ ] Visiting the dashboard while signed out renders the connect screen, not an error
+      - [ ] Tests (Strava HTTP faked): allowlisted athlete signs in; non-allowlisted athlete rejected with
+            nothing persisted; an expired token triggers a refresh; a refresh failure surfaces as a clear
+            reconnect state rather than a 500
+
+      **Open decision for `/larapilot-plan`** — 👾 Andrew: the PRD defers the choice between
+      `laravel/socialite` + `socialiteproviders/strava` (two new dependencies, pending user approval) and a
+      hand-rolled authorization-code exchange on Laravel's HTTP client (~60 lines, zero dependencies).
+      Resolve it in planning; do not add packages without approval.
+  -
+    code: US-003
+    title: 'Daily sync of runs from Strava'
+    epic:
+      code: EP-002
+      title: 'Activity sync'
+    priority: HIGH
+    points: 8
+    status: TODO
+    body: |
+      #### US-003: Daily sync of runs from Strava
+
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** TODO
+      **Blocked by:** US-002
+
+      **User Story**
+      As the runner,
+      I want my runs pulled from Strava automatically once a day,
+      so that the map is current every morning without me doing anything — and stays correct when I edit
+      or delete an activity on Strava afterwards.
+
+      **Demonstrates**
+      Running the sync command against a faked Strava API populates the 112-day window; running it a second
+      time changes nothing; editing and deleting an activity upstream is reflected on the next run.
+
+      **Traces to**
+      `FR-002`, `FR-003` — **MoSCoW: Must**. PRD `### Strava integration` (Matt), `### Data model` (Mike).
+
+      **Acceptance Criteria**
+      - [ ] A scheduled Artisan command runs **once per day** at the configured hour and timezone, registered
+            in `routes/console.php`
+      - [ ] Each run reconciles the **full 112-day window** — requests activities with `after` set to the start
+            of the window and paginates at maximum page size until the response is short
+      - [ ] Only running sport types are stored — `Run`, `TrailRun`, `VirtualRun`; every other sport is
+            discarded at sync time and never persisted
+      - [ ] Distances are stored as **integer metres**; a day's date comes from the activity's Strava **local**
+            start date, so attribution does not depend on server timezone
+      - [ ] Activities are upserted on `strava_activity_id`, so an edit on Strava (corrected distance, renamed,
+            changed sport type) propagates on the next run
+      - [ ] Local activities inside the window that are **absent** from the response are deleted, so an activity
+            removed on Strava disappears from the map
+      - [ ] The command is **idempotent** — running it twice in a row leaves the database byte-identical
+      - [ ] Every run writes a `sync_runs` record: start, finish, status, upserted count, deleted count, and the
+            error message on failure
+      - [ ] `429` and `5xx` responses are retried with backoff; an exhausted retry records a failed `sync_runs`
+            row, exits non-zero, and leaves no half-applied window
+      - [ ] Tests with a faked Strava HTTP client cover: pagination across pages, upsert of a changed activity,
+            deletion of an absent activity, sport-type filtering, token refresh mid-sync, `429` backoff, and
+            idempotency across two consecutive runs
+
+      **Note for planning** — 🔗 Matt: confirm the rate-limit allowance that applies to this application in the
+      Strava developer dashboard before implementation; Strava reduced the default for newer applications and
+      the PRD deliberately does not hardcode a number.
+  -
+    code: US-004
+    title: 'The 16-week heatmap with weekly totals'
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: HIGH
+    points: 5
+    status: TODO
+    body: |
+      #### US-004: The 16-week heatmap with weekly totals
+
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 5 | **Status:** TODO
+      **Blocked by:** US-001
+
+      **User Story**
+      As the runner,
+      I want sixteen weeks of daily mileage laid out as a seven-column grid with each week's total beside it,
+      so that I can see the shape of my training block in one glance, on my phone, straight after a run.
+
+      **Demonstrates**
+      With the seeded 16-week block, the dashboard renders 112 day cells plus 16 week totals, reads correctly
+      at 320 px and at 1280 px, and every cell announces its date and exact distance to a screen reader.
+
+      **Traces to**
+      `FR-004`, `FR-005`, `FR-008`, `FR-009` — **MoSCoW: Must**. PRD `### UX & frontend` (Elise + Joe).
+      Visual contract: `.larapilot/mockups/heatmap-dashboard/` — `index.html`, `dark.html`,
+      `breakpoints.html`, and the geometry and accessibility sections of its `README.md`.
+
+      **Acceptance Criteria**
+      - [ ] The grid renders **16 week-rows × 7 weekday-columns**, ISO-8601 **Monday first**, oldest week at the
+            top, the current in-progress week as the bottom row; the window is rolling and always ends on the
+            current week
+      - [ ] An **eighth column** closes each row with that week's total distance, styled as a summary column and
+            not as a heat cell
+      - [ ] The current week's total covers only the days elapsed and is marked **partial**
+      - [ ] Days in the current week that have not happened yet render as **out-of-range** — a third treatment,
+            visually distinct from both a heat level and a completed 0 km rest day
+      - [ ] Every distance is in **kilometres to one decimal**; the string "mi" or "miles" appears nowhere in
+            the interface
+      - [ ] The grid is a real `<table>` with an `sr-only` `<caption>`, `scope="col"` weekday headers and
+            `scope="row"` week headers; every cell carries an accessible name giving the full date and the exact
+            distance (or "rest day, 0 km", or "not yet")
+      - [ ] The **"Powered by Strava"** attribution is present, per the Strava API Agreement
+      - [ ] Light and dark themes both ship; first visit follows `prefers-color-scheme`, after which the user's
+            explicit choice persists
+      - [ ] Layout verified with **no horizontal scroll** at 320, 375, 768, 1024 and 1280 px; grid density is
+            capped (`max-width: 34rem`) so cells do not inflate on wide screens; at ≥ 1024 px the legend and sync
+            detail move into a side rail
+      - [ ] Column widths use `<colgroup>` percentages with gaps from cell `padding` — **not `border-spacing`**,
+            which is added on top of `width: 100%` and pushes Sunday and the total column off a 375 px viewport
+            (documented in the mockup README)
+      - [ ] Skip link to the grid, visible `:focus-visible` outlines, and 44 × 44 px targets on every control
+      - [ ] Unit tests for the grid builder: week boundaries, Monday start, the partial current week, future-day
+            cells, and a window spanning a month and a year boundary. Feature test renders the dashboard from
+            seeded data
+  -
+    code: US-005
+    title: 'Self-calibrating intensity scale and legend'
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: HIGH
+    points: 5
+    status: TODO
+    body: |
+      #### US-005: Self-calibrating intensity scale and legend
+
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 5 | **Status:** TODO
+      **Blocked by:** US-004
+
+      **User Story**
+      As the runner,
+      I want a cell's darkness to mean "hard for me, right now" rather than "past some fixed number",
+      so that a recovery block still shows contrast and a peak block still shows peaks — and I can always see
+      exactly which kilometre range each shade stands for.
+
+      **Demonstrates**
+      With the seeded block the legend shows computed ranges that match the rendered cells; seeding a window
+      with three runs instead flips the legend to fixed bands and says why.
+
+      **Traces to**
+      `FR-006` — **MoSCoW: Must**. PRD `### UX & frontend`.
+      Visual contract: `.larapilot/mockups/heatmap-dashboard/README.md` → "The intensity ramp" (exact hexes and
+      the validator commands) and `states.html` state 5.
+
+      **Acceptance Criteria**
+      - [ ] Five levels: level 0 for a day with no running, levels 1–4 from the **25th, 50th and 75th
+            percentiles of the non-zero daily distances** in the visible 112-day window
+      - [ ] Thresholds are recomputed after every sync, not cached across windows
+      - [ ] A legend is **always visible** and states the actual kilometre range of each level
+      - [ ] **Sparse fallback:** fewer than four non-zero days in the window → documented fixed bands
+            (0 / ≤ 5 / ≤ 10 / ≤ 20 / 20+ km) and the legend states that the window is too sparse to calibrate
+      - [ ] **Degenerate fallback:** if the computed thresholds collapse (p25 == p75 — e.g. every run is the
+            same distance), the fixed bands are used too, rather than rendering every day at one level
+      - [ ] The ramp uses exactly the validated hexes recorded in the mockup README, with the **dark ramp
+            inverted** (lowest mileage nearest the surface, highest brightest) — not an automatic flip of the
+            light values
+      - [ ] The ramp is single-hue and ordered by luminance; no meaning is carried by colour alone, since the
+            legend states numeric ranges and every cell announces its exact distance
+      - [ ] Unit tests for the bucketing: boundary values landing exactly on p25/p50/p75, windows with 0, 1, 3
+            and 4 non-zero days, an all-identical-distance window, and recomputation after a sync changes the
+            distribution
+  -
+    code: US-006
+    title: 'Sync status, stale-data warning and empty states'
+    epic:
+      code: EP-002
+      title: 'Activity sync'
+    priority: HIGH
+    points: 3
+    status: TODO
+    body: |
+      #### US-006: Sync status, stale-data warning and empty states
+
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 3 | **Status:** TODO
+      **Blocked by:** US-003
+
+      **User Story**
+      As the runner,
+      I want the dashboard to tell me when it last actually reached Strava,
+      so that I never mistake a stale map for a bad training week.
+
+      **Demonstrates**
+      A fresh successful sync shows a relative timestamp; a failed or 48-hour-old sync replaces it with an
+      explicit warning naming the reason; a connected account with no runs still renders the grid.
+
+      **Traces to**
+      `FR-007` — **MoSCoW: Must**. PRD `### Strava integration` → Resilience.
+      Visual contract: `.larapilot/mockups/heatmap-dashboard/states.html` states 3, 4 and 6.
+
+      **Acceptance Criteria**
+      - [ ] The dashboard always shows when data was **last successfully** refreshed, in relative terms
+            ("synced 6 hours ago")
+      - [ ] If the most recent sync **failed**, or no sync has succeeded for **more than 48 hours**, the
+            indicator is replaced by an explicit warning state that names the failure reason and offers the
+            recovery action
+      - [ ] Stale data is **never presented as current** — the grid still renders what it has, under the warning
+      - [ ] The sync detail surface shows last run timestamp, outcome, and the number of runs in the window,
+            sourced from `sync_runs`
+      - [ ] The loading state uses a skeleton that preserves the grid geometry so nothing shifts when data
+            lands, and it animates only under `prefers-reduced-motion: no-preference`
+      - [ ] A connected account with **no runs in the window** renders the empty grid with an explanatory line
+            rather than a blank page or an error
+      - [ ] The loading region uses `aria-busy` with a polite live region; the stale warning uses `role="alert"`
+      - [ ] Tests: a recent success renders the relative time; a failed last run renders the warning with its
+            reason; a success older than 48 hours renders the warning; an account that has never synced renders
+            the correct first-run state

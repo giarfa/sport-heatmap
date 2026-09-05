@@ -1,0 +1,46 @@
+code: US-005
+title: 'Self-calibrating intensity scale and legend'
+epic:
+  code: EP-003
+  title: 'Heatmap dashboard'
+priority: HIGH
+points: 5
+status: TODO
+body: |
+  #### US-005: Self-calibrating intensity scale and legend
+
+  **Epic:** EP-003 | **Priority:** HIGH | **Points:** 5 | **Status:** TODO
+  **Blocked by:** US-004
+
+  **User Story**
+  As the runner,
+  I want a cell's darkness to mean "hard for me, right now" rather than "past some fixed number",
+  so that a recovery block still shows contrast and a peak block still shows peaks — and I can always see
+  exactly which kilometre range each shade stands for.
+
+  **Demonstrates**
+  With the seeded block the legend shows computed ranges that match the rendered cells; seeding a window
+  with three runs instead flips the legend to fixed bands and says why.
+
+  **Traces to**
+  `FR-006` — **MoSCoW: Must**. PRD `### UX & frontend`.
+  Visual contract: `.larapilot/mockups/heatmap-dashboard/README.md` → "The intensity ramp" (exact hexes and
+  the validator commands) and `states.html` state 5.
+
+  **Acceptance Criteria**
+  - [ ] Five levels: level 0 for a day with no running, levels 1–4 from the **25th, 50th and 75th
+        percentiles of the non-zero daily distances** in the visible 112-day window
+  - [ ] Thresholds are recomputed after every sync, not cached across windows
+  - [ ] A legend is **always visible** and states the actual kilometre range of each level
+  - [ ] **Sparse fallback:** fewer than four non-zero days in the window → documented fixed bands
+        (0 / ≤ 5 / ≤ 10 / ≤ 20 / 20+ km) and the legend states that the window is too sparse to calibrate
+  - [ ] **Degenerate fallback:** if the computed thresholds collapse (p25 == p75 — e.g. every run is the
+        same distance), the fixed bands are used too, rather than rendering every day at one level
+  - [ ] The ramp uses exactly the validated hexes recorded in the mockup README, with the **dark ramp
+        inverted** (lowest mileage nearest the surface, highest brightest) — not an automatic flip of the
+        light values
+  - [ ] The ramp is single-hue and ordered by luminance; no meaning is carried by colour alone, since the
+        legend states numeric ranges and every cell announces its exact distance
+  - [ ] Unit tests for the bucketing: boundary values landing exactly on p25/p50/p75, windows with 0, 1, 3
+        and 4 non-zero days, an all-identical-distance window, and recomputation after a sync changes the
+        distribution

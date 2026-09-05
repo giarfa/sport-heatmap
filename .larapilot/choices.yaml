@@ -1,0 +1,34 @@
+project_kind: Personal
+project_origin: Greenfield
+delivery_target: MVP
+budget_sensitivity: 'Relaxed — Personal project; Aurora ran no budget round. Advisory note only: this workload is a single SQLite file, one nightly HTTP job, and a static page. It fits the smallest tier of any host; nothing here justifies managed database, cache, or queue spend.'
+frontend_topology: Laravel-coupled
+deadlines: 'None — no fixed delivery date or milestone recorded.'
+data_store: 'SQLite — **Mike:** correct for one athlete and roughly a hundred rows in the window; concurrency is a single nightly writer.'
+hierarchy_pattern: 'N/A — no tree structures.'
+search: none.
+admin_panel: 'none. Filament and the Laravel starter kits were considered and rejected — there is one screen and one user, and both would ship more scaffolding than the entire product.'
+local_dev: "**Laravel Herd** (macOS, native PHP, `.test` domain) — chosen, not defaulted. Herd's HTTPS `.test` URL doubles as the Strava OAuth callback origin in development. No Sail, no Docker scaffolding."
+cli_tooling: 'Artisan only — **Sarah:** one sync command, invoked by the scheduler and (later) by FR-010. No Bash or Go CLI, no CI pipeline scripts beyond the standard test/lint job, no server shell scripting until a deploy target exists.'
+settings:
+  effort: STANDARD
+  backlog: STANDARD
+  git_mode: GITFLOW
+  testing: NORMAL
+  auto_approve: 'NO'
+  lucille: 'YES'
+  decision_log: 'YES'
+  code_history: 'NO'
+  dashboard_auth: 'NO'
+  api_auth: 'NO'
+  security_scan: 'NO'
+  github: 'NO'
+  gitlab: 'NO'
+  bitbucket: 'NO'
+  azure: 'NO'
+  notifications: 'NO'
+  notify_slack: 'NO'
+  notify_discord: 'NO'
+  notify_telegram: 'NO'
+source: choices.yaml
+updated_at: '2026-09-05T14:42:14+00:00'

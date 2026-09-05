@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 148 32" width="148" height="32" role="img" aria-label="Heatmap">
+  <title>Heatmap</title>
+  <!-- Mark: four cells from the validated intensity ramp (fixed hues).
+       Wordmark: currentColor, so one file serves light and dark surfaces.
+       Clear space: 8px on every side (= half the mark's 16px module).
+       Minimum width: 96px. Below that, use favicon.svg alone. -->
+  <g>
+    <rect x="0"  y="17" width="12" height="12" rx="3" fill="#86b6ef"/>
+    <rect x="14" y="17" width="12" height="12" rx="3" fill="#2a78d6"/>
+    <rect x="0"  y="3"  width="12" height="12" rx="3" fill="#3987e5"/>
+    <rect x="14" y="3"  width="12" height="12" rx="3" fill="#104281"/>
+  </g>
+  <text x="36" y="22"
+        font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+        font-size="17" font-weight="600" letter-spacing="-0.4"
+        fill="currentColor">Heatmap</text>
+</svg>

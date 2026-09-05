@@ -1,0 +1,45 @@
+connector: file
+settings:
+  effort: STANDARD
+  backlog: STANDARD
+  git_mode: GITFLOW
+  testing: NORMAL
+  auto_approve: false
+  lucille: true
+  github: false
+  gitlab: false
+  bitbucket: false
+  notifications: false
+  notify_slack: false
+  notify_discord: false
+  notify_telegram: false
+frontend:
+  repo_path: null
+  stack: null
+paths:
+  prd: .larapilot/docs/PRD.md
+  mockups: .larapilot/mockups/
+  test_results: .larapilot/docs/test-results/
+  review: .larapilot/docs/review/
+  security: .larapilot/docs/security/
+  launch: .larapilot/docs/launch/
+  support: .larapilot/docs/support/
+  client_materials: .larapilot/client-materials/
+  legacy: .larapilot/legacy/
+  research: .larapilot/research/
+  design_systems: .larapilot/design-systems/
+  internal_feedback: .larapilot/internal-feedback/
+  usage: .larapilot/usage/
+  choices: .larapilot/choices.yaml
+  schedule: .larapilot/usage/schedule.yaml
+workflow:
+  statuses:
+    todo: TODO
+    planned: PLANNED
+    in_progress: 'IN PROGRESS'
+    review: REVIEW
+    done: DONE
+file:
+  backlog: .larapilot/backlog.yaml
+  specs: .larapilot/specs/
+  planning: .larapilot/plans/

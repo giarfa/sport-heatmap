@@ -1,0 +1,50 @@
+code: US-002
+title: 'Connect Strava and sign in'
+epic:
+  code: EP-001
+  title: 'Foundation & Strava connection'
+priority: CRITICAL
+points: 5
+status: TODO
+body: |
+  #### US-002: Connect Strava and sign in
+
+  **Epic:** EP-001 | **Priority:** CRITICAL | **Points:** 5 | **Status:** TODO
+  **Blocked by:** US-001
+
+  **User Story**
+  As the runner,
+  I want to sign in to the dashboard by authorising Strava once,
+  so that there is no separate password to manage and the app can read my activities on my behalf —
+  while nobody else who happens to have a Strava account can get in.
+
+  **Demonstrates**
+  Visiting the dashboard signed out shows the connect screen; completing the Strava flow as the
+  allowlisted athlete lands on the dashboard authenticated; completing it as any other athlete is
+  rejected with nothing persisted.
+
+  **Traces to**
+  `FR-001` — **MoSCoW: Must**. PRD `### Security` (Lars), `### Privacy & legal` (Violet).
+  Visual contract: `.larapilot/mockups/heatmap-dashboard/states.html` states 1 and 2.
+
+  **Acceptance Criteria**
+  - [ ] "Connect with Strava" starts the official OAuth2 authorization-code flow requesting **only**
+        `activity:read_all` — no write scope is ever requested
+  - [ ] On callback the athlete id is checked against the `.env` allowlist **before** any token, user row,
+        or session is created
+  - [ ] A non-allowlisted athlete sees an explicit rejection screen and **no session exists, no tokens are
+        stored, and no user record is written** — verified by asserting empty tables after the attempt
+  - [ ] Access and refresh tokens are persisted through Eloquent `encrypted` casts; client id and secret
+        live only in `.env` and never reach the database or the repository
+  - [ ] The access token is refreshed transparently from the refresh token when it is expired or within the
+        configured safety margin of expiring, before any Strava call
+  - [ ] The OAuth callback route is rate-limited
+  - [ ] Visiting the dashboard while signed out renders the connect screen, not an error
+  - [ ] Tests (Strava HTTP faked): allowlisted athlete signs in; non-allowlisted athlete rejected with
+        nothing persisted; an expired token triggers a refresh; a refresh failure surfaces as a clear
+        reconnect state rather than a 500
+
+  **Open decision for `/larapilot-plan`** — 👾 Andrew: the PRD defers the choice between
+  `laravel/socialite` + `socialiteproviders/strava` (two new dependencies, pending user approval) and a
+  hand-rolled authorization-code exchange on Laravel's HTTP client (~60 lines, zero dependencies).
+  Resolve it in planning; do not add packages without approval.

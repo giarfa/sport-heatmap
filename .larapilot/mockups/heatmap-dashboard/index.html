@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Training heatmap — last 16 weeks</title>
+<meta name="description" content="Private training dashboard — daily running distance over the last 16 weeks.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] } } } }</script>
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet">
+<style>
+  /* ---- Design tokens -------------------------------------------------------
+     Intensity ramp: single-hue blue sequential, validated with the dataviz
+     validator against the real card surfaces (#ffffff light / #0f172a dark):
+     light  -> monotone L, adjacent dL >= 0.06, lightest step 2.11:1, hue spread 3deg
+     dark   -> same gates, step nearest surface 2.20:1
+     Do not substitute steps by eye. Re-run the validator if you change one. */
+  :root {
+    --surface-page: #f8fafc;  /* slate-50  */
+    --surface-card: #ffffff;
+    --hairline:     #e2e8f0;  /* slate-200 */
+    --ink:          #0f172a;  /* slate-900 */
+    --ink-muted:    #64748b;  /* slate-500 */
+    --accent:       #4338ca;  /* indigo-700 — focus & links, never a data colour */
+    --warn-bg:      #fffbeb;  /* amber-50  */
+    --warn-border:  #fcd34d;  /* amber-300 */
+    --warn-ink:     #92400e;  /* amber-800 */
+    --ok-dot:       #0ca30c;
+    --skeleton:     #e2e8f0;
+
+    --lv-0: #e2e8f0;
+    --lv-1: #86b6ef;
+    --lv-2: #3987e5;
+    --lv-3: #256abf;
+    --lv-4: #104281;
+    --lv-future-border: #cbd5e1;
+    --cell-ring: rgba(15, 23, 42, 0.08);
+  }
+  html.dark {
+    --surface-page: #020617;  /* slate-950 */
+    --surface-card: #0f172a;  /* slate-900 */
+    --hairline:     #1e293b;  /* slate-800 */
+    --ink:          #f8fafc;
+    --ink-muted:    #94a3b8;  /* slate-400 */
+    --accent:       #a5b4fc;  /* indigo-300 */
+    --warn-bg:      #2a1f05;
+    --warn-border:  #854d0e;
+    --warn-ink:     #fcd34d;
+    --ok-dot:       #22c55e;
+    --skeleton:     #1e293b;
+
+    --lv-0: #1e293b;
+    --lv-1: #184f95;
+    --lv-2: #2a78d6;
+    --lv-3: #5598e7;
+    --lv-4: #9ec5f4;
+    --lv-future-border: #334155;
+    --cell-ring: rgba(248, 250, 252, 0.10);
+  }
+
+  body { background: var(--surface-page); color: var(--ink); }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  .skip-link { position:absolute; left:-9999px; }
+  .skip-link:focus { left:0.75rem; top:0.75rem; z-index:50; padding:0.5rem 0.75rem; border-radius:0.5rem;
+    background:var(--surface-card); color:var(--ink); outline:2px solid var(--accent); outline-offset:2px; }
+  :where(a, button, [tabindex]):focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:0.375rem; }
+
+  .card { background: var(--surface-card); border:1px solid var(--hairline); border-radius:0.75rem; }
+
+  /* ---- Heatmap -------------------------------------------------------------
+     Column widths are percentages on <colgroup> and gaps are cell padding, so
+     the grid always sums to exactly 100% of its container. Never reintroduce
+     border-spacing here: it is added ON TOP of width:100% and pushes Sunday
+     and the week-total column off a 375px viewport. */
+  .hm { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; }
+  .hm-col-week  { width:13%; }
+  .hm-col-day   { width:9.5%; }
+  .hm-col-total { width:20.5%; }
+
+  .hm-th-week { padding:0 0.375rem 0 0; text-align:right; font-size:0.625rem; font-weight:500;
+    color:var(--ink-muted); font-variant-numeric:tabular-nums; white-space:nowrap; vertical-align:middle; }
+  .hm-th-day { padding:0 0 0.375rem; font-size:0.625rem; font-weight:600; color:var(--ink-muted); text-align:center; }
+  .hm-th-day abbr { text-decoration:none; }
+  .hm-th-total { padding:0 0 0.375rem 0.375rem; font-size:0.625rem; font-weight:600; color:var(--ink-muted); text-align:right; }
+  .hm-td { padding:2px; }
+  .hm-cell { display:block; width:100%; aspect-ratio:1/1; border-radius:0.1875rem;
+    box-shadow: inset 0 0 0 1px var(--cell-ring); }
+  .hm-l0 { background: var(--lv-0); }
+  .hm-l1 { background: var(--lv-1); }
+  .hm-l2 { background: var(--lv-2); }
+  .hm-l3 { background: var(--lv-3); }
+  .hm-l4 { background: var(--lv-4); }
+  .hm-future { background: transparent; box-shadow:none; border:1px dashed var(--lv-future-border); }
+  .hm-total { text-align:right; font-size:0.6875rem; color:var(--ink); vertical-align:middle;
+    font-variant-numeric:tabular-nums; white-space:nowrap; padding:0 0 0 0.375rem; }
+  .hm-total-num { font-weight:600; }
+  .hm-total-unit { color:var(--ink-muted); }
+  .hm-partial { display:block; font-size:0.5625rem; font-weight:500; color:var(--ink-muted);
+    text-transform:uppercase; letter-spacing:0.04em; line-height:1.1; }
+  .hm-row-current .hm-th-week { color:var(--ink); font-weight:600; }
+
+  .hm-legend-title { font-size:0.75rem; font-weight:600; color:var(--ink); }
+  .hm-legend-note { margin-top:0.125rem; font-size:0.75rem; color:var(--ink-muted); }
+  .hm-legend-list { margin-top:0.5rem; display:flex; flex-wrap:wrap; gap:0.375rem 1rem; }
+  .hm-key { display:flex; align-items:center; gap:0.375rem; font-size:0.6875rem; color:var(--ink-muted); }
+  .hm-key-swatch { width:0.75rem; height:0.75rem; aspect-ratio:auto; border-radius:0.1875rem; flex:none; }
+  .hm-key-name { font-weight:600; color:var(--ink); }
+  .hm-key-range { font-variant-numeric:tabular-nums; }
+
+  @media (min-width: 480px) {
+    .hm-th-week { font-size:0.6875rem; }
+    .hm-th-day, .hm-th-total { font-size:0.6875rem; }
+    .hm-total { font-size:0.8125rem; }
+    .hm-td { padding:3px; }
+    .hm-cell { border-radius:0.25rem; }
+    .hm-key { font-size:0.75rem; }
+  }
+  @media (min-width: 1024px) {
+    .hm-col-week { width:11%; }
+    .hm-col-day { width:9.7%; }
+    .hm-col-total { width:21.1%; }
+    .hm-th-week { font-size:0.75rem; }
+    .hm-total { font-size:0.875rem; }
+    .hm-td { padding:4px; }
+  }
+
+  /* ---- Dashboard layout ----------------------------------------------------
+     The grid is capped at a readable cell density (~48px) instead of stretching
+     to the container. Desktop enhancement is a side rail, not bigger squares. */
+  .dash { display:grid; gap:1rem; align-items:start; }
+  .dash-grid { max-width:34rem; margin-inline:auto; width:100%; }
+  .states .dash-grid { margin-inline:0; }
+  .rail { display:grid; gap:1rem; }
+  @media (min-width: 1024px) {
+    .dash { grid-template-columns: minmax(0, 34rem) minmax(0, 1fr); gap:1.5rem; }
+    .dash-grid { margin-inline:0; }
+  }
+
+  .skeleton { background: var(--skeleton); border-radius:0.1875rem; }
+  @media (prefers-reduced-motion: no-preference) {
+    .skeleton { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.55 } }
+  }
+</style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+  <a href="#main" class="skip-link">Skip to the heatmap</a>
+  
+    <header class="sticky top-0 z-10 border-b" style="background:var(--surface-card); border-color:var(--hairline);">
+      <div class="mx-auto flex h-14 max-w-5xl items-center justify-between px-3 sm:px-6">
+        <a href="index.html" class="flex items-center gap-2" style="color:var(--ink);">
+          <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true" class="shrink-0">
+            <rect x="3"  y="17" width="12" height="12" rx="3" fill="#86b6ef"/>
+            <rect x="17" y="17" width="12" height="12" rx="3" fill="#2a78d6"/>
+            <rect x="3"  y="3"  width="12" height="12" rx="3" fill="#3987e5"/>
+            <rect x="17" y="3"  width="12" height="12" rx="3" fill="#104281"/>
+          </svg>
+          <span class="text-sm font-semibold tracking-tight">Heatmap</span>
+        </a>
+        <div class="flex items-center gap-1">
+          <span class="hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-xs sm:inline-flex"
+            style="background:var(--hairline); color:var(--ink-muted);">
+            <span aria-hidden="true" class="h-1.5 w-1.5 rounded-full" style="background:var(--ok-dot);"></span>
+            Synced 6 hours ago</span>
+          <button type="button" data-theme-toggle aria-pressed="false"
+                  class="grid h-11 w-11 place-items-center rounded-lg" style="color:var(--ink-muted);">
+            <span class="sr-only">Toggle dark mode</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+  <main id="main" class="mx-auto max-w-5xl px-3 py-4 sm:px-6 sm:py-6">
+    <h1 class="text-lg font-semibold tracking-tight sm:text-xl">Last 16 weeks</h1>
+    <p class="mt-0.5 text-sm" style="color:var(--ink-muted);">18 May – 6 Sep 2026 · running distance per day</p>
+    
+    <div class="dash mt-4">
+      <section class="card dash-grid p-3 sm:p-5" aria-labelledby="grid-heading">
+        <h2 id="grid-heading" class="sr-only">Daily running distance, 16 weeks by weekday</h2>
+      <table class="hm">
+        <caption class="sr-only">
+          Sixteen rows, one per week, oldest first. Seven columns, Monday to Sunday, plus a weekly total column.
+          Cell shading encodes daily running distance in five levels relative to this window.
+        </caption>
+        <colgroup>
+          <col class="hm-col-week"><col span="7" class="hm-col-day"><col class="hm-col-total">
+        </colgroup>
+        <thead>
+          <tr>
+            <td class="hm-th-week"><span class="sr-only">Week starting</span></td>
+            <th scope="col" class="hm-th-day"><abbr title="Monday">Mo</abbr></th>
+            <th scope="col" class="hm-th-day"><abbr title="Tuesday">Tu</abbr></th>
+            <th scope="col" class="hm-th-day"><abbr title="Wednesday">We</abbr></th>
+            <th scope="col" class="hm-th-day"><abbr title="Thursday">Th</abbr></th>
+            <th scope="col" class="hm-th-day"><abbr title="Friday">Fr</abbr></th>
+            <th scope="col" class="hm-th-day"><abbr title="Saturday">Sa</abbr></th>
+            <th scope="col" class="hm-th-day"><abbr title="Sunday">Su</abbr></th>
+            <th scope="col" class="hm-th-total">Week</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>18 May</th>
+            <td class="hm-td"><span class="sr-only">Monday 18 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Monday 18 May 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 19 May 2026: 8.2 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Tuesday 19 May 2026 — 8.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 20 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 20 May 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 21 May 2026: 10.1 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Thursday 21 May 2026 — 10.1 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 22 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 22 May 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 23 May 2026: 14.5 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 23 May 2026 — 14.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 24 May 2026: 6.0 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Sunday 24 May 2026 — 6.0 km"></span></td>
+            <td class="hm-total"><span class="hm-total-num">38.8</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>25 May</th>
+            <td class="hm-td"><span class="sr-only">Monday 25 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Monday 25 May 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 26 May 2026: 8.6 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Tuesday 26 May 2026 — 8.6 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 27 May 2026: 6.2 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Wednesday 27 May 2026 — 6.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 28 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Thursday 28 May 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 29 May 2026: 9.8 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Friday 29 May 2026 — 9.8 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 30 May 2026: 16.2 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 30 May 2026 — 16.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 31 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Sunday 31 May 2026 — rest"></span></td>
+            <td class="hm-total"><span class="hm-total-num">40.8</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>1 Jun</th>
+            <td class="hm-td"><span class="sr-only">Monday 1 Jun 2026: 5.5 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Monday 1 Jun 2026 — 5.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 2 Jun 2026: 9.0 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Tuesday 2 Jun 2026 — 9.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 3 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 3 Jun 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 4 Jun 2026: 10.4 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Thursday 4 Jun 2026 — 10.4 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 5 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 5 Jun 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 6 Jun 2026: 18.0 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 6 Jun 2026 — 18.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 7 Jun 2026: 7.2 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Sunday 7 Jun 2026 — 7.2 km"></span></td>
+            <td class="hm-total"><span class="hm-total-num">50.1</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>8 Jun</th>
+            <td class="hm-td"><span class="sr-only">Monday 8 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Monday 8 Jun 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 9 Jun 2026: 7.0 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Tuesday 9 Jun 2026 — 7.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 10 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 10 Jun 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 11 Jun 2026: 8.5 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Thursday 11 Jun 2026 — 8.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 12 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 12 Jun 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 13 Jun 2026: 12.0 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Saturday 13 Jun 2026 — 12.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 14 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Sunday 14 Jun 2026 — rest"></span></td>
+            <td class="hm-total"><span class="hm-total-num">27.5</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>15 Jun</th>
+            <td class="hm-td"><span class="sr-only">Monday 15 Jun 2026: 6.0 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Monday 15 Jun 2026 — 6.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 16 Jun 2026: 10.2 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Tuesday 16 Jun 2026 — 10.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 17 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 17 Jun 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 18 Jun 2026: 12.4 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Thursday 18 Jun 2026 — 12.4 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 19 Jun 2026: 6.5 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Friday 19 Jun 2026 — 6.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 20 Jun 2026: 20.1 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 20 Jun 2026 — 20.1 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 21 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Sunday 21 Jun 2026 — rest"></span></td>
+            <td class="hm-total"><span class="hm-total-num">55.2</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>22 Jun</th>
+            <td class="hm-td"><span class="sr-only">Monday 22 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Monday 22 Jun 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 23 Jun 2026: 11.0 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Tuesday 23 Jun 2026 — 11.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 24 Jun 2026: 7.0 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Wednesday 24 Jun 2026 — 7.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 25 Jun 2026: 13.2 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Thursday 25 Jun 2026 — 13.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 26 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 26 Jun 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 27 Jun 2026: 22.5 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 27 Jun 2026 — 22.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 28 Jun 2026: 8.0 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Sunday 28 Jun 2026 — 8.0 km"></span></td>
+            <td class="hm-total"><span class="hm-total-num">61.7</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>29 Jun</th>
+            <td class="hm-td"><span class="sr-only">Monday 29 Jun 2026: 6.4 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Monday 29 Jun 2026 — 6.4 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 30 Jun 2026: 12.1 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Tuesday 30 Jun 2026 — 12.1 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 1 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 1 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 2 Jul 2026: 14.0 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Thursday 2 Jul 2026 — 14.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 3 Jul 2026: 7.2 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Friday 3 Jul 2026 — 7.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 4 Jul 2026: 24.2 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 4 Jul 2026 — 24.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 5 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Sunday 5 Jul 2026 — rest"></span></td>
+            <td class="hm-total"><span class="hm-total-num">63.9</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>6 Jul</th>
+            <td class="hm-td"><span class="sr-only">Monday 6 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Monday 6 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 7 Jul 2026: 8.0 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Tuesday 7 Jul 2026 — 8.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 8 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 8 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 9 Jul 2026: 9.5 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Thursday 9 Jul 2026 — 9.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 10 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 10 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 11 Jul 2026: 14.8 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 11 Jul 2026 — 14.8 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 12 Jul 2026: 6.5 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Sunday 12 Jul 2026 — 6.5 km"></span></td>
+            <td class="hm-total"><span class="hm-total-num">38.8</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>13 Jul</th>
+            <td class="hm-td"><span class="sr-only">Monday 13 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Monday 13 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 14 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Tuesday 14 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 15 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 15 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 16 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Thursday 16 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 17 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 17 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 18 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Saturday 18 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 19 Jul 2026: 5.0 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Sunday 19 Jul 2026 — 5.0 km"></span></td>
+            <td class="hm-total"><span class="hm-total-num">5.0</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>20 Jul</th>
+            <td class="hm-td"><span class="sr-only">Monday 20 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Monday 20 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 21 Jul 2026: 6.0 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Tuesday 21 Jul 2026 — 6.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 22 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 22 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 23 Jul 2026: 7.5 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Thursday 23 Jul 2026 — 7.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 24 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 24 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 25 Jul 2026: 11.0 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Saturday 25 Jul 2026 — 11.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 26 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Sunday 26 Jul 2026 — rest"></span></td>
+            <td class="hm-total"><span class="hm-total-num">24.5</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>27 Jul</th>
+            <td class="hm-td"><span class="sr-only">Monday 27 Jul 2026: 5.8 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Monday 27 Jul 2026 — 5.8 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 28 Jul 2026: 10.5 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Tuesday 28 Jul 2026 — 10.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 29 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 29 Jul 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 30 Jul 2026: 12.8 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Thursday 30 Jul 2026 — 12.8 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 31 Jul 2026: 6.8 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Friday 31 Jul 2026 — 6.8 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 1 Aug 2026: 21.0 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 1 Aug 2026 — 21.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 2 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Sunday 2 Aug 2026 — rest"></span></td>
+            <td class="hm-total"><span class="hm-total-num">56.9</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>3 Aug</th>
+            <td class="hm-td"><span class="sr-only">Monday 3 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Monday 3 Aug 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 4 Aug 2026: 12.4 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Tuesday 4 Aug 2026 — 12.4 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 5 Aug 2026: 8.0 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Wednesday 5 Aug 2026 — 8.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 6 Aug 2026: 14.5 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Thursday 6 Aug 2026 — 14.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 7 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 7 Aug 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 8 Aug 2026: 26.4 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 8 Aug 2026 — 26.4 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 9 Aug 2026: 8.5 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Sunday 9 Aug 2026 — 8.5 km"></span></td>
+            <td class="hm-total"><span class="hm-total-num">69.8</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>10 Aug</th>
+            <td class="hm-td"><span class="sr-only">Monday 10 Aug 2026: 6.8 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Monday 10 Aug 2026 — 6.8 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 11 Aug 2026: 13.0 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Tuesday 11 Aug 2026 — 13.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 12 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 12 Aug 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 13 Aug 2026: 15.2 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Thursday 13 Aug 2026 — 15.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 14 Aug 2026: 7.5 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Friday 14 Aug 2026 — 7.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 15 Aug 2026: 28.0 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 15 Aug 2026 — 28.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 16 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Sunday 16 Aug 2026 — rest"></span></td>
+            <td class="hm-total"><span class="hm-total-num">70.5</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>17 Aug</th>
+            <td class="hm-td"><span class="sr-only">Monday 17 Aug 2026: 7.0 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Monday 17 Aug 2026 — 7.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 18 Aug 2026: 14.2 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Tuesday 18 Aug 2026 — 14.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 19 Aug 2026: 8.5 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Wednesday 19 Aug 2026 — 8.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 20 Aug 2026: 16.0 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Thursday 20 Aug 2026 — 16.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 21 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 21 Aug 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 22 Aug 2026: 32.1 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 22 Aug 2026 — 32.1 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 23 Aug 2026: 9.0 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Sunday 23 Aug 2026 — 9.0 km"></span></td>
+            <td class="hm-total"><span class="hm-total-num">86.8</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>24 Aug</th>
+            <td class="hm-td"><span class="sr-only">Monday 24 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Monday 24 Aug 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 25 Aug 2026: 10.0 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Tuesday 25 Aug 2026 — 10.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 26 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 26 Aug 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 27 Aug 2026: 11.5 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Thursday 27 Aug 2026 — 11.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 28 Aug 2026: 6.0 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Friday 28 Aug 2026 — 6.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 29 Aug 2026: 16.0 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 29 Aug 2026 — 16.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 30 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Sunday 30 Aug 2026 — rest"></span></td>
+            <td class="hm-total"><span class="hm-total-num">43.5</span><span class="hm-total-unit"> km</span></td>
+          </tr>
+          <tr class="hm-row hm-row-current">
+            <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>31 Aug</th>
+            <td class="hm-td"><span class="sr-only">Monday 31 Aug 2026: 5.5 km</span><span aria-hidden="true" class="hm-cell hm-l1" title="Monday 31 Aug 2026 — 5.5 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Tuesday 1 Sep 2026: 9.2 km</span><span aria-hidden="true" class="hm-cell hm-l2" title="Tuesday 1 Sep 2026 — 9.2 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Wednesday 2 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Wednesday 2 Sep 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Thursday 3 Sep 2026: 11.0 km</span><span aria-hidden="true" class="hm-cell hm-l3" title="Thursday 3 Sep 2026 — 11.0 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Friday 4 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-l0" title="Friday 4 Sep 2026 — rest"></span></td>
+            <td class="hm-td"><span class="sr-only">Saturday 5 Sep 2026: 18.4 km</span><span aria-hidden="true" class="hm-cell hm-l4" title="Saturday 5 Sep 2026 — 18.4 km"></span></td>
+            <td class="hm-td"><span class="sr-only">Sunday 6 Sep 2026: not yet</span><span aria-hidden="true" class="hm-cell hm-future"></span></td>
+            <td class="hm-total"><span class="hm-total-num">44.1</span><span class="hm-total-unit"> km</span><span class="hm-partial">partial</span></td>
+          </tr>
+        </tbody>
+      </table>
+      </section>
+      <aside class="rail" aria-label="Legend and sync detail">
+        <div class="card p-4">
+          <h3 class="hm-legend-title">Intensity</h3>
+        <p class="hm-legend-note">Calibrated to your 68 running days in this window — recomputed after every sync.</p>
+        <ul class="hm-legend-list">
+            <li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-l0"></span><span class="hm-key-name">Rest</span><span class="hm-key-range">0 km</span></li>
+            <li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-l1"></span><span class="hm-key-name">Easy</span><span class="hm-key-range">0.1 – 7.2 km</span></li>
+            <li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-l2"></span><span class="hm-key-name">Steady</span><span class="hm-key-range">7.2 – 9.9 km</span></li>
+            <li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-l3"></span><span class="hm-key-name">Hard</span><span class="hm-key-range">9.9 – 14.1 km</span></li>
+            <li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-l4"></span><span class="hm-key-name">Peak</span><span class="hm-key-range">14.1+ km</span></li>
+        </ul>
+        </div>
+        
+      <div class="card p-4">
+        <h3 class="text-xs font-semibold">Sync</h3>
+        <dl class="mt-2 space-y-1.5 text-xs" style="color:var(--ink-muted);">
+          <div class="flex justify-between gap-3">
+            <dt>Last run</dt>
+            <dd class="text-right" style="color:var(--ink);">5 Sep 2026, 04:12<span class="block" style="color:var(--ink-muted);">6 hours ago</span></dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt>Outcome</dt>
+            <dd class="inline-flex items-center gap-1.5" style="color:var(--ink);">
+              <span aria-hidden="true" class="h-1.5 w-1.5 rounded-full" style="background:var(--ok-dot);"></span>Succeeded
+            </dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt>Runs in window</dt>
+            <dd style="color:var(--ink);">68</dd>
+          </div>
+        </dl>
+      </div>
+      </aside>
+    </div>
+  </main>
+  
+    <footer class="mx-auto max-w-5xl px-3 pb-8 pt-3 sm:px-6">
+      <p class="text-xs" style="color:var(--ink-muted);">
+        <a href="https://www.strava.com" class="underline underline-offset-2" style="color:var(--accent);">Powered by Strava</a>
+        · runs only · distances in kilometres
+        <span class="sm:hidden"> · synced 6 hours ago</span>
+      </p>
+    </footer>
+  
+<script>
+  /* Mockup default is LIGHT so the primary reference screenshots light.
+     PRODUCT CONTRACT (Alex): on first visit follow prefers-color-scheme,
+     then persist the user's explicit choice. */
+  (function () {
+    var root = document.documentElement;
+    if (localStorage.getItem('theme') === 'dark') root.classList.add('dark');
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-theme-toggle]');
+      if (!btn) return;
+      root.classList.toggle('dark');
+      var dark = root.classList.contains('dark');
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+      document.querySelectorAll('[data-theme-toggle]').forEach(function (b) {
+        b.setAttribute('aria-pressed', dark ? 'true' : 'false');
+      });
+    });
+  })();
+</script>
+</body>
+</html>

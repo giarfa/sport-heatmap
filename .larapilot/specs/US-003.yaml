@@ -1,0 +1,52 @@
+code: US-003
+title: 'Daily sync of runs from Strava'
+epic:
+  code: EP-002
+  title: 'Activity sync'
+priority: HIGH
+points: 8
+status: TODO
+body: |
+  #### US-003: Daily sync of runs from Strava
+
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** TODO
+  **Blocked by:** US-002
+
+  **User Story**
+  As the runner,
+  I want my runs pulled from Strava automatically once a day,
+  so that the map is current every morning without me doing anything — and stays correct when I edit
+  or delete an activity on Strava afterwards.
+
+  **Demonstrates**
+  Running the sync command against a faked Strava API populates the 112-day window; running it a second
+  time changes nothing; editing and deleting an activity upstream is reflected on the next run.
+
+  **Traces to**
+  `FR-002`, `FR-003` — **MoSCoW: Must**. PRD `### Strava integration` (Matt), `### Data model` (Mike).
+
+  **Acceptance Criteria**
+  - [ ] A scheduled Artisan command runs **once per day** at the configured hour and timezone, registered
+        in `routes/console.php`
+  - [ ] Each run reconciles the **full 112-day window** — requests activities with `after` set to the start
+        of the window and paginates at maximum page size until the response is short
+  - [ ] Only running sport types are stored — `Run`, `TrailRun`, `VirtualRun`; every other sport is
+        discarded at sync time and never persisted
+  - [ ] Distances are stored as **integer metres**; a day's date comes from the activity's Strava **local**
+        start date, so attribution does not depend on server timezone
+  - [ ] Activities are upserted on `strava_activity_id`, so an edit on Strava (corrected distance, renamed,
+        changed sport type) propagates on the next run
+  - [ ] Local activities inside the window that are **absent** from the response are deleted, so an activity
+        removed on Strava disappears from the map
+  - [ ] The command is **idempotent** — running it twice in a row leaves the database byte-identical
+  - [ ] Every run writes a `sync_runs` record: start, finish, status, upserted count, deleted count, and the
+        error message on failure
+  - [ ] `429` and `5xx` responses are retried with backoff; an exhausted retry records a failed `sync_runs`
+        row, exits non-zero, and leaves no half-applied window
+  - [ ] Tests with a faked Strava HTTP client cover: pagination across pages, upsert of a changed activity,
+        deletion of an absent activity, sport-type filtering, token refresh mid-sync, `429` backoff, and
+        idempotency across two consecutive runs
+
+  **Note for planning** — 🔗 Matt: confirm the rate-limit allowance that applies to this application in the
+  Strava developer dashboard before implementation; Strava reduced the default for newer applications and
+  the PRD deliberately does not hardcode a number.

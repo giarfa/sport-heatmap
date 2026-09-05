@@ -1,0 +1,44 @@
+code: US-006
+title: 'Sync status, stale-data warning and empty states'
+epic:
+  code: EP-002
+  title: 'Activity sync'
+priority: HIGH
+points: 3
+status: TODO
+body: |
+  #### US-006: Sync status, stale-data warning and empty states
+
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 3 | **Status:** TODO
+  **Blocked by:** US-003
+
+  **User Story**
+  As the runner,
+  I want the dashboard to tell me when it last actually reached Strava,
+  so that I never mistake a stale map for a bad training week.
+
+  **Demonstrates**
+  A fresh successful sync shows a relative timestamp; a failed or 48-hour-old sync replaces it with an
+  explicit warning naming the reason; a connected account with no runs still renders the grid.
+
+  **Traces to**
+  `FR-007` — **MoSCoW: Must**. PRD `### Strava integration` → Resilience.
+  Visual contract: `.larapilot/mockups/heatmap-dashboard/states.html` states 3, 4 and 6.
+
+  **Acceptance Criteria**
+  - [ ] The dashboard always shows when data was **last successfully** refreshed, in relative terms
+        ("synced 6 hours ago")
+  - [ ] If the most recent sync **failed**, or no sync has succeeded for **more than 48 hours**, the
+        indicator is replaced by an explicit warning state that names the failure reason and offers the
+        recovery action
+  - [ ] Stale data is **never presented as current** — the grid still renders what it has, under the warning
+  - [ ] The sync detail surface shows last run timestamp, outcome, and the number of runs in the window,
+        sourced from `sync_runs`
+  - [ ] The loading state uses a skeleton that preserves the grid geometry so nothing shifts when data
+        lands, and it animates only under `prefers-reduced-motion: no-preference`
+  - [ ] A connected account with **no runs in the window** renders the empty grid with an explanatory line
+        rather than a blank page or an error
+  - [ ] The loading region uses `aria-busy` with a polite live region; the stale warning uses `role="alert"`
+  - [ ] Tests: a recent success renders the relative time; a failed last run renders the warning with its
+        reason; a success older than 48 hours renders the warning; an account that has never synced renders
+        the correct first-run state

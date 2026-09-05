@@ -1,0 +1,55 @@
+code: US-004
+title: 'The 16-week heatmap with weekly totals'
+epic:
+  code: EP-003
+  title: 'Heatmap dashboard'
+priority: HIGH
+points: 5
+status: TODO
+body: |
+  #### US-004: The 16-week heatmap with weekly totals
+
+  **Epic:** EP-003 | **Priority:** HIGH | **Points:** 5 | **Status:** TODO
+  **Blocked by:** US-001
+
+  **User Story**
+  As the runner,
+  I want sixteen weeks of daily mileage laid out as a seven-column grid with each week's total beside it,
+  so that I can see the shape of my training block in one glance, on my phone, straight after a run.
+
+  **Demonstrates**
+  With the seeded 16-week block, the dashboard renders 112 day cells plus 16 week totals, reads correctly
+  at 320 px and at 1280 px, and every cell announces its date and exact distance to a screen reader.
+
+  **Traces to**
+  `FR-004`, `FR-005`, `FR-008`, `FR-009` — **MoSCoW: Must**. PRD `### UX & frontend` (Elise + Joe).
+  Visual contract: `.larapilot/mockups/heatmap-dashboard/` — `index.html`, `dark.html`,
+  `breakpoints.html`, and the geometry and accessibility sections of its `README.md`.
+
+  **Acceptance Criteria**
+  - [ ] The grid renders **16 week-rows × 7 weekday-columns**, ISO-8601 **Monday first**, oldest week at the
+        top, the current in-progress week as the bottom row; the window is rolling and always ends on the
+        current week
+  - [ ] An **eighth column** closes each row with that week's total distance, styled as a summary column and
+        not as a heat cell
+  - [ ] The current week's total covers only the days elapsed and is marked **partial**
+  - [ ] Days in the current week that have not happened yet render as **out-of-range** — a third treatment,
+        visually distinct from both a heat level and a completed 0 km rest day
+  - [ ] Every distance is in **kilometres to one decimal**; the string "mi" or "miles" appears nowhere in
+        the interface
+  - [ ] The grid is a real `<table>` with an `sr-only` `<caption>`, `scope="col"` weekday headers and
+        `scope="row"` week headers; every cell carries an accessible name giving the full date and the exact
+        distance (or "rest day, 0 km", or "not yet")
+  - [ ] The **"Powered by Strava"** attribution is present, per the Strava API Agreement
+  - [ ] Light and dark themes both ship; first visit follows `prefers-color-scheme`, after which the user's
+        explicit choice persists
+  - [ ] Layout verified with **no horizontal scroll** at 320, 375, 768, 1024 and 1280 px; grid density is
+        capped (`max-width: 34rem`) so cells do not inflate on wide screens; at ≥ 1024 px the legend and sync
+        detail move into a side rail
+  - [ ] Column widths use `<colgroup>` percentages with gaps from cell `padding` — **not `border-spacing`**,
+        which is added on top of `width: 100%` and pushes Sunday and the total column off a 375 px viewport
+        (documented in the mockup README)
+  - [ ] Skip link to the grid, visible `:focus-visible` outlines, and 44 × 44 px targets on every control
+  - [ ] Unit tests for the grid builder: week boundaries, Monday start, the partial current week, future-day
+        cells, and a window spanning a month and a year boundary. Feature test renders the dashboard from
+        seeded data

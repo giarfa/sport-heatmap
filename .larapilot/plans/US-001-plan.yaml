@@ -1,0 +1,572 @@
+code: US-001
+plan_body: |
+  ## Technical Solution
+
+  Enabling spec. It brings the repository from a bare Laravel 13 skeleton to a state where the heatmap dashboard and the Strava sync can be built against realistic data, on Laravel Herd, with the quality gates green.
+
+  **Starting point (verified):** Laravel 13.30.1 on PHP 8.4.23, SQLite, Blade + Tailwind CSS 4 + Vite 8. Only the default `users` / `cache` / `jobs` migrations exist, only the `User` model and `UserFactory`. **The git repository has zero commits and no `develop` branch.** PHPUnit 12.5 is the test runner — Pest is not installed and must not be introduced.
+
+  ### Schema (Mike)
+
+  Three migrations, one concern each, each owning its own indexes:
+
+  1. **`users` extension** — `strava_athlete_id` (nullable, unique), `strava_access_token` (`TEXT`, nullable), `strava_refresh_token` (`TEXT`, nullable), `strava_token_expires_at` (nullable timestamp); `password` becomes nullable. Both token columns are `TEXT` because the Eloquent `encrypted` cast produces ciphertext of unpredictable length — a `VARCHAR(255)` would truncate. Laravel 13 changes SQLite columns natively; no `doctrine/dbal` is required.
+  2. **`activities`** — `strava_activity_id` (unique), `user_id` (FK, cascade delete), `sport_type`, `name`, `distance_meters` (integer), `moving_time_seconds` (integer), `start_date_local` (datetime), `activity_date` (date), plus the composite index `(user_id, activity_date)` in the same migration. Distances stay integer metres end to end; kilometres exist only at presentation time (FR-003).
+  3. **`sync_runs`** — `started_at`, `finished_at` (nullable), `status`, `activities_upserted`, `activities_deleted`, `error_message` (nullable text). Powers FR-007.
+
+  **No `daily_mileage` aggregate table.** The PRD rejects it explicitly: the grid aggregates ~100 rows by `activity_date` on read and the assembled grid is cached. TASK-05 carries an assertion that the table does not exist, so a later spec cannot reintroduce it by accident.
+
+  ### Architecture decisions recorded here (John, Mike, Andrew)
+
+  - **Integer primary keys, not UUIDs — deliberate deviation.** The Larapilot scaffolding default is UUID PKs on new models. This spec extends the existing auto-increment `users` table, and `activities.user_id` must match it; mixing key types across two tables in a single-user private instance buys nothing. Integer keys throughout. Recorded here rather than left implicit.
+  - **`SportType` backed enum** (`Run`, `TrailRun`, `VirtualRun`) cast on `Activity::$casts`, stored as its string value. The sync spec filters on exactly these three values (FR-003); a bare string column would push stringly-typed comparisons into the sync command and the grid builder. TitleCase enum keys per the project PHP conventions.
+  - **`config/strava.php`** binds every `STRAVA_*` env key. No later spec should reach for `env()` outside a config file — `config:cache` in any deployed environment would return `null`.
+  - **Deferred, not planned here:** the PRD leaves the `laravel/socialite` + `socialiteproviders/strava` vs hand-rolled authorization-code exchange decision open "at planning". That decision belongs to the **FR-001 spec**, not to this one — no OAuth code and no new Composer dependency enters US-001. This spec only documents the Strava application registration and the env keys the chosen approach will need either way.
+
+  ### Demo data (Alex)
+
+  A dedicated `TrainingBlockSeeder` composes `User` + `Activity` factories into a coherent 16-week block for a single fixed demo athlete, so the dashboard and the intensity scale can be built and reviewed before any Strava call exists. The block is generated relative to the current ISO week so it never goes stale.
+
+  ### Documentation (Albert)
+
+  Baseline README only, per the PRD: Herd setup with a `.test` domain (no Sail, no Docker), Strava application registration (`activity:read_all`, callback domain, where credentials go), running the sync manually, and the scheduler cron entry.
+
+  ### CI (Jack policy, Sarah authors)
+
+  One GitHub Actions workflow on PHP 8.4 running PHPUnit, Pint and Larastan level 5 on push and on pull requests to `develop` and `main`. **No deploy stage** — the PRD records the deploy target as "not defined yet".
+
+  ### Out of scope for US-001
+
+  Strava OAuth flow, the sync command, `StravaClient`, `HeatmapBuilder`, `IntensityScale`, the dashboard view, and any new Composer dependency. This spec creates the ground they stand on.
+
+  ## Git & Branching
+
+  - **Mode: `GITFLOW`** (from `settings.git_mode`) — branch and atomic commits, internal PR prepared locally. **No `git push`, no remote PR** unless the user explicitly asks in-session.
+  - **The repository has no commits and no branches yet.** TASK-00 therefore does more than the standard bootstrap: it stages the existing skeleton, creates the initial commit on `main`, cuts `develop` from it, then cuts the feature branch from `develop`.
+  - Branch: `feature/US-001-foundation-schema-setup` from `develop`.
+  - Per task: exactly one Conventional Commit, `type(US-001): TASK-NN summary`. Never batch two tasks into one commit.
+  - Merge to `develop` only after human `/larapilot-review` approval.
+  - Sarah leads any Git mechanics (conflict resolution, rebase onto `develop`, history hygiene).
+
+  ## Test Data Strategy
+
+  - Factories for **every** entity this spec touches, updated in the **same task** as the migration and model — never deferred: `UserFactory` (extended), `ActivityFactory` (new), `SyncRunFactory` (new).
+  - Factory states carry domain meaning: `UserFactory::stravaConnected()` / `withoutStrava()`; `ActivityFactory::trailRun()` / `virtualRun()` / `onDate()`; `SyncRunFactory::failed()` / `running()`.
+  - **Demo dataset** (`TrainingBlockSeeder`, wired into `DatabaseSeeder`): one fixed demo athlete with a Strava athlete id, ~16 weeks of running activities anchored to the current ISO week, containing at minimum —
+    - a **near-empty illness week** (0–1 activities, low distance),
+    - a **peak week** (6–7 activities, clearly the highest weekly total in the block),
+    - a **partial current week** with activities only up to today and none after,
+    - a scattering of double-run days so the day-cell detail spec (FR-011) has something to show,
+    - a handful of `TrailRun` / `VirtualRun` activities alongside plain `Run`,
+    - two or three `SyncRun` rows, the most recent successful, so FR-007 has state to render.
+  - Distances are domain-realistic integer metres (roughly 5–25 km per run), never generic Faker numbers.
+  - `php artisan migrate:fresh --seed` must succeed and produce this dataset before any entity task is marked done.
+
+  ## Test Strategy
+
+  - **Bar: `NORMAL`** (from `settings.testing`). **PHPUnit, not Pest** — Pest is not installed in this project and must not be introduced. Create tests with `php artisan make:test --phpunit {Name}`.
+  - **No Playwright, no Dusk, no Pest browser, no viewport matrix, no journey E2E** — those belong to the `BEST` bar only. This spec has no UI anyway.
+  - Test tasks are interleaved with implementation, not stacked at the end: TASK-05 lands after the three entity tasks, TASK-07 after the seeder.
+  - **TASK-05 — schema, models, factories** (`tests/Feature/`, `tests/Unit/`):
+    - every new column exists on its table with the expected nullability;
+    - the `(user_id, activity_date)` composite index exists on `activities`;
+    - **no `daily_mileage` table exists** — the PRD's explicit rejection, asserted;
+    - `strava_access_token` / `strava_refresh_token` round-trip through the `encrypted` cast and the **raw stored value differs from the plaintext** (an `encrypted` cast silently mis-declared is invisible otherwise);
+    - `users.password` accepts `null`;
+    - `strava_athlete_id` uniqueness is enforced;
+    - `Activity::$casts` maps `sport_type` to the `SportType` enum, `activity_date` to a date and `start_date_local` to a datetime;
+    - `activities.user_id` cascades on user delete;
+    - each factory (`User` with its Strava states, `Activity` with its states, `SyncRun` with its states) produces persistable, coherent records.
+  - **TASK-07 — seeder and guard rails** (`tests/Feature/`):
+    - the seeder produces ~16 distinct ISO weeks of activities for the demo athlete;
+    - the illness week's total is materially below the block median and the peak week's is the maximum;
+    - the current week contains no activity dated after today;
+    - `activity_date` always matches the date part of `start_date_local`;
+    - at least one `SyncRun` exists and the latest is successful;
+    - **no registration route is registered** — `Route::has('register')` is false and no route path contains `register`; likewise no `login` password route. Public signup is explicitly out of scope (FR-016, Won't) and this test keeps it that way.
+  - **Manual test handoff (Anne, for the human reviewer):** on a clean clone, follow `README.md` end to end on Herd — `composer setup`, open the `.test` URL, run `php artisan migrate:fresh --seed`, confirm the 16-week block is present in the database, and confirm `php artisan larapilot:quality` exits clean. The README being *followable* is an acceptance criterion and cannot be asserted in PHPUnit.
+  - Command per task: `php artisan test --compact --filter={TestName}`. Full suite (`php artisan test --compact`) at TASK-10.
+
+  ## Quality Gates
+
+  - `vendor/bin/pint --dirty --format agent` after every task that touches PHP.
+  - `php artisan larapilot:quality` green (Pint + Larastan level 5) before handoff — TASK-10. Larastan level is never lowered below 5.
+
+  ## Risks & Notes
+
+  - **Zero-commit repository.** TASK-00 is the highest-risk task in the plan: the initial commit defines what is tracked forever. `.gitignore` must exclude `database/database.sqlite` *before* it runs, or the SQLite file is committed and every seed thereafter dirties the working tree.
+  - **SQLite column changes.** Making `users.password` nullable is a `->change()` on SQLite. Laravel 13 supports it natively, but the migration must be verified against a real `migrate:fresh` and not only reviewed.
+  - **Encrypted cast + `TEXT`.** Getting this wrong is silent: the tokens still save, they are just truncated or unencrypted. The TASK-05 raw-value assertion is the only thing that catches it.
+  - **Seeder staleness.** The block is generated relative to the current ISO week rather than hard-coded dates, so it cannot drift out of the visible 112-day window over time.
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap git history, develop branch and feature branch'
+    body: |
+      ## Description
+      Bootstrap Gitflow for this spec. The repository currently has **zero commits and no branches with history** — so this task creates the initial commit on `main`, cuts `develop` from it, then cuts the feature branch from `develop`. Prepare the internal PR description toward `develop` locally. Do **not** push (`git_mode: GITFLOW`).
+
+      ## Files Involved
+      - .gitignore (one line added)
+      - (otherwise git only — no application files)
+
+      ## Steps
+      1. Append `/database/database.sqlite` to `.gitignore` **before** staging, so the SQLite file is never tracked (every `migrate:fresh --seed` would otherwise dirty the tree).
+      2. Verify nothing sensitive is about to be committed: `git status --short` and confirm `.env` is excluded while `.env.example` is included.
+      3. `git add -A && git commit` — initial commit on `main`: `chore: initial Laravel 13 skeleton with Larapilot artifacts`.
+      4. `git checkout -b develop` from `main`.
+      5. `git checkout -b feature/US-001-foundation-schema-setup` from `develop`.
+      6. Draft the internal PR title and body toward `develop` — title `US-001: Project foundation, schema and local setup`; body links `.larapilot/plans/US-001-plan.yaml` and lists the planned tasks. Keep it local.
+      7. Anchor commit: `chore(US-001): TASK-00 bootstrap feature branch` (empty commit allowed).
+
+      ## Completion Criteria
+      - [ ] `.gitignore` excludes `/database/database.sqlite`
+      - [ ] `main` has an initial commit containing the skeleton; `.env` is **not** tracked
+      - [ ] `develop` exists locally
+      - [ ] `feature/US-001-foundation-schema-setup` exists locally and is checked out
+      - [ ] PR title/body drafted toward `develop` (remote not opened)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Git Deliverables
+      - Commit: `chore: initial Laravel 13 skeleton with Larapilot artifacts` on `main`
+      - Commit: `chore(US-001): TASK-00 bootstrap feature branch` (empty commit allowed)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally — open remote only if the user requests push
+    type: Impl
+    status: TODO
+    dependencies: {}
+  -
+    id: TASK-01
+    title: 'Strava configuration surface: .env.example keys and config/strava.php'
+    body: |
+      ## Description
+      Declare every environment key the Strava integration needs and bind them through a dedicated config file, so no later spec calls `env()` outside `config/` (which returns `null` once `config:cache` runs).
+
+      ## Files Involved
+      - .env.example
+      - config/strava.php (new)
+
+      ## Steps
+      1. Append a Strava block to `.env.example` with empty values — **no real credentials, ever**:
+         - `STRAVA_CLIENT_ID=`
+         - `STRAVA_CLIENT_SECRET=`
+         - `STRAVA_REDIRECT_URI=` (the Herd HTTPS `.test` callback URL in development)
+         - `STRAVA_ALLOWED_ATHLETE_IDS=` (comma-separated allowlist — FR-001)
+         - `STRAVA_SYNC_HOUR=3` (0–23, local hour of the daily sync — FR-002)
+         - `STRAVA_SYNC_TIMEZONE=Europe/Rome` (the only timezone-sensitive configuration in the product)
+         Add a short comment above the block pointing at the README's Strava registration section.
+      2. Create `config/strava.php` returning `client_id`, `client_secret`, `redirect_uri`, `allowed_athlete_ids` (parsed from the comma-separated string into a filtered `array<int, string>`), `sync_hour` (cast to int), `sync_timezone`. Include an array-shape PHPDoc for the returned structure.
+      3. Confirm the parsing handles an empty string as an empty array, not `['']` — an allowlist that silently contains one empty entry is a security bug waiting for FR-001.
+      4. `php artisan config:show strava` to verify the shape resolves.
+      5. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] `.env.example` lists client id, client secret, redirect URI, allowlisted athlete ids, sync hour and sync timezone, all with empty or safe placeholder values
+      - [ ] No real credential value is committed anywhere
+      - [ ] `config/strava.php` exposes every key; `allowed_athlete_ids` is an array and is empty (not `['']`) when the env var is blank
+      - [ ] `php artisan config:show strava` resolves without error
+      - [ ] Pint clean
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-001): TASK-01 add Strava configuration keys and config file`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-02
+    title: 'Extend users with Strava identity and token columns'
+    body: |
+      ## Description
+      Extend the existing `users` table with the Strava athlete identity and OAuth token storage, make `password` nullable, and update the `User` model and factory so the encrypted casts are exercised by the demo data.
+
+      ## Files Involved
+      - database/migrations/xxxx_add_strava_columns_to_users_table.php (new)
+      - app/Models/User.php
+      - database/factories/UserFactory.php
+
+      ## Steps
+      1. `php artisan make:migration add_strava_columns_to_users_table --no-interaction`
+      2. In `up()`: add `strava_athlete_id` (string, nullable, unique), `strava_access_token` (**`text`**, nullable), `strava_refresh_token` (**`text`**, nullable), `strava_token_expires_at` (timestamp, nullable); change `password` to nullable via `->nullable()->change()`. Both token columns are `text` because the Eloquent `encrypted` cast produces ciphertext of unpredictable length — a `string` column would truncate it. Laravel 13 changes SQLite columns natively; no `doctrine/dbal` needed.
+      3. Write a working `down()` that drops the added columns and restores `password` to non-nullable.
+      4. `User` model: add the new columns to `$fillable`; in `casts()` add `'strava_access_token' => 'encrypted'`, `'strava_refresh_token' => 'encrypted'`, `'strava_token_expires_at' => 'datetime'`; add both token columns to `$hidden` alongside `password`.
+      5. `UserFactory`: default state leaves the Strava columns null and `password` null (there is no password login — FR-001). Add states `stravaConnected()` (athlete id, both tokens, expiry ~6 hours out) and `stravaTokenExpired()` (expiry in the past) for the sync and refresh specs to reuse.
+      6. `php artisan migrate:fresh` then `php artisan migrate:fresh --seed` — both must succeed.
+      7. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] Migration adds `strava_athlete_id` (unique), `strava_access_token` (TEXT), `strava_refresh_token` (TEXT), `strava_token_expires_at`
+      - [ ] `users.password` is nullable and `down()` reverses the migration cleanly
+      - [ ] `User` casts both tokens as `encrypted` and hides them from serialization
+      - [ ] `UserFactory` has `stravaConnected()` and `stravaTokenExpired()` states producing valid records
+      - [ ] `php artisan migrate:fresh --seed` succeeds
+      - [ ] Pint clean
+
+      ## Test Data
+      - [ ] `database/factories/UserFactory.php` updated in **this same task** as the migration and model
+      - [ ] Default state and both Strava states produce persistable users
+      - [ ] Seeder wiring is handled in TASK-06 (`TrainingBlockSeeder`); `DatabaseSeeder` must still run green after this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-001): TASK-02 extend users with Strava identity and token columns`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-01
+  -
+    id: TASK-03
+    title: 'Add Activity model, migration, SportType enum and factory'
+    body: |
+      ## Description
+      Add the `Activity` entity — the only table the heatmap reads — with its composite index, its backed sport-type enum, and a domain-realistic factory.
+
+      ## Files Involved
+      - app/Models/Activity.php (new)
+      - app/Enums/SportType.php (new)
+      - database/migrations/xxxx_create_activities_table.php (new)
+      - database/factories/ActivityFactory.php (new)
+      - app/Models/User.php (relationship)
+
+      ## Steps
+      1. `php artisan make:model Activity -mf --no-interaction`
+      2. `php artisan make:enum SportType --string --no-interaction` (or `make:class` if unavailable) — backed string enum with TitleCase keys `Run = 'Run'`, `TrailRun = 'TrailRun'`, `VirtualRun = 'VirtualRun'` (FR-003). Add a `values(): array<int, string>` helper the sync command will filter on. These are the only sport types ever stored; everything else is discarded at sync time.
+      3. Migration: `strava_activity_id` (unsigned big integer, unique), `user_id` (`foreignId` constrained, `cascadeOnDelete`), `sport_type` (string), `name` (string), `distance_meters` (integer), `moving_time_seconds` (integer), `start_date_local` (datetime), `activity_date` (date), timestamps. Add the composite index `$table->index(['user_id', 'activity_date'])` **in this same migration** — it serves the only query the product makes (PRD data model).
+      4. Distances stay **integer metres**; no float column anywhere (FR-003 — kilometres are a presentation concern only).
+      5. `Activity` model: `$fillable`, `casts()` mapping `sport_type` to `SportType::class`, `activity_date` to `'date'`, `start_date_local` to `'datetime'`, `distance_meters` and `moving_time_seconds` to `'integer'`; `user(): BelongsTo` relation with an explicit return type.
+      6. `User` model: add `activities(): HasMany`.
+      7. `ActivityFactory`: domain-realistic values — distance 4 000–25 000 metres, moving time consistent with the distance at a plausible pace (never an independent random), `sport_type` defaulting to `SportType::Run`, `name` from a small pool of runner-plausible titles ("Morning Run", "Easy shakeout", "Long run"), `start_date_local` within the last 112 days, and `activity_date` **always derived from `start_date_local`** so the two can never disagree. States: `trailRun()`, `virtualRun()`, `onDate(CarbonInterface $date)`.
+      8. `php artisan migrate:fresh --seed`
+      9. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] `activities` has every column from the acceptance criteria with the stated types
+      - [ ] Composite index `(user_id, activity_date)` created in the same migration
+      - [ ] `SportType` backed enum with exactly `Run`, `TrailRun`, `VirtualRun`; cast on the model
+      - [ ] `user_id` foreign key cascades on delete; `User::activities()` relation present
+      - [ ] `ActivityFactory` produces coherent records where `activity_date` matches `start_date_local` and pace is plausible
+      - [ ] `php artisan migrate:fresh --seed` succeeds
+      - [ ] Pint clean
+
+      ## Test Data
+      - [ ] `database/factories/ActivityFactory.php` created in **this same task** as the migration and model
+      - [ ] States `trailRun()`, `virtualRun()`, `onDate()` defined for the seeder and later specs to reuse
+      - [ ] Seeder composition happens in TASK-06
+
+      ## Git Deliverables
+      - Commit: `feat(US-001): TASK-03 add Activity model with SportType enum and factory`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-02
+  -
+    id: TASK-04
+    title: 'Add SyncRun model, migration and factory'
+    body: |
+      ## Description
+      Add the `SyncRun` entity that records the outcome of every sync attempt. It is what FR-007 renders as "synced 6 hours ago" or as the explicit stale/failed warning.
+
+      ## Files Involved
+      - app/Models/SyncRun.php (new)
+      - app/Enums/SyncRunStatus.php (new)
+      - database/migrations/xxxx_create_sync_runs_table.php (new)
+      - database/factories/SyncRunFactory.php (new)
+
+      ## Steps
+      1. `php artisan make:model SyncRun -mf --no-interaction`
+      2. Backed string enum `SyncRunStatus` with TitleCase keys `Running = 'running'`, `Succeeded = 'succeeded'`, `Failed = 'failed'` — FR-007 branches on these three states and a bare string would push the comparison into Blade.
+      3. Migration: `started_at` (datetime), `finished_at` (datetime, nullable — a run in flight has none), `status` (string), `activities_upserted` (unsigned integer, default 0), `activities_deleted` (unsigned integer, default 0), `error_message` (text, nullable), timestamps. Index `started_at` — the dashboard's only query is "most recent successful run".
+      4. `SyncRun` model: `$fillable`, `casts()` mapping `started_at` / `finished_at` to `'datetime'`, `status` to `SyncRunStatus::class`, both counters to `'integer'`.
+      5. `SyncRunFactory`: default state is a **succeeded** run finished a few hours ago with plausible counters and a null `error_message`. States: `failed()` (finished, non-null `error_message`, zero counters), `running()` (null `finished_at`, zero counters), `stale()` (started more than 48 hours ago — the FR-007 warning threshold).
+      6. `php artisan migrate:fresh --seed`
+      7. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] `sync_runs` has `started_at`, `finished_at`, `status`, `activities_upserted`, `activities_deleted`, `error_message`
+      - [ ] `SyncRunStatus` enum cast on the model
+      - [ ] `SyncRunFactory` default is a successful recent run; `failed()`, `running()` and `stale()` states defined
+      - [ ] `php artisan migrate:fresh --seed` succeeds
+      - [ ] Pint clean
+
+      ## Test Data
+      - [ ] `database/factories/SyncRunFactory.php` created in **this same task** as the migration and model
+      - [ ] States cover the three outcomes FR-007 must render, plus the 48-hour stale case
+      - [ ] Seeder composition happens in TASK-06
+
+      ## Git Deliverables
+      - Commit: `feat(US-001): TASK-04 add SyncRun model with status enum and factory`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-03
+  -
+    id: TASK-05
+    title: 'Test schema, casts and factories'
+    body: |
+      ## Description
+      Cover the schema and the models with PHPUnit feature and unit tests. Two of these assertions exist specifically to stop silent regressions: the encrypted-cast check (a mis-declared cast still saves, it just stores plaintext) and the `daily_mileage` absence check (the PRD rejects that table explicitly).
+
+      ## Files Involved
+      - tests/Feature/Database/SchemaTest.php (new)
+      - tests/Feature/Models/UserStravaColumnsTest.php (new)
+      - tests/Unit/Models/ActivityTest.php (new)
+      - tests/Unit/Models/SyncRunTest.php (new)
+
+      ## Steps
+      1. Create tests with `php artisan make:test --phpunit {Name}` — **PHPUnit, not Pest**. Pest is not installed in this project and must not be introduced.
+      2. Reuse the factories from `database/factories/` — never redefine model attributes inside a test.
+      3. **Schema tests** (`Schema::hasColumn`, `Schema::getIndexes`):
+         - `users` has all four Strava columns; `password` is nullable
+         - `activities` has every required column with the expected types
+         - the `(user_id, activity_date)` composite index exists on `activities`
+         - `sync_runs` has all six columns
+         - **`Schema::hasTable('daily_mileage')` is false** — the PRD's explicit rejection, asserted so no later spec reintroduces it
+      4. **Encrypted cast test:** save a user with known token strings, read them back through the model (plaintext matches), then read the same row with `DB::table('users')->find(...)` and assert the **raw stored value differs from the plaintext** and is non-empty.
+      5. `strava_athlete_id` uniqueness is enforced (expect a `QueryException` on a duplicate).
+      6. A user can be created with `password` null.
+      7. `Activity` casts: `sport_type` returns a `SportType` instance, `activity_date` a date, `start_date_local` a datetime; deleting the user cascades the activities away.
+      8. `SyncRun` casts: `status` returns a `SyncRunStatus`; `failed()` state has a non-null `error_message`; `running()` state has a null `finished_at`.
+      9. Every factory and every state produces a persistable record.
+      10. `php artisan test --compact --filter=Schema` and the model filters; all green.
+      11. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`.
+
+      ## Completion Criteria
+      - [ ] Tests pass locally under PHPUnit
+      - [ ] Encrypted tokens verified against the **raw** database value, not only the model accessor
+      - [ ] `daily_mileage` absence asserted
+      - [ ] Composite index presence asserted
+      - [ ] Every factory state covered
+
+      ## Git Deliverables
+      - Commit: `test(US-001): TASK-05 cover schema, casts and factories`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Test
+    status: TODO
+    dependencies:
+      - TASK-04
+  -
+    id: TASK-06
+    title: 'Seed a realistic 16-week training block'
+    body: |
+      ## Description
+      Compose the factories into a coherent 16-week demo block for one fixed athlete, so the heatmap, the intensity scale and the sync-status indicator can all be built and reviewed without ever calling Strava.
+
+      ## Files Involved
+      - database/seeders/TrainingBlockSeeder.php (new)
+      - database/seeders/DatabaseSeeder.php
+
+      ## Steps
+      1. `php artisan make:seeder TrainingBlockSeeder --no-interaction`
+      2. Create one fixed demo athlete via `User::factory()->stravaConnected()` with a stable name, email and `strava_athlete_id` so repeated seeds are recognisable.
+      3. Generate **16 consecutive ISO weeks anchored to the current week** — the current, in-progress week is the last row; the block is computed relative to `now()` and never hard-coded, so it cannot drift out of the 112-day window over time.
+      4. Shape the block so the dashboard has something worth looking at:
+         - a **near-empty illness week** (0–1 activities, low distance) somewhere mid-block
+         - a **peak week** (6–7 activities, the highest weekly total in the whole block)
+         - the **current week partial** — activities only up to and including today, **none dated in the future** (FR-004 renders future days as out-of-range)
+         - normal weeks varying between roughly 3 and 6 running days, so percentile bucketing has a real distribution to work on (FR-006)
+         - two or three days with **two runs**, so FR-011 has a case to display
+         - a handful of `trailRun()` and `virtualRun()` activities among the plain runs
+      5. Add two or three `SyncRun` rows: at least one older run and a most-recent **successful** one finished a few hours ago, so FR-007 renders the healthy state by default.
+      6. Wire `TrainingBlockSeeder` into `DatabaseSeeder` and remove or replace the default `Test User` block — it has no `strava_athlete_id` and would show up as a second, empty athlete.
+      7. `php artisan migrate:fresh --seed` and inspect the result: 16 distinct weeks, no future-dated activity, no orphan foreign keys.
+      8. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] `php artisan migrate:fresh --seed` succeeds from a clean database
+      - [ ] Exactly one demo athlete, with a Strava athlete id
+      - [ ] 16 consecutive ISO weeks of activities ending with the current in-progress week
+      - [ ] Illness week, peak week and partial current week all present and distinguishable
+      - [ ] No activity dated after today; no orphan foreign keys
+      - [ ] At least one successful recent `SyncRun`
+
+      ## Test Data
+      - [ ] `database/seeders/TrainingBlockSeeder.php` composes `User`, `Activity` and `SyncRun` factories — no attribute definitions duplicated from the factories
+      - [ ] `DatabaseSeeder` calls it and no longer creates the stray default `Test User`
+      - [ ] Volumes exercise the UI: ~60–90 activities across the window, not an empty table and not random orphans
+
+      ## Git Deliverables
+      - Commit: `feat(US-001): TASK-06 seed a realistic 16-week training block`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-05
+  -
+    id: TASK-07
+    title: 'Test seeder shape and the no-public-signup guard'
+    body: |
+      ## Description
+      Assert that the demo block really has the shape the dashboard work depends on, and lock in the acceptance criterion that no registration route and no public signup exist.
+
+      ## Files Involved
+      - tests/Feature/Database/TrainingBlockSeederTest.php (new)
+      - tests/Feature/Routing/NoPublicSignupTest.php (new)
+
+      ## Steps
+      1. Create both with `php artisan make:test --phpunit {Name}` — PHPUnit, not Pest.
+      2. **Seeder test** — run `TrainingBlockSeeder` and assert:
+         - exactly one user exists and it has a `strava_athlete_id`
+         - activities span **16 distinct ISO year-weeks**, the last of which is the current one
+         - the illness week's total distance is materially below the block median
+         - the peak week's total is the maximum across the block
+         - **no activity has an `activity_date` after today**
+         - for every activity, `activity_date` equals the date part of `start_date_local`
+         - every activity's `sport_type` is one of the three `SportType` cases
+         - at least one `SyncRun` exists and the most recent one is `SyncRunStatus::Succeeded`
+      3. **No-public-signup test** — assert `Route::has('register')` is false, no registered route URI contains `register`, and `GET /register` returns 404. Public signup is FR-016 (Won't) and this test is what keeps a later starter-kit install from quietly reopening it.
+      4. `php artisan test --compact --filter=TrainingBlockSeeder` and `--filter=NoPublicSignup`; both green.
+      5. No browser, E2E or viewport suites — `settings.testing` is `NORMAL`.
+
+      ## Completion Criteria
+      - [ ] Tests pass locally under PHPUnit
+      - [ ] Seeder shape asserted: 16 weeks, illness week, peak week, no future-dated activity, date consistency
+      - [ ] Absence of any registration route asserted
+
+      ## Git Deliverables
+      - Commit: `test(US-001): TASK-07 cover seeder shape and no-public-signup guard`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Test
+    status: TODO
+    dependencies:
+      - TASK-06
+  -
+    id: TASK-08
+    title: 'Write the baseline README'
+    body: |
+      ## Description
+      Write the baseline `README.md` so a fresh clone comes up on Laravel Herd following the document alone. The PRD scopes documentation to baseline only — no OpenAPI, no diagrams, no manuals.
+
+      ## Files Involved
+      - README.md
+
+      ## Steps
+      1. **What this is** — two or three lines: a private single-athlete Strava training heatmap.
+      2. **Requirements** — PHP 8.4, Composer, Node, SQLite, and **Laravel Herd** on macOS. State explicitly that there is **no Sail and no Docker**; the PRD recorded Herd as a deliberate choice, so a reader does not go looking for a `docker-compose.yml`.
+      3. **Local setup on Herd** — park or link the project directory in Herd, note the resulting `.test` domain, then `composer setup` (the existing script covers install, `.env`, key generation, migrate, npm install and build), then `npm run dev` for asset watching. Show the HTTPS `.test` URL as the app URL and note that `APP_URL` must match it.
+      4. **Registering the Strava application** — walk through creating the app in the Strava developer dashboard: the required scope is **`activity:read_all`** (read-only; no write scope is ever requested), the authorization callback domain is the Herd `.test` host in development, and the resulting client id and secret go into `.env` as `STRAVA_CLIENT_ID` and `STRAVA_CLIENT_SECRET` — **never committed**. Note that access is restricted to the athlete ids listed in `STRAVA_ALLOWED_ATHLETE_IDS`.
+      5. **Environment variables** — a table of every `STRAVA_*` key from `.env.example` with its meaning and an example value.
+      6. **Database and demo data** — `php artisan migrate:fresh --seed` produces a full 16-week block, so the dashboard can be developed without connecting to Strava.
+      7. **Running the sync** — the manual command invocation and the scheduler cron entry:
+         ```
+         * * * * * cd /path/to/sport-heatmap && php artisan schedule:run >> /dev/null 2>&1
+         ```
+         Note that the daily hour and its timezone come from `STRAVA_SYNC_HOUR` / `STRAVA_SYNC_TIMEZONE`. Mark the sync command itself as landing in a later spec, so the README is honest about what exists today.
+      8. **Tests and quality** — `php artisan test --compact` and `php artisan larapilot:quality`.
+      9. Re-read the document as someone who has never seen the project: every command must be runnable in order, with no implied step.
+
+      ## Completion Criteria
+      - [ ] Herd setup documented with a `.test` domain; no Sail or Docker instructions anywhere
+      - [ ] Strava application registration documented — `activity:read_all` scope, callback domain, credential placement
+      - [ ] Every `STRAVA_*` env key documented
+      - [ ] Manual sync invocation and the `* * * * * php artisan schedule:run` cron entry both present
+      - [ ] Seeding and test/quality commands documented
+      - [ ] A fresh clone can be brought up following the README alone
+
+      ## Test Data
+      - N/A — documentation only
+
+      ## Git Deliverables
+      - Commit: `docs(US-001): TASK-08 add baseline README with Herd and Strava setup`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-07
+  -
+    id: TASK-09
+    title: 'Add the CI workflow: tests, Pint and Larastan'
+    body: |
+      ## Description
+      Add a single GitHub Actions workflow running the three quality gates on every push and pull request. **No deploy stage** — the PRD records the deploy target as "not defined yet", so nothing deploy-shaped enters this backlog.
+
+      ## Files Involved
+      - .github/workflows/ci.yml (new)
+
+      ## Steps
+      1. Trigger on `push` and on `pull_request` targeting `develop` and `main`.
+      2. Single job on `ubuntu-latest`, `shivammathur/setup-php` at **PHP 8.4** (matching the local runtime) with the `sqlite3`, `pdo_sqlite` and `mbstring` extensions.
+      3. Steps: checkout → setup PHP → cache Composer → `composer install --prefer-dist --no-interaction --no-progress` → copy `.env.example` to `.env` → `php artisan key:generate` → `touch database/database.sqlite` → `php artisan migrate --force`.
+      4. Gates, each a separate step so a failure names itself in the run summary:
+         - `vendor/bin/pint --test`
+         - `vendor/bin/phpstan analyse --no-progress --memory-limit=1G` (level 5 from `phpstan.neon.dist` — **never lowered**)
+         - `php artisan test`
+         - `composer audit`
+      5. Add the Vite build step (`npm ci && npm run build`) — the project has a Vite frontend and a broken build should fail CI, not the reviewer's browser.
+      6. Confirm the workflow file sits alongside the existing `.github/skills/` directory without disturbing it.
+      7. Validate the YAML parses (`php -r` with a YAML parse, `yamllint`, or `actionlint` if available) before committing — a malformed workflow fails silently on the forge.
+
+      ## Completion Criteria
+      - [ ] `.github/workflows/ci.yml` runs on push and on PRs to `develop` and `main`
+      - [ ] Pint, Larastan level 5, PHPUnit, `composer audit` and the Vite build all run as distinct steps
+      - [ ] PHP 8.4 with SQLite extensions
+      - [ ] **No deploy stage present**
+      - [ ] YAML validated
+
+      ## Test Data
+      - N/A — CI configuration only
+
+      ## Git Deliverables
+      - Commit: `ci(US-001): TASK-09 add test, Pint and Larastan workflow`
+      - Push: **skip** (`git_mode: GITFLOW`) — note the workflow will only actually execute once a remote exists and the branch is pushed
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-08
+  -
+    id: TASK-10
+    title: 'Full verification pass: quality gate and clean-clone check'
+    body: |
+      ## Description
+      Close the spec by running every gate the acceptance criteria name, over the whole repository rather than task by task.
+
+      ## Files Involved
+      - (whole repository — fixes only where a gate fails)
+
+      ## Steps
+      1. `vendor/bin/pint --format agent` — repository-wide, applying fixes.
+      2. `php artisan larapilot:quality` — Pint plus Larastan level 5. Fix every reported issue; **do not lower the Larastan level** and do not add baseline entries to silence findings.
+      3. `php artisan test --compact` — the full suite, not a filter.
+      4. `php artisan migrate:fresh --seed` from a clean database, one final time.
+      5. Re-read the acceptance criteria one by one against the working tree and confirm each is genuinely satisfied — in particular the three verify-only ones: no `daily_mileage` table, no registration routes, quality green.
+      6. Confirm `git status` is clean and that `.env` and `database/database.sqlite` are untracked.
+      7. Confirm one commit per task on `feature/US-001-foundation-schema-setup`, each message carrying `US-001` and its task id.
+      8. Update the local internal PR description with the final task list. **Do not push** (`git_mode: GITFLOW`).
+      9. Note for the reviewer: the manual test handoff from the plan's Test Strategy — following the README end to end on a clean clone — is a human step and is not covered by the suite.
+
+      ## Completion Criteria
+      - [ ] `php artisan larapilot:quality` passes (Pint + Larastan level 5, no lowered level, no new baseline)
+      - [ ] `php artisan test --compact` fully green
+      - [ ] `php artisan migrate:fresh --seed` succeeds from clean
+      - [ ] All 13 acceptance criteria verified against the working tree
+      - [ ] `.env` and `database/database.sqlite` untracked; working tree clean
+      - [ ] One Conventional Commit per task on the feature branch; local PR description updated
+
+      ## Test Data
+      - N/A — verification only; no schema or factory changes expected
+
+      ## Git Deliverables
+      - Commit: `chore(US-001): TASK-10 apply quality gate fixes` (skip if no fixes were needed)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: finalise local PR description toward `develop`
+    type: Impl
+    status: TODO
+    dependencies:
+      - TASK-09
+updated_at: '2026-09-05T16:27:58+00:00'
