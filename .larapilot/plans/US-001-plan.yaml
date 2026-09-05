@@ -266,27 +266,33 @@ tasks:
       9. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] `activities` has every column from the acceptance criteria with the stated types
-      - [ ] Composite index `(user_id, activity_date)` created in the same migration
-      - [ ] `SportType` backed enum with exactly `Run`, `TrailRun`, `VirtualRun`; cast on the model
-      - [ ] `user_id` foreign key cascades on delete; `User::activities()` relation present
-      - [ ] `ActivityFactory` produces coherent records where `activity_date` matches `start_date_local` and pace is plausible
-      - [ ] `php artisan migrate:fresh --seed` succeeds
-      - [ ] Pint clean
+      - [x] `activities` has every column from the acceptance criteria with the stated types
+      - [x] Composite index `(user_id, activity_date)` created in the same migration
+      - [x] `SportType` backed enum with exactly `Run`, `TrailRun`, `VirtualRun`; cast on the model
+      - [x] `user_id` foreign key cascades on delete; `User::activities()` relation present
+      - [x] `ActivityFactory` produces coherent records where `activity_date` matches `start_date_local` and pace is plausible
+      - [x] `php artisan migrate:fresh --seed` succeeds
+      - [x] Pint clean
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` created in **this same task** as the migration and model
-      - [ ] States `trailRun()`, `virtualRun()`, `onDate()` defined for the seeder and later specs to reuse
-      - [ ] Seeder composition happens in TASK-06
+      - [x] `database/factories/ActivityFactory.php` created in **this same task** as the migration and model
+      - [x] States `trailRun()`, `virtualRun()`, `onDate()` defined for the seeder and later specs to reuse
+      - [x] Seeder composition happens in TASK-06
 
       ## Git Deliverables
       - Commit: `feat(US-001): TASK-03 add Activity model with SportType enum and factory`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-02
+    commit:
+      sha: df72a5f941ae81063193ba8cb895524a1941a159
+      short_sha: df72a5f
+      subject: 'feat(US-001): TASK-03 add Activity model with SportType enum and factory'
+      committed_at: '2026-09-05T18:34:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/df72a5f941ae81063193ba8cb895524a1941a159'
   -
     id: TASK-04
     title: 'Add SyncRun model, migration and factory'
@@ -587,4 +593,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:33:31+00:00'
+updated_at: '2026-09-05T16:34:31+00:00'
