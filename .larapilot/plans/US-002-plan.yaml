@@ -153,7 +153,7 @@ tasks:
     id: TASK-00
     title: 'Merge US-001 into develop and bootstrap the US-002 feature branch'
     type: Impl
-    status: TODO
+    status: DONE
     dependencies: {}
     body: |
       ## Description
@@ -175,10 +175,10 @@ tasks:
       6. Anchor the branch: `git commit --allow-empty -m "chore(US-002): TASK-00 bootstrap feature branch"`
 
       ## Completion Criteria
-      - [ ] `develop` contains the US-001 schema (`git log develop --oneline | head` shows the merge commit)
-      - [ ] `php artisan test` passes on `develop` after the merge
-      - [ ] Branch `feature/US-002-strava-oauth-connect` exists locally, branched from the merged `develop`
-      - [ ] PR title/body drafted toward `develop` (remote PR not opened)
+      - [x] `develop` contains the US-001 schema (`git log develop --oneline | head` shows the merge commit)
+      - [x] `php artisan test` passes on `develop` after the merge
+      - [x] Branch `feature/US-002-strava-oauth-connect` exists locally, branched from the merged `develop`
+      - [x] PR title/body drafted toward `develop` (remote PR not opened)
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -188,6 +188,12 @@ tasks:
       - Commit: `chore(US-002): TASK-00 bootstrap feature branch` (empty commit)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally — open the remote PR only if the user requests a push
+    commit:
+      sha: 02be68b2a63ed8072c27187d656ae60904358bf6
+      short_sha: 02be68b
+      subject: 'chore(US-002): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-05T19:26:15+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/02be68b2a63ed8072c27187d656ae60904358bf6'
   -
     id: TASK-01
     title: 'Extend the Strava config surface with scope, endpoints and refresh margin'
@@ -862,4 +868,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:13:20+00:00'
+updated_at: '2026-09-05T17:26:17+00:00'

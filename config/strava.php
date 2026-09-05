@@ -25,6 +25,10 @@ $allowedAthleteIds = array_values(array_filter(
  *     client_id: string|null,
  *     client_secret: string|null,
  *     redirect_uri: string|null,
+ *     scope: string,
+ *     authorize_url: string,
+ *     token_url: string,
+ *     token_refresh_margin_seconds: int,
  *     allowed_athlete_ids: array<int, string>,
  *     sync_hour: int,
  *     sync_timezone: string,
@@ -48,6 +52,47 @@ $config = [
     'client_secret' => env('STRAVA_CLIENT_SECRET'),
 
     'redirect_uri' => env('STRAVA_REDIRECT_URI'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | OAuth scope
+    |--------------------------------------------------------------------------
+    |
+    | Read-only access is a product invariant, not a deployment choice, so this
+    | is a literal rather than an env() lookup: no write scope can be requested
+    | by editing an environment file. The app never posts to Strava (FR-001).
+    |
+    */
+
+    'scope' => 'activity:read_all',
+
+    /*
+    |--------------------------------------------------------------------------
+    | OAuth endpoints
+    |--------------------------------------------------------------------------
+    |
+    | Strava's official authorization and token endpoints. Both are literals:
+    | pointing them at another host would send the client secret somewhere it
+    | does not belong.
+    |
+    */
+
+    'authorize_url' => 'https://www.strava.com/oauth/authorize',
+
+    'token_url' => 'https://www.strava.com/oauth/token',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Token refresh safety margin
+    |--------------------------------------------------------------------------
+    |
+    | Seconds before expiry at which an access token is already treated as
+    | expired. Without a margin, a token that passes the check can still expire
+    | mid-request; five minutes covers a slow Strava call comfortably.
+    |
+    */
+
+    'token_refresh_margin_seconds' => (int) env('STRAVA_TOKEN_REFRESH_MARGIN', 300),
 
     /*
     |--------------------------------------------------------------------------
