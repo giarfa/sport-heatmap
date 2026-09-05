@@ -4,11 +4,17 @@ settings:
   backlog: STANDARD
   git_mode: GITFLOW
   testing: NORMAL
-  auto_approve: false
+  auto_approve: true
   lucille: true
+  decision_log: true
+  code_history: false
+  dashboard_auth: false
+  api_auth: false
+  security_scan: false
   github: false
   gitlab: false
   bitbucket: false
+  azure: false
   notifications: false
   notify_slack: false
   notify_discord: false
