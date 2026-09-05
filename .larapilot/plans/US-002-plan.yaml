@@ -255,7 +255,7 @@ tasks:
     id: TASK-02
     title: 'Add the StravaTokens DTO and the StravaOAuth service'
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-01
     body: |
@@ -303,12 +303,12 @@ tasks:
       5. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] `StravaTokens` is `final readonly`, fully typed, with an `array<int, string>` PHPDoc on `$scopes`
-      - [ ] `StravaOAuth::authorizationUrl()` embeds the config scope and the caller's `state`
-      - [ ] Both token calls return a `StravaTokens` or throw `StravaOAuthException` — never a raw array, never a 500 from an unhandled Guzzle exception
-      - [ ] The refresh path returns Strava's rotated refresh token, not the one passed in
-      - [ ] No client secret, access token or response body reaches a log line or an exception message
-      - [ ] Pint and Larastan level 5 clean
+      - [x] `StravaTokens` is `final readonly`, fully typed, with an `array<int, string>` PHPDoc on `$scopes`
+      - [x] `StravaOAuth::authorizationUrl()` embeds the config scope and the caller's `state`
+      - [x] Both token calls return a `StravaTokens` or throw `StravaOAuthException` — never a raw array, never a 500 from an unhandled Guzzle exception
+      - [x] The refresh path returns Strava's rotated refresh token, not the one passed in
+      - [x] No client secret, access token or response body reaches a log line or an exception message
+      - [x] Pint and Larastan level 5 clean
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -317,6 +317,12 @@ tasks:
       - Commit: `feat(US-002): TASK-02 add StravaTokens DTO and StravaOAuth service`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 0551276a825a474f5f34e3b14cfd0a691b8cd27e
+      short_sha: '0551276'
+      subject: 'feat(US-002): TASK-02 add StravaTokens DTO and StravaOAuth service'
+      committed_at: '2026-09-05T19:27:44+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0551276a825a474f5f34e3b14cfd0a691b8cd27e'
   -
     id: TASK-03
     title: 'Cover the StravaOAuth service against a faked Strava'
@@ -874,4 +880,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:27:03+00:00'
+updated_at: '2026-09-05T17:27:44+00:00'
