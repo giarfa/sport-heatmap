@@ -1,0 +1,271 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Activity;
+use App\Models\SyncRun;
+use App\Models\User;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
+
+/**
+ * A coherent 16-week training block for one fixed demo athlete.
+ *
+ * The block is always computed relative to the current week, so it can never drift
+ * out of the window the dashboard renders. Its shape is deliberate: an illness week
+ * and a peak week give the intensity scale a real distribution to bucket, and the
+ * current week stays partial so future days render as out-of-range.
+ */
+class TrainingBlockSeeder extends Seeder
+{
+    private const BLOCK_WEEKS = 16;
+
+    private const ILLNESS_WEEK_INDEX = 9;
+
+    private const PEAK_WEEK_INDEX = 12;
+
+    /**
+     * Weeks that carry a day with two runs, so the dashboard has a case to display.
+     *
+     * @var array<int, int>
+     */
+    private const DOUBLE_RUN_WEEK_INDEXES = [2, 6, 12];
+
+    public function run(): void
+    {
+        $athlete = User::factory()->stravaConnected()->create([
+            'name' => 'Demo Athlete',
+            'email' => 'athlete@sport-heatmap.test',
+            'strava_athlete_id' => '10000001',
+        ]);
+
+        foreach ($this->trainingBlock() as $runs) {
+            foreach ($runs as $run) {
+                $this->createActivity($athlete, $run['date'], $run['distance_meters']);
+            }
+        }
+
+        $this->createSyncRuns();
+    }
+
+    /**
+     * Build every planned run of the block, week by week.
+     *
+     * @return array<int, array<int, array{date: Carbon, distance_meters: int}>>
+     */
+    private function trainingBlock(): array
+    {
+        $currentWeekStart = Carbon::today()->startOfWeek();
+
+        $block = [];
+
+        for ($weekIndex = 0; $weekIndex < self::BLOCK_WEEKS; $weekIndex++) {
+            $weekStart = $currentWeekStart->copy()->subWeeks(self::BLOCK_WEEKS - 1 - $weekIndex);
+
+            $block[$weekIndex] = match (true) {
+                $weekIndex === self::ILLNESS_WEEK_INDEX => $this->illnessWeek($weekStart),
+                $weekIndex === self::PEAK_WEEK_INDEX => $this->peakWeek($weekStart),
+                $weekIndex === self::BLOCK_WEEKS - 1 => $this->currentPartialWeek($weekStart),
+                default => $this->normalWeek($weekStart, $weekIndex),
+            };
+        }
+
+        return $this->raisePeakAboveEveryOtherWeek($block);
+    }
+
+    /**
+     * Three to six running days, one of them a long run once the week is big enough.
+     *
+     * @return array<int, array{date: Carbon, distance_meters: int}>
+     */
+    private function normalWeek(Carbon $weekStart, int $weekIndex): array
+    {
+        $days = $this->runningDays($weekStart, fake()->numberBetween(3, 6));
+
+        $runs = [];
+
+        foreach ($days as $position => $day) {
+            $isLongRun = $position === count($days) - 1 && count($days) >= 4;
+
+            $runs[] = [
+                'date' => $day,
+                'distance_meters' => $isLongRun
+                    ? fake()->numberBetween(15_000, 19_000)
+                    : fake()->numberBetween(6_000, 13_000),
+            ];
+        }
+
+        if (in_array($weekIndex, self::DOUBLE_RUN_WEEK_INDEXES, true)) {
+            $runs[] = [
+                'date' => $days[0],
+                'distance_meters' => fake()->numberBetween(4_000, 7_000),
+            ];
+        }
+
+        return $runs;
+    }
+
+    /**
+     * A single short run: the athlete was ill.
+     *
+     * @return array<int, array{date: Carbon, distance_meters: int}>
+     */
+    private function illnessWeek(Carbon $weekStart): array
+    {
+        return [[
+            'date' => $weekStart->copy()->addDays(fake()->numberBetween(4, 6)),
+            'distance_meters' => fake()->numberBetween(3_000, 5_000),
+        ]];
+    }
+
+    /**
+     * Seven running days including a long run, plus a double day.
+     *
+     * @return array<int, array{date: Carbon, distance_meters: int}>
+     */
+    private function peakWeek(Carbon $weekStart): array
+    {
+        $days = $this->runningDays($weekStart, 7);
+
+        $runs = [];
+
+        foreach ($days as $position => $day) {
+            $runs[] = [
+                'date' => $day,
+                'distance_meters' => $position === count($days) - 1
+                    ? fake()->numberBetween(22_000, 26_000)
+                    : fake()->numberBetween(11_000, 16_000),
+            ];
+        }
+
+        $runs[] = [
+            'date' => $days[1],
+            'distance_meters' => fake()->numberBetween(5_000, 8_000),
+        ];
+
+        return $runs;
+    }
+
+    /**
+     * The in-progress week: runs only up to and including today, never in the future.
+     *
+     * @return array<int, array{date: Carbon, distance_meters: int}>
+     */
+    private function currentPartialWeek(Carbon $weekStart): array
+    {
+        $elapsedDays = Carbon::today()->dayOfWeekIso;
+
+        $days = $this->runningDays(
+            $weekStart,
+            min(fake()->numberBetween(2, 4), $elapsedDays),
+            $elapsedDays,
+        );
+
+        return array_map(static fn (Carbon $day): array => [
+            'date' => $day,
+            'distance_meters' => fake()->numberBetween(6_000, 13_000),
+        ], $days);
+    }
+
+    /**
+     * Pick distinct, chronologically ordered running days inside a week.
+     *
+     * @return array<int, Carbon>
+     */
+    private function runningDays(Carbon $weekStart, int $count, ?int $availableDays = null): array
+    {
+        $offsets = range(0, ($availableDays ?? 7) - 1);
+        shuffle($offsets);
+
+        $chosen = array_slice($offsets, 0, max($count, 1));
+        sort($chosen);
+
+        return array_map(
+            static fn (int $offset): Carbon => $weekStart->copy()->addDays($offset),
+            $chosen,
+        );
+    }
+
+    /**
+     * Guarantee the peak week really is the highest-volume week of the block, whatever
+     * the random draws produced.
+     *
+     * @param  array<int, array<int, array{date: Carbon, distance_meters: int}>>  $block
+     * @return array<int, array<int, array{date: Carbon, distance_meters: int}>>
+     */
+    private function raisePeakAboveEveryOtherWeek(array $block): array
+    {
+        $peakTotal = $this->weeklyTotal($block[self::PEAK_WEEK_INDEX]);
+
+        $highestOtherTotal = 0;
+
+        foreach ($block as $weekIndex => $runs) {
+            if ($weekIndex !== self::PEAK_WEEK_INDEX) {
+                $highestOtherTotal = max($highestOtherTotal, $this->weeklyTotal($runs));
+            }
+        }
+
+        if ($peakTotal <= $highestOtherTotal) {
+            $longestRunIndex = $this->longestRunIndex($block[self::PEAK_WEEK_INDEX]);
+
+            $block[self::PEAK_WEEK_INDEX][$longestRunIndex]['distance_meters']
+                += $highestOtherTotal - $peakTotal + fake()->numberBetween(5_000, 10_000);
+        }
+
+        return $block;
+    }
+
+    /**
+     * @param  array<int, array{date: Carbon, distance_meters: int}>  $runs
+     */
+    private function weeklyTotal(array $runs): int
+    {
+        return (int) array_sum(array_column($runs, 'distance_meters'));
+    }
+
+    /**
+     * @param  array<int, array{date: Carbon, distance_meters: int}>  $runs
+     */
+    private function longestRunIndex(array $runs): int
+    {
+        $distances = array_column($runs, 'distance_meters');
+
+        return (int) array_search(max($distances), $distances, true);
+    }
+
+    private function createActivity(User $athlete, Carbon $date, int $distanceMeters): void
+    {
+        $factory = Activity::factory()->for($athlete)->onDate($date);
+
+        $factory = match (true) {
+            fake()->boolean(15) => $factory->trailRun(),
+            fake()->boolean(12) => $factory->virtualRun(),
+            default => $factory,
+        };
+
+        $secondsPerKilometre = fake()->numberBetween(255, 375);
+
+        $factory->create([
+            'distance_meters' => $distanceMeters,
+            'moving_time_seconds' => (int) round($distanceMeters / 1_000 * $secondsPerKilometre),
+        ]);
+    }
+
+    /**
+     * A short sync history whose most recent entry succeeded, so the dashboard renders
+     * the healthy FR-007 state by default.
+     */
+    private function createSyncRuns(): void
+    {
+        SyncRun::factory()->stale()->create();
+
+        $failedStartedAt = now()->subHours(26);
+
+        SyncRun::factory()->failed()->create([
+            'started_at' => $failedStartedAt,
+            'finished_at' => $failedStartedAt->copy()->addSeconds(12),
+        ]);
+
+        SyncRun::factory()->create();
+    }
+}

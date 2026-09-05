@@ -373,20 +373,26 @@ tasks:
       11. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`.
 
       ## Completion Criteria
-      - [ ] Tests pass locally under PHPUnit
-      - [ ] Encrypted tokens verified against the **raw** database value, not only the model accessor
-      - [ ] `daily_mileage` absence asserted
-      - [ ] Composite index presence asserted
-      - [ ] Every factory state covered
+      - [x] Tests pass locally under PHPUnit
+      - [x] Encrypted tokens verified against the **raw** database value, not only the model accessor
+      - [x] `daily_mileage` absence asserted
+      - [x] Composite index presence asserted
+      - [x] Every factory state covered
 
       ## Git Deliverables
       - Commit: `test(US-001): TASK-05 cover schema, casts and factories`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Test
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-04
+    commit:
+      sha: de483f076ca0b56714cb2b802bf9ce0a9c48a012
+      short_sha: de483f0
+      subject: 'test(US-001): TASK-05 cover schema, casts and factories'
+      committed_at: '2026-09-05T18:36:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/de483f076ca0b56714cb2b802bf9ce0a9c48a012'
   -
     id: TASK-06
     title: 'Seed a realistic 16-week training block'
@@ -599,4 +605,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:35:10+00:00'
+updated_at: '2026-09-05T16:36:23+00:00'
