@@ -474,18 +474,24 @@ tasks:
       5. No browser, E2E or viewport suites — `settings.testing` is `NORMAL`.
 
       ## Completion Criteria
-      - [ ] Tests pass locally under PHPUnit
-      - [ ] Seeder shape asserted: 16 weeks, illness week, peak week, no future-dated activity, date consistency
-      - [ ] Absence of any registration route asserted
+      - [x] Tests pass locally under PHPUnit
+      - [x] Seeder shape asserted: 16 weeks, illness week, peak week, no future-dated activity, date consistency
+      - [x] Absence of any registration route asserted
 
       ## Git Deliverables
       - Commit: `test(US-001): TASK-07 cover seeder shape and no-public-signup guard`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Test
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-06
+    commit:
+      sha: ae946950dfca9bac2031e37dbc53ad2e7d02e8b0
+      short_sha: ae94695
+      subject: 'test(US-001): TASK-07 cover seeder shape and no-public-signup guard'
+      committed_at: '2026-09-05T18:39:22+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ae946950dfca9bac2031e37dbc53ad2e7d02e8b0'
   -
     id: TASK-08
     title: 'Write the baseline README'
@@ -611,4 +617,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:38:16+00:00'
+updated_at: '2026-09-05T16:39:22+00:00'
