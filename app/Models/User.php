@@ -10,8 +10,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable([
+    'name',
+    'email',
+    'password',
+    'strava_athlete_id',
+    'strava_access_token',
+    'strava_refresh_token',
+    'strava_token_expires_at',
+])]
+#[Hidden([
+    'password',
+    'remember_token',
+    'strava_access_token',
+    'strava_refresh_token',
+])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -27,6 +40,9 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'strava_access_token' => 'encrypted',
+            'strava_refresh_token' => 'encrypted',
+            'strava_token_expires_at' => 'datetime',
         ];
     }
 }

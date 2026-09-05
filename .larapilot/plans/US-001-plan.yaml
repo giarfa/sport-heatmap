@@ -169,11 +169,11 @@ tasks:
       5. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] `.env.example` lists client id, client secret, redirect URI, allowlisted athlete ids, sync hour and sync timezone, all with empty or safe placeholder values
-      - [ ] No real credential value is committed anywhere
-      - [ ] `config/strava.php` exposes every key; `allowed_athlete_ids` is an array and is empty (not `['']`) when the env var is blank
-      - [ ] `php artisan config:show strava` resolves without error
-      - [ ] Pint clean
+      - [x] `.env.example` lists client id, client secret, redirect URI, allowlisted athlete ids, sync hour and sync timezone, all with empty or safe placeholder values
+      - [x] No real credential value is committed anywhere
+      - [x] `config/strava.php` exposes every key; `allowed_athlete_ids` is an array and is empty (not `['']`) when the env var is blank
+      - [x] `php artisan config:show strava` resolves without error
+      - [x] Pint clean
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -183,9 +183,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-00
+    commit:
+      sha: ae9eb1d90ccf941e41ff10d4dd637bed0acc9b2a
+      short_sha: ae9eb1d
+      subject: 'feat(US-001): TASK-01 add Strava configuration keys and config file'
+      committed_at: '2026-09-05T18:32:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ae9eb1d90ccf941e41ff10d4dd637bed0acc9b2a'
   -
     id: TASK-02
     title: 'Extend users with Strava identity and token columns'
@@ -575,4 +581,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:31:10+00:00'
+updated_at: '2026-09-05T16:32:31+00:00'
