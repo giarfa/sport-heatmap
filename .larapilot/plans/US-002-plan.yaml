@@ -198,7 +198,7 @@ tasks:
     id: TASK-01
     title: 'Extend the Strava config surface with scope, endpoints and refresh margin'
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-00
     body: |
@@ -232,11 +232,11 @@ tasks:
       6. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] `config('strava.scope')` returns `activity:read_all` and is not env-driven
-      - [ ] `config('strava.authorize_url')` / `config('strava.token_url')` resolve to the official endpoints
-      - [ ] `config('strava.token_refresh_margin_seconds')` is an int, default 300
-      - [ ] `.env.example` documents `STRAVA_TOKEN_REFRESH_MARGIN` and still carries no real secrets
-      - [ ] `StravaConfigTest` passes; Pint and Larastan level 5 clean
+      - [x] `config('strava.scope')` returns `activity:read_all` and is not env-driven
+      - [x] `config('strava.authorize_url')` / `config('strava.token_url')` resolve to the official endpoints
+      - [x] `config('strava.token_refresh_margin_seconds')` is an int, default 300
+      - [x] `.env.example` documents `STRAVA_TOKEN_REFRESH_MARGIN` and still carries no real secrets
+      - [x] `StravaConfigTest` passes; Pint and Larastan level 5 clean
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -245,6 +245,12 @@ tasks:
       - Commit: `feat(US-002): TASK-01 add OAuth scope, endpoints and refresh margin to Strava config`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
+    commit:
+      sha: 6d8e70e26ebc0ddb625baa5680bf3b81ffbd9ac8
+      short_sha: 6d8e70e
+      subject: 'feat(US-002): TASK-01 add OAuth scope, endpoints and refresh margin to Strava config'
+      committed_at: '2026-09-05T19:27:03+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6d8e70e26ebc0ddb625baa5680bf3b81ffbd9ac8'
   -
     id: TASK-02
     title: 'Add the StravaTokens DTO and the StravaOAuth service'
@@ -868,4 +874,4 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:26:17+00:00'
+updated_at: '2026-09-05T17:27:03+00:00'
