@@ -5,7 +5,7 @@ epic:
   title: 'Foundation & Strava connection'
 priority: HIGH
 points: 3
-status: 'IN PROGRESS'
+status: REVIEW
 body: |
   #### US-001: Project foundation, schema and local setup
 
@@ -59,4 +59,7 @@ status_history:
   -
     status: 'IN PROGRESS'
     at: '2026-09-05T16:30:29+00:00'
+  -
+    status: REVIEW
+    at: '2026-09-05T16:52:22+00:00'
 rework: false
