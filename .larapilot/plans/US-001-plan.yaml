@@ -316,25 +316,31 @@ tasks:
       7. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] `sync_runs` has `started_at`, `finished_at`, `status`, `activities_upserted`, `activities_deleted`, `error_message`
-      - [ ] `SyncRunStatus` enum cast on the model
-      - [ ] `SyncRunFactory` default is a successful recent run; `failed()`, `running()` and `stale()` states defined
-      - [ ] `php artisan migrate:fresh --seed` succeeds
-      - [ ] Pint clean
+      - [x] `sync_runs` has `started_at`, `finished_at`, `status`, `activities_upserted`, `activities_deleted`, `error_message`
+      - [x] `SyncRunStatus` enum cast on the model
+      - [x] `SyncRunFactory` default is a successful recent run; `failed()`, `running()` and `stale()` states defined
+      - [x] `php artisan migrate:fresh --seed` succeeds
+      - [x] Pint clean
 
       ## Test Data
-      - [ ] `database/factories/SyncRunFactory.php` created in **this same task** as the migration and model
-      - [ ] States cover the three outcomes FR-007 must render, plus the 48-hour stale case
-      - [ ] Seeder composition happens in TASK-06
+      - [x] `database/factories/SyncRunFactory.php` created in **this same task** as the migration and model
+      - [x] States cover the three outcomes FR-007 must render, plus the 48-hour stale case
+      - [x] Seeder composition happens in TASK-06
 
       ## Git Deliverables
       - Commit: `feat(US-001): TASK-04 add SyncRun model with status enum and factory`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-03
+    commit:
+      sha: 8c8837b5d2398a0d0e45a56ea1cef1c02e70dced
+      short_sha: 8c8837b
+      subject: 'feat(US-001): TASK-04 add SyncRun model with status enum and factory'
+      committed_at: '2026-09-05T18:35:10+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/8c8837b5d2398a0d0e45a56ea1cef1c02e70dced'
   -
     id: TASK-05
     title: 'Test schema, casts and factories'
@@ -593,4 +599,4 @@ tasks:
     status: TODO
     dependencies:
       - TASK-09
-updated_at: '2026-09-05T16:34:31+00:00'
+updated_at: '2026-09-05T16:35:10+00:00'
