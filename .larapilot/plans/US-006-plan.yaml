@@ -413,12 +413,12 @@ tasks:
       5. `php artisan test --compact` and `php artisan larapilot:quality`; `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] Controller stays a single-action invokable; status resolved outside the grid cache
-      - [ ] Warning renders above the grid; the grid still renders beneath it
-      - [ ] Empty-window line renders on a connected account with zero runs, and not in the skeleton state
-      - [ ] Rail placeholder replaced by the real sync card; legend unaffected
-      - [ ] Existing suite still green
-      - [ ] UI usable at mobile/tablet/desktop (manual smoke)
+      - [x] Controller stays a single-action invokable; status resolved outside the grid cache
+      - [x] Warning renders above the grid; the grid still renders beneath it
+      - [x] Empty-window line renders on a connected account with zero runs, and not in the skeleton state
+      - [x] Rail placeholder replaced by the real sync card; legend unaffected
+      - [x] Existing suite still green
+      - [x] UI usable at mobile/tablet/desktop (manual smoke)
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -428,11 +428,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2
     dependencies:
       - TASK-04
+    commit:
+      sha: 34acee05888d8b374708dfc69076e2468d4eada8
+      short_sha: 34acee0
+      subject: 'feat(US-006): TASK-05 render sync status, warning and empty states on the dashboard'
+      committed_at: '2026-09-06T22:28:51+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/34acee05888d8b374708dfc69076e2468d4eada8'
   -
     id: TASK-06
     title: 'Feature-test every rendered sync and empty state'
@@ -511,4 +517,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-05
-updated_at: '2026-09-06T20:27:53+00:00'
+updated_at: '2026-09-06T20:28:52+00:00'
