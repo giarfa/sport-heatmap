@@ -5,7 +5,7 @@ epic:
   title: 'Heatmap dashboard'
 priority: HIGH
 points: 5
-status: TODO
+status: PLANNED
 body: |
   #### US-004: The 16-week heatmap with weekly totals
 
@@ -53,3 +53,8 @@ body: |
   - [ ] Unit tests for the grid builder: week boundaries, Monday start, the partial current week, future-day
         cells, and a window spanning a month and a year boundary. Feature test renders the dashboard from
         seeded data
+status_history:
+  -
+    status: PLANNED
+    at: '2026-09-06T15:37:50+00:00'
+rework: false

@@ -1,0 +1,673 @@
+code: US-004
+plan_body: |-
+  ## Technical Solution
+
+  US-004 turns the 112-day window US-003 already reconciles into the screen the product exists for: a
+  16 x 7 `<table>` of daily running distance with a trailing weekly-total column, mobile-first, in both
+  themes. It ships the **geometry, the semantics and the numbers**. It deliberately does **not** ship the
+  intensity ramp (US-005) or the sync status surface (US-006).
+
+  ### The seam, end to end
+
+  ```
+  HeatmapWindow::current()          (US-003, already on the branch)
+    -> DailyRunningDistance         one grouped aggregate query, athlete-scoped
+    -> HeatmapBuilder               pure: daily totals + window + today -> HeatmapGrid
+    -> HeatmapGrid / WeekRow / DayCell   readonly DTOs, formatting and accessible names live here
+    -> <x-heatmap-grid>             Blade renders; no logic, no arithmetic
+  ```
+
+  **John:** the builder is pure and takes `today` as an argument rather than reading the clock, because
+  every interesting case in this spec — the partial current week, future cells, a window crossing a month
+  or a year boundary — is a statement about a specific date. A builder that calls `now()` internally can
+  only be tested by travelling time; one that accepts the date can be tested by naming it.
+
+  **Mike:** one query serves the whole grid:
+
+  ```php
+  $athlete->activities()
+      ->whereBetween('activity_date', [$window->startsOn, $window->endsOn])
+      ->selectRaw('activity_date, SUM(distance_meters) as meters')
+      ->groupBy('activity_date')
+  ```
+
+  It rides the `(user_id, activity_date)` index US-001 created. ~100 rows collapse to at most 112 pairs.
+  There is no `daily_mileage` table and none is added — the PRD rejects one explicitly. Days with no run
+  never appear in the result set; the builder materialises them as rest days, which is why the query
+  returning fewer than 112 rows is the normal case and not a bug.
+
+  ### Classes
+
+  | Class | Responsibility |
+  | --- | --- |
+  | `app/Support/Heatmap/DailyRunningDistance.php` | Invokable. `__invoke(User $athlete, HeatmapWindow $window): array<string,int>` keyed `Y-m-d` => metres |
+  | `app/Support/Heatmap/HeatmapBuilder.php` | Invokable. Pure assembly of `HeatmapGrid` from totals + window + today. No DB, no clock |
+  | `app/Data/Heatmap/HeatmapGrid.php` | `final readonly`. `weeks: array<int, WeekRow>`, `startsOn`, `endsOn`; `label()` for the "18 May - 6 Sep 2026" subtitle |
+  | `app/Data/Heatmap/WeekRow.php` | `final readonly`. `weekStart`, `days: array<int, DayCell>` (7, Monday first), `totalMeters`, `isPartial`, `isCurrent`; `kilometres()`, `weekLabel()` |
+  | `app/Data/Heatmap/DayCell.php` | `final readonly`. `date`, `distanceMeters`, `state`; `kilometres()`, `accessibleName()`, `pointerTitle()` |
+  | `app/Enums/DayCellState.php` | `Rest` / `Ran` / `Future` — the three treatments the spec requires be visually distinct |
+
+  `app/Data/Heatmap/` and `app/Support/Heatmap/` follow the settled house rule (`.ai/rules/app.md`):
+  sub-namespace each layer by the concern it serves, exactly as `Strava/` already does.
+
+  **Formatting lives on the DTO, not in Blade.** `kilometres()` returns `number_format($meters / 1000, 1)`
+  and `accessibleName()` returns the exact strings the mockup README fixes:
+
+  - `"Tuesday 19 May 2026: 8.2 km"`
+  - `"Monday 18 May 2026: rest day, 0 km"`
+  - `"Sunday 6 Sep 2026: not yet"`
+
+  That makes the accessibility contract a unit assertion instead of a template expression nobody can
+  test. It is also the only place the string `km` is constructed, which is how the "no miles anywhere"
+  criterion stays enforceable.
+
+  ### Controller
+
+  `DashboardController::__invoke()` gains the two collaborators as `__invoke` parameters, per
+  `.ai/rules/http.md` (single-action invokable, no constructor injection, no Form Request — there is no
+  user input on this route). The signed-out branch is untouched.
+
+  ### Grid caching
+
+  The PRD (`### Performance & Scalability`) specifies the assembled grid is cached and invalidated when a
+  sync completes. Implemented as recorded in the decision journal:
+
+  - Key: `heatmap:grid:{userId}:{windowStart}:{today}`.
+  - **The calendar day must be in the key.** "Invalidate on sync completion" alone is wrong: with no sync
+    between them, yesterday's cached grid would survive midnight and render today's cell as a future
+    cell — the grid changes at the day rollover, not only at sync. The date in the key makes the rollover
+    self-invalidating and the explicit forget handles the intra-day case.
+  - `SyncStravaActivities` forgets the key after a successful run.
+
+  US-005 layers levels onto this same cached grid; **US-006 never caches sync status** — presenting stale
+  data as current is the one failure mode the PRD names as fatal to the product.
+
+  ### Front end
+
+  Tailwind 4 via Vite, Blade, no JavaScript framework — per the PRD's recorded topology. The heatmap
+  geometry is plain CSS in `resources/css/app.css` (utility classes cannot express `<colgroup>` widths or
+  `aspect-ratio` cells cleanly), the page chrome stays Tailwind utilities.
+
+  **Elise — the geometry is a contract, not a suggestion.** From the mockup README:
+
+  ```css
+  .hm { width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0; }
+  .hm-col-week { width:13%; } .hm-col-day { width:9.5%; } .hm-col-total { width:20.5%; }
+  .hm-td { padding:2px; }
+  .dash-grid { max-width:34rem; }
+  ```
+
+  Gaps come from `td` padding. **Do not reintroduce `border-spacing`** — it is applied on top of
+  `width:100%` and pushes Sunday and the whole total column off a 375 px viewport. That was the first
+  version of the mockup and it was wrong. The `34rem` cap is equally load-bearing: without it cells
+  inflate to ~90 px at desktop and the density that makes a heatmap readable at a glance is gone.
+  Desktop gets the side rail, not bigger squares.
+
+  **Joe — theme.** Tokens move out of the bare `@media (prefers-color-scheme: dark)` block into two
+  selectors that both carry the dark palette:
+
+  ```css
+  html.dark { /* dark tokens */ }
+  @media (prefers-color-scheme: dark) { html:not(.light) { /* dark tokens */ } }
+  ```
+
+  A no-flash inline script in `<head>` resolves `localStorage.theme` before first paint; the toggle
+  writes `dark` or `light` and flips the class. A visitor with JS disabled still gets their OS preference
+  from the media query — which is why the media query survives rather than being replaced by the script.
+
+  ### Scope seam with US-005 — read before styling a cell
+
+  US-004 must render three visually distinct treatments (rest / ran / future) but the five-level ramp is
+  US-005's, and `resources/css/app.css` carries a standing comment saying so. Therefore:
+
+  - `--lv-0` (rest) and `--lv-future-border` (dashed, transparent) land **now** — the spec requires rest
+    and out-of-range to be distinguishable from each other and from a heat level.
+  - Every day with a run renders at a single provisional fill, `--lv-run` (`#3987e5` light / `#2a78d6`
+    dark — the validated level-2 step, not a new colour).
+  - US-005 replaces `--lv-run` with `--lv-1` .. `--lv-4` and swaps the `hm-cell--ran` class for
+    `hm-l1` .. `hm-l4`. That is two CSS rules and one Blade expression, and it is deliberately cheap.
+
+  **Do not** add the ramp levels or the legend in this spec, and do not re-tune any hex by eye — the ramp
+  was computed and validated against the real card surfaces and the mockup README records the validator
+  commands.
+
+  ### Rail
+
+  The `.dash` / `.rail` two-column layout at >= 1024 px is US-004's, because the spec requires it. The two
+  cards it holds are placeholders carrying a forward reference — the legend card is US-005, the sync card
+  is US-006 — following the same house convention the current `dashboard.blade.php` already uses.
+
+  ### Attribution
+
+  "Powered by Strava" moves into the layout footer, so it is present on every screen and cannot be lost
+  when a view changes. It is contractual under the Strava API Agreement (FR-008), not decoration.
+
+  ## Git & Branching
+
+  - Mode: **`GITFLOW`** (from `settings.git_mode`) — branch and atomic per-task commits, PR description
+    prepared locally, **no `git push` and no remote PR** unless the user asks in session.
+  - Branch: `feature/US-004-heatmap-grid` from `develop`.
+  - **Blocker cleared in TASK-00 (Sarah):** `develop` does **not** contain US-003's code —
+    `app/Support/Heatmap/HeatmapWindow.php` exists only on `feature/US-003-strava-daily-sync`, and
+    `develop` is at `chore(US-003): record the technical plan`. US-003 is approved and DONE, so TASK-00
+    merges that branch into `develop` first. Branching before the merge starts US-004 on a tree missing
+    its own dependency.
+  - TASK-00 bootstrap: yes (Gitflow mode).
+  - Per task: one Conventional Commit `type(US-004): TASK-NN summary`; never batch tasks.
+  - `php artisan larapilot:quality` (Pint + Larastan level 5) green before each `task-done`.
+  - Merge to `develop` only after human `larapilot-review` approval.
+
+  ## Test Data Strategy
+
+  - **No schema change and no new model in this spec** — every task's `## Test Data` is `N/A` except where
+    noted. `Activity`, `User` and `SyncRun` factories and `TrainingBlockSeeder` already exist from US-001.
+  - The seeded 16-week block is the demo dataset the spec's `Demonstrates` clause names: it already
+    contains an illness week, a peak week and a partial current week, so future cells and the partial
+    total render without any new fixture.
+  - `TrainingBlockSeeder` is re-verified in TASK-06 only as a consumer — `php artisan migrate:fresh --seed`
+    must still produce a grid that renders. If a gap appears (e.g. no rest day in the current week), the
+    seeder is adjusted **in that same task**, and `## Test Data` upgrades from `N/A` accordingly.
+  - Tests build their own windows with `Activity::factory()->for($athlete)->onDate($date)` rather than
+    seeding, so a date-sensitive assertion never depends on the seeder's random draws.
+
+  ## Test Strategy
+
+  - Bar: **`NORMAL`** (from `settings.testing`). Feature, unit and view assertions. **No** Playwright, no
+    Dusk, no Pest browser, no automated viewport matrix.
+  - **Anne — the load-bearing tests are the builder's.** Every date rule in this spec is a pure function of
+    (window, today, totals), so they belong in unit tests where each case is one named assertion:
+    16 rows x 7 columns; ISO-8601 Monday first; oldest week top, current week bottom; the partial current
+    week totalling only elapsed days; future cells in the current week; a window spanning a month
+    boundary; a window spanning a year boundary; a day with two runs summing into one cell; a rest day
+    distinct from a future day.
+  - DTO unit tests pin the formatting and the accessible names — one decimal, correct rounding
+    (8 249 m -> `8.2`), and the three exact `accessibleName()` strings.
+  - One feature test renders the dashboard from data and asserts the structural criteria: 112 day cells,
+    16 totals, `<caption class="sr-only">`, `scope="col"` / `scope="row"`, the skip link, "Powered by
+    Strava", and that **neither `mi` nor `miles` appears anywhere in the response**.
+  - Isolation: another athlete's activities in the same window must not appear in the grid.
+  - `Http::preventStrayRequests()` in `setUp()` per `.ai/rules/tests.md`; athletes signed in via
+    `allowlistedAthlete()` so the allowlist guard keeps being exercised.
+  - **Manual test handoff (Anne)** — the responsive and theme criteria are not automatable at this bar.
+    TASK-06 writes them to `.larapilot/docs/test-results/US-004-manual.md` for the reviewer:
+    no horizontal scroll at 320 / 375 / 768 / 1024 / 1280 px; cells do not inflate past the 34 rem cap;
+    the rail appears at >= 1024 px; first visit follows the OS theme; the toggle persists across a reload;
+    focus outlines visible on the toggle and the skip link; toggle target is 44 x 44 px.
+tasks:
+  -
+    id: TASK-00
+    title: 'Merge US-003 into develop and bootstrap the US-004 feature branch'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for US-004. `develop` does not yet contain US-003's code, so this task merges the
+      approved US-003 feature branch first, then cuts the US-004 branch from it.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. Confirm US-003 is accepted: `php artisan larapilot:spec-show US-003` reports `DONE`
+      2. Commit or stash the pending Larapilot artifact changes on `feature/US-003-strava-daily-sync`
+         (`.larapilot/backlog.yaml`, `.larapilot/specs/US-003.yaml`, `.larapilot/usage/ledger.jsonl`,
+         `.larapilot/decisions.yaml`) so nothing is carried across branches by accident
+      3. `git checkout develop`
+      4. `git merge --no-ff feature/US-003-strava-daily-sync` — resolve conflicts with Sarah leading if any
+         appear; `develop` must afterwards contain `app/Support/Heatmap/HeatmapWindow.php`
+      5. Verify the merged tree is green: `php artisan test` and `php artisan larapilot:quality`
+      6. `git checkout -b feature/US-004-heatmap-grid`
+      7. Draft the internal PR title/body toward `develop` — title `US-004: The 16-week heatmap with weekly
+         totals`; body links `.larapilot/plans/US-004-plan.yaml` and lists the planned tasks. Keep it local.
+
+      ## Completion Criteria
+      - [ ] `develop` contains US-003's merged work (`app/Support/Heatmap/HeatmapWindow.php` present)
+      - [ ] `php artisan test` and `php artisan larapilot:quality` pass on `develop` after the merge
+      - [ ] Branch `feature/US-004-heatmap-grid` exists locally, cut from the merged `develop`
+      - [ ] PR title/body drafted for `develop` (remote stays untouched)
+
+      ## Test Data
+      - N/A — no schema or model changes in this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-004): TASK-00 bootstrap feature branch` (empty commit allowed)
+      - Merge commit on `develop` for US-003 (`--no-ff`)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally — open/update remote only if the user asks
+    type: Impl
+    status: TODO
+    assignee: Sarah
+    estimate_hours: 1
+    dependencies: {}
+  -
+    id: TASK-01
+    title: 'Daily distance query, grid DTOs and the heatmap builder'
+    body: |-
+      ## Description
+      Build the read path and the grid model: one athlete-scoped aggregate query, a pure builder, and the
+      readonly DTOs that carry the numbers, the formatting and the accessible names.
+
+      ## Files Involved
+      - app/Enums/DayCellState.php
+      - app/Data/Heatmap/DayCell.php
+      - app/Data/Heatmap/WeekRow.php
+      - app/Data/Heatmap/HeatmapGrid.php
+      - app/Support/Heatmap/DailyRunningDistance.php
+      - app/Support/Heatmap/HeatmapBuilder.php
+
+      ## Steps
+      1. `php artisan make:enum DayCellState` — cases `Rest`, `Ran`, `Future` (TitleCase keys). These are the
+         three treatments the spec requires be mutually distinguishable; a boolean pair would let a future
+         rest day exist, which is not a thing
+      2. `php artisan make:class Support/Heatmap/DailyRunningDistance` — invokable,
+         `__invoke(User $athlete, HeatmapWindow $window): array<string, int>` keyed `Y-m-d` => summed metres.
+         One `selectRaw('activity_date, SUM(distance_meters) as meters')->groupBy('activity_date')` bounded by
+         `whereBetween('activity_date', [...])` on the `activities()` relation. Never loop and query per day —
+         112 queries where one belongs
+      3. `php artisan make:class Data/Heatmap/DayCell` — `final readonly`, promoted constructor
+         (`CarbonImmutable $date`, `int $distanceMeters`, `DayCellState $state`). Methods:
+         - `kilometres(): string` — `number_format($this->distanceMeters / 1000, 1)`
+         - `accessibleName(): string` — `"Tuesday 19 May 2026: 8.2 km"` / `"Monday 18 May 2026: rest day,
+           0 km"` / `"Sunday 6 Sep 2026: not yet"`
+         - `pointerTitle(): string` — `"Tuesday 19 May 2026 — 8.2 km"` / `"... — rest"`; future cells have none
+      4. `php artisan make:class Data/Heatmap/WeekRow` — `final readonly` (`CarbonImmutable $weekStart`,
+         `array<int, DayCell> $days`, `int $totalMeters`, `bool $isPartial`, `bool $isCurrent`), with
+         `kilometres()` and `weekLabel()` (`"18 May"`). Assert seven days in the constructor
+      5. `php artisan make:class Data/Heatmap/HeatmapGrid` — `final readonly` (`array<int, WeekRow> $weeks`,
+         `CarbonImmutable $startsOn`, `CarbonImmutable $endsOn`) plus `label()` -> `"18 May – 6 Sep 2026"`
+      6. `php artisan make:class Support/Heatmap/HeatmapBuilder` — invokable,
+         `__invoke(HeatmapWindow $window, array $dailyMeters, CarbonInterface $today): HeatmapGrid`. Walk the
+         window week by week from `startsOn`, seven days per row, oldest first. A day after `$today` is
+         `Future` with 0 metres and is excluded from the week total; a day at or before `$today` with no entry
+         is `Rest`; otherwise `Ran`. A row containing at least one `Future` cell is `isPartial` and
+         `isCurrent`
+      7. Add the block comment `.ai/rules/app.md` requires above the future-day branch: the builder takes
+         `$today` as an argument rather than reading the clock so every date rule is testable by naming a
+         date, not by travelling time
+      8. Full `@property`/`@param`/`@return` docblocks with array-shape types — Larastan runs at level 5 with
+         no IDE helper, so the docblock is the only type source
+      9. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] `DailyRunningDistance` returns summed metres per date for one athlete inside the window, in a
+            single query
+      - [ ] `HeatmapBuilder` returns exactly 16 `WeekRow`s of exactly 7 `DayCell`s, oldest week first
+      - [ ] Future days in the current week are `DayCellState::Future` and are excluded from the week total
+      - [ ] `kilometres()` renders one decimal; `accessibleName()` returns the three exact mockup strings
+      - [ ] `php artisan larapilot:quality` passes (Pint + Larastan level 5)
+
+      ## Test Data
+      - N/A — no migration, model or schema change; existing `Activity`/`User` factories are sufficient
+
+      ## Git Deliverables
+      - Commit: `feat(US-004): TASK-01 assemble the heatmap grid from daily running distance`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 5
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-02
+    title: 'Unit tests for the grid builder and cell formatting'
+    body: |-
+      ## Description
+      Unit-test the grid builder and the DTO formatting — the week-boundary and accessible-name rules that
+      carry this spec.
+
+      ## Files Involved
+      - tests/Unit/Support/Heatmap/HeatmapBuilderTest.php
+      - tests/Unit/Data/Heatmap/DayCellTest.php
+      - tests/Unit/Data/Heatmap/WeekRowTest.php
+
+      ## Steps
+      1. `php artisan make:test --phpunit --unit HeatmapBuilderTest` (and the two DTO tests). These need no
+         database: build `HeatmapWindow` and the totals array directly and pass an explicit `$today`
+      2. Builder cases, one named test each:
+         - 16 rows of 7 cells, oldest week first, current week last
+         - columns are ISO-8601 Monday through Sunday
+         - a day after `$today` in the current week is `Future`
+         - a day at or before `$today` with no run is `Rest`, and is **not** the same state as `Future`
+         - the current week's total covers only elapsed days, and the row reports `isPartial`
+         - a completed week is not `isPartial` even when it contains rest days
+         - two runs on one date sum into a single cell
+         - a window spanning a **month** boundary keeps every date in its correct weekday column
+         - a window spanning a **year** boundary does the same (drive it with a January `$today`)
+         - a window with no runs at all yields 112 `Rest`/`Future` cells and 16 zero totals
+      3. `DayCell` cases: one decimal formatting; rounding (`8_249` -> `8.2`, `8_250` -> `8.3`); the three
+         exact `accessibleName()` strings; `pointerTitle()` for ran and rest
+      4. `WeekRow` cases: `kilometres()` one decimal; `weekLabel()`; a non-seven-day construction is rejected
+      5. `php artisan test --compact tests/Unit/Support/Heatmap tests/Unit/Data/Heatmap`
+      6. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`
+
+      ## Completion Criteria
+      - [ ] Every builder case above is a passing named test
+      - [ ] Rest and Future are asserted as distinct states, not just distinct distances
+      - [ ] Month-boundary and year-boundary windows are covered
+      - [ ] Coverage matches the `NORMAL` bar; no browser or viewport tooling introduced
+
+      ## Git Deliverables
+      - Commit: `test(US-004): TASK-02 cover the grid builder and cell formatting`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 4
+    dependencies:
+      - TASK-01
+  -
+    id: TASK-03
+    title: 'Heatmap geometry CSS, persisted theme and Strava attribution (parallel with TASK-01)'
+    body: |-
+      ## Description
+      Lay the visual foundation: heatmap geometry CSS, the three cell treatments, the dashboard/rail layout,
+      the persisted light-dark theme, and the Strava attribution in the layout footer.
+
+      ## Files Involved
+      - resources/css/app.css
+      - resources/views/layouts/app.blade.php
+
+      ## Steps
+      1. **Tokens.** Add `--lv-0`, `--lv-future-border`, `--cell-ring` and the provisional `--lv-run` to both
+         palettes, using the exact hexes from the mockup README:
+         - light: `--lv-0:#e2e8f0`, `--lv-run:#3987e5`, `--lv-future-border:#cbd5e1`,
+           `--cell-ring:rgba(15,23,42,0.08)`
+         - dark: `--lv-0:#1e293b`, `--lv-run:#2a78d6`, `--lv-future-border:#334155`,
+           `--cell-ring:rgba(248,250,252,0.10)`
+         Replace the standing "do not add ramp levels ahead of US-005" comment with one that says level 0 and
+         the future border are here now, `--lv-run` is provisional, and `--lv-1` .. `--lv-4` still belong to
+         US-005. **Do not re-tune any hex by eye** — the ramp was validated against these card surfaces and
+         the mockup README records the validator commands
+      2. **Theme selectors.** Move the dark palette out of the bare `@media (prefers-color-scheme: dark)`
+         block into two selectors carrying the same tokens: `html.dark`, and
+         `@media (prefers-color-scheme: dark) { html:not(.light) { ... } }`. Add the block comment stating
+         why both exist: the class lets an explicit choice persist, the media query keeps a JS-disabled
+         visitor on their OS preference
+      3. **Geometry.** Add the heatmap CSS verbatim from the mockup README — `.hm` with
+         `table-layout:fixed; border-collapse:separate; border-spacing:0`, `<colgroup>` widths 13% / 9.5% /
+         20.5%, `.hm-td { padding:2px }`, `.hm-cell` as a square `aspect-ratio:1/1` block with the inset ring,
+         `.hm-th-week`, `.hm-th-day`, `.hm-th-total`, `.hm-total`, `.hm-total-num`, `.hm-total-unit`,
+         `.hm-partial`, `.hm-row-current`, plus the 480 px and 1024 px steps. Carry over the README's warning
+         as a comment: **never reintroduce `border-spacing`** — it is added on top of `width:100%` and pushes
+         Sunday and the total column off a 375 px viewport
+      4. **Cell states.** `.hm-cell--rest { background: var(--lv-0) }`,
+         `.hm-cell--ran { background: var(--lv-run) }`,
+         `.hm-cell--future { background: transparent; box-shadow: none; border: 1px dashed
+         var(--lv-future-border) }`. Three treatments, mutually distinct in both themes
+      5. **Layout.** `.dash` (single-column grid, `gap:1rem`), `.dash-grid { max-width:34rem; margin-inline:
+         auto }`, `.rail`, and the 1024 px rule switching `.dash` to
+         `grid-template-columns: minmax(0,34rem) minmax(0,1fr)` with `.dash-grid` losing its centring. The
+         34 rem cap is load-bearing — without it cells inflate to ~90 px at desktop and the density dies
+      6. **Layout header.** Make the header `sticky top-0 z-10`. Add the theme toggle to the right of the
+         header: `type="button"`, `data-theme-toggle`, `aria-pressed`, `h-11 w-11` (44 x 44 px), an
+         `sr-only` "Toggle dark mode" label and the `aria-hidden` moon icon from the mockup. Leave room in the
+         same flex row for the sync chip US-006 adds
+      7. **No-flash script.** Inline in `<head>`, before the stylesheet: read `localStorage.theme`; apply
+         `dark` or `light` to `documentElement`; if unset, leave both off so the media query decides. Then a
+         small `resources/js/app.js` handler for the toggle click that flips the class, writes
+         `localStorage.theme` and syncs `aria-pressed`. The head script must be inline — deferring it to the
+         bundle is what causes the light flash on a dark-theme reload
+      8. **Footer.** Replace the placeholder line with the attribution: a link to `https://www.strava.com`
+         reading "Powered by Strava", then `· runs only · distances in kilometres`. This is contractual under
+         the Strava API Agreement (FR-008), not decoration — it stays in the layout so no view change can drop
+         it
+      9. `npm run build`, then smoke-check the existing screens at 375, 768 and 1280 px in both themes
+      10. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] Heatmap geometry matches the mockup README; no `border-spacing` anywhere in `.hm`
+      - [ ] Rest, ran and future cells are visually distinct in **both** themes
+      - [ ] `.dash` becomes two columns at >= 1024 px with the grid capped at 34 rem
+      - [ ] Theme toggle is 44 x 44 px, carries `aria-pressed` and an `sr-only` label, and has a visible
+            `:focus-visible` outline
+      - [ ] First visit follows `prefers-color-scheme`; an explicit choice survives a reload; no flash of the
+            wrong theme
+      - [ ] "Powered by Strava" is present in the layout footer and links to strava.com
+      - [ ] `php artisan larapilot:quality` passes
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-004): TASK-03 heatmap geometry, persisted theme and Strava attribution`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Joe
+    estimate_hours: 5
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-04
+    title: 'Render the grid: Blade component, dashboard rail and controller wiring'
+    body: |-
+      ## Description
+      Render the grid: an anonymous Blade component for the table, the dashboard page with its side rail, and
+      the controller wiring that feeds them.
+
+      ## Files Involved
+      - resources/views/components/heatmap-grid.blade.php
+      - resources/views/dashboard.blade.php
+      - app/Http/Controllers/DashboardController.php
+
+      ## Steps
+      1. `<x-heatmap-grid :grid="$grid" />` — an anonymous component taking the `HeatmapGrid` DTO. It renders
+         markup only; every number and every string comes from a DTO method. No arithmetic in Blade
+      2. Table structure, exactly as the mockup fixes it:
+         - `<table class="hm">` with `<caption class="sr-only">` describing the grid's shape
+         - `<colgroup>`: `hm-col-week`, `<col span="7" class="hm-col-day">`, `hm-col-total`
+         - `<thead>`: an empty `<td>` carrying an `sr-only` "Week starting", then seven
+           `<th scope="col"><abbr title="Monday">Mo</abbr></th>` headers, then `<th scope="col">Week</th>`.
+           **Two-letter abbreviations** per the recorded decision — single letters make Tu/Th and Sa/Su
+           ambiguous, and the mockup verified two letters fit at 320 px
+         - each row: `<th scope="row" class="hm-th-week">` with an `sr-only` "Week of " prefix and
+           `weekLabel()`, then seven `<td class="hm-td">`, then the total `<td class="hm-total">`
+         - each day cell: `<span class="sr-only">{{ $day->accessibleName() }}</span>` followed by
+           `<span aria-hidden="true" class="hm-cell hm-cell--{state}" title="...">`. The visible square is
+           `aria-hidden` and the name is the `sr-only` span — colour never carries meaning alone
+         - future cells get no `title`
+         - the current row adds `hm-row-current`; a partial total appends
+           `<span class="hm-partial">partial</span>`
+      3. `dashboard.blade.php`: the `h1` ("Last 16 weeks"), the `$grid->label()` subtitle, then
+         `<div class="dash">` holding `<section class="card dash-grid">` with the component and
+         `<aside class="rail" aria-label="Legend and sync detail">`. The rail holds two placeholder cards
+         carrying forward references — the intensity legend is US-005, the sync detail is US-006 — matching
+         the convention already used in this view
+      4. `DashboardController::__invoke(DailyRunningDistance $dailyDistance, HeatmapBuilder $buildGrid)` —
+         collaborators as `__invoke` parameters per `.ai/rules/http.md`, not constructor-injected. Resolve
+         `HeatmapWindow::current()`, fetch the totals for `Auth::user()`, build the grid, pass it to the view.
+         The signed-out branch returning `strava.connect` is unchanged
+      5. `npm run build`; check the seeded dashboard at 320, 375, 768, 1024 and 1280 px in both themes — no
+         horizontal scroll, no cell inflation past the cap, rail appears at 1024
+      6. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] The dashboard renders 16 rows x 7 day cells plus 16 week totals from real data
+      - [ ] Every cell carries its accessible name; the coloured square is `aria-hidden`
+      - [ ] Future days in the current week render as the dashed treatment and the row's total is marked
+            partial
+      - [ ] `<caption class="sr-only">`, `scope="col"` and `scope="row"` are all present
+      - [ ] Distances render in kilometres to one decimal; "mi" and "miles" appear nowhere
+      - [ ] Usable at 320 / 375 / 768 / 1024 / 1280 px with no horizontal scroll (manual smoke at this bar)
+      - [ ] `php artisan larapilot:quality` passes
+
+      ## Test Data
+      - N/A — no model or schema changes; rendered from the existing `TrainingBlockSeeder` dataset
+
+      ## Git Deliverables
+      - Commit: `feat(US-004): TASK-04 render the 16-week heatmap and weekly totals`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 5
+    dependencies:
+      - TASK-01
+      - TASK-03
+  -
+    id: TASK-05
+    title: 'Cache the assembled grid and invalidate it on sync'
+    body: |-
+      ## Description
+      Cache the assembled grid per the PRD, keyed so the midnight rollover invalidates itself, and forget it
+      when a sync succeeds.
+
+      ## Files Involved
+      - app/Http/Controllers/DashboardController.php
+      - app/Support/Heatmap/HeatmapGridCache.php
+      - app/Console/Commands/SyncStravaActivities.php
+      - config/heatmap.php
+
+      ## Steps
+      1. `php artisan make:class Support/Heatmap/HeatmapGridCache` — owns the key and the TTL so the
+         controller and the sync command cannot drift apart on the format. Key:
+         `heatmap:grid:{userId}:{windowStart}:{today}`
+      2. Add the block comment `.ai/rules/app.md` requires, stating the failure mode the date in the key
+         avoids: the grid changes at the calendar-day rollover, not only when a sync runs. Keying on the
+         window alone would let yesterday's cached grid survive midnight and render today as a future cell —
+         stale data presented as current, which the PRD names as the one fatal failure mode
+      3. Controller resolves through the cache: hit returns the `HeatmapGrid`, miss builds and stores it. TTL
+         from `config('heatmap.grid_cache_ttl')` — a literal in `config/heatmap.php` alongside
+         `window_weeks`, **not** an `env()` lookup, per `.ai/rules/config.md`
+      4. `SyncStravaActivities` forgets the current athlete's key after a successful run, so a mid-day sync is
+         visible immediately. A failed run leaves the cache alone — there is nothing new to show
+      5. `php artisan larapilot:quality --fix`
+
+      ## Completion Criteria
+      - [ ] A second dashboard request in the same day does not re-run the aggregate query
+      - [ ] A successful sync makes the next request rebuild the grid
+      - [ ] A cached grid does not survive into the next calendar day
+      - [ ] A failed sync does not clear the cache
+      - [ ] TTL is a literal in `config/heatmap.php`, read via `config()`, never `env()` from app code
+      - [ ] `php artisan larapilot:quality` passes
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-004): TASK-05 cache the assembled grid and invalidate it on sync`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-04
+  -
+    id: TASK-06
+    title: 'Feature tests for the rendered dashboard, caching and isolation'
+    body: |-
+      ## Description
+      Feature-test the rendered dashboard, the cache behaviour and the athlete isolation, and write the manual
+      handoff for the responsive and theme criteria automation cannot reach at this bar.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/HeatmapGridTest.php
+      - tests/Feature/Dashboard/HeatmapGridCacheTest.php
+      - tests/Feature/Dashboard/ConnectScreenTest.php (adjust if the layout change broke an assertion)
+      - .larapilot/docs/test-results/US-004-manual.md
+
+      ## Steps
+      1. `php artisan make:test --phpunit HeatmapGridTest`. `Http::preventStrayRequests()` in `setUp()`;
+         sign in through `allowlistedAthlete()` — a user straight from the factory silently stops exercising
+         the allowlist guard
+      2. Build the window with `Activity::factory()->for($athlete)->onDate($date)` on named dates rather than
+         seeding, so no assertion depends on the seeder's random draws
+      3. Assert, one named test each:
+         - the response contains 112 day cells and 16 week totals
+         - a known day's distance renders in kilometres to one decimal
+         - a known rest day renders `"rest day, 0 km"` in its accessible name
+         - a future day in the current week renders `"not yet"` and the dashed treatment
+         - the current week's total is marked partial; a completed week's is not
+         - `<caption class="sr-only">`, `scope="col"` and `scope="row"` are present
+         - the skip link and "Powered by Strava" are present
+         - **neither `mi` nor `miles` appears anywhere in the response**
+         - another athlete's activities in the same window do not appear in this athlete's grid
+         - an athlete with no activities renders the full grid of rest and future cells, not a blank page
+      4. `HeatmapGridCacheTest`: a second request in the same day serves the cached grid; a successful sync
+         forgets it; a different calendar day produces a different key
+      5. Re-run the existing dashboard tests — `ConnectScreenTest` asserts layout invariants US-004 touches
+         (the footer line and the header). Fix any assertion the layout change legitimately invalidated;
+         do not weaken one to make it pass
+      6. Verify the demo dataset still exercises the screen: `php artisan migrate:fresh --seed` then load the
+         dashboard. If the seeded current week never leaves a future day or a rest day, adjust
+         `TrainingBlockSeeder` **in this task** and record it under `## Test Data` below
+      7. Write `.larapilot/docs/test-results/US-004-manual.md` with the checks the `NORMAL` bar does not
+         automate: no horizontal scroll at 320 / 375 / 768 / 1024 / 1280 px; cells do not inflate past the
+         34 rem cap; the rail appears at >= 1024 px; first visit follows the OS theme; the toggle persists
+         across a reload with no flash; focus outlines visible on the toggle and the skip link; the toggle is
+         44 x 44 px
+      8. `php artisan test --compact` (full suite) and `php artisan larapilot:quality`
+      9. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`
+
+      ## Completion Criteria
+      - [ ] Every assertion above is a passing named test
+      - [ ] Athlete isolation and the empty-window case are covered
+      - [ ] Cache hit, sync invalidation and day-rollover keying are covered
+      - [ ] The full suite passes; no pre-existing test was weakened to accommodate the layout change
+      - [ ] `.larapilot/docs/test-results/US-004-manual.md` lists the responsive and theme checks for the
+            reviewer
+      - [ ] `php artisan larapilot:quality` passes
+
+      ## Test Data
+      - Existing `Activity`/`User` factories are used directly; no new factory is introduced
+      - [ ] `TrainingBlockSeeder` adjusted **only if** step 6 shows the seeded current week fails to produce a
+            future day or a rest day — otherwise `N/A`
+
+      ## Git Deliverables
+      - Commit: `test(US-004): TASK-06 cover the rendered heatmap, caching and isolation`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 5
+    dependencies:
+      - TASK-05
+  -
+    id: TASK-07
+    title: 'Changelog and README for the heatmap, theme toggle and grid cache'
+    body: |-
+      ## Description
+      Baseline documentation for the increment: changelog entry and the README lines the new user-visible
+      behaviour needs.
+
+      ## Files Involved
+      - CHANGELOG.md
+      - README.md
+
+      ## Steps
+      1. `CHANGELOG.md` under `Unreleased` -> `Added`: the 16-week heatmap grid with weekly totals, the
+         persisted light/dark theme toggle, and the Strava attribution in the footer
+      2. `README.md`: a short line on the theme behaviour (first visit follows the OS preference, the toggle
+         persists the choice in `localStorage`) and on the grid cache — that it is keyed per athlete, window
+         and calendar day and cleared by a successful sync, so a developer who changes the sync path knows the
+         invalidation exists
+      3. Baseline tier only — no diagrams, no OpenAPI (there is no public API), no manual. The PRD records
+         baseline-only documentation for this project
+      4. `php artisan larapilot:quality`
+
+      ## Completion Criteria
+      - [ ] `CHANGELOG.md` Unreleased describes the user-facing change
+      - [ ] README documents the theme behaviour and the grid cache invalidation
+      - [ ] No documentation beyond the baseline tier was added
+      - [ ] `php artisan larapilot:quality` passes
+
+      ## Test Data
+      - N/A — documentation only
+
+      ## Git Deliverables
+      - Commit: `docs(US-004): TASK-07 document the heatmap, theme toggle and grid cache`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: finalise the local PR description for `develop`
+    type: Impl
+    status: TODO
+    assignee: Albert
+    estimate_hours: 2
+    dependencies:
+      - TASK-06
+updated_at: '2026-09-06T15:37:50+00:00'
