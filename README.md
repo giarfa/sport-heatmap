@@ -193,6 +193,19 @@ count and delays are literals in `config/strava.php`); an exhausted retry record
 `X-RateLimit-Usage` response header in `sync_runs.error_message`, which is where to look if the
 daily sync starts failing.
 
+## The dashboard
+
+The heatmap grid is cached per athlete, per 16-week window and per calendar day
+(`App\Support\Heatmap\HeatmapGridCache`), so a second request the same day skips the aggregate
+query. The cache is cleared automatically for every synced athlete once `strava:sync` succeeds, so a
+mid-day sync is visible on the next request; a failed sync leaves the cache alone, since there is
+nothing new to show. The calendar day is part of the cache key, so a cached grid can never survive
+into the next day even without a sync in between.
+
+On first visit the theme follows the browser's `prefers-color-scheme`; toggling it in the header
+persists the explicit choice in `localStorage` (`theme`), which then wins over the OS preference on
+every later visit.
+
 ## Tests and quality
 
 ```bash
