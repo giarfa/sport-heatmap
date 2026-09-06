@@ -8,3 +8,5 @@
 {"id":"200c177770301dd7","ts":"2026-09-06T07:58:11+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"feature","tokens":118000,"minutes":42,"skill":"larapilot-implement","spec":"US-002","note":null,"estimated":true}
 {"id":"dfdc6295170b875d","ts":"2026-09-06T08:00:28+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"review","tokens":82000,"minutes":6,"skill":"larapilot-review","spec":"US-002","note":null,"estimated":true}
 {"id":"9b21df0a5317b822","ts":"2026-09-06T08:20:21+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"planning","tokens":55000,"minutes":12,"skill":"larapilot-plan","spec":"US-003","note":"Planned US-003 daily Strava sync: 10 tasks, shared 112-day window seam","estimated":true}
+{"id":"b21383f0e0fee298","ts":"2026-09-06T15:30:07+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"review","tokens":21000,"minutes":6,"skill":"larapilot-review","spec":"US-003","note":null,"estimated":true}
+{"id":"b509177f96463ce1","ts":"2026-09-06T15:37:54+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"planning","tokens":48000,"minutes":11,"skill":"larapilot-plan","spec":"US-004","note":null,"estimated":true}

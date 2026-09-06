@@ -137,7 +137,7 @@ specs:
       title: 'Activity sync'
     priority: HIGH
     points: 8
-    status: REVIEW
+    status: DONE
     body: |
       #### US-003: Daily sync of runs from Strava
 
@@ -158,24 +158,24 @@ specs:
       `FR-002`, `FR-003` — **MoSCoW: Must**. PRD `### Strava integration` (Matt), `### Data model` (Mike).
 
       **Acceptance Criteria**
-      - [ ] A scheduled Artisan command runs **once per day** at the configured hour and timezone, registered
+      - [x] A scheduled Artisan command runs **once per day** at the configured hour and timezone, registered
             in `routes/console.php`
-      - [ ] Each run reconciles the **full 112-day window** — requests activities with `after` set to the start
+      - [x] Each run reconciles the **full 112-day window** — requests activities with `after` set to the start
             of the window and paginates at maximum page size until the response is short
-      - [ ] Only running sport types are stored — `Run`, `TrailRun`, `VirtualRun`; every other sport is
+      - [x] Only running sport types are stored — `Run`, `TrailRun`, `VirtualRun`; every other sport is
             discarded at sync time and never persisted
-      - [ ] Distances are stored as **integer metres**; a day's date comes from the activity's Strava **local**
+      - [x] Distances are stored as **integer metres**; a day's date comes from the activity's Strava **local**
             start date, so attribution does not depend on server timezone
-      - [ ] Activities are upserted on `strava_activity_id`, so an edit on Strava (corrected distance, renamed,
+      - [x] Activities are upserted on `strava_activity_id`, so an edit on Strava (corrected distance, renamed,
             changed sport type) propagates on the next run
-      - [ ] Local activities inside the window that are **absent** from the response are deleted, so an activity
+      - [x] Local activities inside the window that are **absent** from the response are deleted, so an activity
             removed on Strava disappears from the map
-      - [ ] The command is **idempotent** — running it twice in a row leaves the database byte-identical
-      - [ ] Every run writes a `sync_runs` record: start, finish, status, upserted count, deleted count, and the
+      - [x] The command is **idempotent** — running it twice in a row leaves the database byte-identical
+      - [x] Every run writes a `sync_runs` record: start, finish, status, upserted count, deleted count, and the
             error message on failure
-      - [ ] `429` and `5xx` responses are retried with backoff; an exhausted retry records a failed `sync_runs`
+      - [x] `429` and `5xx` responses are retried with backoff; an exhausted retry records a failed `sync_runs`
             row, exits non-zero, and leaves no half-applied window
-      - [ ] Tests with a faked Strava HTTP client cover: pagination across pages, upsert of a changed activity,
+      - [x] Tests with a faked Strava HTTP client cover: pagination across pages, upsert of a changed activity,
             deletion of an absent activity, sport-type filtering, token refresh mid-sync, `429` backoff, and
             idempotency across two consecutive runs
 
@@ -186,7 +186,14 @@ specs:
       - { status: PLANNED, at: '2026-09-06T08:19:58+00:00' }
       - { status: 'IN PROGRESS', at: '2026-09-06T09:07:43+00:00' }
       - { status: REVIEW, at: '2026-09-06T09:29:54+00:00' }
+      - { status: DONE, at: '2026-09-06T15:30:01+00:00' }
     rework: false
+    merge_commit:
+      sha: 4f48c2a76f3e5cf4c16657a12acecf64ac9658f1
+      short_sha: 4f48c2a
+      subject: 'chore(US-003): hand off to REVIEW'
+      committed_at: '2026-09-06T12:07:28+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4f48c2a76f3e5cf4c16657a12acecf64ac9658f1'
   -
     code: US-004
     title: 'The 16-week heatmap with weekly totals'
@@ -195,7 +202,7 @@ specs:
       title: 'Heatmap dashboard'
     priority: HIGH
     points: 5
-    status: TODO
+    status: PLANNED
     body: |
       #### US-004: The 16-week heatmap with weekly totals
 
@@ -243,6 +250,9 @@ specs:
       - [ ] Unit tests for the grid builder: week boundaries, Monday start, the partial current week, future-day
             cells, and a window spanning a month and a year boundary. Feature test renders the dashboard from
             seeded data
+    status_history:
+      - { status: PLANNED, at: '2026-09-06T15:37:50+00:00' }
+    rework: false
   -
     code: US-005
     title: 'Self-calibrating intensity scale and legend'
