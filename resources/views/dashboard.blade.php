@@ -12,9 +12,9 @@
             <x-heatmap-grid :grid="$grid" />
         </section>
         <aside class="rail" aria-label="Legend and sync detail">
-            {{-- The intensity legend arrives with US-005; the sync detail card with US-006. --}}
+            {{-- The intensity legend has landed; the sync detail card is still US-006. --}}
             <div class="card p-4">
-                <p class="text-sm" style="color: var(--ink-muted);">Intensity legend arrives with the next spec.</p>
+                <x-heatmap-legend :scale="$grid->scale" />
             </div>
             <div class="card p-4">
                 <p class="text-sm" style="color: var(--ink-muted);">Sync detail arrives with the next spec.</p>

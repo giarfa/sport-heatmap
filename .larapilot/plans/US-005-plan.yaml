@@ -388,12 +388,12 @@ tasks:
       6. Smoke-check the dashboard at 375, 768 and 1280 px in both themes; confirm the five steps are distinguishable and the dark ramp reads lightest-at-peak.
 
       ## Completion Criteria
-      - [ ] `--lv-1`…`--lv-4` present in all three token blocks with the exact README hexes
-      - [ ] `--lv-run` and `.hm-cell--ran` removed; `.hm-cell--l1`…`--l4` present
-      - [ ] Stale US-004 comments deferring the ramp to US-005 replaced
-      - [ ] Legend classes present; `.hm-key-swatch` overrides `aspect-ratio`
-      - [ ] `npm run build` succeeds
-      - [ ] Manual smoke at 375 / 768 / 1280 px in light and dark
+      - [x] `--lv-1`…`--lv-4` present in all three token blocks with the exact README hexes
+      - [x] `--lv-run` and `.hm-cell--ran` removed; `.hm-cell--l1`…`--l4` present
+      - [x] Stale US-004 comments deferring the ramp to US-005 replaced
+      - [x] Legend classes present; `.hm-key-swatch` overrides `aspect-ratio`
+      - [x] `npm run build` succeeds
+      - [x] Manual smoke at 375 / 768 / 1280 px in light and dark
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -403,11 +403,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: 4749af997efd0157f6488f195872e5e7f5de421c
+      short_sha: 4749af9
+      subject: 'feat(US-005): TASK-04 add the validated intensity ramp and legend styles'
+      committed_at: '2026-09-06T18:25:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4749af997efd0157f6488f195872e5e7f5de421c'
   -
     id: TASK-05
     title: 'Render the always-visible legend in the dashboard rail'
@@ -525,4 +531,4 @@ tasks:
     estimate_hours: 1.5
     dependencies:
       - TASK-06
-updated_at: '2026-09-06T16:24:09+00:00'
+updated_at: '2026-09-06T16:25:23+00:00'
