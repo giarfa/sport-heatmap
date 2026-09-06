@@ -137,7 +137,7 @@ specs:
       title: 'Activity sync'
     priority: HIGH
     points: 8
-    status: PLANNED
+    status: REVIEW
     body: |
       #### US-003: Daily sync of runs from Strava
 
@@ -184,6 +184,8 @@ specs:
       the PRD deliberately does not hardcode a number.
     status_history:
       - { status: PLANNED, at: '2026-09-06T08:19:58+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-09-06T09:07:43+00:00' }
+      - { status: REVIEW, at: '2026-09-06T09:29:54+00:00' }
     rework: false
   -
     code: US-004
