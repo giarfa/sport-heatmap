@@ -10,6 +10,7 @@
 /**
  * @var array{
  *     window_weeks: int,
+ *     grid_cache_ttl: int,
  * } $config
  */
 $config = [
@@ -27,6 +28,21 @@ $config = [
     */
 
     'window_weeks' => 16,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Grid cache TTL
+    |--------------------------------------------------------------------------
+    |
+    | The cache key already carries the calendar day (HeatmapGridCache), so this
+    | TTL only bounds how long a stale entry can outlive an interrupted sync; it
+    | is a literal rather than an env() lookup for the same reason window_weeks
+    | is — a deployment file must not be able to widen how long a stale grid can
+    | be served.
+    |
+    */
+
+    'grid_cache_ttl' => 86_400,
 
 ];
 
