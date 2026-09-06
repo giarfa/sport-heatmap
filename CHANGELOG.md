@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A daily `strava:sync` command that reconciles the full 112-day activity window: upserts on the
+  Strava activity id, deletes local activities Strava no longer returns, and keeps only running
+  sport types (US-003).
+- A `sync_runs` audit trail — every attempt records its start, finish, status, upserted/deleted
+  counts, and the error on failure — which the dashboard's sync-status indicator will read
+  (US-003).
 - Strava OAuth sign-in: the dashboard is reached by authorising Strava once, with no password and
   no registration (US-002).
 - An athlete allowlist read from `STRAVA_ALLOWED_ATHLETE_IDS`, which is what keeps an instance
