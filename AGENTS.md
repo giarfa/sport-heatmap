@@ -7,7 +7,7 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 
 ## Foundational Context
 
-This application is a Laravel application running on PHP 8.5. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
+This application is a Laravel application running on PHP 8.4. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
 
 Before relying on a package's API, confirm its installed version:
 - PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
@@ -58,7 +58,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Searching Documentation (IMPORTANT)
 
-- Always use `search-docs` before making code changes. Do not skip this step. It returns version-specific docs based on installed packages automatically.
+- Use `search-docs` before changes that depend on Laravel ecosystem APIs, behavior, configuration, or version-specific syntax. Skip it for copy-only edits and other changes where package documentation is irrelevant. Reuse sufficient results already in context instead of searching again.
 - Pass a `packages` array to scope results when you know which packages are relevant.
 - Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
 - Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
@@ -72,7 +72,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Project Rules
 
-- This project keeps committed, area-grouped rules in `.ai/rules` (settled decisions, non-obvious traps, standing constraints). Framework and package guidelines that only apply to specific paths (testing, frontend, components) also live there, under `.ai/rules/boost` — this is not just recorded decisions, it is load-bearing guidance you have not seen inline. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule.
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists (settled decisions, non-obvious traps, standing constraints). Framework and package guidelines that only apply to specific paths (testing, frontend, components) also live there, under `.ai/rules/boost` — this is not just recorded decisions, it is load-bearing guidance you have not seen inline. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
 - Record durable rules with `record-rule` so the next agent or teammate inherits them instead of working them out again. Pass a `glob` (e.g. `app/Http/Controllers/**`), a short `title`, and a few-line `note`. Always use `record-rule`, never your native memory or notes tool — native memory is personal and session-scoped; only `.ai/rules` is shared with the team and persists in the repo.
 
 ## Artisan
@@ -104,6 +104,22 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
 
+=== herd rules ===
+
+# Laravel Herd
+
+- The application is served by Laravel Herd at `https?://[kebab-case-project-dir].test`. Use the `get-absolute-url` tool to generate valid URLs. Never run commands to serve the site. It is always available.
+- Use the `herd` CLI to manage services, PHP versions, and sites (e.g. `herd sites`, `herd services:start <service>`, `herd php:list`). Run `herd list` to discover all available commands.
+
+=== tests rules ===
+
+# Test Enforcement
+
+- Test every code change by adding or updating a test.
+- Run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
+
 === laravel/core rules ===
 
 # Do Things the Laravel Way
@@ -112,23 +128,9 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - If you're creating a generic PHP class, use `php artisan make:class`.
 - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
 
-### Model Creation
-
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
-
-## APIs & Eloquent Resources
-
-- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
-
 ## URL Generation
 
 - When generating links to other pages, prefer named routes and the `route()` function.
-
-## Testing
-
-- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
-- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
 
 ## Vite Error
 
@@ -141,24 +143,6 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
 - Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
 
-=== phpunit/core rules ===
-
-# PHPUnit
-
-- This application uses PHPUnit for testing. All tests must be written as PHPUnit classes. Use `php artisan make:test --phpunit {name}` to create a new test.
-- If you see a test using "Pest", convert it to PHPUnit.
-- Every time a test has been updated, run that singular test.
-- When the tests relating to your feature are passing, ask the user if they would like to also run the entire test suite to make sure everything is still passing.
-- Tests should cover all happy paths, failure paths, and edge cases.
-- You must not remove any tests or test files from the tests directory without approval. These are not temporary or helper files; these are core to the application.
-
-## Running Tests
-
-- Run the minimal number of tests, using an appropriate filter, before finalizing.
-- To run all tests: `php artisan test --compact`.
-- To run all tests in a file: `php artisan test --compact tests/Feature/ExampleTest.php`.
-- To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change to a related file).
-
 === andreapollastri/larapilot/core rules ===
 
 ## Larapilot
@@ -169,13 +153,14 @@ Larapilot brings **spec-driven product development** to Laravel projects via [La
 
 **Runtime loading:** at skill activation read `.larapilot/shared-runtime.md` (core rules: settings, personas, language, output economy, sub-agents); each skill names the additional runtime packs it needs (`.larapilot/runtime-discovery.md`, `runtime-delivery.md`, `runtime-ux.md`, `runtime-ship.md`, `runtime-ops.md`). Task body templates: `.larapilot/task-templates.md`.
 
-**Project settings:** `.larapilot/config.yaml` → `settings` (`effort`, `backlog`, `git_mode`, `testing`, `auto_approve`, `lucille`, `github`, `gitlab`, `bitbucket`, `notifications`, `notify_slack`, `notify_discord`, `notify_telegram` — set via `/larapilot-settings`, exposed on `config-show` as `data.settings`). Every skill must read and honor `data.settings` before planning or implementing — canonical matrices in `.larapilot/shared-runtime.md` → **Project Settings**. Note: `GITFLOW` never auto-pushes (only `GITFLOW_PUSH` does); `ECO` never spawns sub-agents and **disables Lucille automatically** (re-enable with `larapilot:settings-set --lucille=YES`); boolean settings are `true`/`false` in YAML and `YES`/`NO` in envelopes; **Lucille is ON by default** otherwise; **GitHub/GitLab/Bitbucket + notifications are OFF by default** (setup in `.larapilot/integrations.md`).
+**Project settings:** `.larapilot/config.yaml` → `settings` (`effort`, `backlog`, `git_mode`, `testing`, `auto_approve`, `lucille`, `decision_log`, `code_history`, `dashboard_auth`, `api_auth`, `security_scan`, `github`, `gitlab`, `bitbucket`, `azure`, `notifications`, `notify_slack`, `notify_discord`, `notify_telegram` — set via `/larapilot-settings`, exposed on `config-show` as `data.settings`). Every skill must read and honor `data.settings` before planning or implementing — canonical matrices in `.larapilot/shared-runtime.md` → **Project Settings**. Note: `GITFLOW` never auto-pushes (only `GITFLOW_PUSH` does); `ECO` never spawns sub-agents and **disables Lucille automatically** (re-enable with `larapilot:settings-set --lucille=YES`); boolean settings are `true`/`false` in YAML and `YES`/`NO` in envelopes; **Lucille and the decision journal (`decision_log`) are ON by default**; record every explicit user choice with `larapilot:decision-log` and check `larapilot:decision-check` before overriding one; **`code_history` (per spec/task file+line log via `larapilot:code-log`), `dashboard_auth` (optional HTTP Basic Auth on the dashboard UI only — never the JSON API or MCP), `api_auth` (make `LARAPILOT_API_TOKEN` mandatory on every `/larapilot/api/*` request; fails closed HTTP 503 when the token is unset — never the dashboard UI or MCP), `security_scan` (fold `andreapollastri/checkpoint` static scan into `/larapilot-review` + pre-ship; optional `--dev` package, never bundled), GitHub/GitLab/Bitbucket/Azure DevOps + notifications are OFF by default** (setup in `.larapilot/integrations.md`).
 
 ### When to use Larapilot
 
 Use Larapilot skills when the user wants to:
 
 - Define a product vision or write a PRD (guided discovery interview — Project Kind Personal/Website/Application/Package, delivery target, MoSCoW; drop client docs in `.larapilot/client-materials/` and legacy snapshots in `.larapilot/legacy/` first)
+- **Adopt an existing production Laravel app** built without Larapilot — reverse-engineer a complete PRD (+ `.larapilot/research/codebase-analysis.md`) from the code so the normal loop can continue (`larapilot-adopt`)
 - Build or evolve a **PHP/Laravel Composer package** (new or existing path/git) with professional standards, distribution, and docs
 - Create or extend a backlog of user stories / specs
 - Add **one new feature or evolutiva** on an existing project (`larapilot-feature`)
@@ -195,6 +180,7 @@ Use Larapilot skills when the user wants to:
 | Step | Skill | Output |
 | --- | --- | --- |
 | Discovery | `larapilot-inception` | `.larapilot/docs/PRD.md` |
+| Brownfield onboarding | `larapilot-adopt` | `.larapilot/docs/PRD.md` (reverse-engineered) + `.larapilot/research/codebase-analysis.md` |
 | Feature / evolutiva | `larapilot-feature` | New `US-XXX` spec (+ optional PRD `FR-XXX`) |
 | Bug report | `larapilot-bug` | Fix spec or rework + `.larapilot/docs/support/intake.md` |
 | FE companion (split repo) | `larapilot-frontend-companion` | Link FE path, scan code; implement via `repo: frontend` from Laravel |
@@ -204,7 +190,7 @@ Use Larapilot skills when the user wants to:
 | Implementation | `larapilot-implement` | Code, tests, review notes |
 | Acceptance | `larapilot-review` | DONE or rework feedback |
 | Ship (optional) | `larapilot-ship` | Security assessment + deploy + web launch checks |
-| Settings | `larapilot-settings` | Persist `effort` / `backlog` / `git_mode` / `testing` / `auto_approve` / `lucille` in `.larapilot/config.yaml` |
+| Settings | `larapilot-settings` | Persist `effort` / `backlog` / `git_mode` / `testing` / `auto_approve` / `lucille` / `decision_log` / `code_history` in `.larapilot/config.yaml` |
 | Usage / time tracking | `larapilot-usage` | Lucille: query ledger (tokens/minutes), schedule drift, export Markdown resoconto |
 | Developer portal (optional) | `larapilot-backstage` | `catalog-info.yaml` + TechDocs (`mkdocs.yml`, `.larapilot/techdocs/`) for backstage.io |
 | Project tracker (optional) | `larapilot-tracker` | Stories + plan subtasks in Linear/Asana/Jira/Trello/ClickUp/Monday; links in `.larapilot/tracker.yaml` |
@@ -231,7 +217,7 @@ Register the Larapilot MCP server in your editor (in addition to `laravel-boost`
 Skills call Artisan commands — never invent persistence logic:
 
 - `php artisan larapilot:config-show`
-- `php artisan larapilot:settings-set --effort=… --backlog=… --git-mode=… --testing=… --auto-approve=… --lucille=…`
+- `php artisan larapilot:settings-set --effort=… --backlog=… --git-mode=… --testing=… --auto-approve=… --lucille=… --decision-log=… --code-history=…`
 - `php artisan larapilot:prd-write`
 - `php artisan larapilot:validate-prd`
 - `php artisan larapilot:frontend-set --path=/abs/fe/repo [--stack=React]`
@@ -258,6 +244,10 @@ Skills call Artisan commands — never invent persistence logic:
 - `php artisan larapilot:usage-report [--insights] [--category=] [--user=] [--skill=] [--spec=] [--from=] [--to=]` _(Lucille query + Markdown resoconto)_
 - `php artisan larapilot:schedule-set --deadline=YYYY-MM-DD` _(deadlines / drift notes)_
 - `php artisan larapilot:choices-set --from-prd` _(dashboard inception snapshot)_
+- `php artisan larapilot:decision-log --topic=… --value=… [--source=chat|askquestion --skill=… --spec=… --supersedes=…]` _(decision journal; ON by default)_
+- `php artisan larapilot:decision-check --topic=… [--value=…]` _(read-only; regression check before overriding a choice)_
+- `php artisan larapilot:code-log --spec=US-XXX --task=TASK-NN [--commit=|--range=]` _(code change history; OFF by default)_
+- `php artisan larapilot:code-history [--file=… --spec=…]` _(read-only; per-file touchpoints)_
 
 Parse stdout/stderr as JSON envelopes with schema `larapilot/v1`.
 
@@ -270,7 +260,7 @@ Parse stdout/stderr as JSON envelopes with schema `larapilot/v1`.
 
 ### Artifacts live in the repo
 
-PRD `.larapilot/docs/PRD.md` (living product contract — see **PRD Living Document** in `.larapilot/runtime-ops.md`) · backlog `.larapilot/backlog.yaml` · specs `.larapilot/specs/US-XXX.yaml` · plans `.larapilot/plans/US-XXX-plan.yaml` · mockups `.larapilot/mockups/{spec}/` (served at `/mockups/{spec}` outside production) · docs (test-results, review, security, support, launch) under `.larapilot/docs/` · client materials `.larapilot/client-materials/` · legacy `.larapilot/legacy/` · research `.larapilot/research/` · usage ledger `.larapilot/usage/` (Lucille) · choices `.larapilot/choices.yaml` · tracker links `.larapilot/tracker.yaml` (commit it; ids only, never credentials). Dashboard: `/larapilot` (Board · PRD · Settings · Usage — dev/staging only).
+PRD `.larapilot/docs/PRD.md` (living product contract — see **PRD Living Document** in `.larapilot/runtime-ops.md`) · backlog `.larapilot/backlog.yaml` · specs `.larapilot/specs/US-XXX.yaml` · plans `.larapilot/plans/US-XXX-plan.yaml` · mockups `.larapilot/mockups/{spec}/` (served at `/mockups/{spec}` outside production) · docs (test-results, review, security, support, launch) under `.larapilot/docs/` · client materials `.larapilot/client-materials/` · legacy `.larapilot/legacy/` · research `.larapilot/research/` · usage ledger `.larapilot/usage/` (Lucille) · choices `.larapilot/choices.yaml` · decision journal `.larapilot/decisions.yaml` (via `larapilot:decision-log`; ON by default) · code change history `.larapilot/code-history.yaml` (via `larapilot:code-log`; OFF by default) · tracker links `.larapilot/tracker.yaml` (commit it; ids only, never credentials). Dashboard: `/larapilot` (Board · PRD · Settings · Usage — dev/staging only).
 
 ### Personas
 

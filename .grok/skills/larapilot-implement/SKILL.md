@@ -29,8 +29,10 @@ When `settings.effort` is **`ECO`**: **never spawn sub-agents**; **defer docs** 
 2. `php artisan larapilot:spec-show {code}` OR `php artisan larapilot:spec-next --status=PLANNED`
 3. `php artisan larapilot:spec-start {code}`
 4. `php artisan larapilot:task-done {code} {taskId}` (after each task)
-5. `php artisan larapilot:quality` — Pint + Larastan (level 5+) before backend `task-done`; use `--fix` for formatting when needed
-6. `php artisan larapilot:spec-review {code}`
+5. `php artisan larapilot:code-log --spec={code} --task={taskId} --skill=larapilot-implement` — **only when `data.settings.code_history` is `YES`** (default OFF); run right after `task-done`, and once more after `spec-review`
+6. `php artisan larapilot:quality` — Pint + Larastan (level 5+) before backend `task-done`; use `--fix` for formatting when needed
+7. `php artisan larapilot:spec-review {code}`
+8. `php artisan larapilot:decision-log …` / `decision-check …` — when `data.settings.decision_log` is `YES` (default) and the user redirects scope or changes a preference mid-run; `decision-check` first when it reverses an earlier recorded choice
 
 ## Execution Contract
 
@@ -48,7 +50,7 @@ Apply the canonical delivery rules from `runtime-delivery.md` — do not re-deri
 - **Architecture Standards** — SOLID Actions/Services, thin controllers, Form Requests + Policies at the edge, `DB::transaction` on multi-write paths, queues for slow I/O, eager loading + indexes on every relation-touching path (**no N+1** before `task-done`).
 - **Laravel Scaffolding Defaults** — Fortify 2FA on auth specs, `Password::defaults()`, UUID PKs (`HasUuids`), Argon2id hashing, Socialite for SSO; local dev per the PRD choice (Sail commands only when the PRD chose Sail; generic `php artisan` when undefined).
 - **Git Workflow / Git discipline** — honor `settings.git_mode`: `NO_GITFLOW` → current branch, commits only; `GITFLOW` → `feature/US-XXX-*` + atomic commits + PR prepared **without push**; `GITFLOW_PUSH` → same **plus** push and open/update the internal PR toward `develop` after each task. Never commit directly to `main`/`develop` in Gitflow modes.
-- **Remote forges (`settings.github` / `gitlab` / `bitbucket`, default OFF)** — orthogonal to `git_mode`. Enable the forge matching `origin`. When ON: probe `larapilot:{github,gitlab,bitbucket}-status`; after push open/update PR/MR via `gh` / `glab` / Bitbucket API; **always print the PR/MR URL**; `larapilot:notify --event=pr_opened|pr_updated` when notifications are ON.
+- **Remote forges (`settings.github` / `gitlab` / `bitbucket` / `azure`, default OFF)** — orthogonal to `git_mode`. Enable the forge matching `origin`. When ON: probe `larapilot:{github,gitlab,bitbucket,azure}-status`; after push open/update PR/MR via `gh` / `glab` / Bitbucket API / `az repos` (or Azure DevOps REST); **always print the PR/MR URL**; `larapilot:notify --event=pr_opened|pr_updated` when notifications are ON.
 - **Notifications** — when `settings.notifications` is `YES`, after handoff to REVIEW call `larapilot:notify --event=spec_review --title="…"`. `task-done` / hard hooks notify automatically.
 - **Test Data — Factories & Seeders** — factory + seeder updated in the **same task** as model/migration changes; `migrate:fresh --seed` verified before `task-done`.
 - **Vendor & Package Policy** — Laravel first-party → Spatie → Filament plugins (only when the PRD chose Filament — never introduce it on your own) → other vetted vendors; Starter Kit specs scaffold per [starter-kits docs](https://laravel.com/docs/starter-kits) — never mix a mismatched UI stack. Verify compatibility via `Application Info`; `composer audit` after `composer require`.
@@ -63,7 +65,7 @@ Skill-specific execution notes:
 - **Mobile (Ricky):** hybrid/native/PWA device features per PRD — permissions, graceful degradation, store constraints.
 - **Copy (Marika):** no placeholder lorem on shipped surfaces; realistic copy in views, notifications, `lang/` files. **i18n (Emily):** `lang/` translations, locale detection, currency/timezone display when in scope.
 - **Integrations (Matt):** wire third-party APIs per plan — OAuth, webhooks + signature verification, SDK/HTTP clients, queued sync, `Http::fake()` tests, README notes; also wire the PRD-chosen stack (storage, newsletter, analytics, edge proxies, observability). **Jack** is involved when choices touch deploy, CDN, queues, storage, or CI runners; **Sarah** authors/updates CI workflow files, deploy hooks, and server shell scripts for those choices.
-- **CLI / Git / Linux (Sarah):** whenever tasks touch `.github/workflows`, GitLab/Bitbucket CI, git hooks, `gh`/`glab` helpers, Bash/Go tooling, systemd/cron, or VPS bootstrap — Sarah implements them per **CLI, Git Pipelines & Linux** in `runtime-delivery.md`. On merge/rebase conflicts or history cleanup, **Sarah leads** Git resolution; Alex resolves conflicting file content.
+- **CLI / Git / Linux (Sarah):** whenever tasks touch `.github/workflows`, GitLab/Bitbucket/Azure Pipelines CI, git hooks, `gh`/`glab`/`az repos` helpers, Bash/Go tooling, systemd/cron, or VPS bootstrap — Sarah implements them per **CLI, Git Pipelines & Linux** in `runtime-delivery.md`. On merge/rebase conflicts or history cleanup, **Sarah leads** Git resolution; Alex resolves conflicting file content.
 - **Multi-tenancy:** implement the chosen pattern per PRD; add isolation tests when Anne requires.
 - **High-risk integrations:** note in handoff if an **Oliver** red-team pass is recommended before ship (payments, OAuth, webhooks, imports).
 
@@ -79,8 +81,9 @@ Group tasks by dependencies. For each task:
 
 1. Alex / Joe implement per the task body contract — backend under `data.workdir`, frontend under `data.frontend.repo_path` when `repo: frontend`
 2. Anne writes/runs tests per `settings.testing` — `php artisan test` / Pest for Laravel; `npm test` / vitest / playwright from the FE root for `repo: frontend` tasks
-3. Alex commits (one atomic commit per task). Push + remote PR **only** when `git_mode` is `GITFLOW_PUSH` (or the user explicitly asks). If a forge setting is `YES`, open/update via `gh` / `glab` / Bitbucket API, print the PR/MR URL, and notify `pr_opened` / `pr_updated` when notifications are on
+3. Alex commits (one atomic commit per task). Push + remote PR **only** when `git_mode` is `GITFLOW_PUSH` (or the user explicitly asks). If a forge setting is `YES`, open/update via `gh` / `glab` / Bitbucket API / `az repos` (Azure DevOps), print the PR/MR URL, and notify `pr_opened` / `pr_updated` when notifications are on
 4. `task-done` when verified — the CLI also ticks the task's `- [ ]` completion criteria and may emit a `task_done` notification; never edit the plan YAML manually
+5. When `data.settings.code_history` is `YES` (default OFF): `php artisan larapilot:code-log --spec={code} --task={taskId} --skill=larapilot-implement` — records the touched files + line ranges from the task commit into `.larapilot/code-history.yaml`
 
 ### Phase 2 — Review (sub-agents or inline)
 

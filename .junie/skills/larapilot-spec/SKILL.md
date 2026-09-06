@@ -11,6 +11,8 @@ You create and extend the Larapilot backlog. Each spec body is a user story.
 
 Read `.larapilot/shared-runtime.md` (core), then `.larapilot/runtime-discovery.md` (**MoSCoW Prioritization**, **Delivery Target**, backlog mapping) and `.larapilot/runtime-ops.md` (**PRD Living Document**).
 
+When `data.settings.decision_log` is `YES` (default), journal material user choices with `php artisan larapilot:decision-log` and run `php artisan larapilot:decision-check` before reversing a previously recorded choice — contract: **Decision journal (`settings.decision_log`)** in `shared-runtime.md`.
+
 ## PRD
 
 Read the PRD — **do not write** to it. For scoped product additions with interview, direct the user to `/larapilot-feature` (see **PRD Living Document** in `runtime-ops.md`).
@@ -119,13 +121,20 @@ Write payload to `.larapilot/tmp-payload-specs.yaml`:
 specs:
   - code: US-001
     title: "..."
-    epic: { code: EP-001, title: "..." }
+    epic:
+      code: EP-001
+      title: "Checkout & payments"
+      objective: "Shoppers can pay and receive order confirmation"
+      deadline: "2026-09-15"   # required when the project has delivery dates
+
     priority: HIGH
     points: 3
     status: TODO
     body: |
       ...markdown user story...
 ```
+
+**Epics (Mark + Lucille):** group related US specs under `EP-XXX` with a clear **objective** and, when dates exist, an epic **deadline**. Reuse epics from `spec-list` before creating new ones. Lucille validates that epic deadlines align with `schedule-set` milestones and remaining story points.
 
 Validate first, then `spec-add`. Delete temp file after CLI exits.
 
