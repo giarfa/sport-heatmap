@@ -65,8 +65,13 @@
                 </svg>
                 <span class="text-sm font-semibold tracking-tight">Heatmap</span>
             </a>
-            {{-- The sync status chip US-006 adds lands to the left of the toggle, in this same row. --}}
             <div class="flex items-center gap-1">
+                {{--
+                    A yield, not a view composer or a shared variable: strava/connect
+                    and strava/rejected extend this same layout and must render with
+                    no chip at all, which a composer could not express as cleanly.
+                --}}
+                @yield('header-status')
                 <button type="button" data-theme-toggle aria-pressed="false"
                         class="grid h-11 w-11 place-items-center rounded-lg" style="color: var(--ink-muted);">
                     <span class="sr-only">Toggle dark mode</span>
@@ -87,6 +92,7 @@
             {{-- Contractual under the Strava API Agreement (FR-008), not decoration — it stays in the layout so no view change can drop it. --}}
             <a href="https://www.strava.com" class="underline underline-offset-2" style="color: var(--accent);">Powered by Strava</a>
             · runs only · distances in kilometres
+            <span class="sm:hidden">@yield('footer-status')</span>
         </p>
     </footer>
 </body>

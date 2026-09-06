@@ -315,11 +315,11 @@ tasks:
       7. `npm run build` to confirm the stylesheet compiles.
 
       ## Completion Criteria
-      - [ ] `--ok-dot` and `--skeleton` present in all three token blocks with the mockup's exact hexes
-      - [ ] `.sync-chip`, `.sync-alert`, `.sync-detail`, `.skeleton` defined
-      - [ ] Pulse animation exists only under `prefers-reduced-motion: no-preference`
-      - [ ] Skeleton cells inherit `.hm-cell` geometry
-      - [ ] `npm run build` succeeds
+      - [x] `--ok-dot` and `--skeleton` present in all three token blocks with the mockup's exact hexes
+      - [x] `.sync-chip`, `.sync-alert`, `.sync-detail`, `.skeleton` defined
+      - [x] Pulse animation exists only under `prefers-reduced-motion: no-preference`
+      - [x] Skeleton cells inherit `.hm-cell` geometry
+      - [x] `npm run build` succeeds
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -329,11 +329,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: f604aa4d6c0a9e9678c518af8dffc6235385de93
+      short_sha: f604aa4
+      subject: 'feat(US-006): TASK-03 add sync status and skeleton design tokens'
+      committed_at: '2026-09-06T22:26:09+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/f604aa4d6c0a9e9678c518af8dffc6235385de93'
   -
     id: TASK-04
     title: 'Build the chip, warning, detail and skeleton components'
@@ -499,4 +505,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-05
-updated_at: '2026-09-06T20:25:20+00:00'
+updated_at: '2026-09-06T20:26:11+00:00'
