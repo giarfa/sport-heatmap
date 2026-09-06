@@ -32,6 +32,11 @@ $allowedAthleteIds = array_values(array_filter(
  *     allowed_athlete_ids: array<int, string>,
  *     sync_hour: int,
  *     sync_timezone: string,
+ *     api_base_url: string,
+ *     activities_per_page: int,
+ *     max_activity_pages: int,
+ *     retry_attempts: int,
+ *     retry_backoff_ms: array<int, int>,
  * } $config
  */
 $config = [
@@ -121,6 +126,39 @@ $config = [
     'sync_hour' => (int) env('STRAVA_SYNC_HOUR', 3),
 
     'sync_timezone' => (string) env('STRAVA_SYNC_TIMEZONE', 'Europe/Rome'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Activities API
+    |--------------------------------------------------------------------------
+    |
+    | The base URL is a literal for the same reason token_url is: pointing it
+    | elsewhere would send a live bearer token to another host. activities_per_page
+    | is Strava's maximum page size — the value that makes "paginate until the
+    | response is short" cheap. max_activity_pages is a safety stop so a Strava
+    | change that never returns a short page cannot spin the sync forever.
+    |
+    */
+
+    'api_base_url' => 'https://www.strava.com/api/v3',
+
+    'activities_per_page' => 200,
+
+    'max_activity_pages' => 10,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Retry behaviour
+    |--------------------------------------------------------------------------
+    |
+    | Overridable so tests can zero the backoff out with Config::set() and
+    | exercise the retry path without a suite that sleeps for seconds.
+    |
+    */
+
+    'retry_attempts' => 3,
+
+    'retry_backoff_ms' => [1000, 2000, 4000],
 
 ];
 
