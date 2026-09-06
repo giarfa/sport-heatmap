@@ -242,13 +242,13 @@ tasks:
       9. `vendor/bin/pint --dirty --format agent` and `php artisan larapilot:quality`
 
       ## Completion Criteria
-      - [ ] `IntensityScale` and `LegendRow` are `final readonly`; `IntensityScale` is built only through its named factories
-      - [ ] Percentiles use R-7 linear interpolation on integer metres
-      - [ ] Sparse fallback triggers below 4 non-zero days; degenerate fallback triggers on `p25 === p75`
-      - [ ] Both fallbacks emit the identical `0 / <= 5 / <= 10 / <= 20 / 20+` km bands
-      - [ ] The three legend notes match the plan's copy table verbatim
-      - [ ] No new Composer dependency added
-      - [ ] Pint and Larastan level 5 clean
+      - [x] `IntensityScale` and `LegendRow` are `final readonly`; `IntensityScale` is built only through its named factories
+      - [x] Percentiles use R-7 linear interpolation on integer metres
+      - [x] Sparse fallback triggers below 4 non-zero days; degenerate fallback triggers on `p25 === p75`
+      - [x] Both fallbacks emit the identical `0 / <= 5 / <= 10 / <= 20 / 20+` km bands
+      - [x] The three legend notes match the plan's copy table verbatim
+      - [x] No new Composer dependency added
+      - [x] Pint and Larastan level 5 clean
 
       ## Test Data
       - N/A — no model, migration or relationship changes in this task
@@ -258,11 +258,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-00
+    commit:
+      sha: efd45885cdcb6cc11ad7c688ee3f1fde1e1fce2c
+      short_sha: efd4588
+      subject: 'feat(US-005): TASK-01 compute the self-calibrating intensity scale'
+      committed_at: '2026-09-06T18:21:09+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/efd45885cdcb6cc11ad7c688ee3f1fde1e1fce2c'
   -
     id: TASK-02
     title: 'Unit-test the bucketing, both fallbacks, and the percentile method itself'
@@ -507,4 +513,4 @@ tasks:
     estimate_hours: 1.5
     dependencies:
       - TASK-06
-updated_at: '2026-09-06T16:20:06+00:00'
+updated_at: '2026-09-06T16:21:09+00:00'
