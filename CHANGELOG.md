@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The athlete allowlist is enforced **before** any token, user record, or session is created, so a
   rejected attempt leaves the database untouched.
+- The allowlist is re-checked on **every** authenticated request, so removing an athlete ends their
+  session immediately rather than whenever it happens to expire.
+- A callback granting any write scope is refused and never exchanged: read-only is a property of
+  what is stored, not only of what was asked for.
 - Only the `activity:read_all` scope is ever requested. The scope is a literal in
   `config/strava.php`, not an environment value, so no deployment can widen it.
 - Both OAuth routes are rate limited to 10 requests per minute per IP.

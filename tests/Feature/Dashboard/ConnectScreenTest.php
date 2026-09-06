@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Dashboard;
 
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
@@ -35,7 +34,7 @@ class ConnectScreenTest extends TestCase
 
     public function test_a_connected_athlete_gets_the_dashboard(): void
     {
-        $response = $this->actingAs(User::factory()->stravaConnected()->create())->get('/');
+        $response = $this->actingAs($this->allowlistedAthlete())->get('/');
 
         $response->assertOk();
         $response->assertViewIs('dashboard');
@@ -94,6 +93,26 @@ class ConnectScreenTest extends TestCase
         $response->assertSee('activity:read_all');
     }
 
+    public function test_the_rejection_screen_explains_a_refused_write_scope(): void
+    {
+        $response = $this->view('strava.rejected', [
+            'reason' => 'write_scope',
+            'requiredScope' => 'activity:read_all',
+        ]);
+
+        $response->assertSee('Only read access is accepted');
+        $response->assertSee('activity:read_all');
+    }
+
+    public function test_the_connect_screen_renders_the_cancellation_notice(): void
+    {
+        $response = $this->withSession(['status' => 'Strava authorization was cancelled. Nothing was stored.'])
+            ->get('/');
+
+        $response->assertOk();
+        $response->assertSee('Strava authorization was cancelled. Nothing was stored.');
+    }
+
     /**
      * @return array<string, TestResponse>
      */
@@ -101,7 +120,7 @@ class ConnectScreenTest extends TestCase
     {
         return [
             'connect' => $this->get('/'),
-            'dashboard' => $this->actingAs(User::factory()->stravaConnected()->create())->get('/'),
+            'dashboard' => $this->actingAs($this->allowlistedAthlete())->get('/'),
         ];
     }
 }

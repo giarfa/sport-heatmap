@@ -880,7 +880,7 @@ tasks:
     id: TASK-12
     title: 'Document the Strava setup and close the quality gate'
     type: Impl
-    status: TODO
+    status: DONE
     dependencies:
       - TASK-07
       - TASK-09
@@ -920,12 +920,12 @@ tasks:
          the manual test handoff from TASK-11. **Do not push** — `git_mode` is `GITFLOW`
 
       ## Completion Criteria
-      - [ ] README documents Strava app registration, the callback-domain trap, every `STRAVA_*` key and the synthetic email
-      - [ ] `CHANGELOG.md` exists with a populated `Unreleased` section
-      - [ ] `php artisan larapilot:quality` passes
-      - [ ] `php artisan test` passes in full
-      - [ ] `php artisan migrate:fresh --seed` succeeds
-      - [ ] The internal PR description is drafted locally and the branch has not been pushed
+      - [x] README documents Strava app registration, the callback-domain trap, every `STRAVA_*` key and the synthetic email
+      - [x] `CHANGELOG.md` exists with a populated `Unreleased` section
+      - [x] `php artisan larapilot:quality` passes
+      - [x] `php artisan test` passes in full
+      - [x] `php artisan migrate:fresh --seed` succeeds
+      - [x] The internal PR description is drafted locally and the branch has not been pushed
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -934,4 +934,10 @@ tasks:
       - Commit: `docs(US-002): TASK-12 document Strava setup and add CHANGELOG`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: final local PR description toward `develop`
-updated_at: '2026-09-05T17:36:15+00:00'
+    commit:
+      sha: 527fc5390fa29eaa0e66634f83c71be2ced82992
+      short_sha: 527fc53
+      subject: 'docs(US-002): TASK-12 document Strava setup and add CHANGELOG'
+      committed_at: '2026-09-05T19:37:04+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/527fc5390fa29eaa0e66634f83c71be2ced82992'
+updated_at: '2026-09-05T17:37:05+00:00'

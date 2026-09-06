@@ -8,7 +8,10 @@ use App\Exceptions\Strava\StravaReconnectRequiredException;
 use App\Models\User;
 use App\Services\Strava\StravaOAuth;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -20,6 +23,12 @@ use Illuminate\Support\Facades\Log;
  */
 class EnsureFreshAccessToken
 {
+    /**
+     * How long to wait for a refresh already in flight elsewhere before giving
+     * up. Comfortably longer than the 10s cap on the token call itself.
+     */
+    private const LOCK_SECONDS = 15;
+
     public function __construct(private readonly StravaOAuth $stravaOAuth) {}
 
     /**
@@ -27,20 +36,56 @@ class EnsureFreshAccessToken
      */
     public function __invoke(User $user): string
     {
-        $refreshToken = $user->strava_refresh_token;
+        if (! $this->needsRefresh($user)) {
+            return (string) $this->readToken($user, 'strava_access_token');
+        }
 
-        if ($refreshToken === null || $refreshToken === '') {
+        /*
+         * Strava invalidates the old refresh token the moment it issues a new
+         * one, so two requests refreshing at the same time is not a wasted call —
+         * it is a dead athlete. The loser of the race would persist a refresh
+         * token Strava had already retired, and the only way back would be a full
+         * re-authorization. The lock serialises them; the second one through
+         * re-reads the row and finds the token the first one stored.
+         */
+        $lock = Cache::lock('strava:refresh:'.$user->getKey(), self::LOCK_SECONDS);
+
+        try {
+            $lock->block(self::LOCK_SECONDS);
+        } catch (LockTimeoutException $exception) {
+            throw new StravaReconnectRequiredException(
+                'Timed out waiting for a Strava token refresh already in progress.', 0, $exception,
+            );
+        }
+
+        try {
+            $user->refresh();
+
+            if (! $this->needsRefresh($user)) {
+                return (string) $this->readToken($user, 'strava_access_token');
+            }
+
+            return $this->refresh($user);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * @throws StravaReconnectRequiredException
+     */
+    private function refresh(User $user): string
+    {
+        $refreshToken = (string) $this->readToken($user, 'strava_refresh_token');
+
+        if ($refreshToken === '') {
             throw new StravaReconnectRequiredException('No Strava refresh token is stored for this athlete.');
         }
 
-        if (! $this->needsRefresh($user)) {
-            return (string) $user->strava_access_token;
-        }
-
         $current = new StravaTokens(
-            accessToken: (string) $user->strava_access_token,
+            accessToken: (string) $this->readToken($user, 'strava_access_token'),
             refreshToken: $refreshToken,
-            expiresAt: CarbonImmutable::now(),
+            expiresAt: CarbonImmutable::instance($user->strava_token_expires_at ?? Carbon::now()),
             athleteId: $user->strava_athlete_id,
         );
 
@@ -79,12 +124,36 @@ class EnsureFreshAccessToken
     {
         $expiresAt = $user->strava_token_expires_at;
 
-        if ($expiresAt === null || $user->strava_access_token === null) {
+        if ($expiresAt === null || $this->readToken($user, 'strava_access_token') === null) {
             return true;
         }
 
         $margin = (int) config('strava.token_refresh_margin_seconds');
 
         return $expiresAt->lessThanOrEqualTo(Carbon::now()->addSeconds($margin));
+    }
+
+    /**
+     * Read one of the `encrypted` token columns.
+     *
+     * Rotating APP_KEY — or restoring a database into an environment holding a
+     * different one — makes every stored token undecryptable. That is a
+     * reconnect, not a server fault: without this the guard middleware would 500
+     * on the dashboard route with no in-app way back.
+     *
+     * @throws StravaReconnectRequiredException
+     */
+    private function readToken(User $user, string $column): ?string
+    {
+        try {
+            /** @var string|null $value */
+            $value = $user->getAttribute($column);
+
+            return $value;
+        } catch (DecryptException $exception) {
+            throw new StravaReconnectRequiredException(
+                'The stored Strava tokens could not be decrypted.', 0, $exception,
+            );
+        }
     }
 }

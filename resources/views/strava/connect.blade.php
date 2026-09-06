@@ -3,6 +3,14 @@
 @section('title', 'Connect Strava — Sport Heatmap')
 
 @section('content')
+    {{-- Set when the athlete pressed Cancel on Strava's consent screen. --}}
+    @if (session('status'))
+        <div role="status" class="card mx-auto mb-4 max-w-sm p-4 text-sm"
+             style="color: var(--ink-muted);">
+            {{ session('status') }}
+        </div>
+    @endif
+
     @if ($reconnect ?? false)
         <div role="alert" class="card mx-auto mb-4 max-w-sm p-4 text-sm"
              style="background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-ink);">

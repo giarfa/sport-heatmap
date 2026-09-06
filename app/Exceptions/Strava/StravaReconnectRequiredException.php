@@ -2,28 +2,17 @@
 
 namespace App\Exceptions\Strava;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The stored refresh token is no longer usable — typically because the athlete
- * revoked this application on Strava's side.
+ * The stored Strava credentials are no longer usable — typically because the
+ * athlete revoked this application on Strava's side, or because APP_KEY changed
+ * underneath the encrypted columns.
  *
- * It renders rather than bubbling into a 500: an expired connection is an
- * expected state of this product, not a server fault. Rendering the connect
- * screen instead of redirecting keeps the reason visible in one round trip.
+ * An expired connection is an expected state of this product, not a server
+ * fault. This exception carries no render() of its own: the caller decides what
+ * that means. On the web that is EnsureFreshStravaToken, which ends the session
+ * and renders the connect screen in its reconnect state; the scheduled sync in a
+ * later spec will record it against the sync run instead.
  */
-class StravaReconnectRequiredException extends RuntimeException
-{
-    public function render(Request $request): Response
-    {
-        Auth::logout();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return response()->view('strava.connect', ['reconnect' => true]);
-    }
-}
+class StravaReconnectRequiredException extends RuntimeException {}

@@ -29,36 +29,70 @@ class StravaCallbackController extends Controller
         AthleteAllowlist $allowlist,
         ConnectStravaAthlete $connectStravaAthlete,
     ): Response {
+        /*
+         * The state is consumed first, on every path including cancellation:
+         * leaving it in the session on an early return would keep one live and
+         * replayable, which is the one thing a single-use nonce must never be.
+         */
+        $expectedState = $this->pullExpectedState($request);
+
         // 1. The athlete pressed Cancel on Strava's consent screen.
-        if ($request->query('error') === 'access_denied') {
+        if ($this->queryString($request, 'error') === 'access_denied') {
             return redirect()
                 ->route('dashboard')
                 ->with('status', 'Strava authorization was cancelled. Nothing was stored.');
         }
 
         // 2. CSRF: the state must match the one this session minted, and is single-use.
-        $expectedState = (string) $request->session()->pull('strava.oauth_state', '');
-        $providedState = (string) $request->query('state', '');
+        $providedState = $this->queryString($request, 'state');
 
         if ($expectedState === '' || $providedState === '' || ! hash_equals($expectedState, $providedState)) {
             abort(403, 'The Strava authorization state did not match.');
         }
 
         // 3. The athlete unticked the permission box: without read access there is nothing to sync.
-        $grantedScope = (string) $request->query('scope', '');
+        $grantedScope = $this->queryString($request, 'scope');
         $requiredScope = (string) config('strava.scope');
+        $grantedScopes = array_filter(array_map('trim', explode(',', $grantedScope)));
 
-        if (! in_array($requiredScope, array_map('trim', explode(',', $grantedScope)), strict: true)) {
+        if (! in_array($requiredScope, $grantedScopes, strict: true)) {
             return response()->view('strava.rejected', [
                 'reason' => 'scope',
                 'requiredScope' => $requiredScope,
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // 4. Exchange the code. Strava embeds the athlete object here, so the id
-        //    is known before anything at all is persisted.
+        /*
+         * 3b. The request side can only ever ask for activity:read_all
+         *     (config/strava.php keeps it as a literal), but the *response* side
+         *     is attacker-controlled: the athlete can hand-edit the scope on
+         *     Strava's consent URL and come back holding a write-capable token.
+         *     Refusing it here is what makes "read-only" a property of what is
+         *     stored rather than only of what was asked for. Surplus *read*
+         *     scopes are tolerated — Strava may add its own, and they widen
+         *     nothing.
+         */
+        if (array_filter($grantedScopes, $this->isWriteScope(...)) !== []) {
+            return response()->view('strava.rejected', [
+                'reason' => 'write_scope',
+                'requiredScope' => $requiredScope,
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // 4. No code means there is nothing to exchange — refuse locally rather
+        //    than spending a round trip on a request that can only fail.
+        $code = $this->queryString($request, 'code');
+
+        if ($code === '') {
+            return response()->view('strava.rejected', [
+                'reason' => 'exchange',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // 5. Exchange it. Strava embeds the athlete object in the response, so the
+        //    id is known before anything at all is persisted.
         try {
-            $tokens = $stravaOAuth->exchangeAuthorizationCode((string) $request->query('code', ''), $grantedScope);
+            $tokens = $stravaOAuth->exchangeAuthorizationCode($code, $grantedScope);
         } catch (StravaOAuthException $exception) {
             Log::warning('Strava token exchange failed.', ['reason' => $exception->getMessage()]);
 
@@ -67,7 +101,7 @@ class StravaCallbackController extends Controller
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
-        // 5. The access decision — still no write of any kind has happened.
+        // 6. The access decision — still no write of any kind has happened.
         if ($tokens->athleteId === null || ! $allowlist->allows($tokens->athleteId)) {
             return response()->view('strava.rejected', [
                 'reason' => 'allowlist',
@@ -75,13 +109,52 @@ class StravaCallbackController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // 6. Only now: persist, then log in on a fresh session id.
+        // 7. Only now: persist, then log in on a fresh session id.
         $user = $connectStravaAthlete($tokens);
 
+        /*
+         * Auth::login already migrates the session id, which is the fixation
+         * boundary; regenerating again would only churn it a second time.
+         *
+         * The destination is the literal dashboard route, never
+         * redirect()->intended(): the intended URL is session data, and an
+         * absolute one passes through the generator untouched — a post-login
+         * open redirect waiting for the first middleware that writes it.
+         */
         Auth::login($user, remember: true);
 
-        $request->session()->regenerate();
+        return redirect()->route('dashboard');
+    }
 
-        return redirect()->intended(route('dashboard'));
+    /**
+     * Read a query parameter as a string, treating anything else as absent.
+     *
+     * Every parameter here is attacker-supplied and `?state[]=x` arrives as an
+     * array. Casting one to string raises a warning that Laravel's error handler
+     * promotes to an exception, so a plain `(string)` cast hands any anonymous
+     * caller a 500 — and a stack trace wherever APP_DEBUG is on.
+     */
+    private function queryString(Request $request, string $key): string
+    {
+        $value = $request->query($key);
+
+        return is_string($value) ? $value : '';
+    }
+
+    private function pullExpectedState(Request $request): string
+    {
+        $state = $request->session()->pull('strava.oauth_state');
+
+        return is_string($state) ? $state : '';
+    }
+
+    /**
+     * Strava spells write access as `activity:write` and `profile:write`, so the
+     * suffix is the reliable marker rather than an allowlist of known scopes —
+     * a scope Strava adds later is refused by default instead of by omission.
+     */
+    private function isWriteScope(string $scope): bool
+    {
+        return str_ends_with($scope, ':write') || $scope === 'write';
     }
 }

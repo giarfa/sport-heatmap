@@ -4,11 +4,15 @@ namespace Tests\Feature\Strava;
 
 use App\Models\User;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
+use Tests\Support\RecordSessionId;
 use Tests\TestCase;
 
 /**
@@ -67,13 +71,28 @@ class StravaConnectFlowTest extends TestCase
 
     /**
      * Session fixation: the id the athlete arrived on must not be the id they
-     * leave authenticated on. The comparison has to happen *inside* the request —
-     * the test client starts a fresh session per request, so comparing ids across
-     * the call would pass even with the regenerate() removed.
+     * leave authenticated on.
+     *
+     * Both ids are taken *inside* the request — the id as the route was entered,
+     * and the id at the moment the Login event fired. Comparing across the call
+     * would prove nothing, because the test client starts a fresh session per
+     * request; comparing to the id after the controller returned would only prove
+     * that some later regenerate() ran, not that the login boundary itself
+     * migrated the session.
      */
     public function test_signing_in_regenerates_the_session_id(): void
     {
         $this->fakeTokenEndpoint(self::ALLOWED_ATHLETE_ID);
+
+        RecordSessionId::$id = null;
+
+        /*
+         * The kernel is resolved first on purpose: constructing it syncs its own
+         * middleware groups onto the router, which would overwrite a push made
+         * before that happened.
+         */
+        $this->app->make(Kernel::class);
+        $this->app->make(Router::class)->pushMiddlewareToGroup('web', RecordSessionId::class);
 
         $idAtLogin = null;
 
@@ -83,8 +102,9 @@ class StravaConnectFlowTest extends TestCase
 
         $this->withOAuthState()->get($this->callbackUrl())->assertRedirect(route('dashboard'));
 
+        $this->assertNotNull(RecordSessionId::$id, 'The request never reached the route.');
         $this->assertNotNull($idAtLogin, 'The athlete was never logged in.');
-        $this->assertNotSame($idAtLogin, session()->getId());
+        $this->assertNotSame(RecordSessionId::$id, $idAtLogin);
     }
 
     /**
@@ -169,6 +189,91 @@ class StravaConnectFlowTest extends TestCase
         $response->assertStatus(503);
         $response->assertViewIs('strava.rejected');
         $this->assertGuest();
+        $this->assertDatabaseEmpty('users');
+    }
+
+    /**
+     * The request side can only ask for `activity:read_all`, but the athlete can
+     * hand-edit the scope on Strava's consent URL. A write-capable token must not
+     * be persisted just because it also carries the read scope this app wanted.
+     */
+    public function test_a_granted_write_scope_is_refused_and_never_exchanged(): void
+    {
+        $response = $this->withOAuthState()->get($this->callbackUrl(scope: 'read,activity:read_all,activity:write'));
+
+        $response->assertForbidden();
+        $response->assertViewIs('strava.rejected');
+        $response->assertSee('Only read access is accepted');
+
+        $this->assertGuest();
+        $this->assertDatabaseEmpty('users');
+
+        Http::assertNothingSent();
+    }
+
+    /**
+     * Every callback parameter is attacker-supplied, and `?state[]=x` arrives as
+     * an array. Casting one to a string raises a warning Laravel promotes to an
+     * exception, so an unguarded cast hands any anonymous caller a 500 — and a
+     * stack trace wherever APP_DEBUG is on.
+     */
+    public function test_array_shaped_callback_parameters_are_rejected_rather_than_crashing(): void
+    {
+        foreach (['state', 'code', 'scope', 'error'] as $parameter) {
+            $response = $this->withOAuthState()
+                ->get('/auth/strava/callback?'.http_build_query([$parameter => ['injected']]));
+
+            $response->assertForbidden();
+            $this->assertGuest();
+        }
+
+        $this->assertDatabaseEmpty('users');
+        Http::assertNothingSent();
+    }
+
+    public function test_a_callback_without_a_code_is_refused_without_calling_strava(): void
+    {
+        $response = $this->withOAuthState()
+            ->get('/auth/strava/callback?state='.self::STATE.'&scope=read,activity:read_all');
+
+        $response->assertStatus(400);
+        $response->assertViewIs('strava.rejected');
+        $this->assertGuest();
+        $this->assertDatabaseEmpty('users');
+
+        Http::assertNothingSent();
+    }
+
+    /**
+     * A DNS, TLS, or timeout failure is a ConnectionException, not a response —
+     * it has to land on the same rejection screen as a refused exchange rather
+     * than escaping the catch block as a 500.
+     */
+    public function test_an_unreachable_token_endpoint_surfaces_as_a_service_error_not_a_five_hundred(): void
+    {
+        Http::fake(fn () => throw new ConnectionException('cURL error 28: Operation timed out'));
+
+        $response = $this->withOAuthState()->get($this->callbackUrl());
+
+        $response->assertStatus(503);
+        $response->assertViewIs('strava.rejected');
+        $this->assertGuest();
+        $this->assertDatabaseEmpty('users');
+    }
+
+    /**
+     * Cancelling is the one path that used to return before the state was pulled,
+     * leaving a live single-use nonce in the session for a later replay.
+     */
+    public function test_cancelling_consumes_the_state_too(): void
+    {
+        $this->fakeTokenEndpoint(self::ALLOWED_ATHLETE_ID);
+
+        $this->withOAuthState()
+            ->get('/auth/strava/callback?error=access_denied&state='.self::STATE)
+            ->assertRedirect(route('dashboard'));
+
+        $this->get($this->callbackUrl())->assertForbidden();
         $this->assertDatabaseEmpty('users');
     }
 

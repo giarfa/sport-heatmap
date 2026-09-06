@@ -11,6 +11,14 @@
     {{-- Private single-athlete instance: there is nothing here to index. --}}
     <meta name="robots" content="noindex, nofollow">
 
+    {{--
+        The OAuth callback URL carries the authorization code in its query
+        string, and the rejection screens render on that URL. Browsers default to
+        strict-origin-when-cross-origin, which already truncates it; this pins
+        that rather than inheriting it.
+    --}}
+    <meta name="referrer" content="same-origin">
+
     <title>@yield('title', 'Sport Heatmap')</title>
     <meta name="description" content="Private training dashboard — daily running distance over the last 16 weeks.">
 

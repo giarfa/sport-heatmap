@@ -21,6 +21,14 @@
                 permission to read your activities. It was not granted, so no session was created
                 and nothing was stored.
             </p>
+        @elseif (($reason ?? 'allowlist') === 'write_scope')
+            <h1 class="mt-3 text-base font-semibold">Only read access is accepted</h1>
+            <p class="mt-1.5 text-sm" style="color: var(--ink-muted);">
+                Sport Heatmap never writes to Strava, so it will not hold a permission that lets it.
+                Authorize again granting only
+                <code style="color: var(--ink);">{{ $requiredScope ?? 'activity:read_all' }}</code> —
+                no session was created and nothing was stored.
+            </p>
         @elseif (($reason ?? 'allowlist') === 'exchange')
             <h1 class="mt-3 text-base font-semibold">Strava could not be reached</h1>
             <p class="mt-1.5 text-sm" style="color: var(--ink-muted);">

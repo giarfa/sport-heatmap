@@ -109,6 +109,23 @@ A few things worth knowing before the first attempt:
   refresh token on every refresh and both halves are stored, encrypted at rest.
 - **If you revoke the app on Strava**, the next visit shows the connect screen in a reconnect
   state rather than an error. Press the button again to reconnect.
+- **Removing yourself from the allowlist signs you out immediately.** It is re-checked on every
+  request, not only at connect time, so an existing session does not outlive the edit.
+
+### Before putting this on a real host
+
+The OAuth routes are reachable without a session, which makes them the part of this app a stranger
+can actually touch. Three settings are not safe at their `.env.example` defaults:
+
+| Key | Set it to | Why |
+| --- | --- | --- |
+| `APP_DEBUG` | `false` | Otherwise any unhandled error renders a stack trace, environment variables included, to whoever triggered it |
+| `APP_ENV` | `production` | Turns off the development affordances that assume a trusted visitor |
+| `SESSION_SECURE_COOKIE` | `true` | Sign-in issues a long-lived remember-me cookie; without this it is sent over plain HTTP too |
+
+If the app sits behind a reverse proxy or CDN, also configure trusted proxies — the OAuth rate
+limiter keys on the client IP, and every request arriving from the proxy's address collapses that
+budget into one shared bucket.
 
 ## Environment variables
 
