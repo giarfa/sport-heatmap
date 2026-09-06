@@ -3,12 +3,22 @@
 @section('title', 'Dashboard — Sport Heatmap')
 
 @section('content')
-    <h1 class="text-lg font-semibold tracking-tight sm:text-xl">Your training</h1>
+    <h1 class="text-lg font-semibold tracking-tight sm:text-xl">Last 16 weeks</h1>
+    <p class="mt-0.5 text-sm" style="color: var(--ink-muted);">{{ $grid->label() }} · running distance per day</p>
 
-    {{-- The heatmap grid, the legend and the sync status land in US-004 through US-006. --}}
-    <div class="card mt-4 p-6">
-        <p class="text-sm" style="color: var(--ink-muted);">
-            Strava is connected. The heatmap arrives with the next spec.
-        </p>
+    <div class="dash mt-4">
+        <section class="card dash-grid p-3 sm:p-5" aria-labelledby="grid-heading">
+            <h2 id="grid-heading" class="sr-only">Daily running distance, 16 weeks by weekday</h2>
+            <x-heatmap-grid :grid="$grid" />
+        </section>
+        <aside class="rail" aria-label="Legend and sync detail">
+            {{-- The intensity legend arrives with US-005; the sync detail card with US-006. --}}
+            <div class="card p-4">
+                <p class="text-sm" style="color: var(--ink-muted);">Intensity legend arrives with the next spec.</p>
+            </div>
+            <div class="card p-4">
+                <p class="text-sm" style="color: var(--ink-muted);">Sync detail arrives with the next spec.</p>
+            </div>
+        </aside>
     </div>
 @endsection

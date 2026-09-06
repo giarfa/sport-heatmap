@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The 16-week heatmap dashboard: 112 daily cells laid out as 16 week-rows by 7 weekday-columns,
+  Monday first, each row closed by its week total in kilometres; the current week's total is
+  partial and future days in it render with a dashed, out-of-range treatment (US-004).
+  Accessible from a real `<table>` with a screen-reader caption, column/row headers, and an
+  accessible name per cell.
+- A light/dark theme toggle in the header: first visit follows the operating system, an explicit
+  choice then persists across reloads with no flash of the wrong theme (US-004).
+  Includes the "Powered by Strava" attribution required by the Strava API Agreement.
+- The assembled grid is cached per athlete, window and calendar day, and cleared automatically by
+  a successful sync (US-004).
 - A daily `strava:sync` command that reconciles the full 112-day activity window: upserts on the
   Strava activity id, deletes local activities Strava no longer returns, and keeps only running
   sport types (US-003).

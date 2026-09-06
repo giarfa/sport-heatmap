@@ -10,6 +10,7 @@ use App\Exceptions\Strava\StravaReconnectRequiredException;
 use App\Models\SyncRun;
 use App\Models\User;
 use App\Services\Strava\StravaClient;
+use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
 use App\Support\Strava\AthleteAllowlist;
 use Illuminate\Console\Attributes\Description;
@@ -25,6 +26,7 @@ class SyncStravaActivities extends Command
     public function __construct(
         private readonly StravaClient $stravaClient,
         private readonly ReconcileStravaWindow $reconcileStravaWindow,
+        private readonly HeatmapGridCache $gridCache,
     ) {
         parent::__construct();
     }
@@ -76,8 +78,12 @@ class SyncStravaActivities extends Command
                 $athletes->count(), $outcome->upserted, $outcome->deleted,
             ));
 
-            // The seam where US-004 invalidates the cached grid once the sync
-            // succeeds — no cache key is invented here.
+            $today = now();
+
+            foreach ($athletes as $athlete) {
+                $this->gridCache->forget($athlete, $window, $today);
+            }
+
             return self::SUCCESS;
         } catch (StravaApiException|StravaReconnectRequiredException $exception) {
             $syncRun->update([

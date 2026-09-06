@@ -5,7 +5,7 @@ epic:
   title: 'Heatmap dashboard'
 priority: HIGH
 points: 5
-status: TODO
+status: 'IN PROGRESS'
 body: |
   #### US-005: Self-calibrating intensity scale and legend
 
@@ -44,3 +44,11 @@ body: |
   - [ ] Unit tests for the bucketing: boundary values landing exactly on p25/p50/p75, windows with 0, 1, 3
         and 4 non-zero days, an all-identical-distance window, and recomputation after a sync changes the
         distribution
+status_history:
+  -
+    status: PLANNED
+    at: '2026-09-06T16:17:10+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-09-06T16:18:43+00:00'
+rework: false
