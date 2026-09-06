@@ -54,11 +54,11 @@ class SyncStravaActivities extends Command
 
         try {
             $outcome = new SyncOutcome(0, 0);
+            $window = HeatmapWindow::current();
 
             foreach ($athletes as $athlete) {
                 $lastAttemptedAthleteId = $athlete->strava_athlete_id;
 
-                $window = HeatmapWindow::current();
                 $activities = $this->stravaClient->activitiesInWindow($athlete, $window);
                 $outcome = $outcome->plus(($this->reconcileStravaWindow)($athlete, $window, $activities));
             }

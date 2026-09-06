@@ -187,8 +187,8 @@ Run it on a schedule. It registers itself to run daily at `STRAVA_SYNC_HOUR` in
 
 One run costs one or two Strava API requests, well inside any allowance Strava currently issues —
 the application hardcodes no quota, since Strava has changed the default allowance for newer
-applications. 🔗 Matt: confirm the allowance issued to this application in the Strava developer
-dashboard before relying on it in production. A `429` response is retried with backoff (the retry
+applications. Confirm the allowance issued to this application in the Strava developer dashboard
+before relying on it in production. A `429` response is retried with backoff (the retry
 count and delays are literals in `config/strava.php`); an exhausted retry records the observed
 `X-RateLimit-Usage` response header in `sync_runs.error_message`, which is where to look if the
 daily sync starts failing.
