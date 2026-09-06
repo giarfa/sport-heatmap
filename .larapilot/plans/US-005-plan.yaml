@@ -1,0 +1,504 @@
+code: US-005
+plan_body: |
+  ## Technical Solution
+
+  The intensity scale becomes a value object that is computed once per grid build and carried **inside** `HeatmapGrid`. The cells and the legend are therefore bucketed by the same object, which is what makes the spec's "the swatches and the numbers cannot disagree" guarantee structural rather than a convention someone has to remember.
+
+  **New classes**
+
+  | Class | Role |
+  | --- | --- |
+  | `app/Data/Heatmap/IntensityScale.php` | Final readonly DTO: the three threshold values in metres, whether it is calibrated or fallback, and the running-day count. Owns `levelFor()`, `legendRows()` and `note()` so no arithmetic or string-building reaches Blade — same contract `DayCell` already follows. |
+  | `app/Data/Heatmap/LegendRow.php` | Final readonly DTO: one legend line — level, name, kilometre-range label. |
+  | `app/Support/Heatmap/CalibrateIntensityScale.php` | Final readonly invokable: takes the window's daily metre totals, returns an `IntensityScale`. The only place percentile arithmetic and the two fallbacks live. |
+
+  **Changed classes**
+
+  - `app/Support/Heatmap/HeatmapBuilder.php` — calibrates once before assembling weeks, passes the scale into every `DayCell`, and hands it to `HeatmapGrid`.
+  - `app/Data/Heatmap/DayCell.php` — gains `public int $level` and `modifier(): string` (`rest` | `future` | `l1`…`l4`) so the Blade class name is a method return, not a conditional in the template.
+  - `app/Data/Heatmap/HeatmapGrid.php` — gains `public IntensityScale $scale`.
+  - `resources/views/components/heatmap-grid.blade.php` — cell class comes from `$day->modifier()`.
+  - `resources/views/dashboard.blade.php` — the rail's legend placeholder card is replaced by the real component.
+  - `resources/css/app.css` — `--lv-1`…`--lv-4` in all three token blocks, `.hm-cell--l1`…`--l4`, legend classes; `--lv-run` and `.hm-cell--ran` are **deleted**, not left beside the ramp.
+
+  ### The percentile method is pinned, not left to the implementer
+
+  Thresholds are the **25th, 50th and 75th percentiles by R-7 linear interpolation** (the numpy / Excel `PERCENTILE.INC` default) over the **non-zero** daily metre totals in the window, computed on integer metres and rounded to the nearest whole metre.
+
+  This is not a preference — it is the method that reproduces the mockup. Running both candidate methods over the 68 running days rendered in `index.html`:
+
+  | Method | p25 | p50 | p75 |
+  | --- | --- | --- | --- |
+  | **R-7 linear interpolation** | 7150 m → **7.2 km** | 9900 m → **9.9 km** | 14050 m → **14.1 km** |
+  | Nearest-rank (ceil) | 7000 m → 7.0 km | 9800 m → 9.8 km | 14000 m → 14.0 km |
+
+  The mockup README records **7.2 / 9.9 / 14.1**. Only R-7 matches. An implementation that picks nearest-rank will pass a naive unit test and silently disagree with the visual contract, so TASK-02 pins the method with an explicit regression test against that dataset.
+
+  ### Bucketing rule
+
+  Comparison happens in **metres against the unrounded thresholds**; kilometres are a display concern only.
+
+  ```
+  0 metres                      -> level 0 (rest)
+  metres <= p25                 -> level 1 (Easy)
+  metres <= p50                 -> level 2 (Steady)
+  metres <= p75                 -> level 3 (Hard)
+  otherwise                     -> level 4 (Peak)
+  ```
+
+  Upper-inclusive on each band, which is how the legend reads (`Easy 0.1 – 7.2 km`, `Steady 7.2 – 9.9 km`): a distance landing exactly on a threshold belongs to the **lower** level. Future cells carry level 0 and render with the dashed future treatment, never a heat colour.
+
+  ### The two fallbacks
+
+  Both produce the identical documented fixed bands — `0 / <= 5 / <= 10 / <= 20 / 20+ km`, i.e. thresholds `5000 / 10000 / 20000` metres — and differ only in the sentence the legend prints.
+
+  1. **Sparse** — fewer than four non-zero days in the window. Four is the minimum at which three distinct quartiles can separate at all.
+  2. **Degenerate** — the computed thresholds collapse (`p25 == p75`). Without this, a window where every run is the same distance renders every running day at one level, which looks like a bug and hides the data. Checked **after** computing the percentiles, so it catches the general collapse case, not only the all-identical one.
+
+  ### Legend copy (Marika — exact strings, do not improvise)
+
+  | State | Note |
+  | --- | --- |
+  | Calibrated | `Calibrated to your {n} running days in this window — recomputed after every sync.` |
+  | Sparse | `Only {n} running days in this window — too few to calibrate, so fixed bands are shown instead.` |
+  | Degenerate | `The runs in this window are too alike to calibrate a scale — fixed bands are shown instead.` |
+
+  The first two are transcribed from `index.html` and `states.html`. The **degenerate note is the one string this spec invents** — the mockup does not draw that state. It is an authorised addition required by the spec's own acceptance criterion, not mockup drift.
+
+  Level names are fixed: **Rest · Easy · Steady · Hard · Peak**. Range labels use an en dash with surrounding spaces exactly as the mockup does: `0 km`, `0.1 – 7.2 km`, `7.2 – 9.9 km`, `9.9 – 14.1 km`, `14.1+ km`.
+
+  ### The intensity ramp
+
+  Hexes are **transcribed verbatim** from `.larapilot/mockups/heatmap-dashboard/README.md` → "The intensity ramp". The dark ramp is a separately selected set of steps for the slate-900 card surface — it is **not** a programmatic inversion of the light values, and must not be generated by flipping an array.
+
+  | Level | Light (on `#ffffff`) | Dark (on `#0f172a`) |
+  | --- | --- | --- |
+  | 0 | `#e2e8f0` *(already present)* | `#1e293b` *(already present)* |
+  | 1 | `#86b6ef` | `#184f95` |
+  | 2 | `#3987e5` | `#2a78d6` |
+  | 3 | `#256abf` | `#5598e7` |
+  | 4 | `#104281` | `#9ec5f4` |
+
+  **Risk — the palette validator is not in this repository.** The README cites `node scripts/validate_palette.js`, but `scripts/` does not exist here; the script lived in the design session, not the codebase. The README's hex table is therefore the **sole** contract. Do not attempt to re-derive, re-tune, or "improve" a step — there is no committed gate that would catch a regression. Committing the validator is out of scope for this spec.
+
+  ### Cache correctness
+
+  The scale rides inside `HeatmapGrid`, so it inherits US-004's cache behaviour with no new invalidation logic: the key already carries the athlete, the window start and the calendar day, and `SyncStravaActivities` already calls `HeatmapGridCache::forget()` on a successful sync. That is precisely what satisfies "recomputed after every sync, not cached across windows" — TASK-06 proves it rather than assuming it.
+
+  ### Architecture notes (John, Andrew)
+
+  - No models, migrations, routes or queries change. `DailyRunningDistance` already returns the whole window in **one grouped aggregate**, so calibration reads an in-memory array — no new query, no N+1 surface.
+  - No new dependencies. Percentile arithmetic is a dozen lines; pulling a statistics package for it would fail the vendor policy's own test.
+  - `.ai/rules/app.md` — every non-obvious decision (the percentile method, the degenerate guard, the deliberate non-inversion of the dark ramp) carries a `/* … */` block comment stating the reason and the failure mode it avoids, placed at the decision site.
+  - `.ai/rules/data.md` — DTOs are `final readonly`, built through named static factories (`IntensityScale::calibrated()`, `::fixedBands()`); spatie/laravel-data is not installed.
+  - `.ai/rules/http.md` — `DashboardController` stays a single-action invokable and needs **no change**: the scale arrives inside the grid it already passes to the view.
+
+  ### Accessibility (Elise, Violet)
+
+  WCAG 2.2 AA is held, per the mockup contract. The legend is a `<ul>` of text rows; swatches are `aria-hidden` decorations beside real words and real numbers, so meaning never rests on colour. Cells already announce their exact distance from US-004. The ramp is single-hue and ordered by luminance, so it survives deuteranopia and protanopia. Contrast was validated against the actual card surfaces in both themes — every adjacent step clears 0.06 ΔL and the step nearest the surface clears 2:1 (2.11:1 light, 2.20:1 dark). Swatches reuse `.hm-cell`, which sets `aspect-ratio: 1 / 1`; the legend must override it to `auto` or the swatches inflate.
+
+  "Always visible" is satisfied at every breakpoint: below 1024 px the rail stacks directly beneath the grid card (mockup: grid, then legend, then sync); at and above 1024 px it is the top card of the right rail. No disclosure, no toggle, no collapse.
+
+  ### Out of scope for this spec
+
+  `FR-013` configurable fixed bands, `FR-011` day-cell detail, and any change to grid geometry, weekly totals, or the sync pipeline. The sync-detail rail card stays a US-006 placeholder.
+
+  ## Git & Branching
+
+  - Mode: **GITFLOW** (from `settings.git_mode`) — Gitflow discipline **without** automatic push.
+  - `feature/US-004-heatmap-grid` is approved (US-004 is DONE) but still **10 commits ahead of `develop`**. TASK-00 merges it into `develop` with `--no-ff` first, then branches — the same sequence US-004's own TASK-00 used for US-003.
+  - Branch: `feature/US-005-intensity-scale` from `develop`.
+  - One atomic Conventional Commit per task: `type(US-005): TASK-NN summary`. Never batch tasks into one commit.
+  - **No `git push` and no remote PR** unless the user explicitly asks in-session. The PR description toward `develop` is prepared locally.
+  - Run `vendor/bin/pint --dirty --format agent` and `php artisan larapilot:quality` before each commit; tests green before every `task-done`.
+  - Merge to `develop` only after human `larapilot-review` approval.
+
+  ## Test Data Strategy
+
+  - **No new or changed Eloquent models, migrations, or relationships in this spec** — every task therefore declares `## Test Data: N/A` except where noted below. Nothing in `database/factories/` or `database/seeders/` requires an update, and `migrate:fresh --seed` is unaffected.
+  - Existing fixtures cover the demo case: `TrainingBlockSeeder` already produces a realistic 16-week block, which is the calibrated (non-sparse) path.
+  - Tests build their distributions from the existing `Activity` factory via `Tests\TestCase` helpers — `allowlistedAthlete()` / `allowlistAthletes()`, never a raw factory user, per `.ai/rules/tests.md`.
+  - The sparse and degenerate windows are constructed **inside the tests** (3 activities, and N activities at one distance). They are edge cases, not demo data, so they must not be seeded into the shared dataset.
+
+  ## Test Strategy
+
+  - Bar: **NORMAL** (from `settings.testing`). Pest/PHPUnit feature and unit tests only. **No** Playwright, Dusk, Pest browser, viewport matrix, or axe automation — those belong to `BEST` and are explicitly not planned here.
+  - Test tasks are interleaved with implementation (TASK-02 follows TASK-01; TASK-06 follows TASK-05), not stacked at the end.
+
+  **Unit — `CalibrateIntensityScale` and `IntensityScale`** (TASK-02), covering every case the spec's final criterion names:
+
+  | Case | Expectation |
+  | --- | --- |
+  | 0 non-zero days | fixed bands, sparse note, `n = 0` |
+  | 1 non-zero day | fixed bands, sparse note |
+  | 3 non-zero days | fixed bands, sparse note — the boundary below which calibration is refused |
+  | 4 non-zero days, distinct | **calibrated** — the boundary at which it is allowed |
+  | all distances identical | fixed bands, degenerate note — never every day at one level |
+  | `p25 == p75` without all-identical | fixed bands, degenerate note |
+  | distance exactly `== p25` / `== p50` / `== p75` | lands in the **lower** level (1 / 2 / 3) |
+  | 0 metres | level 0, regardless of calibration state |
+  | **the mockup's 68-day dataset** | p25/p50/p75 render as **7.2 / 9.9 / 14.1 km** — the regression test that pins R-7 and would fail under nearest-rank |
+  | rest days present | zero-distance days are excluded from the distribution, not counted as low mileage |
+
+  **Unit — `DayCell` / `HeatmapBuilder`** (TASK-02): `modifier()` returns `rest` / `future` / `l1`…`l4`; future cells never carry a heat level; the grid exposes the same scale its cells were bucketed with.
+
+  **Feature — rendered dashboard** (TASK-06):
+
+  - The legend renders with computed ranges that match the cells actually rendered — assert the *same* threshold numbers appear in both, so a future regression that recalibrates one without the other fails.
+  - A window seeded with 3 runs flips the legend to fixed bands (`0.1 – 5.0`, `5.0 – 10.0`, `10.0 – 20.0`, `20.0+`) and prints the sparse note.
+  - A window where every run is the same distance prints the degenerate note and does not render every day at one level.
+  - The legend is present in the response on the connected dashboard — the "always visible" criterion.
+  - **Recomputation after sync:** build the grid, add activities that change the distribution, run the sync path that calls `HeatmapGridCache::forget()`, assert the re-rendered legend shows the **new** thresholds. This is the criterion "recomputed after every sync, not cached across windows", proven end to end rather than assumed.
+  - Athlete isolation on the cached scale stays covered by the existing `HeatmapGridCacheTest`; extend it only if the key shape changes (it should not).
+
+  **Manual tests recommended** (Anne — handoff, allowed at `NORMAL`): view the dashboard at 375 px and 1280 px in **both** themes; confirm the five ramp steps are visually distinguishable in each, that the dark ramp reads lightest-at-peak, and that the legend swatches are square and match the cells. Automated contrast checking is a `BEST`-bar activity and is not planned.
+
+  ## Definition of Done
+
+  Every acceptance criterion in US-005 maps to a task and a test:
+
+  | Criterion | Task | Evidence |
+  | --- | --- | --- |
+  | Five levels, 1–4 from p25/p50/p75 of non-zero daily distances | TASK-01 | TASK-02 unit |
+  | Recomputed after every sync, not cached across windows | TASK-03 | TASK-06 feature |
+  | Legend always visible, states actual kilometre ranges | TASK-05 | TASK-06 feature |
+  | Sparse fallback (< 4 non-zero days) + stated reason | TASK-01 | TASK-02, TASK-06 |
+  | Degenerate fallback (`p25 == p75`) | TASK-01 | TASK-02 |
+  | Exact validated hexes, dark ramp not auto-flipped | TASK-04 | manual + code review |
+  | Single-hue, luminance-ordered, no colour-alone meaning | TASK-04, TASK-05 | TASK-06 asserts numeric ranges in the DOM |
+  | Unit tests for boundaries, 0/1/3/4-day and identical windows, post-sync recomputation | TASK-02, TASK-06 | suite green |
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap the feature branch on a develop that carries US-004'
+    body: |-
+      ## Description
+      Merge the approved US-004 branch into `develop`, then create this spec's feature branch from it. US-004 is DONE but its 10 commits have not reached `develop` yet, so branching from `develop` as-is would fork from a tree without the heatmap grid this spec extends. Do **not** push — `git_mode` is `GITFLOW`.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `git checkout develop`
+      2. `git merge --no-ff feature/US-004-heatmap-grid` — same sequence US-004's own TASK-00 used to bring US-003 in
+      3. Confirm the tree is sound after the merge: `php artisan test --compact` and `php artisan larapilot:quality`
+      4. `git checkout -b feature/US-005-intensity-scale`
+      5. Draft the internal PR title (`US-005: Self-calibrating intensity scale and legend`) and body (link the plan, list TASK-01…TASK-07) — keep it local
+      6. Anchor commit: `chore(US-005): TASK-00 bootstrap feature branch`
+
+      ## Completion Criteria
+      - [ ] `develop` contains the US-004 commits via a `--no-ff` merge
+      - [ ] Full suite and quality gate green on `develop` before branching
+      - [ ] Branch `feature/US-005-intensity-scale` exists locally, off the merged `develop`
+      - [ ] PR title/body drafted locally; nothing pushed
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-005): TASK-00 bootstrap feature branch` (empty commit allowed)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally — open remotely only if the user asks
+    type: Impl
+    status: TODO
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+  -
+    id: TASK-01
+    title: 'Compute the intensity scale: percentiles, sparse and degenerate fallbacks'
+    body: |-
+      ## Description
+      Add the value object that carries the five-level scale and the invokable that computes it from the window's daily distances, including both documented fallbacks. This task owns **all** the arithmetic in the spec; nothing downstream recomputes a threshold.
+
+      ## Files Involved
+      - app/Data/Heatmap/IntensityScale.php (new)
+      - app/Data/Heatmap/LegendRow.php (new)
+      - app/Support/Heatmap/CalibrateIntensityScale.php (new)
+
+      ## Steps
+      1. `php artisan make:class Data/Heatmap/IntensityScale`, `Data/Heatmap/LegendRow`, `Support/Heatmap/CalibrateIntensityScale`
+      2. `LegendRow` — `final readonly`: `int $level`, `string $name`, `string $rangeLabel`.
+      3. `IntensityScale` — `final readonly`, private constructor, two named factories per `.ai/rules/data.md`:
+         - `IntensityScale::calibrated(int $p25, int $p50, int $p75, int $runningDayCount)`
+         - `IntensityScale::fixedBands(int $runningDayCount, bool $degenerate)`
+         Fixed-band thresholds are the literals `5000 / 10000 / 20000` metres.
+      4. `IntensityScale::levelFor(int $metres): int` — `0` when `$metres === 0`; otherwise `1` when `<= p25`, `2` when `<= p50`, `3` when `<= p75`, else `4`. **Upper-inclusive**: a distance landing exactly on a threshold belongs to the lower level, which is how the legend reads.
+      5. `IntensityScale::legendRows(): array<int, LegendRow>` — five rows, names `Rest · Easy · Steady · Hard · Peak`, labels formatted as `0 km`, `0.1 – {p25} km`, `{p25} – {p50} km`, `{p50} – {p75} km`, `{p75}+ km`. Kilometres via `number_format($metres / 1000, 1)`, matching `DayCell::kilometres()`. Use the en dash with surrounding spaces exactly as the mockup does.
+      6. `IntensityScale::note(): string` and `isCalibrated(): bool` — the three exact strings from the plan's copy table. The degenerate string is the one this spec invents; use it verbatim.
+      7. `CalibrateIntensityScale::__invoke(array $dailyMetres): IntensityScale`:
+         - filter to non-zero values, sort ascending
+         - **fewer than 4** → `fixedBands($count, degenerate: false)`
+         - otherwise compute p25/p50/p75 by **R-7 linear interpolation** — `h = (n - 1) * p`, `value = s[floor(h)] + (h - floor(h)) * (s[ceil(h)] - s[floor(h)])` — and `(int) round()` each to whole metres
+         - **then** guard: `p25 === p75` → `fixedBands($count, degenerate: true)`
+         - otherwise `calibrated(...)`
+      8. Per `.ai/rules/app.md`, carry `/* … */` block comments **at the decision sites**, each naming the failure mode avoided: (a) R-7 is the method that reproduces the mockup's 7.2 / 9.9 / 14.1 — nearest-rank yields 7.0 / 9.8 / 14.0 and silently desynchronises the legend from the design contract; (b) the degenerate guard runs *after* the percentiles so it catches any collapse, not only all-identical windows, and exists so a uniform block does not render every day at one level; (c) comparison is in metres against unrounded thresholds because kilometres are a display concern and rounding at the boundary would move cells between levels.
+      9. `vendor/bin/pint --dirty --format agent` and `php artisan larapilot:quality`
+
+      ## Completion Criteria
+      - [ ] `IntensityScale` and `LegendRow` are `final readonly`; `IntensityScale` is built only through its named factories
+      - [ ] Percentiles use R-7 linear interpolation on integer metres
+      - [ ] Sparse fallback triggers below 4 non-zero days; degenerate fallback triggers on `p25 === p75`
+      - [ ] Both fallbacks emit the identical `0 / <= 5 / <= 10 / <= 20 / 20+` km bands
+      - [ ] The three legend notes match the plan's copy table verbatim
+      - [ ] No new Composer dependency added
+      - [ ] Pint and Larastan level 5 clean
+
+      ## Test Data
+      - N/A — no model, migration or relationship changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-005): TASK-01 compute the self-calibrating intensity scale`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-02
+    title: 'Unit-test the bucketing, both fallbacks, and the percentile method itself'
+    body: |-
+      ## Description
+      Cover every case the spec's final acceptance criterion names, plus the regression test that pins the percentile method to the one the mockup was drawn with. Bar is `NORMAL`: Pest/PHPUnit only, no browser or viewport suites.
+
+      ## Files Involved
+      - tests/Unit/Support/Heatmap/CalibrateIntensityScaleTest.php (new)
+      - tests/Unit/Data/Heatmap/IntensityScaleTest.php (new)
+
+      ## Steps
+      1. `php artisan make:test --phpunit --unit CalibrateIntensityScaleTest` and `IntensityScaleTest`; place them under the existing `tests/Unit/Support/Heatmap` and `tests/Unit/Data/Heatmap` folders to match the current tree.
+      2. `CalibrateIntensityScaleTest` — one test per case:
+         - 0, 1 and 3 non-zero days → fixed bands, sparse note, correct count in the note
+         - 4 distinct non-zero days → calibrated (the boundary at which calibration is allowed)
+         - all distances identical → fixed bands, degenerate note
+         - a window where `p25 == p75` **without** every value being identical → fixed bands, degenerate note
+         - zero-distance days are excluded from the distribution rather than counted as low mileage
+      3. **Method-pinning regression test** — feed the 68 running distances rendered in `.larapilot/mockups/heatmap-dashboard/index.html` and assert the thresholds format to **7.2**, **9.9** and **14.1** km. Extract them once into a private fixture method inside the test with a comment naming the source file. This test is the guard: nearest-rank produces 7.0 / 9.8 / 14.0 and fails it, which is exactly the outcome required.
+      4. `IntensityScaleTest` — `levelFor()` boundaries: metres exactly `== p25`, `== p50`, `== p75` land in levels **1, 2, 3** respectively; one metre above each lands in the next level up; `0` metres is level 0 under both calibrated and fallback scales; `legendRows()` returns five rows with the expected names and label formatting for both a calibrated and a fixed-band scale.
+      5. `php artisan test --compact tests/Unit/Support/Heatmap/CalibrateIntensityScaleTest.php tests/Unit/Data/Heatmap/IntensityScaleTest.php`
+      6. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites.
+
+      ## Completion Criteria
+      - [ ] Windows with 0, 1, 3 and 4 non-zero days each covered
+      - [ ] All-identical and general `p25 == p75` degenerate windows covered
+      - [ ] Boundary values landing exactly on p25/p50/p75 asserted to fall in the lower level
+      - [ ] The mockup's 68-day dataset asserts 7.2 / 9.9 / 14.1 km and would fail under nearest-rank
+      - [ ] Tests pass; coverage matches the `NORMAL` bar
+
+      ## Git Deliverables
+      - Commit: `test(US-005): TASK-02 cover the intensity scale and its fallbacks`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-01
+  -
+    id: TASK-03
+    title: 'Carry the scale through the builder into every cell and the grid'
+    body: |-
+      ## Description
+      Wire the scale into grid assembly so cells and legend are bucketed by one object. `DashboardController` needs no change — the scale arrives inside the `HeatmapGrid` it already passes to the view — and the cache needs no new invalidation, because US-004's key already carries the athlete, the window start and the calendar day.
+
+      ## Files Involved
+      - app/Support/Heatmap/HeatmapBuilder.php
+      - app/Data/Heatmap/DayCell.php
+      - app/Data/Heatmap/HeatmapGrid.php
+      - resources/views/components/heatmap-grid.blade.php
+      - tests/Unit/Support/Heatmap/HeatmapBuilderTest.php
+      - tests/Unit/Data/Heatmap/DayCellTest.php
+
+      ## Steps
+      1. `HeatmapBuilder` — constructor-promote `private CalibrateIntensityScale $calibrate`; in `__invoke`, calibrate **once** from `$dailyMeters` before the week loop, thread the resulting scale through `buildWeek()` into each `DayCell`, and pass it to the `HeatmapGrid` constructor. One calibration per grid build, never per week or per cell.
+      2. `DayCell` — add `public int $level` to the constructor. Add `modifier(): string` returning `'rest'`, `'future'`, or `'l1'`…`'l4'`, so Blade never branches on state to pick a class. Future cells carry level 0 and always return `'future'` — a day that has not happened cannot have an intensity.
+      3. `HeatmapGrid` — add `public IntensityScale $scale`.
+      4. `heatmap-grid.blade.php` — replace `hm-cell--{{ $day->state->value }}` with `hm-cell--{{ $day->modifier() }}`. No other markup change; the sr-only names, titles, caption and scopes stay exactly as US-004 left them.
+      5. Update the existing `HeatmapBuilderTest` and `DayCellTest` for the new signatures, and add assertions that ran cells carry the level the grid's own scale assigns, and that future cells never carry a heat level.
+      6. `php artisan test --compact` (full suite — this touches shared DTO signatures), then `vendor/bin/pint --dirty --format agent` and `php artisan larapilot:quality`
+
+      ## Completion Criteria
+      - [ ] The scale is computed exactly once per grid build
+      - [ ] `HeatmapGrid` exposes the same scale its cells were bucketed with
+      - [ ] `DayCell::modifier()` covers rest, future and l1–l4; future cells never carry a heat level
+      - [ ] Blade contains no arithmetic and no state branching for the cell class
+      - [ ] `DashboardController` and `HeatmapGridCache` are unchanged
+      - [ ] Full suite green; Pint and Larastan clean
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-005): TASK-03 thread the intensity scale through the grid`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-01
+  -
+    id: TASK-04
+    title: 'Add the validated ramp tokens, level classes and legend styles'
+    body: |-
+      ## Description
+      Bring the four-step ramp into the stylesheet using the exact hexes recorded in the mockup README, in both themes, and add the legend's own classes. Retire the US-004 placeholder fill rather than leaving it beside the ramp. Shares no files with TASK-01…TASK-03 and can run alongside them.
+
+      ## Files Involved
+      - resources/css/app.css
+
+      ## Steps
+      1. Add `--lv-1` … `--lv-4` to **all three** token blocks that already carry `--lv-0`: `:root`, `html.dark`, and the `@media (prefers-color-scheme: dark) { html:not(.light) }` block. Missing the third silently breaks a JS-disabled visitor on a dark OS.
+         - Light: `--lv-1: #86b6ef; --lv-2: #3987e5; --lv-3: #256abf; --lv-4: #104281;`
+         - Dark: `--lv-1: #184f95; --lv-2: #2a78d6; --lv-3: #5598e7; --lv-4: #9ec5f4;`
+         **Transcribe these.** The dark ramp is a separately selected set of steps for the slate-900 card, not a programmatic flip of the light values, and the palette validator the README cites is not committed to this repo — there is no gate that would catch a retuned step.
+      2. Delete `--lv-run` from all three blocks and delete the `.hm-cell--ran` rule. Add `.hm-cell--l1` … `.hm-cell--l4` mapping to `--lv-1` … `--lv-4`. `.hm-cell--rest` and `.hm-cell--future` are unchanged.
+      3. Replace the US-004 comment above the token block that says `--lv-1..--lv-4` belongs to US-005 and must not be added yet — it is now false. Replace the one above `.hm-cell--rest` for the same reason. State instead that the hexes are transcribed from the mockup README and that the dark ramp is deliberately not an inversion.
+      4. Add the legend classes from the mockup: `.hm-legend-title`, `.hm-legend-note`, `.hm-legend-list`, `.hm-key`, `.hm-key-swatch`, `.hm-key-name`, `.hm-key-range`, plus the `@media (min-width: 480px)` step `.hm-key { font-size: 0.75rem; }` inside the existing 480 px block. `.hm-key-swatch` **must** set `aspect-ratio: auto` — it reuses `.hm-cell`, which sets `1 / 1`, and without the override the swatches inflate.
+      5. `npm run build` to confirm the stylesheet compiles.
+      6. Smoke-check the dashboard at 375, 768 and 1280 px in both themes; confirm the five steps are distinguishable and the dark ramp reads lightest-at-peak.
+
+      ## Completion Criteria
+      - [ ] `--lv-1`…`--lv-4` present in all three token blocks with the exact README hexes
+      - [ ] `--lv-run` and `.hm-cell--ran` removed; `.hm-cell--l1`…`--l4` present
+      - [ ] Stale US-004 comments deferring the ramp to US-005 replaced
+      - [ ] Legend classes present; `.hm-key-swatch` overrides `aspect-ratio`
+      - [ ] `npm run build` succeeds
+      - [ ] Manual smoke at 375 / 768 / 1280 px in light and dark
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-005): TASK-04 add the validated intensity ramp and legend styles`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Joe
+    estimate_hours: 2
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-05
+    title: 'Render the always-visible legend in the dashboard rail'
+    body: |-
+      ## Description
+      Replace the US-004 legend placeholder card with the real component, driven entirely by the grid's own scale so the swatches and the numbers cannot disagree.
+
+      ## Files Involved
+      - resources/views/components/heatmap-legend.blade.php (new)
+      - resources/views/dashboard.blade.php
+
+      ## Steps
+      1. Create `heatmap-legend.blade.php` taking `@props(['scale'])`. Markup follows `index.html` exactly: `<h3 class="hm-legend-title">Intensity</h3>`, `<p class="hm-legend-note">{{ $scale->note() }}</p>`, then `<ul class="hm-legend-list">` with one `<li class="hm-key">` per `legendRows()` entry — `<span aria-hidden="true" class="hm-cell hm-key-swatch hm-cell--l{n}">` (or `--rest` for level 0), `<span class="hm-key-name">`, `<span class="hm-key-range">`.
+      2. Markup only — every string comes from `IntensityScale` / `LegendRow`, matching the contract `heatmap-grid.blade.php` already holds. No arithmetic, no `number_format`, no conditional copy in the template.
+      3. `dashboard.blade.php` — replace the first rail placeholder card with `<x-heatmap-legend :scale="$grid->scale" />` inside the existing `<div class="card p-4">`. Update the comment above the rail: the legend has landed, the sync detail card is still US-006. Leave the second placeholder card alone.
+      4. Accessibility: swatches are `aria-hidden` decorations beside real words and real numbers, so no meaning rests on colour. The rail's `aria-label` already reads "Legend and sync detail" — it is now accurate and stays.
+      5. Confirm the legend is visible with no interaction at 375 px (stacked below the grid card) and at 1280 px (top card of the right rail).
+      6. `php artisan test --compact tests/Feature/Dashboard` then `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] Legend renders from `$grid->scale` — the same object the cells were bucketed with
+      - [ ] Five rows with names and numeric kilometre ranges; note reflects calibrated / sparse / degenerate
+      - [ ] Visible without interaction at every breakpoint — no toggle, no disclosure, no collapse
+      - [ ] Swatches `aria-hidden`; no arithmetic or string-building in Blade
+      - [ ] Existing dashboard feature tests still pass
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-005): TASK-05 render the intensity legend in the dashboard rail`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 2.5
+    dependencies:
+      - TASK-03
+      - TASK-04
+  -
+    id: TASK-06
+    title: 'Feature-test the rendered legend, the sparse flip and post-sync recomputation'
+    body: |-
+      ## Description
+      Prove the two acceptance criteria that only hold end to end: that the legend's numbers agree with the cells actually rendered, and that a sync recomputes the scale rather than serving a cached one. Bar is `NORMAL` — no browser suites.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/HeatmapLegendTest.php (new)
+
+      ## Steps
+      1. `php artisan make:test --phpunit HeatmapLegendTest`, placed under `tests/Feature/Dashboard` beside the existing dashboard tests.
+      2. Sign athletes in through `allowlistedAthlete()` from `Tests\TestCase` per `.ai/rules/tests.md` — never a raw factory user, or the test stops exercising the allowlist guard. Build distributions with the existing `Activity` factory; add no seeder entries.
+      3. Calibrated case: seed a window with a known distribution, assert the legend note reads `Calibrated to your {n} running days…`, and assert the rendered threshold numbers appear in **both** the legend and the cell bucketing — so a regression that recalibrates one without the other fails here.
+      4. Sparse case: seed exactly 3 runs; assert the legend shows the fixed bands `0.1 – 5.0`, `5.0 – 10.0`, `10.0 – 20.0`, `20.0+` and the note explaining the window is too sparse to calibrate.
+      5. Degenerate case: seed several runs all at one distance; assert the degenerate note and that the running days do **not** all render at a single level.
+      6. Always-visible: assert the legend markup is present in the connected dashboard response.
+      7. **Recomputation after sync:** render the dashboard, add activities that shift the distribution, run the path that calls `HeatmapGridCache::forget()`, re-render, and assert the legend now shows the **new** thresholds. Set `Http::preventStrayRequests()` alongside `Http::fake()` if the exercised path makes any outbound call, and override config with `Config::set()` inside the test.
+      8. `php artisan test --compact tests/Feature/Dashboard`, then the full suite once before `task-done`.
+      9. Do **not** add Playwright, Dusk, Pest browser, viewport, or axe suites — record the responsive and contrast checks as a `Manual tests recommended` note in the handoff instead.
+
+      ## Completion Criteria
+      - [ ] Legend ranges asserted to agree with the rendered cells
+      - [ ] Sparse window flips to fixed bands with the stated reason
+      - [ ] Degenerate window flips to fixed bands and is not rendered at one level
+      - [ ] Legend present without interaction on the connected dashboard
+      - [ ] A sync that changes the distribution produces new thresholds on the next request
+      - [ ] Full suite green; no browser/E2E tooling added
+
+      ## Git Deliverables
+      - Commit: `test(US-005): TASK-06 cover the rendered legend, fallbacks and recalibration`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-05
+  -
+    id: TASK-07
+    title: 'Document the scale, the pinned percentile method and the ramp contract'
+    body: |-
+      ## Description
+      Baseline documentation only — `effort` is `STANDARD` and no extended docs were recorded at spec approval. There is no public or partner API here, so no OpenAPI work.
+
+      ## Files Involved
+      - README.md
+      - CHANGELOG.md
+
+      ## Steps
+      1. README — a short section on the intensity scale: the five levels, that thresholds are the p25/p50/p75 of non-zero daily distances **by R-7 linear interpolation**, that they are recomputed on every sync, and the two documented fallbacks with their bands. State plainly that the percentile method is the one that reproduces the mockup's legend and is not interchangeable.
+      2. README — note that the ramp hexes are transcribed from `.larapilot/mockups/heatmap-dashboard/README.md` and that the palette validator that produced them is **not** committed to this repository, so the README table is the only contract for anyone tempted to retune a step.
+      3. `CHANGELOG.md` — Unreleased / `Added`: the self-calibrating five-level intensity scale and the always-visible numeric legend, with the sparse and degenerate fallbacks.
+      4. Confirm the stale US-004 comments deferring the ramp to US-005 were replaced in TASK-04 (`resources/css/app.css`) and TASK-05 (`resources/views/dashboard.blade.php`) — no comment left in the tree should still say the ramp or legend is a future spec.
+      5. Ask Alex to record the percentile-method trap as a shared rule with the Boost `record-rule` tool, glob `app/Support/Heatmap/**`, so the next agent does not swap in nearest-rank and quietly desynchronise the legend from the design contract.
+
+      ## Completion Criteria
+      - [ ] README documents the levels, the pinned percentile method, and both fallbacks
+      - [ ] README records that the palette validator is absent and the mockup table is the contract
+      - [ ] CHANGELOG Unreleased updated
+      - [ ] No stale comment deferring the ramp or legend to a future spec remains
+      - [ ] The percentile-method trap recorded in `.ai/rules` via `record-rule`
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `docs(US-005): TASK-07 document the intensity scale and ramp contract`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: finalise the local PR body before handing off to review
+    type: Impl
+    status: TODO
+    assignee: Albert
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-06
+updated_at: '2026-09-06T16:17:10+00:00'
