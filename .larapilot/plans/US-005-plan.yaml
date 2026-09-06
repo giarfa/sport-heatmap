@@ -482,23 +482,29 @@ tasks:
       9. Do **not** add Playwright, Dusk, Pest browser, viewport, or axe suites — record the responsive and contrast checks as a `Manual tests recommended` note in the handoff instead.
 
       ## Completion Criteria
-      - [ ] Legend ranges asserted to agree with the rendered cells
-      - [ ] Sparse window flips to fixed bands with the stated reason
-      - [ ] Degenerate window flips to fixed bands and is not rendered at one level
-      - [ ] Legend present without interaction on the connected dashboard
-      - [ ] A sync that changes the distribution produces new thresholds on the next request
-      - [ ] Full suite green; no browser/E2E tooling added
+      - [x] Legend ranges asserted to agree with the rendered cells
+      - [x] Sparse window flips to fixed bands with the stated reason
+      - [x] Degenerate window flips to fixed bands and is not rendered at one level
+      - [x] Legend present without interaction on the connected dashboard
+      - [x] A sync that changes the distribution produces new thresholds on the next request
+      - [x] Full suite green; no browser/E2E tooling added
 
       ## Git Deliverables
       - Commit: `test(US-005): TASK-06 cover the rendered legend, fallbacks and recalibration`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-05
+    commit:
+      sha: e67b9b26dcaa4095871f8fc2c2be1fd854499f00
+      short_sha: e67b9b2
+      subject: 'test(US-005): TASK-06 cover the rendered legend, fallbacks and recalibration'
+      committed_at: '2026-09-06T18:32:29+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e67b9b26dcaa4095871f8fc2c2be1fd854499f00'
   -
     id: TASK-07
     title: 'Document the scale, the pinned percentile method and the ramp contract'
@@ -537,4 +543,4 @@ tasks:
     estimate_hours: 1.5
     dependencies:
       - TASK-06
-updated_at: '2026-09-06T16:25:51+00:00'
+updated_at: '2026-09-06T16:32:30+00:00'

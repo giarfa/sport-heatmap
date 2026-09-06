@@ -11,6 +11,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | tests/** | .ai/rules/boost/tests.md |
 | config/** | .ai/rules/config.md |
 | app/Data/** | .ai/rules/data.md |
+| app/Support/Heatmap/** | .ai/rules/heatmap.md |
 | app/Http/** | .ai/rules/http.md |
 | app/Models/** | .ai/rules/models.md |
 | tests/** | .ai/rules/tests.md |

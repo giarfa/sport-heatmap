@@ -206,6 +206,33 @@ On first visit the theme follows the browser's `prefers-color-scheme`; toggling 
 persists the explicit choice in `localStorage` (`theme`), which then wins over the OS preference on
 every later visit.
 
+### The intensity scale
+
+Each running day is bucketed into one of five levels — Rest, Easy, Steady, Hard, Peak — shaded from
+a single-hue blue ramp, always shown next to a legend that states the actual kilometre range of
+every level so no meaning ever rests on colour alone. Levels 1–4 are the **25th, 50th and 75th
+percentiles of the window's own non-zero daily distances**, computed by **R-7 linear
+interpolation** (the numpy / Excel `PERCENTILE.INC` default). That method is not interchangeable:
+it is the one that reproduces this project's validated legend, and a different percentile method
+(nearest-rank, for instance) silently desynchronises the legend from the ramp it was designed
+against. Thresholds are recomputed by `App\Support\Heatmap\CalibrateIntensityScale` from scratch on
+every request that misses the grid cache, and the cache is cleared on every successful sync — so
+the scale is never carried over from a previous window's distribution.
+
+Two fallbacks fall back to the same fixed bands (`0 / ≤ 5 / ≤ 10 / ≤ 20 / 20+ km`) rather than a
+computed scale, and differ only in the sentence the legend prints:
+
+- **Sparse** — fewer than four non-zero days in the window; there are not enough data points to
+  separate three distinct quartiles.
+- **Degenerate** — the computed percentiles collapse (p25 equals p75), which would otherwise render
+  every running day at a single level and hide the data.
+
+The ramp's hexes — four steps per theme, transcribed verbatim from
+`.larapilot/mockups/heatmap-dashboard/README.md` → "The intensity ramp" — are the **only** contract
+for that colour table. The palette validator script the mockup README cites was never committed to
+this repository, so there is no automated gate that would catch a retuned step; treat that README
+table as authoritative before changing a hex.
+
 ## Tests and quality
 
 ```bash
