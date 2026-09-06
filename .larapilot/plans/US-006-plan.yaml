@@ -364,11 +364,11 @@ tasks:
       7. `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] Four components render from `SyncStatus` alone — no dates, no conditionals building strings in Blade
-      - [ ] Banner is `role="alert"`; skeleton region is `aria-busy` + `aria-live="polite"` with its table `aria-hidden`
-      - [ ] Chip is `aria-hidden` whenever a banner is on the page
-      - [ ] Layout exposes both yields; connect and rejected screens are visually unchanged
-      - [ ] Usable at 375 / 768 / 1280 px (manual smoke is sufficient at `NORMAL`)
+      - [x] Four components render from `SyncStatus` alone — no dates, no conditionals building strings in Blade
+      - [x] Banner is `role="alert"`; skeleton region is `aria-busy` + `aria-live="polite"` with its table `aria-hidden`
+      - [x] Chip is `aria-hidden` whenever a banner is on the page
+      - [x] Layout exposes both yields; connect and rejected screens are visually unchanged
+      - [x] Usable at 375 / 768 / 1280 px (manual smoke is sufficient at `NORMAL`)
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -378,12 +378,18 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-01
       - TASK-03
+    commit:
+      sha: 0fc5bde60624e8a67c78ef21ad8c3efc1cac4116
+      short_sha: 0fc5bde
+      subject: 'feat(US-006): TASK-04 add sync chip, warning, detail and skeleton components'
+      committed_at: '2026-09-06T22:27:52+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0fc5bde60624e8a67c78ef21ad8c3efc1cac4116'
   -
     id: TASK-05
     title: 'Wire the dashboard: warning, empty state, skeleton and rail card'
@@ -505,4 +511,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-05
-updated_at: '2026-09-06T20:26:11+00:00'
+updated_at: '2026-09-06T20:27:53+00:00'
