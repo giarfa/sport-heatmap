@@ -5,7 +5,7 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 3
-status: 'IN PROGRESS'
+status: REVIEW
 body: |
   #### US-006: Sync status, stale-data warning and empty states
 
@@ -49,4 +49,7 @@ status_history:
   -
     status: 'IN PROGRESS'
     at: '2026-09-06T20:16:41+00:00'
+  -
+    status: REVIEW
+    at: '2026-09-06T20:35:14+00:00'
 rework: false
