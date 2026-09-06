@@ -24,13 +24,30 @@
 
     <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
 
+    {{--
+        Inline and blocking, on purpose: this must run before the stylesheet
+        paints anything. Deferring it to the bundle is what causes the flash of
+        the wrong theme on a dark-theme reload. Unset leaves both classes off
+        so prefers-color-scheme decides.
+    --}}
+    <script>
+        (function () {
+            var stored = localStorage.getItem('theme');
+            if (stored === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else if (stored === 'light') {
+                document.documentElement.classList.add('light');
+            }
+        })();
+    </script>
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen font-sans antialiased">
     <a href="#main" class="skip-link">Skip to content</a>
 
-    <header class="border-b" style="background: var(--surface-card); border-color: var(--hairline);">
-        <div class="mx-auto flex h-14 max-w-5xl items-center px-3 sm:px-6">
+    <header class="sticky top-0 z-10 border-b" style="background: var(--surface-card); border-color: var(--hairline);">
+        <div class="mx-auto flex h-14 max-w-5xl items-center justify-between px-3 sm:px-6">
             {{--
                 The mark is inlined and the wordmark is live text rather than an
                 <img> of logo.svg: the wordmark is currentColor, which an <img>
@@ -48,6 +65,16 @@
                 </svg>
                 <span class="text-sm font-semibold tracking-tight">Heatmap</span>
             </a>
+            {{-- The sync status chip US-006 adds lands to the left of the toggle, in this same row. --}}
+            <div class="flex items-center gap-1">
+                <button type="button" data-theme-toggle aria-pressed="false"
+                        class="grid h-11 w-11 place-items-center rounded-lg" style="color: var(--ink-muted);">
+                    <span class="sr-only">Toggle dark mode</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
+            </div>
         </div>
     </header>
 
@@ -56,7 +83,11 @@
     </main>
 
     <footer class="mx-auto max-w-5xl px-3 pb-8 sm:px-6">
-        <p class="text-xs" style="color: var(--ink-muted);">Private instance — one athlete, one screen.</p>
+        <p class="text-xs" style="color: var(--ink-muted);">
+            {{-- Contractual under the Strava API Agreement (FR-008), not decoration — it stays in the layout so no view change can drop it. --}}
+            <a href="https://www.strava.com" class="underline underline-offset-2" style="color: var(--accent);">Powered by Strava</a>
+            · runs only · distances in kilometres
+        </p>
     </footer>
 </body>
 </html>

@@ -9,9 +9,11 @@
 }
 
 /* ---- Design tokens ---------------------------------------------------------
-   Surface, ink and accent only. The five intensity-ramp levels belong to the
-   heatmap grid (US-005) and are validated against these exact card surfaces —
-   do not add them here ahead of that spec.
+   Surface, ink and accent, plus the heatmap's level-0 (rest), provisional
+   "ran" fill and future-day border. The four-step intensity ramp above level 0
+   belongs to US-005 and is validated against these exact card surfaces — do
+   not add --lv-1..--lv-4 here ahead of that spec; --lv-run is a placeholder
+   single fill until the ramp lands.
 
    Indigo is the accent for focus rings and links only, never a data colour. */
 :root {
@@ -24,12 +26,36 @@
     --warn-bg: #fffbeb; /* amber-50  */
     --warn-border: #fcd34d; /* amber-300 */
     --warn-ink: #92400e; /* amber-800 */
+    --lv-0: #e2e8f0;
+    --lv-run: #3987e5;
+    --lv-future-border: #cbd5e1;
+    --cell-ring: rgba(15, 23, 42, 0.08);
 }
 
-/* First visit follows the operating system. The persisted toggle lands with the
-   screen it lives on (US-004). */
+/*
+ * Dark tokens live in two selectors carrying the same values: the "dark"
+ * class lets an explicit user choice persist across reloads, and the media
+ * query keeps a JS-disabled visitor on their OS preference. First visit
+ * follows prefers-color-scheme; the persisted choice (US-004) then wins.
+ */
+html.dark {
+    --surface-page: #020617; /* slate-950 */
+    --surface-card: #0f172a; /* slate-900 */
+    --hairline: #1e293b; /* slate-800 */
+    --ink: #f8fafc;
+    --ink-muted: #94a3b8; /* slate-400 */
+    --accent: #a5b4fc; /* indigo-300 */
+    --warn-bg: #2a1f05;
+    --warn-border: #854d0e;
+    --warn-ink: #fcd34d;
+    --lv-0: #1e293b;
+    --lv-run: #2a78d6;
+    --lv-future-border: #334155;
+    --cell-ring: rgba(248, 250, 252, 0.1);
+}
+
 @media (prefers-color-scheme: dark) {
-    :root {
+    html:not(.light) {
         --surface-page: #020617; /* slate-950 */
         --surface-card: #0f172a; /* slate-900 */
         --hairline: #1e293b; /* slate-800 */
@@ -39,6 +65,10 @@
         --warn-bg: #2a1f05;
         --warn-border: #854d0e;
         --warn-ink: #fcd34d;
+        --lv-0: #1e293b;
+        --lv-run: #2a78d6;
+        --lv-future-border: #334155;
+        --cell-ring: rgba(248, 250, 252, 0.1);
     }
 }
 
@@ -74,4 +104,203 @@ body {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 0.375rem;
+}
+
+/* ---- Heatmap grid -----------------------------------------------------------
+   Column widths are percentages on <colgroup> and the gaps between cells are
+   padding on the <td> — this is load-bearing. Never reintroduce
+   border-spacing here: it is added ON TOP of width:100%, which pushes Sunday
+   and the week-total column off a 375px viewport. That was the first version
+   of this grid and it was wrong. */
+.hm {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.hm-col-week {
+    width: 13%;
+}
+
+.hm-col-day {
+    width: 9.5%;
+}
+
+.hm-col-total {
+    width: 20.5%;
+}
+
+.hm-th-week {
+    padding: 0 0.375rem 0 0;
+    text-align: right;
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.hm-th-day {
+    padding: 0 0 0.375rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    text-align: center;
+}
+
+.hm-th-day abbr {
+    text-decoration: none;
+}
+
+.hm-th-total {
+    padding: 0 0 0.375rem 0.375rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    text-align: right;
+}
+
+.hm-td {
+    padding: 2px;
+}
+
+.hm-cell {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 0.1875rem;
+    box-shadow: inset 0 0 0 1px var(--cell-ring);
+}
+
+/* Rest, ran and future are the only three treatments this spec renders — the
+   graded intensity ramp (--lv-1..--lv-4) arrives with US-005. */
+.hm-cell--rest {
+    background: var(--lv-0);
+}
+
+.hm-cell--ran {
+    background: var(--lv-run);
+}
+
+.hm-cell--future {
+    background: transparent;
+    box-shadow: none;
+    border: 1px dashed var(--lv-future-border);
+}
+
+.hm-total {
+    text-align: right;
+    font-size: 0.6875rem;
+    color: var(--ink);
+    vertical-align: middle;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 0 0 0 0.375rem;
+}
+
+.hm-total-num {
+    font-weight: 600;
+}
+
+.hm-total-unit {
+    color: var(--ink-muted);
+}
+
+.hm-partial {
+    display: block;
+    font-size: 0.5625rem;
+    font-weight: 500;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+}
+
+.hm-row-current .hm-th-week {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+@media (min-width: 480px) {
+    .hm-th-week {
+        font-size: 0.6875rem;
+    }
+
+    .hm-th-day,
+    .hm-th-total {
+        font-size: 0.6875rem;
+    }
+
+    .hm-total {
+        font-size: 0.8125rem;
+    }
+
+    .hm-td {
+        padding: 3px;
+    }
+
+    .hm-cell {
+        border-radius: 0.25rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .hm-col-week {
+        width: 11%;
+    }
+
+    .hm-col-day {
+        width: 9.7%;
+    }
+
+    .hm-col-total {
+        width: 21.1%;
+    }
+
+    .hm-th-week {
+        font-size: 0.75rem;
+    }
+
+    .hm-total {
+        font-size: 0.875rem;
+    }
+
+    .hm-td {
+        padding: 4px;
+    }
+}
+
+/* ---- Dashboard layout --------------------------------------------------------
+   The grid is capped at a readable cell density (~48px) instead of stretching
+   to the container — desktop enhancement is a side rail, not bigger squares.
+   Without the 34rem cap, cells inflate to ~90px at desktop and the density
+   that makes a heatmap readable at a glance is gone. */
+.dash {
+    display: grid;
+    gap: 1rem;
+    align-items: start;
+}
+
+.dash-grid {
+    max-width: 34rem;
+    margin-inline: auto;
+    width: 100%;
+}
+
+.rail {
+    display: grid;
+    gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+    .dash {
+        grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
+        gap: 1.5rem;
+    }
+
+    .dash-grid {
+        margin-inline: 0;
+    }
 }
