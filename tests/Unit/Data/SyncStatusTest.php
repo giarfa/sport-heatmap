@@ -29,6 +29,7 @@ class SyncStatusTest extends TestCase
         $this->assertTrue($status->needsWarning());
         $this->assertFalse($status->showsSkeleton());
         $this->assertSame('Never synced', $status->chipLabel());
+        $this->assertSame('warn', $status->chipDotModifier());
         $this->assertSame('Waiting for the first sync', $status->warningTitle());
         $this->assertSame(
             'No sync has completed yet. The nightly job runs at 3:00 Europe/Rome.',
@@ -53,6 +54,7 @@ class SyncStatusTest extends TestCase
         $this->assertSame(SyncHealth::Failed, $status->health);
         $this->assertTrue($status->needsWarning());
         $this->assertSame('Sync failed 2 hours ago', $status->chipLabel());
+        $this->assertSame('warn', $status->chipDotModifier());
         $this->assertSame('Last sync failed 2 hours ago', $status->warningTitle());
         $this->assertSame(
             'Strava API returned 401 Unauthorized: refresh token rejected. The map below is showing data from 5 Sep.',
@@ -94,6 +96,7 @@ class SyncStatusTest extends TestCase
 
         $this->assertSame(SyncHealth::Stale, $status->health);
         $this->assertTrue($status->needsWarning());
+        $this->assertSame('warn', $status->chipDotModifier());
         $this->assertSame('Last successful sync was 2 days ago', $status->warningTitle());
         $this->assertSame(
             'The nightly sync has not completed since 3 Sep. The map below is showing data from then.',
@@ -110,6 +113,7 @@ class SyncStatusTest extends TestCase
         $this->assertSame(SyncHealth::Healthy, $status->health);
         $this->assertFalse($status->needsWarning());
         $this->assertSame('Synced 6 hours ago', $status->chipLabel());
+        $this->assertSame('ok', $status->chipDotModifier());
     }
 
     public function test_a_history_of_running_only_is_never_synced_and_shows_the_skeleton(): void

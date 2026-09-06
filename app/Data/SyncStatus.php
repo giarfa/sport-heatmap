@@ -100,6 +100,16 @@ final readonly class SyncStatus
     }
 
     /**
+     * The chip's dot is aria-hidden but not display:none once a warning is on
+     * the page (it stays visible at 640px+, alongside the banner) — so its
+     * colour still has to agree with the health it names, not default to ok.
+     */
+    public function chipDotModifier(): string
+    {
+        return $this->needsWarning() ? 'warn' : 'ok';
+    }
+
+    /**
      * The lowercase variant the footer prints below 640 px, where the header
      * chip is hidden.
      */

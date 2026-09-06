@@ -59,6 +59,11 @@ class SyncStatusTest extends TestCase
         $this->assertStringContainsString(route('strava.redirect'), $html);
         $this->assertStringContainsString('Reconnect Strava', $html);
         $this->assertStringContainsString('<table class="hm"', $html);
+
+        // The chip is aria-hidden but not display:none once a banner is on the
+        // page, so its dot colour must still agree with the warning state.
+        $this->assertStringContainsString('sync-dot--warn', $html);
+        $this->assertStringNotContainsString('sync-dot--ok', $html);
     }
 
     public function test_a_success_older_than_48_hours_renders_the_stale_warning_naming_the_data_date_and_the_grid_still_renders(): void

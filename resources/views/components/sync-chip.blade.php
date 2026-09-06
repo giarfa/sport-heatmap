@@ -6,6 +6,6 @@
     reader is never told the same fact twice.
 --}}
 <span class="sync-chip" @if ($status->chipIsRedundant()) aria-hidden="true" @endif>
-    <span aria-hidden="true" class="sync-dot sync-dot--ok"></span>
+    <span aria-hidden="true" class="sync-dot sync-dot--{{ $status->chipDotModifier() }}"></span>
     {{ $status->chipLabel() }}
 </span>
