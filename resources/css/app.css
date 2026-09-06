@@ -9,11 +9,13 @@
 }
 
 /* ---- Design tokens ---------------------------------------------------------
-   Surface, ink and accent, plus the heatmap's level-0 (rest), provisional
-   "ran" fill and future-day border. The four-step intensity ramp above level 0
-   belongs to US-005 and is validated against these exact card surfaces — do
-   not add --lv-1..--lv-4 here ahead of that spec; --lv-run is a placeholder
-   single fill until the ramp lands.
+   Surface, ink, accent, and the five-step intensity ramp (level 0 rest,
+   levels 1-4 heat) plus the future-day border. Hexes are transcribed verbatim
+   from .larapilot/mockups/heatmap-dashboard/README.md — "The intensity
+   ramp" — the palette validator that produced them is not committed to this
+   repository, so that table is the sole contract. The dark ramp below is a
+   separately selected set of steps for the slate-900 card surface, not a
+   programmatic inversion of the light values.
 
    Indigo is the accent for focus rings and links only, never a data colour. */
 :root {
@@ -27,7 +29,10 @@
     --warn-border: #fcd34d; /* amber-300 */
     --warn-ink: #92400e; /* amber-800 */
     --lv-0: #e2e8f0;
-    --lv-run: #3987e5;
+    --lv-1: #86b6ef;
+    --lv-2: #3987e5;
+    --lv-3: #256abf;
+    --lv-4: #104281;
     --lv-future-border: #cbd5e1;
     --cell-ring: rgba(15, 23, 42, 0.08);
 }
@@ -49,7 +54,10 @@ html.dark {
     --warn-border: #854d0e;
     --warn-ink: #fcd34d;
     --lv-0: #1e293b;
-    --lv-run: #2a78d6;
+    --lv-1: #184f95;
+    --lv-2: #2a78d6;
+    --lv-3: #5598e7;
+    --lv-4: #9ec5f4;
     --lv-future-border: #334155;
     --cell-ring: rgba(248, 250, 252, 0.1);
 }
@@ -66,7 +74,10 @@ html.dark {
         --warn-border: #854d0e;
         --warn-ink: #fcd34d;
         --lv-0: #1e293b;
-        --lv-run: #2a78d6;
+        --lv-1: #184f95;
+        --lv-2: #2a78d6;
+        --lv-3: #5598e7;
+        --lv-4: #9ec5f4;
         --lv-future-border: #334155;
         --cell-ring: rgba(248, 250, 252, 0.1);
     }
@@ -174,14 +185,26 @@ body {
     box-shadow: inset 0 0 0 1px var(--cell-ring);
 }
 
-/* Rest, ran and future are the only three treatments this spec renders — the
-   graded intensity ramp (--lv-1..--lv-4) arrives with US-005. */
+/* Rest is level 0, l1-l4 are the graded intensity ramp, and future is a third
+   treatment that is neither a heat level nor a completed rest day. */
 .hm-cell--rest {
     background: var(--lv-0);
 }
 
-.hm-cell--ran {
-    background: var(--lv-run);
+.hm-cell--l1 {
+    background: var(--lv-1);
+}
+
+.hm-cell--l2 {
+    background: var(--lv-2);
+}
+
+.hm-cell--l3 {
+    background: var(--lv-3);
+}
+
+.hm-cell--l4 {
+    background: var(--lv-4);
 }
 
 .hm-cell--future {
@@ -223,6 +246,50 @@ body {
     font-weight: 600;
 }
 
+.hm-legend-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.hm-legend-note {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+}
+
+.hm-legend-list {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1rem;
+}
+
+.hm-key {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.6875rem;
+    color: var(--ink-muted);
+}
+
+.hm-key-swatch {
+    width: 0.75rem;
+    height: 0.75rem;
+    aspect-ratio: auto; /* .hm-cell sets 1/1; without this override the swatches inflate. */
+    border-radius: 0.1875rem;
+    flex: none;
+}
+
+.hm-key-name {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.hm-key-range {
+    font-variant-numeric: tabular-nums;
+}
+
 @media (min-width: 480px) {
     .hm-th-week {
         font-size: 0.6875rem;
@@ -243,6 +310,10 @@ body {
 
     .hm-cell {
         border-radius: 0.25rem;
+    }
+
+    .hm-key {
+        font-size: 0.75rem;
     }
 }
 

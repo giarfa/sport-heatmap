@@ -40,7 +40,7 @@ class WeekRowTest extends TestCase
         $weekStart = CarbonImmutable::parse('2026-05-18');
 
         return array_map(
-            static fn (int $offset): DayCell => new DayCell($weekStart->addDays($offset), 0, DayCellState::Rest),
+            static fn (int $offset): DayCell => new DayCell($weekStart->addDays($offset), 0, DayCellState::Rest, 0),
             range(0, 6),
         );
     }

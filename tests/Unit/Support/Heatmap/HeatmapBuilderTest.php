@@ -3,6 +3,7 @@
 namespace Tests\Unit\Support\Heatmap;
 
 use App\Enums\DayCellState;
+use App\Support\Heatmap\CalibrateIntensityScale;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapWindow;
 use Carbon\CarbonImmutable;
@@ -10,12 +11,17 @@ use Tests\TestCase;
 
 class HeatmapBuilderTest extends TestCase
 {
+    private function builder(): HeatmapBuilder
+    {
+        return new HeatmapBuilder(new CalibrateIntensityScale);
+    }
+
     public function test_the_grid_has_16_rows_of_7_cells_oldest_week_first(): void
     {
         $today = CarbonImmutable::parse('2026-09-05'); // Saturday
         $window = HeatmapWindow::current($today);
 
-        $grid = (new HeatmapBuilder)($window, [], $today);
+        $grid = $this->builder()($window, [], $today);
 
         $this->assertCount(16, $grid->weeks);
 
@@ -32,7 +38,7 @@ class HeatmapBuilderTest extends TestCase
         $today = CarbonImmutable::parse('2026-09-05');
         $window = HeatmapWindow::current($today);
 
-        $grid = (new HeatmapBuilder)($window, [], $today);
+        $grid = $this->builder()($window, [], $today);
 
         foreach ($grid->weeks as $week) {
             foreach ($week->days as $position => $day) {
@@ -46,7 +52,7 @@ class HeatmapBuilderTest extends TestCase
         $today = CarbonImmutable::parse('2026-09-05'); // Saturday
         $window = HeatmapWindow::current($today);
 
-        $grid = (new HeatmapBuilder)($window, [], $today);
+        $grid = $this->builder()($window, [], $today);
         $currentWeek = $grid->weeks[15];
 
         $this->assertSame(DayCellState::Future, $currentWeek->days[6]->state); // Sunday, tomorrow
@@ -57,7 +63,7 @@ class HeatmapBuilderTest extends TestCase
         $today = CarbonImmutable::parse('2026-09-05');
         $window = HeatmapWindow::current($today);
 
-        $grid = (new HeatmapBuilder)($window, [], $today);
+        $grid = $this->builder()($window, [], $today);
         $currentWeek = $grid->weeks[15];
 
         $this->assertSame(DayCellState::Rest, $currentWeek->days[0]->state); // Monday, elapsed
@@ -72,7 +78,7 @@ class HeatmapBuilderTest extends TestCase
             $today->toDateString() => 8_200,
         ];
 
-        $grid = (new HeatmapBuilder)($window, $dailyMeters, $today);
+        $grid = $this->builder()($window, $dailyMeters, $today);
         $currentWeek = $grid->weeks[15];
 
         $this->assertTrue($currentWeek->isPartial);
@@ -85,7 +91,7 @@ class HeatmapBuilderTest extends TestCase
         $today = CarbonImmutable::parse('2026-09-05');
         $window = HeatmapWindow::current($today);
 
-        $grid = (new HeatmapBuilder)($window, [], $today);
+        $grid = $this->builder()($window, [], $today);
         $completedWeek = $grid->weeks[0];
 
         $this->assertFalse($completedWeek->isPartial);
@@ -100,7 +106,7 @@ class HeatmapBuilderTest extends TestCase
             $today->toDateString() => 5_000 + 3_200,
         ];
 
-        $grid = (new HeatmapBuilder)($window, $dailyMeters, $today);
+        $grid = $this->builder()($window, $dailyMeters, $today);
         $currentWeek = $grid->weeks[15];
 
         $this->assertSame(DayCellState::Ran, $currentWeek->days[5]->state); // Saturday
@@ -113,7 +119,7 @@ class HeatmapBuilderTest extends TestCase
         $endsOn = $startsOn->addDays(111);
         $window = new HeatmapWindow($startsOn, $endsOn);
 
-        $grid = (new HeatmapBuilder)($window, [], $endsOn);
+        $grid = $this->builder()($window, [], $endsOn);
 
         foreach ($grid->weeks as $week) {
             foreach ($week->days as $position => $day) {
@@ -129,7 +135,7 @@ class HeatmapBuilderTest extends TestCase
         $window = new HeatmapWindow($startsOn, $endsOn);
         $today = CarbonImmutable::parse('2026-01-15'); // January $today
 
-        $grid = (new HeatmapBuilder)($window, [], $today);
+        $grid = $this->builder()($window, [], $today);
 
         foreach ($grid->weeks as $week) {
             foreach ($week->days as $position => $day) {
@@ -138,12 +144,42 @@ class HeatmapBuilderTest extends TestCase
         }
     }
 
+    public function test_ran_cells_carry_the_level_the_grids_own_scale_assigns(): void
+    {
+        $today = CarbonImmutable::parse('2026-09-05');
+        $window = HeatmapWindow::current($today);
+        $dailyMeters = [
+            $today->toDateString() => 8_200,
+        ];
+
+        $grid = $this->builder()($window, $dailyMeters, $today);
+        $currentWeek = $grid->weeks[15];
+        $ranDay = $currentWeek->days[5]; // Saturday, the only ran day
+
+        $this->assertSame(DayCellState::Ran, $ranDay->state);
+        $this->assertSame($grid->scale->levelFor(8_200), $ranDay->level);
+    }
+
+    public function test_future_cells_never_carry_a_heat_level(): void
+    {
+        $today = CarbonImmutable::parse('2026-09-05'); // Saturday
+        $window = HeatmapWindow::current($today);
+
+        $grid = $this->builder()($window, [], $today);
+        $currentWeek = $grid->weeks[15];
+        $futureDay = $currentWeek->days[6]; // Sunday, tomorrow
+
+        $this->assertSame(DayCellState::Future, $futureDay->state);
+        $this->assertSame(0, $futureDay->level);
+        $this->assertSame('future', $futureDay->modifier());
+    }
+
     public function test_a_window_with_no_runs_at_all_yields_112_rest_or_future_cells_and_16_zero_totals(): void
     {
         $today = CarbonImmutable::parse('2026-09-05');
         $window = HeatmapWindow::current($today);
 
-        $grid = (new HeatmapBuilder)($window, [], $today);
+        $grid = $this->builder()($window, [], $today);
 
         $cellCount = 0;
 

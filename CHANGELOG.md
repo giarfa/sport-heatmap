@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A self-calibrating, five-level intensity scale for the heatmap: levels 1–4 are the 25th, 50th
+  and 75th percentiles of the window's own non-zero daily distances (R-7 linear interpolation),
+  recomputed on every request that misses the grid cache. An always-visible legend states the
+  exact kilometre range of every level. Windows with fewer than four non-zero days, or whose
+  percentiles collapse, fall back to the documented fixed bands (`0 / ≤ 5 / ≤ 10 / ≤ 20 / 20+ km`)
+  instead (US-005).
 - The 16-week heatmap dashboard: 112 daily cells laid out as 16 week-rows by 7 weekday-columns,
   Monday first, each row closed by its week total in kilometres; the current week's total is
   partial and future days in it render with a dashed, out-of-range treatment (US-004).
