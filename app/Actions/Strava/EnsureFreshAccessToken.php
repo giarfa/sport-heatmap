@@ -32,11 +32,14 @@ class EnsureFreshAccessToken
     public function __construct(private readonly StravaOAuth $stravaOAuth) {}
 
     /**
+     * The `?string $rejectedToken` argument is the seam US-003's client uses to
+     * force a refresh after a mid-sync 401: the token Strava just rejected.
+     *
      * @throws StravaReconnectRequiredException
      */
-    public function __invoke(User $user): string
+    public function __invoke(User $user, ?string $rejectedToken = null): string
     {
-        if (! $this->needsRefresh($user)) {
+        if (! $this->mustRefresh($user, $rejectedToken)) {
             return (string) $this->readToken($user, 'strava_access_token');
         }
 
@@ -61,7 +64,7 @@ class EnsureFreshAccessToken
         try {
             $user->refresh();
 
-            if (! $this->needsRefresh($user)) {
+            if (! $this->mustRefresh($user, $rejectedToken)) {
                 return (string) $this->readToken($user, 'strava_access_token');
             }
 
@@ -69,6 +72,26 @@ class EnsureFreshAccessToken
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * Whether the stored token needs refreshing before this caller can use it.
+     *
+     * Takes the rejected token rather than a `bool $force`: a plain force flag
+     * would re-refresh unconditionally after the lock and retire the refresh
+     * token the winner of a concurrent race just stored — the exact failure this
+     * Action exists to prevent. Comparing against the rejected value instead
+     * means a caller whose token was already rotated by another process finds a
+     * token different from the one it was rejected with, and returns it without
+     * refreshing a second time.
+     */
+    private function mustRefresh(User $user, ?string $rejectedToken): bool
+    {
+        if ($this->needsRefresh($user)) {
+            return true;
+        }
+
+        return $rejectedToken !== null && $rejectedToken === (string) $this->readToken($user, 'strava_access_token');
     }
 
     /**
