@@ -105,7 +105,13 @@ class StravaClient
                 ->timeout(15)
                 ->retry(
                     (int) config('strava.retry_attempts'),
-                    config('strava.retry_backoff_ms'),
+                    /*
+                     * $times above is the attempt count; the backoff array is
+                     * applied here, indexed by attempt, because PendingRequest::
+                     * retry() only accepts an array as its *first* argument (the
+                     * attempt count itself) — not as the sleep argument.
+                     */
+                    fn (int $attempt): int => (int) (self::retryBackoffMilliseconds()[$attempt - 1] ?? 0),
                     function (Throwable $exception, PendingRequest $request) use ($user, &$currentToken, &$refreshedOnce): bool {
                         if ($exception instanceof ConnectionException) {
                             return true;
@@ -146,5 +152,16 @@ class StravaClient
         } catch (ConnectionException $exception) {
             throw StravaApiException::unreachable($exception);
         }
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private static function retryBackoffMilliseconds(): array
+    {
+        /** @var array<int, int> $backoff */
+        $backoff = config('strava.retry_backoff_ms');
+
+        return $backoff;
     }
 }
