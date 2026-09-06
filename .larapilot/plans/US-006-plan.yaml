@@ -466,21 +466,27 @@ tasks:
       5. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`.
 
       ## Completion Criteria
-      - [ ] One test per acceptance criterion, all passing
-      - [ ] Warning-plus-grid asserted as a conjunction in both stale and failed cases
-      - [ ] Runs-in-window count proven to ignore activities outside the window
-      - [ ] Full suite and `php artisan larapilot:quality` green
+      - [x] One test per acceptance criterion, all passing
+      - [x] Warning-plus-grid asserted as a conjunction in both stale and failed cases
+      - [x] Runs-in-window count proven to ignore activities outside the window
+      - [x] Full suite and `php artisan larapilot:quality` green
 
       ## Git Deliverables
       - Commit: `test(US-006): TASK-06 cover the rendered sync status and empty states`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-05
+    commit:
+      sha: 3f8a600949485893c2679deaf04908d237f56e30
+      short_sha: 3f8a600
+      subject: 'test(US-006): TASK-06 cover the rendered sync status and empty states'
+      committed_at: '2026-09-06T22:30:14+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3f8a600949485893c2679deaf04908d237f56e30'
   -
     id: TASK-07
     title: 'Document the sync states, the threshold and the manual checklist'
@@ -517,4 +523,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-05
-updated_at: '2026-09-06T20:28:52+00:00'
+updated_at: '2026-09-06T20:30:15+00:00'

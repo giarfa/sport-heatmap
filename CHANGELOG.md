@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A sync-status indicator on the dashboard: a relative "synced {time}" chip when healthy, an
+  explicit warning naming the reason and offering **Reconnect Strava** when the last sync failed
+  or no sync has succeeded in over 48 hours, and a loading skeleton — in the grid's exact
+  geometry — while a first sync is in flight. A connected account with no runs in the window
+  renders the empty grid with an explanatory line rather than a blank page. Stale data is never
+  presented as current: the grid still renders what it has, under the warning (US-006).
 - A self-calibrating, five-level intensity scale for the heatmap: levels 1–4 are the 25th, 50th
   and 75th percentiles of the window's own non-zero daily distances (R-7 linear interpolation),
   recomputed on every request that misses the grid cache. An always-visible legend states the
