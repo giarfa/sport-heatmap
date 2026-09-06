@@ -187,10 +187,10 @@ tasks:
       6. Anchor commit: `chore(US-005): TASK-00 bootstrap feature branch`
 
       ## Completion Criteria
-      - [ ] `develop` contains the US-004 commits via a `--no-ff` merge
-      - [ ] Full suite and quality gate green on `develop` before branching
-      - [ ] Branch `feature/US-005-intensity-scale` exists locally, off the merged `develop`
-      - [ ] PR title/body drafted locally; nothing pushed
+      - [x] `develop` contains the US-004 commits via a `--no-ff` merge
+      - [x] Full suite and quality gate green on `develop` before branching
+      - [x] Branch `feature/US-005-intensity-scale` exists locally, off the merged `develop`
+      - [x] PR title/body drafted locally; nothing pushed
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -200,10 +200,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally — open remotely only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
+    commit:
+      sha: 1705911f87f617ed14c384b796ba113ce89b6c3f
+      short_sha: '1705911'
+      subject: 'chore(US-005): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-06T18:20:05+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1705911f87f617ed14c384b796ba113ce89b6c3f'
   -
     id: TASK-01
     title: 'Compute the intensity scale: percentiles, sparse and degenerate fallbacks'
@@ -501,4 +507,4 @@ tasks:
     estimate_hours: 1.5
     dependencies:
       - TASK-06
-updated_at: '2026-09-06T16:17:10+00:00'
+updated_at: '2026-09-06T16:20:06+00:00'
