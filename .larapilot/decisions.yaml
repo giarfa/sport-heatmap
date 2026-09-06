@@ -1,0 +1,41 @@
+decisions:
+  -
+    id: 97c7b8fc0416492d
+    ts: '2026-09-06T15:30:07+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-review
+    topic: 'us-003 review verdict'
+    label: 'US-003 review verdict'
+    value: 'Approved to DONE with no rework; 3 residual risks noted (per-athlete vs per-run transaction scope, no Running-row reaper, US-004 cache-invalidation seam)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-003
+    supersedes: null
+  -
+    id: 798ab56fe60ea43c
+    ts: '2026-09-06T15:34:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'heatmap weekday column headers'
+    label: 'heatmap weekday column headers'
+    value: 'Two-letter abbreviations (Mo-Su) inside <abbr title>, per the mockup, not the single letters the PRD FR-009 prose mentions'
+    question: null
+    rationale: null
+    source: chat
+    spec: US-004
+    supersedes: null
+  -
+    id: 4a7f0fb3e9bb61ac
+    ts: '2026-09-06T15:34:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'heatmap grid caching'
+    label: 'heatmap grid caching'
+    value: 'Cache the assembled HeatmapGrid keyed on athlete + window start + today, forgotten on sync success; the calendar day must be in the key or a cached grid outlives the midnight rollover and renders stale future cells'
+    question: null
+    rationale: null
+    source: chat
+    spec: US-004
+    supersedes: null
+updated_at: '2026-09-06T15:34:42+00:00'

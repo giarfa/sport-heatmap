@@ -98,8 +98,8 @@ tasks:
       4. Anchor the branch: `git commit --allow-empty -m 'chore(US-003): TASK-00 bootstrap feature branch'`
 
       ## Completion Criteria
-      - [ ] Branch `feature/US-003-strava-daily-sync` exists locally, based on current `develop`
-      - [ ] Internal PR title/body drafted locally toward `develop` (nothing pushed)
+      - [x] Branch `feature/US-003-strava-daily-sync` exists locally, based on current `develop`
+      - [x] Internal PR title/body drafted locally toward `develop` (nothing pushed)
 
       ## Test Data
       - N/A — no application files touched
@@ -109,10 +109,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepared locally — open remotely only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
+    commit:
+      sha: 8568b23b5e6f19702c0a59f09d2e72b3a1082f00
+      short_sha: 8568b23
+      subject: 'chore(US-003): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-06T11:07:45+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/8568b23b5e6f19702c0a59f09d2e72b3a1082f00'
   -
     id: TASK-01
     title: 'Define the 112-day window and the Strava API client configuration'
@@ -142,10 +148,10 @@ tasks:
       4. `php artisan larapilot:quality`
 
       ## Completion Criteria
-      - [ ] `HeatmapWindow::current()` returns a Monday start and a Sunday end spanning exactly 112 days
-      - [ ] `window_weeks`, the API base URL and the page size are literals — no new `env()` keys, so `.env.example` is unchanged
-      - [ ] `contains()` is inclusive at both ends and ignores time of day
-      - [ ] Pint and Larastan level 5 pass
+      - [x] `HeatmapWindow::current()` returns a Monday start and a Sunday end spanning exactly 112 days
+      - [x] `window_weeks`, the API base URL and the page size are literals — no new `env()` keys, so `.env.example` is unchanged
+      - [x] `contains()` is inclusive at both ends and ignores time of day
+      - [x] Pint and Larastan level 5 pass
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -155,11 +161,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 1.5
     dependencies:
       - TASK-00
+    commit:
+      sha: c3c36a3fba56b59b046149bb81d9d6236d61f768
+      short_sha: c3c36a3
+      subject: 'feat(US-003): TASK-01 add the heatmap window and Strava API configuration'
+      committed_at: '2026-09-06T11:08:33+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c3c36a3fba56b59b046149bb81d9d6236d61f768'
   -
     id: TASK-02
     title: 'Add the StravaActivity DTO with run-only filtering at the boundary'
@@ -184,10 +196,10 @@ tasks:
       5. `@param array<string, mixed> $payload` docblocks throughout; `php artisan larapilot:quality`
 
       ## Completion Criteria
-      - [ ] Non-running sport types return `null` and can never reach persistence
-      - [ ] Distances are integer metres; `activity_date` is derived from the raw local date string with no timezone conversion
-      - [ ] A malformed or identity-less payload returns `null` instead of throwing — one bad row must not fail the whole run
-      - [ ] Pint and Larastan level 5 pass
+      - [x] Non-running sport types return `null` and can never reach persistence
+      - [x] Distances are integer metres; `activity_date` is derived from the raw local date string with no timezone conversion
+      - [x] A malformed or identity-less payload returns `null` instead of throwing — one bad row must not fail the whole run
+      - [x] Pint and Larastan level 5 pass
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -197,11 +209,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 1.5
     dependencies:
       - TASK-00
+    commit:
+      sha: dbac33791dee55e72d429bbc959097ccb6876743
+      short_sha: dbac337
+      subject: 'feat(US-003): TASK-02 add the StravaActivity DTO with run-only filtering'
+      committed_at: '2026-09-06T11:09:16+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/dbac33791dee55e72d429bbc959097ccb6876743'
   -
     id: TASK-03
     title: 'Add StravaClient with pagination, backoff and mid-sync token refresh'
@@ -236,12 +254,12 @@ tasks:
       5. `php artisan larapilot:quality`
 
       ## Completion Criteria
-      - [ ] One `after`-filtered pass paginates at `per_page=200` and stops on the first short page
-      - [ ] `429` and `5xx` are retried with the configured backoff; an exhausted retry raises `StravaApiException` carrying the status and the rate-limit headers
-      - [ ] A `401` mid-sync refreshes the token and re-sends the same page once; a second `401` after a fresh token fails instead of looping
-      - [ ] No token value, response body, or request URL appears in any exception message or log line
-      - [ ] The existing `EnsureFreshAccessToken` tests still pass unchanged — the new argument is optional and the lock semantics are untouched
-      - [ ] Pint and Larastan level 5 pass
+      - [x] One `after`-filtered pass paginates at `per_page=200` and stops on the first short page
+      - [x] `429` and `5xx` are retried with the configured backoff; an exhausted retry raises `StravaApiException` carrying the status and the rate-limit headers
+      - [x] A `401` mid-sync refreshes the token and re-sends the same page once; a second `401` after a fresh token fails instead of looping
+      - [x] No token value, response body, or request URL appears in any exception message or log line
+      - [x] The existing `EnsureFreshAccessToken` tests still pass unchanged — the new argument is optional and the lock semantics are untouched
+      - [x] Pint and Larastan level 5 pass
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -251,12 +269,18 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-01
       - TASK-02
+    commit:
+      sha: c807c91b4a637b4daacaeb90f908e17f0aee7e86
+      short_sha: c807c91
+      subject: 'feat(US-003): TASK-03 add StravaClient with pagination, backoff and mid-sync refresh'
+      committed_at: '2026-09-06T11:11:03+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c807c91b4a637b4daacaeb90f908e17f0aee7e86'
   -
     id: TASK-04
     title: 'Cover the Strava client: pagination, backoff, refresh mid-sync and filtering'
@@ -286,21 +310,27 @@ tasks:
       6. `php artisan test --compact tests/Feature/Strava/StravaClientTest.php tests/Unit/Data/StravaActivityTest.php`
 
       ## Completion Criteria
-      - [ ] Pagination, `429` backoff, `5xx` exhaustion, `401` refresh-and-retry, and sport/window filtering are all covered
-      - [ ] No test reaches the network — `preventStrayRequests()` is set in `setUp()`
-      - [ ] The suite adds no measurable wall-clock time from backoff sleeps
-      - [ ] `php artisan test` is green
+      - [x] Pagination, `429` backoff, `5xx` exhaustion, `401` refresh-and-retry, and sport/window filtering are all covered
+      - [x] No test reaches the network — `preventStrayRequests()` is set in `setUp()`
+      - [x] The suite adds no measurable wall-clock time from backoff sleeps
+      - [x] `php artisan test` is green
 
       ## Git Deliverables
       - Commit: `test(US-003): TASK-04 cover the Strava client and activity DTO`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2.5
     dependencies:
       - TASK-03
+    commit:
+      sha: 7114d8c5a97e816b0e167eece6749ce6fcf484c5
+      short_sha: 7114d8c
+      subject: 'test(US-003): TASK-04 cover the Strava client and activity DTO'
+      committed_at: '2026-09-06T11:14:41+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/7114d8c5a97e816b0e167eece6749ce6fcf484c5'
   -
     id: TASK-05
     title: 'Add ReconcileStravaWindow: transactional upsert and delete-on-absence'
@@ -324,12 +354,12 @@ tasks:
       5. `php artisan larapilot:quality`
 
       ## Completion Criteria
-      - [ ] Upsert keys on `strava_activity_id` and propagates changed distance, name and sport type
-      - [ ] Local activities inside the window absent from the fetch are deleted; activities outside the window are untouched
-      - [ ] The upserted count reflects real changes only, so a second identical run reports `0 / 0`
-      - [ ] All writes happen in one transaction — a throw mid-apply leaves the window exactly as it was
-      - [ ] `user_id` is never mass-assigned; writes go through the `activities()` relation
-      - [ ] Pint and Larastan level 5 pass
+      - [x] Upsert keys on `strava_activity_id` and propagates changed distance, name and sport type
+      - [x] Local activities inside the window absent from the fetch are deleted; activities outside the window are untouched
+      - [x] The upserted count reflects real changes only, so a second identical run reports `0 / 0`
+      - [x] All writes happen in one transaction — a throw mid-apply leaves the window exactly as it was
+      - [x] `user_id` is never mass-assigned; writes go through the `activities()` relation
+      - [x] Pint and Larastan level 5 pass
 
       ## Test Data
       - N/A — no schema change. The existing `ActivityFactory` (`onDate()`, `trailRun()`, `virtualRun()`) covers every fixture TASK-06 needs; no factory or seeder edit is required.
@@ -339,12 +369,18 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2.5
     dependencies:
       - TASK-01
       - TASK-02
+    commit:
+      sha: 9d367804d7181634921648542188e9c882408bd3
+      short_sha: 9d36780
+      subject: 'feat(US-003): TASK-05 add the transactional window reconciliation'
+      committed_at: '2026-09-06T11:15:13+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9d367804d7181634921648542188e9c882408bd3'
   -
     id: TASK-06
     title: 'Cover reconciliation: upsert, delete-on-absence, filtering and idempotency'
@@ -371,21 +407,27 @@ tasks:
       4. `php artisan test --compact tests/Feature/Strava/ReconcileStravaWindowTest.php`
 
       ## Completion Criteria
-      - [ ] Upsert, delete-on-absence, window boundaries and cross-athlete isolation are covered
-      - [ ] Idempotency is asserted on `updated_at`, not only on row counts
-      - [ ] The rollback case proves no half-applied window
-      - [ ] `php artisan test` is green
+      - [x] Upsert, delete-on-absence, window boundaries and cross-athlete isolation are covered
+      - [x] Idempotency is asserted on `updated_at`, not only on row counts
+      - [x] The rollback case proves no half-applied window
+      - [x] `php artisan test` is green
 
       ## Git Deliverables
       - Commit: `test(US-003): TASK-06 cover window reconciliation and idempotency`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2.5
     dependencies:
       - TASK-05
+    commit:
+      sha: 6f2ae551bbd08e49e7f87523458faace83f09577
+      short_sha: 6f2ae55
+      subject: 'test(US-003): TASK-06 cover window reconciliation and idempotency'
+      committed_at: '2026-09-06T11:16:06+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6f2ae551bbd08e49e7f87523458faace83f09577'
   -
     id: TASK-07
     title: 'Add the strava:sync command, its sync_runs lifecycle and the daily schedule'
@@ -412,13 +454,13 @@ tasks:
       10. `php artisan schedule:list` to confirm the registration, then `php artisan larapilot:quality`
 
       ## Completion Criteria
-      - [ ] `php artisan strava:sync` reconciles the 112-day window and prints a summary
-      - [ ] `php artisan schedule:list` shows the command daily at the configured hour in the configured timezone
-      - [ ] Every attempt writes exactly one `sync_runs` row: running → succeeded or failed, with counts and an error message
-      - [ ] A failure exits non-zero and leaves the window untouched
-      - [ ] An athlete removed from the allowlist is not synced
-      - [ ] No token value reaches `sync_runs.error_message` or the log
-      - [ ] Pint and Larastan level 5 pass
+      - [x] `php artisan strava:sync` reconciles the 112-day window and prints a summary
+      - [x] `php artisan schedule:list` shows the command daily at the configured hour in the configured timezone
+      - [x] Every attempt writes exactly one `sync_runs` row: running → succeeded or failed, with counts and an error message
+      - [x] A failure exits non-zero and leaves the window untouched
+      - [x] An athlete removed from the allowlist is not synced
+      - [x] No token value reaches `sync_runs.error_message` or the log
+      - [x] Pint and Larastan level 5 pass
 
       ## Test Data
       - N/A — no schema change. `SyncRunFactory` already provides the `running()`, `failed()` and `stale()` states TASK-08 needs.
@@ -428,12 +470,18 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-03
       - TASK-05
+    commit:
+      sha: 794f86094693ed97821a0a9c47fb2074cae0d5ed
+      short_sha: 794f860
+      subject: 'feat(US-003): TASK-07 add the daily strava:sync command and its schedule'
+      committed_at: '2026-09-06T11:17:15+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/794f86094693ed97821a0a9c47fb2074cae0d5ed'
   -
     id: TASK-08
     title: 'Cover the sync command end to end and its schedule registration'
@@ -460,22 +508,28 @@ tasks:
       4. `php artisan test --compact tests/Feature/Strava/SyncStravaActivitiesCommandTest.php tests/Feature/Console/ScheduleTest.php`, then the full `php artisan test`
 
       ## Completion Criteria
-      - [ ] The spec's demonstration is covered: populate, re-run unchanged, upstream edit, upstream delete
-      - [ ] Failure covered: non-zero exit, failed `sync_runs` row, untouched activities table
-      - [ ] The schedule is asserted for both the command and the configured hour/timezone
-      - [ ] No test reaches the network
-      - [ ] Full `php artisan test` is green
+      - [x] The spec's demonstration is covered: populate, re-run unchanged, upstream edit, upstream delete
+      - [x] Failure covered: non-zero exit, failed `sync_runs` row, untouched activities table
+      - [x] The schedule is asserted for both the command and the configured hour/timezone
+      - [x] No test reaches the network
+      - [x] Full `php artisan test` is green
 
       ## Git Deliverables
       - Commit: `test(US-003): TASK-08 cover the sync command and its schedule`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-07
+    commit:
+      sha: 32eb893e4580e58ca5b79b90b020a3ffa75c168f
+      short_sha: 32eb893
+      subject: 'test(US-003): TASK-08 cover the sync command and its schedule'
+      committed_at: '2026-09-06T11:24:02+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/32eb893e4580e58ca5b79b90b020a3ffa75c168f'
   -
     id: TASK-09
     title: 'Update the README sync section and the changelog'
@@ -496,24 +550,30 @@ tasks:
       6. `php artisan larapilot:quality` and the full `php artisan test`
 
       ## Completion Criteria
-      - [ ] README describes the shipped command, the schedule, and how to verify it
-      - [ ] The rate-limit note is present and hardcodes no number
-      - [ ] CHANGELOG `Unreleased` records the user-visible change
-      - [ ] `migrate:fresh --seed` succeeds and the seeded 16-week block still falls inside `HeatmapWindow::current()`
-      - [ ] Quality gate and full test suite pass
+      - [x] README describes the shipped command, the schedule, and how to verify it
+      - [x] The rate-limit note is present and hardcodes no number
+      - [x] CHANGELOG `Unreleased` records the user-visible change
+      - [x] `migrate:fresh --seed` succeeds and the seeded 16-week block still falls inside `HeatmapWindow::current()`
+      - [x] Quality gate and full test suite pass
 
       ## Test Data
-      - [ ] No factory or seeder change required — verified by re-running `migrate:fresh --seed`
-      - [ ] Seeded block confirmed to sit inside the window `HeatmapWindow` computes
+      - [x] No factory or seeder change required — verified by re-running `migrate:fresh --seed`
+      - [x] Seeded block confirmed to sit inside the window `HeatmapWindow` computes
 
       ## Git Deliverables
       - Commit: `docs(US-003): TASK-09 document the daily sync and update the changelog`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalise the local PR description before handing off to review
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 1
     dependencies:
       - TASK-07
-updated_at: '2026-09-06T08:19:58+00:00'
+    commit:
+      sha: 3cfdca981e23250e16c6a2f206edb92685d454b2
+      short_sha: 3cfdca9
+      subject: 'docs(US-003): TASK-09 document the daily sync and update the changelog'
+      committed_at: '2026-09-06T11:25:05+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3cfdca981e23250e16c6a2f206edb92685d454b2'
+updated_at: '2026-09-06T09:25:05+00:00'

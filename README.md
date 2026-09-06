@@ -157,12 +157,16 @@ without ever connecting to Strava.
 
 ## Running the sync
 
-The sync pulls your recent Strava activities and upserts them into `activities`. It records
-every attempt in `sync_runs`, which is what the dashboard's sync-status indicator reads.
-
-> **The sync command is not implemented yet** — it lands in a later spec. The Strava OAuth
-> connection it depends on is in place. This section documents how the sync will be operated, so
-> the scheduling setup can be done once and left alone.
+Every run reconciles the full 112-day window: it requests activities with `after` set to the
+start of the window and paginates at Strava's maximum page size until a page comes back short.
+Only running sport types (`Run`, `TrailRun`, `VirtualRun`) are stored; everything else is
+discarded. Activities are upserted on their Strava activity id, so an edit made on Strava
+(distance, name, sport type) propagates on the next run, and a local activity inside the window
+that Strava no longer returns is deleted — so the map always matches Strava, in both directions.
+The command is idempotent: running it twice in a row leaves the database byte-identical. Every
+attempt — success or failure — writes exactly one row to `sync_runs` (start, finish, status,
+upserted/deleted counts, and the error on failure), which is what the dashboard's sync-status
+indicator reads.
 
 Run it manually:
 
@@ -170,16 +174,24 @@ Run it manually:
 php artisan strava:sync
 ```
 
-Run it on a schedule. Once the sync command lands it will register itself to run daily at
-`STRAVA_SYNC_HOUR` in `STRAVA_SYNC_TIMEZONE`; the host only ever needs Laravel's one-minute
-scheduler tick, so this cron entry can be installed now and never touched again:
+Run it on a schedule. It registers itself to run daily at `STRAVA_SYNC_HOUR` in
+`STRAVA_SYNC_TIMEZONE`; the host only ever needs Laravel's one-minute scheduler tick:
 
 ```cron
 * * * * * cd /path/to/sport-heatmap && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-`php artisan schedule:list` shows what is currently registered — today it reports no scheduled
-tasks, because the sync command does not exist yet.
+`php artisan schedule:list` shows the registration and its next run time.
+
+### Rate limits
+
+One run costs one or two Strava API requests, well inside any allowance Strava currently issues —
+the application hardcodes no quota, since Strava has changed the default allowance for newer
+applications. Confirm the allowance issued to this application in the Strava developer dashboard
+before relying on it in production. A `429` response is retried with backoff (the retry
+count and delays are literals in `config/strava.php`); an exhausted retry records the observed
+`X-RateLimit-Usage` response header in `sync_runs.error_message`, which is where to look if the
+daily sync starts failing.
 
 ## Tests and quality
 
