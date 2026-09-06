@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Heatmap\DailyRunningDistance;
+use App\Support\Heatmap\HeatmapBuilder;
+use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -14,10 +17,17 @@ class DashboardController extends Controller
      * login page — there is no login page, and a redirect loop is the failure
      * mode this route exists to avoid.
      */
-    public function __invoke(): View
+    public function __invoke(DailyRunningDistance $dailyDistance, HeatmapBuilder $buildGrid): View
     {
-        return Auth::check()
-            ? view('dashboard')
-            : view('strava.connect');
+        if (! Auth::check()) {
+            return view('strava.connect');
+        }
+
+        $athlete = Auth::user();
+        $window = HeatmapWindow::current();
+        $dailyMeters = $dailyDistance($athlete, $window);
+        $grid = $buildGrid($window, $dailyMeters, now());
+
+        return view('dashboard', ['grid' => $grid]);
     }
 }
