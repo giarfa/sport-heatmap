@@ -5,7 +5,7 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 3
-status: TODO
+status: PLANNED
 body: |
   #### US-006: Sync status, stale-data warning and empty states
 
@@ -42,3 +42,8 @@ body: |
   - [ ] Tests: a recent success renders the relative time; a failed last run renders the warning with its
         reason; a success older than 48 hours renders the warning; an account that has never synced renders
         the correct first-run state
+status_history:
+  -
+    status: PLANNED
+    at: '2026-09-06T17:25:00+00:00'
+rework: false
