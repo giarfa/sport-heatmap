@@ -329,7 +329,7 @@ specs:
       title: 'Activity sync'
     priority: HIGH
     points: 3
-    status: PLANNED
+    status: 'IN PROGRESS'
     body: |
       #### US-006: Sync status, stale-data warning and empty states
 
@@ -368,4 +368,5 @@ specs:
             the correct first-run state
     status_history:
       - { status: PLANNED, at: '2026-09-06T17:25:00+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-09-06T20:16:41+00:00' }
     rework: false
