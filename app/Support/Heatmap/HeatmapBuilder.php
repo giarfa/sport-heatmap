@@ -4,6 +4,7 @@ namespace App\Support\Heatmap;
 
 use App\Data\Heatmap\DayCell;
 use App\Data\Heatmap\HeatmapGrid;
+use App\Data\Heatmap\IntensityScale;
 use App\Data\Heatmap\WeekRow;
 use App\Enums\DayCellState;
 use Carbon\CarbonImmutable;
@@ -15,6 +16,10 @@ use Carbon\CarbonInterface;
  */
 final readonly class HeatmapBuilder
 {
+    public function __construct(
+        private CalibrateIntensityScale $calibrate,
+    ) {}
+
     /**
      * @param  array<string, int>  $dailyMeters  keyed by "Y-m-d" => summed distance in metres
      */
@@ -22,18 +27,25 @@ final readonly class HeatmapBuilder
     {
         $today = CarbonImmutable::instance($today)->startOfDay();
 
+        /*
+         * Calibrated once per grid build, never per week or per cell, so the
+         * cells and the legend are bucketed by the same object and cannot
+         * disagree.
+         */
+        $scale = ($this->calibrate)($dailyMeters);
+
         $weeks = [];
         $weekStart = $window->startsOn;
 
         while ($weekStart->lessThanOrEqualTo($window->endsOn)) {
-            $weeks[] = $this->buildWeek($weekStart, $dailyMeters, $today);
+            $weeks[] = $this->buildWeek($weekStart, $dailyMeters, $today, $scale);
             $weekStart = $weekStart->addWeek();
         }
 
-        return new HeatmapGrid($weeks, $window->startsOn, $window->endsOn);
+        return new HeatmapGrid($weeks, $window->startsOn, $window->endsOn, $scale);
     }
 
-    private function buildWeek(CarbonImmutable $weekStart, array $dailyMeters, CarbonImmutable $today): WeekRow
+    private function buildWeek(CarbonImmutable $weekStart, array $dailyMeters, CarbonImmutable $today, IntensityScale $scale): WeekRow
     {
         $days = [];
         $totalMeters = 0;
@@ -48,7 +60,7 @@ final readonly class HeatmapBuilder
              * travelling time.
              */
             if ($date->greaterThan($today)) {
-                $days[] = new DayCell($date, 0, DayCellState::Future);
+                $days[] = new DayCell($date, 0, DayCellState::Future, 0);
                 $isPartial = true;
 
                 continue;
@@ -57,7 +69,7 @@ final readonly class HeatmapBuilder
             $metres = $dailyMeters[$date->toDateString()] ?? 0;
             $state = $metres > 0 ? DayCellState::Ran : DayCellState::Rest;
 
-            $days[] = new DayCell($date, $metres, $state);
+            $days[] = new DayCell($date, $metres, $state, $scale->levelFor($metres));
             $totalMeters += $metres;
         }
 

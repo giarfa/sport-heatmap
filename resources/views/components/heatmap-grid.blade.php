@@ -38,7 +38,7 @@
                 @foreach ($week->days as $day)
                     <td class="hm-td">
                         <span class="sr-only">{{ $day->accessibleName() }}</span>
-                        <span aria-hidden="true" class="hm-cell hm-cell--{{ $day->state->value }}"
+                        <span aria-hidden="true" class="hm-cell hm-cell--{{ $day->modifier() }}"
                             @if ($day->pointerTitle() !== null) title="{{ $day->pointerTitle() }}" @endif></span>
                     </td>
                 @endforeach

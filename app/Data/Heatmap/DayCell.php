@@ -15,7 +15,22 @@ final readonly class DayCell
         public CarbonImmutable $date,
         public int $distanceMeters,
         public DayCellState $state,
+        public int $level,
     ) {}
+
+    /**
+     * The Blade cell-class modifier: 'rest', 'future', or 'l1'..'l4'. Future
+     * cells always return 'future' — a day that has not happened cannot
+     * carry an intensity, regardless of the level it was constructed with.
+     */
+    public function modifier(): string
+    {
+        return match ($this->state) {
+            DayCellState::Future => 'future',
+            DayCellState::Rest => 'rest',
+            DayCellState::Ran => 'l'.$this->level,
+        };
+    }
 
     /**
      * The distance in kilometres, to one decimal.

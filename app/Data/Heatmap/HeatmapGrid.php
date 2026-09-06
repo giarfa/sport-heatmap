@@ -17,6 +17,7 @@ final readonly class HeatmapGrid
         public array $weeks,
         public CarbonImmutable $startsOn,
         public CarbonImmutable $endsOn,
+        public IntensityScale $scale,
     ) {}
 
     /**
