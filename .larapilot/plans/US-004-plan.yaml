@@ -219,10 +219,10 @@ tasks:
          totals`; body links `.larapilot/plans/US-004-plan.yaml` and lists the planned tasks. Keep it local.
 
       ## Completion Criteria
-      - [ ] `develop` contains US-003's merged work (`app/Support/Heatmap/HeatmapWindow.php` present)
-      - [ ] `php artisan test` and `php artisan larapilot:quality` pass on `develop` after the merge
-      - [ ] Branch `feature/US-004-heatmap-grid` exists locally, cut from the merged `develop`
-      - [ ] PR title/body drafted for `develop` (remote stays untouched)
+      - [x] `develop` contains US-003's merged work (`app/Support/Heatmap/HeatmapWindow.php` present)
+      - [x] `php artisan test` and `php artisan larapilot:quality` pass on `develop` after the merge
+      - [x] Branch `feature/US-004-heatmap-grid` exists locally, cut from the merged `develop`
+      - [x] PR title/body drafted for `develop` (remote stays untouched)
 
       ## Test Data
       - N/A — no schema or model changes in this task
@@ -233,10 +233,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 1
     dependencies: {}
+    commit:
+      sha: 84c045700c63f5bda863b015463d9d261cc47a05
+      short_sha: 84c0457
+      subject: 'chore(US-004): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-06T17:48:20+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/84c045700c63f5bda863b015463d9d261cc47a05'
   -
     id: TASK-01
     title: 'Daily distance query, grid DTOs and the heatmap builder'
@@ -287,12 +293,12 @@ tasks:
       9. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] `DailyRunningDistance` returns summed metres per date for one athlete inside the window, in a
+      - [x] `DailyRunningDistance` returns summed metres per date for one athlete inside the window, in a
             single query
-      - [ ] `HeatmapBuilder` returns exactly 16 `WeekRow`s of exactly 7 `DayCell`s, oldest week first
-      - [ ] Future days in the current week are `DayCellState::Future` and are excluded from the week total
-      - [ ] `kilometres()` renders one decimal; `accessibleName()` returns the three exact mockup strings
-      - [ ] `php artisan larapilot:quality` passes (Pint + Larastan level 5)
+      - [x] `HeatmapBuilder` returns exactly 16 `WeekRow`s of exactly 7 `DayCell`s, oldest week first
+      - [x] Future days in the current week are `DayCellState::Future` and are excluded from the week total
+      - [x] `kilometres()` renders one decimal; `accessibleName()` returns the three exact mockup strings
+      - [x] `php artisan larapilot:quality` passes (Pint + Larastan level 5)
 
       ## Test Data
       - N/A — no migration, model or schema change; existing `Activity`/`User` factories are sufficient
@@ -302,11 +308,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
       - TASK-00
+    commit:
+      sha: 87521d992445ace423c644045bf4d79afd323ef3
+      short_sha: 87521d9
+      subject: 'feat(US-004): TASK-01 assemble the heatmap grid from daily running distance'
+      committed_at: '2026-09-06T17:50:35+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/87521d992445ace423c644045bf4d79afd323ef3'
   -
     id: TASK-02
     title: 'Unit tests for the grid builder and cell formatting'
@@ -341,21 +353,27 @@ tasks:
       6. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`
 
       ## Completion Criteria
-      - [ ] Every builder case above is a passing named test
-      - [ ] Rest and Future are asserted as distinct states, not just distinct distances
-      - [ ] Month-boundary and year-boundary windows are covered
-      - [ ] Coverage matches the `NORMAL` bar; no browser or viewport tooling introduced
+      - [x] Every builder case above is a passing named test
+      - [x] Rest and Future are asserted as distinct states, not just distinct distances
+      - [x] Month-boundary and year-boundary windows are covered
+      - [x] Coverage matches the `NORMAL` bar; no browser or viewport tooling introduced
 
       ## Git Deliverables
       - Commit: `test(US-004): TASK-02 cover the grid builder and cell formatting`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 4
     dependencies:
       - TASK-01
+    commit:
+      sha: b2a201a2f11561ebbe1d037dcd10324b5c237761
+      short_sha: b2a201a
+      subject: 'test(US-004): TASK-02 cover the grid builder and cell formatting'
+      committed_at: '2026-09-06T17:52:08+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/b2a201a2f11561ebbe1d037dcd10324b5c237761'
   -
     id: TASK-03
     title: 'Heatmap geometry CSS, persisted theme and Strava attribution (parallel with TASK-01)'
@@ -416,15 +434,15 @@ tasks:
       10. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] Heatmap geometry matches the mockup README; no `border-spacing` anywhere in `.hm`
-      - [ ] Rest, ran and future cells are visually distinct in **both** themes
-      - [ ] `.dash` becomes two columns at >= 1024 px with the grid capped at 34 rem
-      - [ ] Theme toggle is 44 x 44 px, carries `aria-pressed` and an `sr-only` label, and has a visible
+      - [x] Heatmap geometry matches the mockup README; no `border-spacing` anywhere in `.hm`
+      - [x] Rest, ran and future cells are visually distinct in **both** themes
+      - [x] `.dash` becomes two columns at >= 1024 px with the grid capped at 34 rem
+      - [x] Theme toggle is 44 x 44 px, carries `aria-pressed` and an `sr-only` label, and has a visible
             `:focus-visible` outline
-      - [ ] First visit follows `prefers-color-scheme`; an explicit choice survives a reload; no flash of the
+      - [x] First visit follows `prefers-color-scheme`; an explicit choice survives a reload; no flash of the
             wrong theme
-      - [ ] "Powered by Strava" is present in the layout footer and links to strava.com
-      - [ ] `php artisan larapilot:quality` passes
+      - [x] "Powered by Strava" is present in the layout footer and links to strava.com
+      - [x] `php artisan larapilot:quality` passes
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -434,11 +452,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 5
     dependencies:
       - TASK-00
+    commit:
+      sha: db762b516b0dd6eec5053e193d713ffcb24a30c6
+      short_sha: db762b5
+      subject: 'feat(US-004): TASK-03 heatmap geometry, persisted theme and Strava attribution'
+      committed_at: '2026-09-06T17:55:57+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/db762b516b0dd6eec5053e193d713ffcb24a30c6'
   -
     id: TASK-04
     title: 'Render the grid: Blade component, dashboard rail and controller wiring'
@@ -484,14 +508,14 @@ tasks:
       6. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] The dashboard renders 16 rows x 7 day cells plus 16 week totals from real data
-      - [ ] Every cell carries its accessible name; the coloured square is `aria-hidden`
-      - [ ] Future days in the current week render as the dashed treatment and the row's total is marked
+      - [x] The dashboard renders 16 rows x 7 day cells plus 16 week totals from real data
+      - [x] Every cell carries its accessible name; the coloured square is `aria-hidden`
+      - [x] Future days in the current week render as the dashed treatment and the row's total is marked
             partial
-      - [ ] `<caption class="sr-only">`, `scope="col"` and `scope="row"` are all present
-      - [ ] Distances render in kilometres to one decimal; "mi" and "miles" appear nowhere
-      - [ ] Usable at 320 / 375 / 768 / 1024 / 1280 px with no horizontal scroll (manual smoke at this bar)
-      - [ ] `php artisan larapilot:quality` passes
+      - [x] `<caption class="sr-only">`, `scope="col"` and `scope="row"` are all present
+      - [x] Distances render in kilometres to one decimal; "mi" and "miles" appear nowhere
+      - [x] Usable at 320 / 375 / 768 / 1024 / 1280 px with no horizontal scroll (manual smoke at this bar)
+      - [x] `php artisan larapilot:quality` passes
 
       ## Test Data
       - N/A — no model or schema changes; rendered from the existing `TrainingBlockSeeder` dataset
@@ -501,12 +525,18 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
       - TASK-01
       - TASK-03
+    commit:
+      sha: 838c7918fa611b22e8c0e5e84c4dbedac2c6562d
+      short_sha: 838c791
+      subject: 'feat(US-004): TASK-04 render the 16-week heatmap and weekly totals'
+      committed_at: '2026-09-06T17:57:12+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/838c7918fa611b22e8c0e5e84c4dbedac2c6562d'
   -
     id: TASK-05
     title: 'Cache the assembled grid and invalidate it on sync'
@@ -537,12 +567,12 @@ tasks:
       5. `php artisan larapilot:quality --fix`
 
       ## Completion Criteria
-      - [ ] A second dashboard request in the same day does not re-run the aggregate query
-      - [ ] A successful sync makes the next request rebuild the grid
-      - [ ] A cached grid does not survive into the next calendar day
-      - [ ] A failed sync does not clear the cache
-      - [ ] TTL is a literal in `config/heatmap.php`, read via `config()`, never `env()` from app code
-      - [ ] `php artisan larapilot:quality` passes
+      - [x] A second dashboard request in the same day does not re-run the aggregate query
+      - [x] A successful sync makes the next request rebuild the grid
+      - [x] A cached grid does not survive into the next calendar day
+      - [x] A failed sync does not clear the cache
+      - [x] TTL is a literal in `config/heatmap.php`, read via `config()`, never `env()` from app code
+      - [x] `php artisan larapilot:quality` passes
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -552,11 +582,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2
     dependencies:
       - TASK-04
+    commit:
+      sha: c2eda0d53d28ead299804845386abfa68875ec8d
+      short_sha: c2eda0d
+      subject: 'feat(US-004): TASK-05 cache the assembled grid and invalidate it on sync'
+      committed_at: '2026-09-06T17:58:51+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c2eda0d53d28ead299804845386abfa68875ec8d'
   -
     id: TASK-06
     title: 'Feature tests for the rendered dashboard, caching and isolation'
@@ -605,17 +641,17 @@ tasks:
       9. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`
 
       ## Completion Criteria
-      - [ ] Every assertion above is a passing named test
-      - [ ] Athlete isolation and the empty-window case are covered
-      - [ ] Cache hit, sync invalidation and day-rollover keying are covered
-      - [ ] The full suite passes; no pre-existing test was weakened to accommodate the layout change
-      - [ ] `.larapilot/docs/test-results/US-004-manual.md` lists the responsive and theme checks for the
+      - [x] Every assertion above is a passing named test
+      - [x] Athlete isolation and the empty-window case are covered
+      - [x] Cache hit, sync invalidation and day-rollover keying are covered
+      - [x] The full suite passes; no pre-existing test was weakened to accommodate the layout change
+      - [x] `.larapilot/docs/test-results/US-004-manual.md` lists the responsive and theme checks for the
             reviewer
-      - [ ] `php artisan larapilot:quality` passes
+      - [x] `php artisan larapilot:quality` passes
 
       ## Test Data
       - Existing `Activity`/`User` factories are used directly; no new factory is introduced
-      - [ ] `TrainingBlockSeeder` adjusted **only if** step 6 shows the seeded current week fails to produce a
+      - [x] `TrainingBlockSeeder` adjusted **only if** step 6 shows the seeded current week fails to produce a
             future day or a rest day — otherwise `N/A`
 
       ## Git Deliverables
@@ -623,11 +659,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 5
     dependencies:
       - TASK-05
+    commit:
+      sha: acbddf7e4844e5160e61081099466b52b1c6345a
+      short_sha: acbddf7
+      subject: 'test(US-004): TASK-06 cover the rendered heatmap, caching and isolation'
+      committed_at: '2026-09-06T18:01:11+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/acbddf7e4844e5160e61081099466b52b1c6345a'
   -
     id: TASK-07
     title: 'Changelog and README for the heatmap, theme toggle and grid cache'
@@ -652,10 +694,10 @@ tasks:
       4. `php artisan larapilot:quality`
 
       ## Completion Criteria
-      - [ ] `CHANGELOG.md` Unreleased describes the user-facing change
-      - [ ] README documents the theme behaviour and the grid cache invalidation
-      - [ ] No documentation beyond the baseline tier was added
-      - [ ] `php artisan larapilot:quality` passes
+      - [x] `CHANGELOG.md` Unreleased describes the user-facing change
+      - [x] README documents the theme behaviour and the grid cache invalidation
+      - [x] No documentation beyond the baseline tier was added
+      - [x] `php artisan larapilot:quality` passes
 
       ## Test Data
       - N/A — documentation only
@@ -665,9 +707,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalise the local PR description for `develop`
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 2
     dependencies:
       - TASK-06
-updated_at: '2026-09-06T15:37:50+00:00'
+    commit:
+      sha: ba59ea29d43e35144dbb4c8b41c117b0f7d14210
+      short_sha: ba59ea2
+      subject: 'docs(US-004): TASK-07 document the heatmap, theme toggle and grid cache'
+      committed_at: '2026-09-06T18:01:35+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ba59ea29d43e35144dbb4c8b41c117b0f7d14210'
+updated_at: '2026-09-06T16:01:36+00:00'
