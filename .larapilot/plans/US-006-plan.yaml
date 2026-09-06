@@ -274,21 +274,27 @@ tasks:
       7. No browser, viewport or E2E work — `settings.testing` is `NORMAL`.
 
       ## Completion Criteria
-      - [ ] Every case in the plan's unit table has a test
-      - [ ] Both sides of the 48-hour boundary asserted
-      - [ ] Warning copy asserted, not just the health enum
-      - [ ] Suite green
+      - [x] Every case in the plan's unit table has a test
+      - [x] Both sides of the 48-hour boundary asserted
+      - [x] Warning copy asserted, not just the health enum
+      - [x] Suite green
 
       ## Git Deliverables
       - Commit: `test(US-006): TASK-02 cover the sync state machine and resolver`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
       - TASK-01
+    commit:
+      sha: 48f26a1ad6521a6a1218dfb0adc8bb4b990e3839
+      short_sha: 48f26a1
+      subject: 'test(US-006): TASK-02 cover the sync state machine and resolver'
+      committed_at: '2026-09-06T22:25:20+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/48f26a1ad6521a6a1218dfb0adc8bb4b990e3839'
   -
     id: TASK-03
     title: 'Add sync status and skeleton design tokens (parallel with TASK-01)'
@@ -493,4 +499,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-05
-updated_at: '2026-09-06T20:23:51+00:00'
+updated_at: '2026-09-06T20:25:20+00:00'
