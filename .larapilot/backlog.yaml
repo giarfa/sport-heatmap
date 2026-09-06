@@ -74,7 +74,7 @@ specs:
       title: 'Foundation & Strava connection'
     priority: CRITICAL
     points: 5
-    status: 'IN PROGRESS'
+    status: REVIEW
     body: |
       #### US-002: Connect Strava and sign in
 
@@ -120,6 +120,7 @@ specs:
     status_history:
       - { status: PLANNED, at: '2026-09-05T17:13:20+00:00' }
       - { status: 'IN PROGRESS', at: '2026-09-05T17:25:43+00:00' }
+      - { status: REVIEW, at: '2026-09-06T07:58:08+00:00' }
     rework: false
   -
     code: US-003
