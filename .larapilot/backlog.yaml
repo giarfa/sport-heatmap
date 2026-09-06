@@ -270,7 +270,7 @@ specs:
       title: 'Heatmap dashboard'
     priority: HIGH
     points: 5
-    status: 'IN PROGRESS'
+    status: REVIEW
     body: |
       #### US-005: Self-calibrating intensity scale and legend
 
@@ -312,6 +312,7 @@ specs:
     status_history:
       - { status: PLANNED, at: '2026-09-06T16:17:10+00:00' }
       - { status: 'IN PROGRESS', at: '2026-09-06T16:18:43+00:00' }
+      - { status: REVIEW, at: '2026-09-06T16:37:11+00:00' }
     rework: false
   -
     code: US-006
