@@ -21,7 +21,7 @@ class CalibrateIntensityScaleTest extends TestCase
         $scale = (new CalibrateIntensityScale)(['d1' => 6_000]);
 
         $this->assertFalse($scale->isCalibrated());
-        $this->assertSame('Only 1 running days in this window — too few to calibrate, so fixed bands are shown instead.', $scale->note());
+        $this->assertSame('Only 1 running day in this window — too few to calibrate, so fixed bands are shown instead.', $scale->note());
     }
 
     public function test_three_non_zero_days_falls_back_to_fixed_bands_with_the_sparse_note(): void

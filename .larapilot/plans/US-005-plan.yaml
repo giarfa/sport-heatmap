@@ -524,11 +524,11 @@ tasks:
       5. Ask Alex to record the percentile-method trap as a shared rule with the Boost `record-rule` tool, glob `app/Support/Heatmap/**`, so the next agent does not swap in nearest-rank and quietly desynchronise the legend from the design contract.
 
       ## Completion Criteria
-      - [ ] README documents the levels, the pinned percentile method, and both fallbacks
-      - [ ] README records that the palette validator is absent and the mockup table is the contract
-      - [ ] CHANGELOG Unreleased updated
-      - [ ] No stale comment deferring the ramp or legend to a future spec remains
-      - [ ] The percentile-method trap recorded in `.ai/rules` via `record-rule`
+      - [x] README documents the levels, the pinned percentile method, and both fallbacks
+      - [x] README records that the palette validator is absent and the mockup table is the contract
+      - [x] CHANGELOG Unreleased updated
+      - [x] No stale comment deferring the ramp or legend to a future spec remains
+      - [x] The percentile-method trap recorded in `.ai/rules` via `record-rule`
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -538,9 +538,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalise the local PR body before handing off to review
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 1.5
     dependencies:
       - TASK-06
-updated_at: '2026-09-06T16:32:30+00:00'
+    commit:
+      sha: 1ed947826286fef662dd35d8e58729b2836694af
+      short_sha: 1ed9478
+      subject: 'docs(US-005): TASK-07 document the intensity scale and ramp contract'
+      committed_at: '2026-09-06T18:33:21+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1ed947826286fef662dd35d8e58729b2836694af'
+updated_at: '2026-09-06T16:33:22+00:00'

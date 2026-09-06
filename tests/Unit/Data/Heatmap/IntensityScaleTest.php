@@ -75,6 +75,7 @@ class IntensityScaleTest extends TestCase
         $this->assertSame('7.2 – 9.9 km', $rows[2]->rangeLabel);
         $this->assertSame('9.9 – 14.1 km', $rows[3]->rangeLabel);
         $this->assertSame('14.1+ km', $rows[4]->rangeLabel);
+        $this->assertSame(['rest', 'l1', 'l2', 'l3', 'l4'], array_map(fn ($row) => $row->modifier(), $rows));
     }
 
     public function test_legend_rows_for_a_fixed_band_scale(): void

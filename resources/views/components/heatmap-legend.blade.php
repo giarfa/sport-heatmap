@@ -6,7 +6,7 @@
 <ul class="hm-legend-list">
     @foreach ($scale->legendRows() as $row)
         <li class="hm-key">
-            <span aria-hidden="true" class="hm-cell hm-key-swatch hm-cell--{{ $row->level === 0 ? 'rest' : 'l'.$row->level }}"></span>
+            <span aria-hidden="true" class="hm-cell hm-key-swatch hm-cell--{{ $row->modifier() }}"></span>
             <span class="hm-key-name">{{ $row->name }}</span>
             <span class="hm-key-range">{{ $row->rangeLabel }}</span>
         </li>
