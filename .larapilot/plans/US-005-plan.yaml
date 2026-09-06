@@ -434,11 +434,11 @@ tasks:
       6. `php artisan test --compact tests/Feature/Dashboard` then `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Legend renders from `$grid->scale` — the same object the cells were bucketed with
-      - [ ] Five rows with names and numeric kilometre ranges; note reflects calibrated / sparse / degenerate
-      - [ ] Visible without interaction at every breakpoint — no toggle, no disclosure, no collapse
-      - [ ] Swatches `aria-hidden`; no arithmetic or string-building in Blade
-      - [ ] Existing dashboard feature tests still pass
+      - [x] Legend renders from `$grid->scale` — the same object the cells were bucketed with
+      - [x] Five rows with names and numeric kilometre ranges; note reflects calibrated / sparse / degenerate
+      - [x] Visible without interaction at every breakpoint — no toggle, no disclosure, no collapse
+      - [x] Swatches `aria-hidden`; no arithmetic or string-building in Blade
+      - [x] Existing dashboard feature tests still pass
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -448,12 +448,18 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2.5
     dependencies:
       - TASK-03
       - TASK-04
+    commit:
+      sha: 2565b2ceeb1e46eebb8a2993762a511e010a9d7d
+      short_sha: 2565b2c
+      subject: 'feat(US-005): TASK-05 render the intensity legend in the dashboard rail'
+      committed_at: '2026-09-06T18:25:50+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/2565b2ceeb1e46eebb8a2993762a511e010a9d7d'
   -
     id: TASK-06
     title: 'Feature-test the rendered legend, the sparse flip and post-sync recomputation'
@@ -531,4 +537,4 @@ tasks:
     estimate_hours: 1.5
     dependencies:
       - TASK-06
-updated_at: '2026-09-06T16:25:23+00:00'
+updated_at: '2026-09-06T16:25:51+00:00'
