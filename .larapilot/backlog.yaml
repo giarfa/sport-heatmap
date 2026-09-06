@@ -137,7 +137,7 @@ specs:
       title: 'Activity sync'
     priority: HIGH
     points: 8
-    status: TODO
+    status: PLANNED
     body: |
       #### US-003: Daily sync of runs from Strava
 
@@ -182,6 +182,9 @@ specs:
       **Note for planning** — 🔗 Matt: confirm the rate-limit allowance that applies to this application in the
       Strava developer dashboard before implementation; Strava reduced the default for newer applications and
       the PRD deliberately does not hardcode a number.
+    status_history:
+      - { status: PLANNED, at: '2026-09-06T08:19:58+00:00' }
+    rework: false
   -
     code: US-004
     title: 'The 16-week heatmap with weekly totals'
