@@ -227,12 +227,12 @@ tasks:
       11. `vendor/bin/pint --dirty --format agent` and `php artisan larapilot:quality`.
 
       ## Completion Criteria
-      - [ ] `SyncHealth`, `SyncStatus`, `ResolveSyncStatus` in place; DTO is `final readonly` with a named static factory
-      - [ ] Precedence and the strict 48-hour boundary implemented as specified
-      - [ ] Every user-facing string lives on the DTO — no date maths or concatenation left for Blade
-      - [ ] `stale_after_hours` is a config literal, documented, in the `@var` shape
-      - [ ] Resolver issues three queries and no more
-      - [ ] Pint and Larastan level 5 green
+      - [x] `SyncHealth`, `SyncStatus`, `ResolveSyncStatus` in place; DTO is `final readonly` with a named static factory
+      - [x] Precedence and the strict 48-hour boundary implemented as specified
+      - [x] Every user-facing string lives on the DTO — no date maths or concatenation left for Blade
+      - [x] `stale_after_hours` is a config literal, documented, in the `@var` shape
+      - [x] Resolver issues three queries and no more
+      - [x] Pint and Larastan level 5 green
 
       ## Test Data
       - N/A — no model, migration, factory or seeder changes in this task
@@ -242,11 +242,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-00
+    commit:
+      sha: ee7780288240d31d537b3bd93f4daff3bb91ecce
+      short_sha: ee77802
+      subject: 'feat(US-006): TASK-01 resolve sync status into a value object'
+      committed_at: '2026-09-06T22:23:48+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ee7780288240d31d537b3bd93f4daff3bb91ecce'
   -
     id: TASK-02
     title: 'Unit-test the state machine, the 48-hour boundary and the resolver'
@@ -487,4 +493,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-05
-updated_at: '2026-09-06T20:17:09+00:00'
+updated_at: '2026-09-06T20:23:51+00:00'
