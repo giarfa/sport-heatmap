@@ -175,11 +175,11 @@ tasks:
       7. Anchor commit: `chore(US-006): TASK-00 bootstrap feature branch`
 
       ## Completion Criteria
-      - [ ] US-005 confirmed `DONE` before any merge
-      - [ ] `develop` contains the US-005 commits via a `--no-ff` merge
-      - [ ] Full suite and quality gate green on `develop` before branching
-      - [ ] Branch `feature/US-006-sync-status` exists locally, off the merged `develop`
-      - [ ] PR title/body drafted locally; nothing pushed
+      - [x] US-005 confirmed `DONE` before any merge
+      - [x] `develop` contains the US-005 commits via a `--no-ff` merge
+      - [x] Full suite and quality gate green on `develop` before branching
+      - [x] Branch `feature/US-006-sync-status` exists locally, off the merged `develop`
+      - [x] PR title/body drafted locally; nothing pushed
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -189,10 +189,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 1
     dependencies: {}
+    commit:
+      sha: a93a70caf68bad87e88fa9fc3be2d4c42445e0da
+      short_sha: a93a70c
+      subject: 'chore(US-006): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-06T22:17:07+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/a93a70caf68bad87e88fa9fc3be2d4c42445e0da'
   -
     id: TASK-01
     title: 'Resolve sync health into a SyncStatus value object'
@@ -481,4 +487,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-05
-updated_at: '2026-09-06T17:25:00+00:00'
+updated_at: '2026-09-06T20:17:09+00:00'

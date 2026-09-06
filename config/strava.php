@@ -32,6 +32,7 @@ $allowedAthleteIds = array_values(array_filter(
  *     allowed_athlete_ids: array<int, string>,
  *     sync_hour: int,
  *     sync_timezone: string,
+ *     stale_after_hours: int,
  *     api_base_url: string,
  *     activities_per_page: int,
  *     max_activity_pages: int,
@@ -126,6 +127,21 @@ $config = [
     'sync_hour' => (int) env('STRAVA_SYNC_HOUR', 3),
 
     'sync_timezone' => (string) env('STRAVA_SYNC_TIMEZONE', 'Europe/Rome'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Staleness threshold
+    |--------------------------------------------------------------------------
+    |
+    | Hours after the last successful sync at which FR-007 stops presenting the
+    | dashboard as current and switches to the stale-data warning. This is a
+    | product invariant, not a deployment knob — an environment file must not be
+    | able to widen how stale is "fine", so it is a literal rather than an
+    | env() lookup.
+    |
+    */
+
+    'stale_after_hours' => 48,
 
     /*
     |--------------------------------------------------------------------------
