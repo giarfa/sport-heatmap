@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-07
+
+First release: the complete MVP scope — a private, single-athlete Strava running heatmap. Covers
+US-001 through US-006 (EP-001 Foundation, EP-002 Activity sync, EP-003 Heatmap).
+
 ### Added
 
 - A sync-status indicator on the dashboard: a relative "synced {time}" chip when healthy, an
