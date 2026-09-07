@@ -233,6 +233,47 @@ for that colour table. The palette validator script the mockup README cites was 
 this repository, so there is no automated gate that would catch a retuned step; treat that README
 table as authoritative before changing a hex.
 
+### Sync status
+
+`App\Support\Sync\ResolveSyncStatus` reads `sync_runs` fresh on every request — never from the
+grid cache — and resolves one of five states, in this precedence order:
+
+| State | Condition | What renders |
+| --- | --- | --- |
+| **Never synced** | no `sync_runs` row at all, or the only rows are still `running` | The header chip reads "Never synced"; a banner says "Waiting for the first sync" and names the nightly job's hour. |
+| **Failed** | the most recent run's status is `failed` | An alert banner names the run's own `error_message` and offers **Reconnect Strava**; wins even over a recent success, because the map is now frozen at that last good sync. |
+| **Stale** | the most recent **successful** run finished more than `stale_after_hours` ago | An alert banner names the date the map's data is from and offers **Reconnect Strava**. |
+| **Loading** | a run is `running` and no run has ever succeeded | A skeleton in the grid's exact geometry, `aria-busy="true"` with a polite live region — the only moment the product has geometry to hold open and no data yet. |
+| **Healthy** | none of the above | The header chip alone reads "Synced {relative time}". |
+
+`stale_after_hours` (48) is a literal in `config/strava.php`, not an environment value, since it is
+a product invariant rather than a deployment knob — see the comment there for why. The boundary is
+strict: a success finished exactly 48 hours ago is still healthy, one second more is stale.
+
+A **failed** sync deliberately leaves the cached grid in place — the map keeps showing the last
+good data under the warning, which is what "stale data is never presented as current, but the grid
+still renders what it has" actually means in practice. Seeing an old map under an amber banner is
+the feature working, not a bug to chase.
+
+To reach each state in local dev without editing `TrainingBlockSeeder`, edit the newest
+`sync_runs` row directly:
+
+- **Never synced** — delete the newest row (or every row).
+- **Stale** — set its `finished_at` to more than 48 hours in the past.
+- **Failed** — set its `status` to `failed` and give it an `error_message`.
+- **Loading** — set its `finished_at` to `null`.
+
+### Manual review checklist
+
+Automated coverage is PHPUnit only at this project's `NORMAL` test bar — no Playwright, Dusk, or
+axe automation. Before accepting a change to the dashboard's states, check by hand:
+
+- Each of the five sync states above, at 375 px and 1280 px, in both light and dark theme.
+- The amber warning banner clears contrast against both card surfaces.
+- The skeleton's pulse stops under an OS "reduce motion" setting (`prefers-reduced-motion:
+  reduce`) and otherwise animates.
+- The header chip disappears below 640 px and the footer's lowercase line takes over.
+
 ## Tests and quality
 
 ```bash

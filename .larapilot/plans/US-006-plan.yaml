@@ -175,11 +175,11 @@ tasks:
       7. Anchor commit: `chore(US-006): TASK-00 bootstrap feature branch`
 
       ## Completion Criteria
-      - [ ] US-005 confirmed `DONE` before any merge
-      - [ ] `develop` contains the US-005 commits via a `--no-ff` merge
-      - [ ] Full suite and quality gate green on `develop` before branching
-      - [ ] Branch `feature/US-006-sync-status` exists locally, off the merged `develop`
-      - [ ] PR title/body drafted locally; nothing pushed
+      - [x] US-005 confirmed `DONE` before any merge
+      - [x] `develop` contains the US-005 commits via a `--no-ff` merge
+      - [x] Full suite and quality gate green on `develop` before branching
+      - [x] Branch `feature/US-006-sync-status` exists locally, off the merged `develop`
+      - [x] PR title/body drafted locally; nothing pushed
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -189,10 +189,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 1
     dependencies: {}
+    commit:
+      sha: a93a70caf68bad87e88fa9fc3be2d4c42445e0da
+      short_sha: a93a70c
+      subject: 'chore(US-006): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-06T22:17:07+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/a93a70caf68bad87e88fa9fc3be2d4c42445e0da'
   -
     id: TASK-01
     title: 'Resolve sync health into a SyncStatus value object'
@@ -221,12 +227,12 @@ tasks:
       11. `vendor/bin/pint --dirty --format agent` and `php artisan larapilot:quality`.
 
       ## Completion Criteria
-      - [ ] `SyncHealth`, `SyncStatus`, `ResolveSyncStatus` in place; DTO is `final readonly` with a named static factory
-      - [ ] Precedence and the strict 48-hour boundary implemented as specified
-      - [ ] Every user-facing string lives on the DTO — no date maths or concatenation left for Blade
-      - [ ] `stale_after_hours` is a config literal, documented, in the `@var` shape
-      - [ ] Resolver issues three queries and no more
-      - [ ] Pint and Larastan level 5 green
+      - [x] `SyncHealth`, `SyncStatus`, `ResolveSyncStatus` in place; DTO is `final readonly` with a named static factory
+      - [x] Precedence and the strict 48-hour boundary implemented as specified
+      - [x] Every user-facing string lives on the DTO — no date maths or concatenation left for Blade
+      - [x] `stale_after_hours` is a config literal, documented, in the `@var` shape
+      - [x] Resolver issues three queries and no more
+      - [x] Pint and Larastan level 5 green
 
       ## Test Data
       - N/A — no model, migration, factory or seeder changes in this task
@@ -236,11 +242,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-00
+    commit:
+      sha: ee7780288240d31d537b3bd93f4daff3bb91ecce
+      short_sha: ee77802
+      subject: 'feat(US-006): TASK-01 resolve sync status into a value object'
+      committed_at: '2026-09-06T22:23:48+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ee7780288240d31d537b3bd93f4daff3bb91ecce'
   -
     id: TASK-02
     title: 'Unit-test the state machine, the 48-hour boundary and the resolver'
@@ -262,21 +274,27 @@ tasks:
       7. No browser, viewport or E2E work — `settings.testing` is `NORMAL`.
 
       ## Completion Criteria
-      - [ ] Every case in the plan's unit table has a test
-      - [ ] Both sides of the 48-hour boundary asserted
-      - [ ] Warning copy asserted, not just the health enum
-      - [ ] Suite green
+      - [x] Every case in the plan's unit table has a test
+      - [x] Both sides of the 48-hour boundary asserted
+      - [x] Warning copy asserted, not just the health enum
+      - [x] Suite green
 
       ## Git Deliverables
       - Commit: `test(US-006): TASK-02 cover the sync state machine and resolver`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
       - TASK-01
+    commit:
+      sha: 48f26a1ad6521a6a1218dfb0adc8bb4b990e3839
+      short_sha: 48f26a1
+      subject: 'test(US-006): TASK-02 cover the sync state machine and resolver'
+      committed_at: '2026-09-06T22:25:20+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/48f26a1ad6521a6a1218dfb0adc8bb4b990e3839'
   -
     id: TASK-03
     title: 'Add sync status and skeleton design tokens (parallel with TASK-01)'
@@ -297,11 +315,11 @@ tasks:
       7. `npm run build` to confirm the stylesheet compiles.
 
       ## Completion Criteria
-      - [ ] `--ok-dot` and `--skeleton` present in all three token blocks with the mockup's exact hexes
-      - [ ] `.sync-chip`, `.sync-alert`, `.sync-detail`, `.skeleton` defined
-      - [ ] Pulse animation exists only under `prefers-reduced-motion: no-preference`
-      - [ ] Skeleton cells inherit `.hm-cell` geometry
-      - [ ] `npm run build` succeeds
+      - [x] `--ok-dot` and `--skeleton` present in all three token blocks with the mockup's exact hexes
+      - [x] `.sync-chip`, `.sync-alert`, `.sync-detail`, `.skeleton` defined
+      - [x] Pulse animation exists only under `prefers-reduced-motion: no-preference`
+      - [x] Skeleton cells inherit `.hm-cell` geometry
+      - [x] `npm run build` succeeds
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -311,11 +329,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: f604aa4d6c0a9e9678c518af8dffc6235385de93
+      short_sha: f604aa4
+      subject: 'feat(US-006): TASK-03 add sync status and skeleton design tokens'
+      committed_at: '2026-09-06T22:26:09+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/f604aa4d6c0a9e9678c518af8dffc6235385de93'
   -
     id: TASK-04
     title: 'Build the chip, warning, detail and skeleton components'
@@ -340,11 +364,11 @@ tasks:
       7. `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] Four components render from `SyncStatus` alone — no dates, no conditionals building strings in Blade
-      - [ ] Banner is `role="alert"`; skeleton region is `aria-busy` + `aria-live="polite"` with its table `aria-hidden`
-      - [ ] Chip is `aria-hidden` whenever a banner is on the page
-      - [ ] Layout exposes both yields; connect and rejected screens are visually unchanged
-      - [ ] Usable at 375 / 768 / 1280 px (manual smoke is sufficient at `NORMAL`)
+      - [x] Four components render from `SyncStatus` alone — no dates, no conditionals building strings in Blade
+      - [x] Banner is `role="alert"`; skeleton region is `aria-busy` + `aria-live="polite"` with its table `aria-hidden`
+      - [x] Chip is `aria-hidden` whenever a banner is on the page
+      - [x] Layout exposes both yields; connect and rejected screens are visually unchanged
+      - [x] Usable at 375 / 768 / 1280 px (manual smoke is sufficient at `NORMAL`)
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -354,12 +378,18 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-01
       - TASK-03
+    commit:
+      sha: 0fc5bde60624e8a67c78ef21ad8c3efc1cac4116
+      short_sha: 0fc5bde
+      subject: 'feat(US-006): TASK-04 add sync chip, warning, detail and skeleton components'
+      committed_at: '2026-09-06T22:27:52+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0fc5bde60624e8a67c78ef21ad8c3efc1cac4116'
   -
     id: TASK-05
     title: 'Wire the dashboard: warning, empty state, skeleton and rail card'
@@ -383,12 +413,12 @@ tasks:
       5. `php artisan test --compact` and `php artisan larapilot:quality`; `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] Controller stays a single-action invokable; status resolved outside the grid cache
-      - [ ] Warning renders above the grid; the grid still renders beneath it
-      - [ ] Empty-window line renders on a connected account with zero runs, and not in the skeleton state
-      - [ ] Rail placeholder replaced by the real sync card; legend unaffected
-      - [ ] Existing suite still green
-      - [ ] UI usable at mobile/tablet/desktop (manual smoke)
+      - [x] Controller stays a single-action invokable; status resolved outside the grid cache
+      - [x] Warning renders above the grid; the grid still renders beneath it
+      - [x] Empty-window line renders on a connected account with zero runs, and not in the skeleton state
+      - [x] Rail placeholder replaced by the real sync card; legend unaffected
+      - [x] Existing suite still green
+      - [x] UI usable at mobile/tablet/desktop (manual smoke)
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -398,11 +428,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2
     dependencies:
       - TASK-04
+    commit:
+      sha: 34acee05888d8b374708dfc69076e2468d4eada8
+      short_sha: 34acee0
+      subject: 'feat(US-006): TASK-05 render sync status, warning and empty states on the dashboard'
+      committed_at: '2026-09-06T22:28:51+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/34acee05888d8b374708dfc69076e2468d4eada8'
   -
     id: TASK-06
     title: 'Feature-test every rendered sync and empty state'
@@ -430,21 +466,27 @@ tasks:
       5. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`.
 
       ## Completion Criteria
-      - [ ] One test per acceptance criterion, all passing
-      - [ ] Warning-plus-grid asserted as a conjunction in both stale and failed cases
-      - [ ] Runs-in-window count proven to ignore activities outside the window
-      - [ ] Full suite and `php artisan larapilot:quality` green
+      - [x] One test per acceptance criterion, all passing
+      - [x] Warning-plus-grid asserted as a conjunction in both stale and failed cases
+      - [x] Runs-in-window count proven to ignore activities outside the window
+      - [x] Full suite and `php artisan larapilot:quality` green
 
       ## Git Deliverables
       - Commit: `test(US-006): TASK-06 cover the rendered sync status and empty states`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-05
+    commit:
+      sha: 3f8a600949485893c2679deaf04908d237f56e30
+      short_sha: 3f8a600
+      subject: 'test(US-006): TASK-06 cover the rendered sync status and empty states'
+      committed_at: '2026-09-06T22:30:14+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3f8a600949485893c2679deaf04908d237f56e30'
   -
     id: TASK-07
     title: 'Document the sync states, the threshold and the manual checklist'
@@ -463,10 +505,10 @@ tasks:
       5. `CHANGELOG.md` Unreleased → `Added` line for the sync status indicator, stale warning and empty states, since this is user-facing behaviour.
 
       ## Completion Criteria
-      - [ ] README documents the five states, the threshold, and how to reproduce each locally
-      - [ ] The deliberate cache behaviour under a failed sync is written down
-      - [ ] Manual test handoff recorded
-      - [ ] CHANGELOG Unreleased updated
+      - [x] README documents the five states, the threshold, and how to reproduce each locally
+      - [x] The deliberate cache behaviour under a failed sync is written down
+      - [x] Manual test handoff recorded
+      - [x] CHANGELOG Unreleased updated
 
       ## Test Data
       - N/A — no model or schema changes in this task
@@ -476,9 +518,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 1
     dependencies:
       - TASK-05
-updated_at: '2026-09-06T17:25:00+00:00'
+    commit:
+      sha: e20b40cf09f717558f1a0b3ab2f8153858bb2ada
+      short_sha: e20b40c
+      subject: 'docs(US-006): TASK-07 document the sync status states and thresholds'
+      committed_at: '2026-09-06T22:30:52+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e20b40cf09f717558f1a0b3ab2f8153858bb2ada'
+updated_at: '2026-09-06T20:30:53+00:00'
