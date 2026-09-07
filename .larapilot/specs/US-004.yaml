@@ -5,7 +5,7 @@ epic:
   title: 'Heatmap dashboard'
 priority: HIGH
 points: 5
-status: TODO
+status: DONE
 body: |
   #### US-004: The 16-week heatmap with weekly totals
 
@@ -27,29 +27,49 @@ body: |
   `breakpoints.html`, and the geometry and accessibility sections of its `README.md`.
 
   **Acceptance Criteria**
-  - [ ] The grid renders **16 week-rows × 7 weekday-columns**, ISO-8601 **Monday first**, oldest week at the
+  - [x] The grid renders **16 week-rows × 7 weekday-columns**, ISO-8601 **Monday first**, oldest week at the
         top, the current in-progress week as the bottom row; the window is rolling and always ends on the
         current week
-  - [ ] An **eighth column** closes each row with that week's total distance, styled as a summary column and
+  - [x] An **eighth column** closes each row with that week's total distance, styled as a summary column and
         not as a heat cell
-  - [ ] The current week's total covers only the days elapsed and is marked **partial**
-  - [ ] Days in the current week that have not happened yet render as **out-of-range** — a third treatment,
+  - [x] The current week's total covers only the days elapsed and is marked **partial**
+  - [x] Days in the current week that have not happened yet render as **out-of-range** — a third treatment,
         visually distinct from both a heat level and a completed 0 km rest day
-  - [ ] Every distance is in **kilometres to one decimal**; the string "mi" or "miles" appears nowhere in
+  - [x] Every distance is in **kilometres to one decimal**; the string "mi" or "miles" appears nowhere in
         the interface
-  - [ ] The grid is a real `<table>` with an `sr-only` `<caption>`, `scope="col"` weekday headers and
+  - [x] The grid is a real `<table>` with an `sr-only` `<caption>`, `scope="col"` weekday headers and
         `scope="row"` week headers; every cell carries an accessible name giving the full date and the exact
         distance (or "rest day, 0 km", or "not yet")
-  - [ ] The **"Powered by Strava"** attribution is present, per the Strava API Agreement
-  - [ ] Light and dark themes both ship; first visit follows `prefers-color-scheme`, after which the user's
+  - [x] The **"Powered by Strava"** attribution is present, per the Strava API Agreement
+  - [x] Light and dark themes both ship; first visit follows `prefers-color-scheme`, after which the user's
         explicit choice persists
-  - [ ] Layout verified with **no horizontal scroll** at 320, 375, 768, 1024 and 1280 px; grid density is
+  - [x] Layout verified with **no horizontal scroll** at 320, 375, 768, 1024 and 1280 px; grid density is
         capped (`max-width: 34rem`) so cells do not inflate on wide screens; at ≥ 1024 px the legend and sync
         detail move into a side rail
-  - [ ] Column widths use `<colgroup>` percentages with gaps from cell `padding` — **not `border-spacing`**,
+  - [x] Column widths use `<colgroup>` percentages with gaps from cell `padding` — **not `border-spacing`**,
         which is added on top of `width: 100%` and pushes Sunday and the total column off a 375 px viewport
         (documented in the mockup README)
-  - [ ] Skip link to the grid, visible `:focus-visible` outlines, and 44 × 44 px targets on every control
-  - [ ] Unit tests for the grid builder: week boundaries, Monday start, the partial current week, future-day
+  - [x] Skip link to the grid, visible `:focus-visible` outlines, and 44 × 44 px targets on every control
+  - [x] Unit tests for the grid builder: week boundaries, Monday start, the partial current week, future-day
         cells, and a window spanning a month and a year boundary. Feature test renders the dashboard from
         seeded data
+status_history:
+  -
+    status: PLANNED
+    at: '2026-09-06T15:37:50+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-09-06T15:48:22+00:00'
+  -
+    status: REVIEW
+    at: '2026-09-06T16:04:54+00:00'
+  -
+    status: DONE
+    at: '2026-09-06T16:09:31+00:00'
+rework: false
+merge_commit:
+  sha: d14038eb513b0aa7b39bbbf246b797d53476fbca
+  short_sha: d14038e
+  subject: 'chore(US-004): hand off to REVIEW'
+  committed_at: '2026-09-06T18:05:09+02:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/d14038eb513b0aa7b39bbbf246b797d53476fbca'

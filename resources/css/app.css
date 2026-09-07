@@ -4,6 +4,496 @@
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* ---- Design tokens ---------------------------------------------------------
+   Surface, ink, accent, and the five-step intensity ramp (level 0 rest,
+   levels 1-4 heat) plus the future-day border. Hexes are transcribed verbatim
+   from .larapilot/mockups/heatmap-dashboard/README.md — "The intensity
+   ramp" — the palette validator that produced them is not committed to this
+   repository, so that table is the sole contract. The dark ramp below is a
+   separately selected set of steps for the slate-900 card surface, not a
+   programmatic inversion of the light values.
+
+   Indigo is the accent for focus rings and links only, never a data colour. */
+:root {
+    --surface-page: #f8fafc; /* slate-50  */
+    --surface-card: #ffffff;
+    --hairline: #e2e8f0; /* slate-200 */
+    --ink: #0f172a; /* slate-900 */
+    --ink-muted: #64748b; /* slate-500 */
+    --accent: #4338ca; /* indigo-700 */
+    --warn-bg: #fffbeb; /* amber-50  */
+    --warn-border: #fcd34d; /* amber-300 */
+    --warn-ink: #92400e; /* amber-800 */
+    --ok-dot: #0ca30c;
+    --skeleton: #e2e8f0;
+    --lv-0: #e2e8f0;
+    --lv-1: #86b6ef;
+    --lv-2: #3987e5;
+    --lv-3: #256abf;
+    --lv-4: #104281;
+    --lv-future-border: #cbd5e1;
+    --cell-ring: rgba(15, 23, 42, 0.08);
+}
+
+/*
+ * Dark tokens live in two selectors carrying the same values: the "dark"
+ * class lets an explicit user choice persist across reloads, and the media
+ * query keeps a JS-disabled visitor on their OS preference. First visit
+ * follows prefers-color-scheme; the persisted choice (US-004) then wins.
+ */
+html.dark {
+    --surface-page: #020617; /* slate-950 */
+    --surface-card: #0f172a; /* slate-900 */
+    --hairline: #1e293b; /* slate-800 */
+    --ink: #f8fafc;
+    --ink-muted: #94a3b8; /* slate-400 */
+    --accent: #a5b4fc; /* indigo-300 */
+    --warn-bg: #2a1f05;
+    --warn-border: #854d0e;
+    --warn-ink: #fcd34d;
+    --ok-dot: #22c55e;
+    --skeleton: #1e293b;
+    --lv-0: #1e293b;
+    --lv-1: #184f95;
+    --lv-2: #2a78d6;
+    --lv-3: #5598e7;
+    --lv-4: #9ec5f4;
+    --lv-future-border: #334155;
+    --cell-ring: rgba(248, 250, 252, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) {
+        --surface-page: #020617; /* slate-950 */
+        --surface-card: #0f172a; /* slate-900 */
+        --hairline: #1e293b; /* slate-800 */
+        --ink: #f8fafc;
+        --ink-muted: #94a3b8; /* slate-400 */
+        --accent: #a5b4fc; /* indigo-300 */
+        --warn-bg: #2a1f05;
+        --warn-border: #854d0e;
+        --warn-ink: #fcd34d;
+        --ok-dot: #22c55e;
+        --skeleton: #1e293b;
+        --lv-0: #1e293b;
+        --lv-1: #184f95;
+        --lv-2: #2a78d6;
+        --lv-3: #5598e7;
+        --lv-4: #9ec5f4;
+        --lv-future-border: #334155;
+        --cell-ring: rgba(248, 250, 252, 0.1);
+    }
+}
+
+body {
+    background: var(--surface-page);
+    color: var(--ink);
+}
+
+.card {
+    background: var(--surface-card);
+    border: 1px solid var(--hairline);
+    border-radius: 0.75rem;
+}
+
+.skip-link {
+    position: absolute;
+    left: -9999px;
+}
+
+.skip-link:focus {
+    left: 0.75rem;
+    top: 0.75rem;
+    z-index: 50;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background: var(--surface-card);
+    color: var(--ink);
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+:where(a, button, [tabindex]):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+}
+
+/* ---- Heatmap grid -----------------------------------------------------------
+   Column widths are percentages on <colgroup> and the gaps between cells are
+   padding on the <td> — this is load-bearing. Never reintroduce
+   border-spacing here: it is added ON TOP of width:100%, which pushes Sunday
+   and the week-total column off a 375px viewport. That was the first version
+   of this grid and it was wrong. */
+.hm {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.hm-col-week {
+    width: 13%;
+}
+
+.hm-col-day {
+    width: 9.5%;
+}
+
+.hm-col-total {
+    width: 20.5%;
+}
+
+.hm-th-week {
+    padding: 0 0.375rem 0 0;
+    text-align: right;
+    font-size: 0.625rem;
+    font-weight: 500;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.hm-th-day {
+    padding: 0 0 0.375rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    text-align: center;
+}
+
+.hm-th-day abbr {
+    text-decoration: none;
+}
+
+.hm-th-total {
+    padding: 0 0 0.375rem 0.375rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    text-align: right;
+}
+
+.hm-td {
+    padding: 2px;
+}
+
+.hm-cell {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 0.1875rem;
+    box-shadow: inset 0 0 0 1px var(--cell-ring);
+}
+
+/* Rest is level 0, l1-l4 are the graded intensity ramp, and future is a third
+   treatment that is neither a heat level nor a completed rest day. */
+.hm-cell--rest {
+    background: var(--lv-0);
+}
+
+.hm-cell--l1 {
+    background: var(--lv-1);
+}
+
+.hm-cell--l2 {
+    background: var(--lv-2);
+}
+
+.hm-cell--l3 {
+    background: var(--lv-3);
+}
+
+.hm-cell--l4 {
+    background: var(--lv-4);
+}
+
+.hm-cell--future {
+    background: transparent;
+    box-shadow: none;
+    border: 1px dashed var(--lv-future-border);
+}
+
+.hm-total {
+    text-align: right;
+    font-size: 0.6875rem;
+    color: var(--ink);
+    vertical-align: middle;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 0 0 0 0.375rem;
+}
+
+.hm-total-num {
+    font-weight: 600;
+}
+
+.hm-total-unit {
+    color: var(--ink-muted);
+}
+
+.hm-partial {
+    display: block;
+    font-size: 0.5625rem;
+    font-weight: 500;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+}
+
+.hm-row-current .hm-th-week {
+    color: var(--ink);
+    font-weight: 600;
+}
+
+.hm-legend-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.hm-legend-note {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+}
+
+.hm-legend-list {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1rem;
+}
+
+.hm-key {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.6875rem;
+    color: var(--ink-muted);
+}
+
+.hm-key-swatch {
+    width: 0.75rem;
+    height: 0.75rem;
+    aspect-ratio: auto; /* .hm-cell sets 1/1; without this override the swatches inflate. */
+    border-radius: 0.1875rem;
+    flex: none;
+}
+
+.hm-key-name {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.hm-key-range {
+    font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 480px) {
+    .hm-th-week {
+        font-size: 0.6875rem;
+    }
+
+    .hm-th-day,
+    .hm-th-total {
+        font-size: 0.6875rem;
+    }
+
+    .hm-total {
+        font-size: 0.8125rem;
+    }
+
+    .hm-td {
+        padding: 3px;
+    }
+
+    .hm-cell {
+        border-radius: 0.25rem;
+    }
+
+    .hm-key {
+        font-size: 0.75rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .hm-col-week {
+        width: 11%;
+    }
+
+    .hm-col-day {
+        width: 9.7%;
+    }
+
+    .hm-col-total {
+        width: 21.1%;
+    }
+
+    .hm-th-week {
+        font-size: 0.75rem;
+    }
+
+    .hm-total {
+        font-size: 0.875rem;
+    }
+
+    .hm-td {
+        padding: 4px;
+    }
+}
+
+/* ---- Dashboard layout --------------------------------------------------------
+   The grid is capped at a readable cell density (~48px) instead of stretching
+   to the container — desktop enhancement is a side rail, not bigger squares.
+   Without the 34rem cap, cells inflate to ~90px at desktop and the density
+   that makes a heatmap readable at a glance is gone. */
+.dash {
+    display: grid;
+    gap: 1rem;
+    align-items: start;
+}
+
+.dash-grid {
+    max-width: 34rem;
+    margin-inline: auto;
+    width: 100%;
+}
+
+.rail {
+    display: grid;
+    gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+    .dash {
+        grid-template-columns: minmax(0, 34rem) minmax(0, 1fr);
+        gap: 1.5rem;
+    }
+
+    .dash-grid {
+        margin-inline: 0;
+    }
+}
+
+/* ---- Sync status ------------------------------------------------------------
+   The header chip, the amber warning banner and the rail's sync detail card,
+   plus the skeleton the grid card shows while a first sync is in flight. */
+.sync-chip {
+    display: none;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    background: var(--hairline);
+    color: var(--ink-muted);
+}
+
+@media (min-width: 640px) {
+    .sync-chip {
+        display: inline-flex;
+    }
+}
+
+.sync-dot {
+    display: inline-block;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 9999px;
+    flex: none;
+}
+
+.sync-dot--ok {
+    background: var(--ok-dot);
+}
+
+.sync-dot--warn {
+    background: var(--warn-ink);
+}
+
+.sync-alert {
+    display: flex;
+    gap: 0.625rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--warn-border);
+    background: var(--warn-bg);
+    color: var(--warn-ink);
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+.sync-alert-title {
+    font-weight: 600;
+}
+
+.sync-alert-action {
+    display: inline-flex;
+    align-items: center;
+    height: 2.75rem;
+    margin-top: 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--warn-border);
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--warn-ink);
+}
+
+.sync-detail dl {
+    margin-top: 0.5rem;
+    display: grid;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+}
+
+.sync-detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.sync-detail-value {
+    text-align: right;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.sync-detail-outcome {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+/* The pulse is added inside the reduced-motion query, never added then
+   disabled — a skeleton with the animation declared unconditionally would
+   ignore an OS "reduce motion" setting instead of respecting it. */
+.skeleton {
+    background: var(--skeleton);
+    border-radius: 0.1875rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .skeleton {
+        animation: sync-skeleton-pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes sync-skeleton-pulse {
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.55;
+        }
+    }
 }

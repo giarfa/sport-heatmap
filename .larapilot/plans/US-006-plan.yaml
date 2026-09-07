@@ -1,0 +1,532 @@
+code: US-006
+plan_body: |
+  ## Technical Solution
+
+  FR-007 is the criterion the PRD calls fatal if it fails: *stale data presented silently as current*. So the sync state is resolved on **every request**, from the live `sync_runs` table, and is deliberately kept **out of** `HeatmapGridCache` — the grid may legitimately be a cached copy of the last good data, but the sentence that describes it must never be.
+
+  **New classes**
+
+  | Class | Role |
+  | --- | --- |
+  | `app/Enums/SyncHealth.php` | The four states the dashboard branches on: `Healthy`, `Failed`, `Stale`, `NeverSynced`. |
+  | `app/Data/SyncStatus.php` | Final readonly DTO built by a named static factory `SyncStatus::from()`. Owns the health decision and **every user-facing string** — `chipLabel()`, `warningTitle()`, `warningReason()`, `lastRunLabel()`, `outcomeLabel()` — so no date arithmetic or string building reaches Blade. Same contract `IntensityScale` follows in US-005. |
+  | `app/Support/Sync/ResolveSyncStatus.php` | Final readonly invokable: three small queries in, one `SyncStatus` out. The only place the dashboard learns about `sync_runs`. |
+  | `resources/views/components/sync-chip.blade.php` | Header chip: dot + `Synced 6 hours ago`. |
+  | `resources/views/components/sync-warning.blade.php` | `role="alert"` banner above the grid. |
+  | `resources/views/components/sync-detail.blade.php` | Rail card: last run, outcome, runs in window. Replaces the US-005 placeholder. |
+  | `resources/views/components/heatmap-skeleton.blade.php` | Loading skeleton in the grid's exact geometry. |
+
+  **Changed**
+
+  - `app/Enums/SyncRunStatus.php` — gains `label()` and `dotModifier()`; the three status words stop being Blade literals.
+  - `app/Http/Controllers/DashboardController.php` — resolves the status and passes it to the view. Stays a single-action invokable with collaborators type-hinted on `__invoke` (`.ai/rules/http.md`).
+  - `resources/views/dashboard.blade.php` — banner above the grid card, empty-window line inside it, real sync card in the rail, skeleton branch.
+  - `resources/views/layouts/app.blade.php` — `@yield('header-status')` in the slot the layout already reserves for it, and `@yield('footer-status')` for the sub-640 px footer variant. The connect and rejected screens share this layout and must stay untouched, which is why this is a yield and not a view composer.
+  - `resources/css/app.css` — `--ok-dot` and `--skeleton` tokens in **all three** blocks (`:root`, `html.dark`, and the `prefers-color-scheme: dark` block for the unset case), plus `.sync-*` and `.skeleton` classes.
+  - `config/strava.php` — `stale_after_hours => 48`, a literal beside `sync_hour` (`.ai/rules/config.md`: FR-007's threshold is a product invariant, not a deployment knob — no environment file gets to widen how stale is "fine").
+
+  ### The state machine — one table, five renderings
+
+  `SyncStatus::from()` decides in this precedence order. Precedence matters: a failure that follows a recent success must still warn, because the map is now frozen at the last good sync.
+
+  | # | Condition | `SyncHealth` | Renders |
+  | --- | --- | --- | --- |
+  | 1 | no `sync_runs` row at all | `NeverSynced` | first-run banner + grid |
+  | 2 | most recent run `status = failed` | `Failed` | alert banner (names `error_message`) + grid |
+  | 3 | no run has ever succeeded (history is `running` only) | `NeverSynced` | first-run banner + grid, **or the skeleton** when a run is in flight |
+  | 4 | last success `finished_at` **more than** 48 h before now | `Stale` | alert banner + grid |
+  | 5 | otherwise | `Healthy` | chip only |
+
+  **Boundary is strict:** exactly 48 hours old is still `Healthy`; 48 h + 1 s is `Stale`. TASK-02 pins both sides.
+
+  **Which timestamp:** staleness and the chip read `finished_at` — the moment data actually became current. The detail card's "Last run" reads `started_at`, which is what the mockup prints and what the table is indexed on. A succeeded run always has both.
+
+  **The skeleton is a real state, not decoration.** The page is server-rendered with no client framework, so there is no async fetch to spin over. The skeleton renders exactly when `isSyncing && lastSuccessfulRun === null` — a connected athlete whose first sync is in flight, which is the only moment the product has geometry to hold open and no data to put in it. Rendering it in any other state would be a lie about work in progress.
+
+  ### Copy (Marika — exact strings, transcribed from the mockup where it draws the state)
+
+  | State | Chip | Banner title | Banner body |
+  | --- | --- | --- | --- |
+  | `Healthy` | `Synced {rel}` | — | — |
+  | `Failed` | `Sync failed {rel}` | `Last sync failed {rel}` | `{error_message} The map below is showing data from {j M}.` |
+  | `Failed`, never succeeded | `Sync failed {rel}` | `Last sync failed {rel}` | `{error_message} No sync has ever completed, so the map below is empty.` |
+  | `Stale` | `Synced {rel}` | `Last successful sync was {rel}` | `The nightly sync has not completed since {j M}. The map below is showing data from then.` |
+  | `NeverSynced` | `Never synced` | `Waiting for the first sync` | `No sync has completed yet. The nightly job runs at {sync_hour}:00 {sync_timezone}.` |
+
+  `{rel}` is Carbon `diffForHumans()` — `6 hours ago`, `2 days ago`. The footer variant below 640 px is lowercase, per the mockup: ` · synced 6 hours ago`.
+
+  **Recovery action:** every warning state offers the same single control — **`Reconnect Strava`** → `route('strava.redirect')`, styled as the mockup draws it in state 3. It is uniform on purpose: re-running OAuth is idempotent and harmless, it is the fix for the most common failure (a revoked or rejected refresh token), and Elise's one-primary-action-per-screen rule rejects a banner that offers a menu. FR-010's manual re-sync button is **not** in this spec and must not appear.
+
+  **Empty window** (mockup state 6, verbatim, inside the grid card above the table):
+  `No runs found in the last 16 weeks. The map fills in after your next activity syncs.`
+
+  ### Data & queries (Mike, John)
+
+  `ResolveSyncStatus` issues exactly **three** queries, all trivially indexed:
+
+  1. latest run — `SyncRun::query()->latest('started_at')->first()` (the `started_at` index the US-001 migration added exists for precisely this)
+  2. latest success — same, filtered on `status = succeeded`
+  3. runs in the window — `$athlete->activities()->whereBetween('activity_date', [...])->count()`, served by the existing `(user_id, activity_date)` index
+
+  No new index, no new column, no migration, no model change. `sync_runs` has **no `user_id`** and that is the PRD's recorded data model, not an oversight: this is a single-athlete instance and the sync is instance-wide. The athlete argument scopes query 3 only.
+
+  **Interpretation note (Tom).** The criterion reads "*last run timestamp, outcome, and the number of runs in the window, sourced from `sync_runs`*". Timestamp and outcome come from `sync_runs`; the runs-in-window count **cannot** — `activities_upserted` is a churn counter (the sync command's own comment records that unchanged rows are deliberately not counted), so using it would print `0` after an idempotent re-run of an unchanged window. The count is therefore read from `activities` inside the window, which is exactly the `68` the mockup's sync card shows beside its 68-run dataset.
+
+  **Cache boundary.** `HeatmapGridCache` keeps its US-004 behaviour untouched. A **failed** sync does not call `forget()`, so the grid correctly keeps serving the last good data — which is what makes "the grid still renders what it has, under the warning" work without any new invalidation logic.
+
+  ### Accessibility (Elise, Violet)
+
+  - The warning banner is `role="alert"`, per the mockup README's live-region contract.
+  - The loading card carries `aria-busy="true"` **and** `aria-live="polite"` with an `sr-only` "Loading your heatmap…"; its skeleton table is `aria-hidden="true"` so a screen reader is never walked through 42 empty cells.
+  - The header chip repeats information the banner already announces. In every warning state the chip is `aria-hidden="true"` — visual redundancy is fine, double announcement is not. In `Healthy` it is the only carrier and stays exposed.
+  - The skeleton pulses **only** under `@media (prefers-reduced-motion: no-preference)` — the animation is added inside that query, never added then disabled.
+  - The `Reconnect Strava` control is 44 px tall like every other button in this product, and inherits the settled `:focus-visible` ring.
+  - `error_message` is rendered through `{{ }}`, escaped. Per `.ai/rules/app.md` these messages are already written to carry status codes and reasons, never tokens — TASK-01 must not widen them, and Lars checks that at review.
+  - Contrast: the amber warn triple (`--warn-bg` / `--warn-border` / `--warn-ink`) is already committed in all three token blocks from an earlier spec and is used unchanged; only `--ok-dot` and `--skeleton` are new.
+
+  ### Out of scope
+
+  FR-010 manual re-sync (no "Sync now" button — the recovery action is Reconnect only), FR-011 day-cell detail, FR-012 disconnect, auto-refresh or polling of any kind, and every change to grid geometry, weekly totals, the intensity scale, or the sync pipeline itself.
+
+  ## Git & Branching
+
+  - Mode: **GITFLOW** (from `settings.git_mode`) — Gitflow discipline **without** automatic push.
+  - **Precondition, and this one blocks TASK-00:** `feature/US-005-intensity-scale` is **12 commits ahead of `develop` and US-005 is still in `REVIEW`**. US-006 edits the very files US-005 delivered — `dashboard.blade.php`'s rail placeholder and the `app.css` token blocks — so branching from today's `develop` would fork from a tree without them and guarantee a conflict. TASK-00 waits for the US-005 human approval, merges it `--no-ff`, then branches. The same sequence US-004 → US-005 already used.
+  - Note for the record: the spec header says **Blocked by: US-003**, which is the *data* dependency (`sync_runs` is written by the US-003 sync command). The *code* dependency is **US-005**. Both are satisfied by the TASK-00 sequence; no spec edit is requested.
+  - Branch: `feature/US-006-sync-status` from `develop`.
+  - One atomic Conventional Commit per task: `type(US-006): TASK-NN summary`. Never batch tasks into one commit.
+  - **No `git push` and no remote PR** unless the user explicitly asks in-session. The PR description toward `develop` is prepared locally.
+  - `vendor/bin/pint --dirty --format agent` and `php artisan larapilot:quality` before each commit; tests green before every `task-done`.
+  - Merge to `develop` only after human `larapilot-review` approval.
+
+  ## Test Data Strategy
+
+  - **No new or changed Eloquent models, migrations, relationships, factories or seeders.** Every task declares `## Test Data: N/A`.
+  - `SyncRunFactory` already ships every state this spec needs, from US-001: `failed()` (recent, with a realistic non-secret `error_message`), `stale()` (succeeded 49–96 h ago — written for this exact criterion), `running()` (in flight, `finished_at` null), and the default succeeded-a-few-hours-ago definition. The "never synced" case is the absence of rows and needs no state.
+  - `TrainingBlockSeeder::createSyncRuns()` already composes stale → failed → succeeded so that `migrate:fresh --seed` lands on the **healthy** dashboard. Unchanged.
+  - The other four states are reachable in local dev by deleting or re-timing the last row; TASK-07 documents how, so the states can be reviewed without editing the seeder.
+  - Tests sign athletes in through `allowlistedAthlete()` / `allowlistAthletes()` from `Tests\TestCase` — never a raw factory user (`.ai/rules/tests.md`) — and set `Http::preventStrayRequests()` in `setUp()`.
+
+  ## Test Strategy
+
+  - Bar: **NORMAL** (from `settings.testing`). PHPUnit feature and unit tests only. **No** Playwright, Dusk, browser tests, viewport matrix, or axe automation — those are `BEST`-bar and are explicitly not planned.
+  - Interleaved, not stacked: TASK-02 follows TASK-01; TASK-06 follows TASK-05.
+  - The suite is PHPUnit, not Pest (`.ai/rules/boost/tests.md`): `php artisan make:test --phpunit`.
+
+  **Unit — `SyncStatus` and `ResolveSyncStatus`** (TASK-02):
+
+  | Case | Expectation |
+  | --- | --- |
+  | no rows | `NeverSynced`; chip `Never synced`; banner is the first-run copy |
+  | last run failed, earlier success 6 h ago | `Failed` — the failure wins over the recent success |
+  | last run failed, no success ever | `Failed`, body says the map is empty |
+  | last success finished **exactly** 48 h ago | `Healthy` — the boundary is strict |
+  | last success finished 48 h + 1 s ago | `Stale` |
+  | last success 6 h ago, no failure | `Healthy`, no banner |
+  | history is `running` only | `NeverSynced` **and** `showsSkeleton()` true |
+  | `running` with an earlier success | health from the earlier success; `showsSkeleton()` **false** — the grid stays up |
+  | `ResolveSyncStatus` counts | runs inside the window only; activities dated outside it and another athlete's activities are excluded |
+  | `ResolveSyncStatus` ordering | picks the most recent run and the most recent *successful* run independently |
+
+  **Feature — rendered dashboard** (TASK-06), one test per acceptance criterion:
+
+  - Recent success renders the relative time (`Synced 6 hours ago`) and **no** `role="alert"`.
+  - Failed last run renders `role="alert"` carrying the run's own `error_message` and the `Reconnect Strava` action pointing at `route('strava.redirect')`.
+  - Success older than 48 hours renders the stale warning naming the date the data is from.
+  - Never-synced renders the first-run banner, not a 500 and not a blank rail.
+  - **Stale data is never presented as current:** in the failed and stale cases assert the warning **and** that the grid table still rendered — the criterion is a conjunction and must be tested as one.
+  - Zero runs in the window renders the empty line above a grid that is still a full table, not an error page.
+  - Sync detail card shows the last-run timestamp, the outcome word, and the runs-in-window count; the count matches activities in the window and ignores one placed outside it.
+  - First sync in flight renders the skeleton with `aria-busy="true"` and the polite live region, and does **not** render the empty-window line.
+  - The connect screen (signed out) still renders with **no** chip and no banner — the layout yields must not leak into the shared shell.
+
+  **Manual tests recommended** (Anne — handoff, allowed at `NORMAL`): view each of the five states at 375 px and 1280 px in both themes; confirm the amber banner clears contrast on both surfaces, the skeleton stops animating under an OS "reduce motion" setting, and the header chip disappears below 640 px while the footer line takes over.
+
+  ## Definition of Done
+
+  | Criterion | Task | Evidence |
+  | --- | --- | --- |
+  | Relative last-successful-refresh always shown | TASK-01, TASK-04 | TASK-06 feature |
+  | Failed or >48 h → warning naming the reason + recovery action | TASK-01, TASK-04 | TASK-02 unit, TASK-06 feature |
+  | Stale data never presented as current; grid still renders | TASK-05 | TASK-06 feature (conjunct assertion) |
+  | Sync detail: last run, outcome, runs in window | TASK-01, TASK-04 | TASK-06 feature |
+  | Skeleton preserves grid geometry; animates only under `prefers-reduced-motion: no-preference` | TASK-03, TASK-04 | TASK-06 + manual |
+  | Connected, no runs → empty grid with explanatory line | TASK-05 | TASK-06 feature |
+  | `aria-busy` + polite live region; `role="alert"` on the warning | TASK-04 | TASK-06 feature |
+  | Tests: recent success, failed run, >48 h, never synced | TASK-02, TASK-06 | suite green |
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap the feature branch on a develop that carries US-005'
+    body: |-
+      ## Description
+      Bring the approved US-005 work into `develop`, then branch this spec from it. `feature/US-005-intensity-scale` is 12 commits ahead of `develop`; US-006 edits `resources/views/dashboard.blade.php` (the rail placeholder US-005 left) and `resources/css/app.css` (its token blocks), so branching from `develop` as it stands today would fork from a tree without them. Do **not** push — `git_mode` is `GITFLOW`.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. **Blocking check:** confirm US-005 is `DONE` via `php artisan larapilot:spec-show US-005`. If it is still `REVIEW`, stop and take it through `/larapilot-review` first — do not merge an unapproved branch.
+      2. `git checkout develop`
+      3. `git merge --no-ff feature/US-005-intensity-scale` — the same sequence US-005's own TASK-00 used to bring US-004 in
+      4. Confirm the merged tree is sound: `php artisan test --compact` and `php artisan larapilot:quality`
+      5. `git checkout -b feature/US-006-sync-status`
+      6. Draft the internal PR title (`US-006: Sync status, stale-data warning and empty states`) and body (link the plan, list TASK-01…TASK-07) — keep it local
+      7. Anchor commit: `chore(US-006): TASK-00 bootstrap feature branch`
+
+      ## Completion Criteria
+      - [x] US-005 confirmed `DONE` before any merge
+      - [x] `develop` contains the US-005 commits via a `--no-ff` merge
+      - [x] Full suite and quality gate green on `develop` before branching
+      - [x] Branch `feature/US-006-sync-status` exists locally, off the merged `develop`
+      - [x] PR title/body drafted locally; nothing pushed
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-006): TASK-00 bootstrap feature branch` (empty commit allowed)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally — open/update remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Sarah
+    estimate_hours: 1
+    dependencies: {}
+    commit:
+      sha: a93a70caf68bad87e88fa9fc3be2d4c42445e0da
+      short_sha: a93a70c
+      subject: 'chore(US-006): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-06T22:17:07+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/a93a70caf68bad87e88fa9fc3be2d4c42445e0da'
+  -
+    id: TASK-01
+    title: 'Resolve sync health into a SyncStatus value object'
+    body: |-
+      ## Description
+      Build the domain layer FR-007 needs: the health enum, the `SyncStatus` DTO that owns the decision **and** every string, and the resolver that reads the three values it is built from. No Blade in this task — the next tasks consume a finished object.
+
+      ## Files Involved
+      - app/Enums/SyncHealth.php _(new)_
+      - app/Data/SyncStatus.php _(new)_
+      - app/Support/Sync/ResolveSyncStatus.php _(new)_
+      - app/Enums/SyncRunStatus.php _(add `label()`, `dotModifier()`)_
+      - config/strava.php _(add `stale_after_hours`)_
+
+      ## Steps
+      1. `php artisan make:enum SyncHealth` (or `make:class`) — cases `Healthy`, `Failed`, `Stale`, `NeverSynced`, TitleCase per the PHP rules.
+      2. `app/Data/SyncStatus.php` — `final readonly`, promoted public properties (`SyncHealth $health`, `?SyncRun $lastRun`, `?SyncRun $lastSuccessfulRun`, `int $runsInWindow`, `bool $isSyncing`), built by a named static factory `SyncStatus::from(?SyncRun $lastRun, ?SyncRun $lastSuccessfulRun, int $runsInWindow, CarbonInterface $now)` per `.ai/rules/data.md`. spatie/laravel-data is **not** installed — plain PHP.
+      3. Implement the precedence exactly as the plan's state table orders it: no rows → `NeverSynced`; last run failed → `Failed`; never succeeded → `NeverSynced`; last success `finished_at` **strictly** older than `now - stale_after_hours` → `Stale`; else `Healthy`.
+      4. Query methods: `needsWarning()`, `showsSkeleton()` (`$isSyncing && $lastSuccessfulRun === null`), `hasRuns()`.
+      5. String methods — the only place this copy exists: `chipLabel()`, `chipIsRedundant()`, `footerLabel()`, `warningTitle()`, `warningReason()`, `recoveryLabel()`, `lastRunLabel()`, `lastRunRelative()`, `outcomeLabel()`, `outcomeModifier()`. Transcribe the plan's copy table verbatim, including the en-dash-free terse register the PRD pins ("synced 6 hours ago", "18.4 km").
+      6. Timestamps: staleness and the chip read `finished_at`; the detail card reads `started_at`. Format the absolute stamp in `config('strava.sync_timezone')` — the sync hour is expressed in it, so a 04:12 row must not print as 02:12.
+      7. `app/Support/Sync/ResolveSyncStatus.php` — `final readonly`, invokable, `__invoke(User $athlete, HeatmapWindow $window, ?CarbonInterface $now = null): SyncStatus`. Three queries as specified in the plan; no eager-load surface, no loop, no query inside a conditional that could run per row.
+      8. `config/strava.php` — `'stale_after_hours' => 48` as a **literal** beside `sync_hour`, with the `/* … */` block explaining why it is not an `env()` lookup, and add it to the file's `@var` array shape.
+      9. `.ai/rules/app.md`: every non-obvious decision carries a `/* … */` block **at the decision site** — the precedence order, the strict boundary, why `finished_at` and not `started_at`, why `sync_runs` has no `user_id`, and why `activities_upserted` is not the runs-in-window source.
+      10. Do not widen any exception message: `error_message` is rendered to the page, and it must keep carrying status codes and reasons only, never tokens or URLs.
+      11. `vendor/bin/pint --dirty --format agent` and `php artisan larapilot:quality`.
+
+      ## Completion Criteria
+      - [x] `SyncHealth`, `SyncStatus`, `ResolveSyncStatus` in place; DTO is `final readonly` with a named static factory
+      - [x] Precedence and the strict 48-hour boundary implemented as specified
+      - [x] Every user-facing string lives on the DTO — no date maths or concatenation left for Blade
+      - [x] `stale_after_hours` is a config literal, documented, in the `@var` shape
+      - [x] Resolver issues three queries and no more
+      - [x] Pint and Larastan level 5 green
+
+      ## Test Data
+      - N/A — no model, migration, factory or seeder changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-006): TASK-01 resolve sync status into a value object`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-00
+    commit:
+      sha: ee7780288240d31d537b3bd93f4daff3bb91ecce
+      short_sha: ee77802
+      subject: 'feat(US-006): TASK-01 resolve sync status into a value object'
+      committed_at: '2026-09-06T22:23:48+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ee7780288240d31d537b3bd93f4daff3bb91ecce'
+  -
+    id: TASK-02
+    title: 'Unit-test the state machine, the 48-hour boundary and the resolver'
+    body: |-
+      ## Description
+      Pin the state machine before any of it reaches a template: precedence, the 48-hour boundary from both sides, the skeleton condition, and the resolver's counting and ordering.
+
+      ## Files Involved
+      - tests/Unit/Data/SyncStatusTest.php _(new)_
+      - tests/Unit/Support/Sync/ResolveSyncStatusTest.php _(new)_
+
+      ## Steps
+      1. `php artisan make:test --phpunit --unit SyncStatusTest` and `ResolveSyncStatusTest`, then move them under the paths above to match the existing `tests/Unit/Support/...` layout.
+      2. `SyncStatusTest` — construct `SyncRun` instances via the factory (`make()` where no database row is needed) and cover every row of the plan's unit table: no rows; failure over a recent success; failure with no success ever; **exactly** 48 h → `Healthy`; 48 h + 1 s → `Stale`; healthy 6 h; running-only → `NeverSynced` + `showsSkeleton()`; running after a success → `showsSkeleton()` false.
+      3. Assert the strings too, not only the enum: `chipLabel()`, `warningTitle()` and `warningReason()` for each warning state. These are the sentences the athlete reads; a silent copy regression is exactly the failure this spec exists to prevent.
+      4. Freeze time with `$this->travelTo(...)` so `diffForHumans()` output is deterministic.
+      5. `ResolveSyncStatusTest` — `RefreshDatabase`; `Http::preventStrayRequests()` in `setUp()` per `.ai/rules/tests.md`. Cover: the most recent run and the most recent *successful* run are picked independently; the runs-in-window count includes only activities inside `HeatmapWindow::current()` and only this athlete's, using `allowlistedAthlete()` and the `Activity` factory's `onDate()` state.
+      6. `php artisan test --compact tests/Unit/Data/SyncStatusTest.php tests/Unit/Support/Sync/ResolveSyncStatusTest.php`
+      7. No browser, viewport or E2E work — `settings.testing` is `NORMAL`.
+
+      ## Completion Criteria
+      - [x] Every case in the plan's unit table has a test
+      - [x] Both sides of the 48-hour boundary asserted
+      - [x] Warning copy asserted, not just the health enum
+      - [x] Suite green
+
+      ## Git Deliverables
+      - Commit: `test(US-006): TASK-02 cover the sync state machine and resolver`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 2
+    dependencies:
+      - TASK-01
+    commit:
+      sha: 48f26a1ad6521a6a1218dfb0adc8bb4b990e3839
+      short_sha: 48f26a1
+      subject: 'test(US-006): TASK-02 cover the sync state machine and resolver'
+      committed_at: '2026-09-06T22:25:20+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/48f26a1ad6521a6a1218dfb0adc8bb4b990e3839'
+  -
+    id: TASK-03
+    title: 'Add sync status and skeleton design tokens (parallel with TASK-01)'
+    body: |-
+      ## Description
+      Add the two missing design tokens and the CSS the four new components need, in the same hand-authored token style the file already uses. No component markup in this task.
+
+      ## Files Involved
+      - resources/css/app.css
+
+      ## Steps
+      1. Add `--ok-dot` and `--skeleton` to **all three** token blocks, transcribed from the mockup: `:root` → `#0ca30c` / `#e2e8f0`; `html.dark` → `#22c55e` / `#1e293b`; and the `@media (prefers-color-scheme: dark)` block → the dark pair, matching how `--warn-*` and `--lv-*` are already triplicated. Missing the third block is the flash-of-wrong-token bug the layout's inline script exists to avoid.
+      2. `.sync-chip` — pill, `hidden` below 640 px and `inline-flex` at and above it (mockup: the chip appears at `sm`, the footer carries it below); `.sync-chip-dot` 6 px round, colour from a modifier class (`--ok` → `var(--ok-dot)`, `--warn` → `var(--warn-ink)`).
+      3. `.sync-alert` — the amber banner: `var(--warn-bg)` / `var(--warn-border)` / `var(--warn-ink)`, 0.5 rem radius, icon and text in a two-column flex; `.sync-alert-title` semibold; `.sync-alert-action` a 44 px-tall bordered button using `var(--warn-border)`.
+      4. `.sync-detail` — the rail card's `<dl>`: label/value rows, `font-variant-numeric: tabular-nums` on the value so the timestamp aligns with the legend numbers above it.
+      5. `.skeleton` — `background: var(--skeleton)`, 0.1875 rem radius. The pulse keyframes go **inside** `@media (prefers-reduced-motion: no-preference)`, never declared then disabled.
+      6. Reuse `.hm-cell` for the skeleton cells so the geometry is the grid's, not a copy of it — the criterion is that nothing shifts when data lands.
+      7. `npm run build` to confirm the stylesheet compiles.
+
+      ## Completion Criteria
+      - [x] `--ok-dot` and `--skeleton` present in all three token blocks with the mockup's exact hexes
+      - [x] `.sync-chip`, `.sync-alert`, `.sync-detail`, `.skeleton` defined
+      - [x] Pulse animation exists only under `prefers-reduced-motion: no-preference`
+      - [x] Skeleton cells inherit `.hm-cell` geometry
+      - [x] `npm run build` succeeds
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-006): TASK-03 add sync status and skeleton design tokens`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Joe
+    estimate_hours: 2
+    dependencies:
+      - TASK-00
+    commit:
+      sha: f604aa4d6c0a9e9678c518af8dffc6235385de93
+      short_sha: f604aa4
+      subject: 'feat(US-006): TASK-03 add sync status and skeleton design tokens'
+      committed_at: '2026-09-06T22:26:09+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/f604aa4d6c0a9e9678c518af8dffc6235385de93'
+  -
+    id: TASK-04
+    title: 'Build the chip, warning, detail and skeleton components'
+    body: |-
+      ## Description
+      Build the four Blade components and open the two layout yields they hang from. Markup only — every string and every branch comes from `SyncStatus`.
+
+      ## Files Involved
+      - resources/views/components/sync-chip.blade.php _(new)_
+      - resources/views/components/sync-warning.blade.php _(new)_
+      - resources/views/components/sync-detail.blade.php _(new)_
+      - resources/views/components/heatmap-skeleton.blade.php _(new)_
+      - resources/views/layouts/app.blade.php
+
+      ## Steps
+      1. `layouts/app.blade.php` — replace the `{{-- The sync status chip US-006 adds… --}}` comment with `@yield('header-status')` in that exact slot, and add `@yield('footer-status')` to the footer paragraph after the "distances in kilometres" text. Yields, not a view composer or shared variable: `strava/connect.blade.php` and `strava/rejected.blade.php` extend this same layout and must render with neither.
+      2. `sync-chip` — `@props(['status'])`; dot span (`aria-hidden`) + `$status->chipLabel()`; `aria-hidden="true"` on the whole chip when `$status->chipIsRedundant()` is true, so the `role="alert"` banner is the single announcement.
+      3. `sync-warning` — `<div role="alert" class="sync-alert">`, the mockup's triangle icon `aria-hidden`, `$status->warningTitle()`, `$status->warningReason()` (escaped `{{ }}` — it can carry a Strava error string), and the `Reconnect Strava` anchor to `route('strava.redirect')` with `$status->recoveryLabel()`.
+      4. `sync-detail` — the rail card: `<h3>Sync</h3>` and a `<dl>` with **Last run** (`lastRunLabel()` plus `lastRunRelative()` on its own line), **Outcome** (dot + `outcomeLabel()`), **Runs in window** (`$status->runsInWindow`). Never-synced prints `Never` and `—` rather than an empty row.
+      5. `heatmap-skeleton` — the grid card with `aria-busy="true" aria-live="polite"`, an `sr-only` "Loading your heatmap…", and a `<table class="hm" aria-hidden="true">` of six skeleton rows using the same `<colgroup>` percentages as `heatmap-grid`, so the geometry is identical.
+      6. Implement **mobile-first** per the mockup README: chip hidden below 640 px with the footer line taking over, banner full-width at every breakpoint, detail card stacking under the grid below 1024 px and entering the rail at and above it. Smoke-check at 375, 768 and 1280 px.
+      7. `vendor/bin/pint --dirty --format agent`.
+
+      ## Completion Criteria
+      - [x] Four components render from `SyncStatus` alone — no dates, no conditionals building strings in Blade
+      - [x] Banner is `role="alert"`; skeleton region is `aria-busy` + `aria-live="polite"` with its table `aria-hidden`
+      - [x] Chip is `aria-hidden` whenever a banner is on the page
+      - [x] Layout exposes both yields; connect and rejected screens are visually unchanged
+      - [x] Usable at 375 / 768 / 1280 px (manual smoke is sufficient at `NORMAL`)
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-006): TASK-04 add sync chip, warning, detail and skeleton components`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-01
+      - TASK-03
+    commit:
+      sha: 0fc5bde60624e8a67c78ef21ad8c3efc1cac4116
+      short_sha: 0fc5bde
+      subject: 'feat(US-006): TASK-04 add sync chip, warning, detail and skeleton components'
+      committed_at: '2026-09-06T22:27:52+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0fc5bde60624e8a67c78ef21ad8c3efc1cac4116'
+  -
+    id: TASK-05
+    title: 'Wire the dashboard: warning, empty state, skeleton and rail card'
+    body: |-
+      ## Description
+      Wire the dashboard: resolve the status in the controller, render the banner above the grid, the empty-window line inside it, the real sync card in the rail, and the skeleton on a first sync in flight.
+
+      ## Files Involved
+      - app/Http/Controllers/DashboardController.php
+      - resources/views/dashboard.blade.php
+
+      ## Steps
+      1. `DashboardController::__invoke` — add `ResolveSyncStatus $resolveSyncStatus` as an `__invoke` parameter beside the existing collaborators (`.ai/rules/http.md`: single-action invokable, collaborators type-hinted on `__invoke`, not constructor-injected), call it with the same `$window` and `$today` the grid already uses, and pass `status` to the view.
+      2. Resolve the status **outside** `$gridCache->remember()`. A cached grid is legitimate; a cached "synced 6 hours ago" is the failure mode this whole spec exists to prevent. Record that with a `/* … */` block at the call site.
+      3. `dashboard.blade.php`:
+         - `@section('header-status')` → `<x-sync-chip :status="$status" />`; `@section('footer-status')` → the lowercase footer variant, `sm:hidden`.
+         - `@if ($status->needsWarning())` → `<x-sync-warning :status="$status" />` **above** the `.dash` block, so it precedes the grid card at every breakpoint.
+         - Grid card: `@if ($status->showsSkeleton())` render `<x-heatmap-skeleton />`, `@else` render the empty-window line when `$status->runsInWindow === 0`, then `<x-heatmap-grid :grid="$grid" />`. The grid renders under every warning state — the criterion is a conjunction, never an either/or.
+         - Rail: replace the `Sync detail arrives with the next spec.` placeholder card with `<x-sync-detail :status="$status" />`; the legend card above it is untouched.
+      4. Verify the empty-window line does **not** appear in the skeleton state — an in-flight first sync has nothing to report yet.
+      5. `php artisan test --compact` and `php artisan larapilot:quality`; `vendor/bin/pint --dirty --format agent`.
+
+      ## Completion Criteria
+      - [x] Controller stays a single-action invokable; status resolved outside the grid cache
+      - [x] Warning renders above the grid; the grid still renders beneath it
+      - [x] Empty-window line renders on a connected account with zero runs, and not in the skeleton state
+      - [x] Rail placeholder replaced by the real sync card; legend unaffected
+      - [x] Existing suite still green
+      - [x] UI usable at mobile/tablet/desktop (manual smoke)
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-006): TASK-05 render sync status, warning and empty states on the dashboard`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-04
+    commit:
+      sha: 34acee05888d8b374708dfc69076e2468d4eada8
+      short_sha: 34acee0
+      subject: 'feat(US-006): TASK-05 render sync status, warning and empty states on the dashboard'
+      committed_at: '2026-09-06T22:28:51+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/34acee05888d8b374708dfc69076e2468d4eada8'
+  -
+    id: TASK-06
+    title: 'Feature-test every rendered sync and empty state'
+    body: |-
+      ## Description
+      Cover the rendered dashboard: one test per acceptance criterion, including the conjunction that the warning and the grid appear together.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/SyncStatusTest.php _(new)_
+
+      ## Steps
+      1. `php artisan make:test --phpunit SyncStatusTest`, placed under `tests/Feature/Dashboard/` beside `HeatmapGridTest` and `HeatmapLegendTest`; mirror their `setUp()` — `RefreshDatabase`, `Http::preventStrayRequests()`, `$this->travelTo('2026-09-05 09:00:00')`.
+      2. Use `allowlistedAthlete()` and `actingAs()`; build sync history from the existing `SyncRunFactory` states (`failed()`, `stale()`, `running()`, default) and activities from `Activity::factory()->for($athlete)->onDate(...)`.
+      3. Tests, one per criterion:
+         - recent success → response contains `Synced 6 hours ago` and **no** `role="alert"`
+         - failed last run → `role="alert"` present, contains that run's `error_message`, and the `Reconnect Strava` action links to `route('strava.redirect')`
+         - success older than 48 hours → stale warning naming the date the data is from
+         - never synced → first-run banner, HTTP 200, rail still rendered
+         - **stale data never presented as current** → in both the failed and stale cases assert the warning **and** that the grid table rendered in the same response
+         - connected with zero runs in the window → the empty line and a full grid table, not an error
+         - sync detail card → last-run timestamp, outcome word, and a runs-in-window count that excludes an activity deliberately dated outside the window
+         - first sync in flight → `aria-busy="true"`, the polite live region, and no empty-window line
+         - signed out → the connect screen renders with no chip and no banner
+      4. `php artisan test --compact tests/Feature/Dashboard/SyncStatusTest.php`, then the full suite.
+      5. Do **not** add Playwright, Dusk, Pest browser or viewport suites — `settings.testing` is `NORMAL`.
+
+      ## Completion Criteria
+      - [x] One test per acceptance criterion, all passing
+      - [x] Warning-plus-grid asserted as a conjunction in both stale and failed cases
+      - [x] Runs-in-window count proven to ignore activities outside the window
+      - [x] Full suite and `php artisan larapilot:quality` green
+
+      ## Git Deliverables
+      - Commit: `test(US-006): TASK-06 cover the rendered sync status and empty states`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-05
+    commit:
+      sha: 3f8a600949485893c2679deaf04908d237f56e30
+      short_sha: 3f8a600
+      subject: 'test(US-006): TASK-06 cover the rendered sync status and empty states'
+      committed_at: '2026-09-06T22:30:14+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3f8a600949485893c2679deaf04908d237f56e30'
+  -
+    id: TASK-07
+    title: 'Document the sync states, the threshold and the manual checklist'
+    body: |-
+      ## Description
+      Baseline documentation for the states this spec introduces: what each one means, what trips it, and how to reach it locally for review. Baseline tier only — the PRD records no OpenAPI (no public API) and no extended docs.
+
+      ## Files Involved
+      - README.md
+
+      ## Steps
+      1. Add a **Sync status** subsection under the existing sync documentation: the five states, the condition that produces each, and the 48-hour threshold with a pointer to `config('strava.stale_after_hours')` and why it is a literal.
+      2. Document how to reach each state in local dev without editing the seeder — delete the newest `sync_runs` row for never-synced, re-time it past 48 hours for stale, set its status to `failed` with a message for the warning, null its `finished_at` for the in-flight skeleton.
+      3. Note that a failed sync deliberately leaves the cached grid in place, so the map keeps showing the last good data under the warning — otherwise a reader will file it as a bug.
+      4. Record Anne's manual test handoff (the five states at 375/1280 px in both themes, reduced-motion check) so review has the checklist.
+      5. `CHANGELOG.md` Unreleased → `Added` line for the sync status indicator, stale warning and empty states, since this is user-facing behaviour.
+
+      ## Completion Criteria
+      - [x] README documents the five states, the threshold, and how to reproduce each locally
+      - [x] The deliberate cache behaviour under a failed sync is written down
+      - [x] Manual test handoff recorded
+      - [x] CHANGELOG Unreleased updated
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `docs(US-006): TASK-07 document the sync status states and thresholds`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Albert
+    estimate_hours: 1
+    dependencies:
+      - TASK-05
+    commit:
+      sha: e20b40cf09f717558f1a0b3ab2f8153858bb2ada
+      short_sha: e20b40c
+      subject: 'docs(US-006): TASK-07 document the sync status states and thresholds'
+      committed_at: '2026-09-06T22:30:52+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e20b40cf09f717558f1a0b3ab2f8153858bb2ada'
+updated_at: '2026-09-06T20:30:53+00:00'

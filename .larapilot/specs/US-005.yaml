@@ -5,7 +5,7 @@ epic:
   title: 'Heatmap dashboard'
 priority: HIGH
 points: 5
-status: TODO
+status: DONE
 body: |
   #### US-005: Self-calibrating intensity scale and legend
 
@@ -28,19 +28,39 @@ body: |
   the validator commands) and `states.html` state 5.
 
   **Acceptance Criteria**
-  - [ ] Five levels: level 0 for a day with no running, levels 1–4 from the **25th, 50th and 75th
+  - [x] Five levels: level 0 for a day with no running, levels 1–4 from the **25th, 50th and 75th
         percentiles of the non-zero daily distances** in the visible 112-day window
-  - [ ] Thresholds are recomputed after every sync, not cached across windows
-  - [ ] A legend is **always visible** and states the actual kilometre range of each level
-  - [ ] **Sparse fallback:** fewer than four non-zero days in the window → documented fixed bands
+  - [x] Thresholds are recomputed after every sync, not cached across windows
+  - [x] A legend is **always visible** and states the actual kilometre range of each level
+  - [x] **Sparse fallback:** fewer than four non-zero days in the window → documented fixed bands
         (0 / ≤ 5 / ≤ 10 / ≤ 20 / 20+ km) and the legend states that the window is too sparse to calibrate
-  - [ ] **Degenerate fallback:** if the computed thresholds collapse (p25 == p75 — e.g. every run is the
+  - [x] **Degenerate fallback:** if the computed thresholds collapse (p25 == p75 — e.g. every run is the
         same distance), the fixed bands are used too, rather than rendering every day at one level
-  - [ ] The ramp uses exactly the validated hexes recorded in the mockup README, with the **dark ramp
+  - [x] The ramp uses exactly the validated hexes recorded in the mockup README, with the **dark ramp
         inverted** (lowest mileage nearest the surface, highest brightest) — not an automatic flip of the
         light values
-  - [ ] The ramp is single-hue and ordered by luminance; no meaning is carried by colour alone, since the
+  - [x] The ramp is single-hue and ordered by luminance; no meaning is carried by colour alone, since the
         legend states numeric ranges and every cell announces its exact distance
-  - [ ] Unit tests for the bucketing: boundary values landing exactly on p25/p50/p75, windows with 0, 1, 3
+  - [x] Unit tests for the bucketing: boundary values landing exactly on p25/p50/p75, windows with 0, 1, 3
         and 4 non-zero days, an all-identical-distance window, and recomputation after a sync changes the
         distribution
+status_history:
+  -
+    status: PLANNED
+    at: '2026-09-06T16:17:10+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-09-06T16:18:43+00:00'
+  -
+    status: REVIEW
+    at: '2026-09-06T16:37:11+00:00'
+  -
+    status: DONE
+    at: '2026-09-06T17:16:37+00:00'
+rework: false
+merge_commit:
+  sha: 822ed67fe3f98137c1b6d99331148b5d1260992e
+  short_sha: 822ed67
+  subject: 'chore(US-005): record usage ledger updates'
+  committed_at: '2026-09-06T18:37:42+02:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/822ed67fe3f98137c1b6d99331148b5d1260992e'

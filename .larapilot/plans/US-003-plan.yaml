@@ -1,0 +1,579 @@
+code: US-003
+plan_body: |-
+  ## Technical Solution
+
+  US-003 turns the connected Strava account (US-002) into data. It adds one Artisan command, one HTTP client, one reconciliation Action, and the shared definition of the 112-day window — nothing else. No queue worker (PRD `### Performance & Scalability`: the run is a handful of requests and ~100 rows, well inside the default timeout), no new package, no schema change (US-001 already shipped `activities` and `sync_runs`; the PRD explicitly rejects a `daily_mileage` aggregate).
+
+  **Layering** — `SyncStravaActivities` (command, orchestration + `sync_runs` lifecycle) → `StravaClient` (all HTTP: token, pagination, retry) → `ReconcileStravaWindow` (all persistence: one transaction, upsert + delete-absent). `App\Data\StravaActivity` carries the payload across the boundary so no Strava array shape reaches the Action or Eloquent, per `.ai/rules/data.md`. Each layer is independently testable against `Http::fake()`, which is what the acceptance criteria ask for.
+
+  ### The window — one definition, two specs
+
+  📐 John: the 112-day window is not the sync's private concept — US-004 renders exactly the same span and US-005 computes percentiles over it. It gets **one** home now, before two specs invent their own week arithmetic and drift by a day:
+
+  - `config/heatmap.php` → `window_weeks => 16` as a **literal**, not `env()` (`.ai/rules/config.md`: product invariants are literals — the grid is 16 rows by definition, an environment file must not be able to make it 12).
+  - `App\Support\Heatmap\HeatmapWindow` — a `final readonly` value object with `HeatmapWindow::current()`: `startsOn` = `startOfWeek(today)` minus 15 weeks (ISO-8601 Monday), `endsOn` = `endOfWeek(today)` (Sunday), plus `contains(CarbonInterface $date): bool` and `afterTimestamp(): int` for the Strava `after` parameter. US-004 consumes the same object.
+
+  ### Date attribution — no timezone math at all
+
+  🗄️ Mike: Strava returns `start_date_local` as an ISO-8601 string with a misleading `Z` suffix — it is already the athlete's local wall-clock time, not UTC. Parsing it with `Carbon::parse()` and letting the app timezone touch it is exactly how a 22:30 run lands on the wrong day. `activity_date` is therefore taken from the **first ten characters of the raw string**, and `start_date_local` is built with an explicit `createFromFormat(..., 'UTC')` so nothing converts it. That is what makes the AC "attribution does not depend on server timezone" literally true rather than approximately true.
+
+  ### Reconciliation — fetch everything, then apply once
+
+  All pages are collected in memory **before** a single write happens, and the upsert + delete run inside one `DB::transaction`. Two acceptance criteria fall out of that ordering: a retry exhausted on page 3 leaves no half-applied window (nothing was written yet), and the delete-absent set is computed against the complete response rather than against a partial one — reconciling page by page would delete every activity that happened to be on page 2.
+
+  Idempotency is a property of `updateOrCreate`, not of a guard: when every attribute matches, Eloquent finds no dirty attributes and issues no `UPDATE`, so `updated_at` does not move. The second consecutive run is byte-identical, and the test asserts that by snapshotting `updated_at` rather than by counting rows.
+
+  ### Sport filtering
+
+  `SportType::values()` (US-001) is the filter, applied in `StravaActivity::fromApiPayload()` at the boundary: a ride is discarded before a DTO exists for it, so no path can persist one. Note the second-order case the AC names: an activity whose sport type is *edited on Strava* from `Run` to `Ride` disappears from the response's running set and is therefore **deleted** by the delete-absent pass — not left stale.
+
+  ### Token refresh mid-sync
+
+  `EnsureFreshAccessToken` (US-002) already refreshes on the expiry margin, and its docblock reserved this seam. It gains one optional argument, `?string $rejectedToken`: the client passes the token Strava just answered `401` to, and the Action refreshes when the stored token is still that same rejected value. The existing distributed lock and post-lock re-read are unchanged, so the race the Action was built to prevent (two refreshes retiring each other's rotated refresh token) is not reopened — the second caller through the lock sees a token different from the rejected one and returns it. The retry hook then re-sends the page with the new bearer, which is Laravel's documented `retry(..., function (Throwable $e, PendingRequest $request))` pattern.
+
+  ### Rate limits — 🔗 Matt
+
+  The PRD deliberately hardcodes no quota, and this plan does not either. The strategy is unchanged: one `after`-filtered pass at `per_page=200` costs one or two requests a day, orders of magnitude below any allowance Strava currently issues. What the plan **does** add is visibility — on a `429` or an exhausted retry, the `X-RateLimit-Limit` and `X-RateLimit-Usage` response headers are recorded verbatim in the `sync_runs.error_message`, so the actual allowance for this application is discoverable from the failure itself instead of from the dashboard. The README notes that the owner should confirm the allowance in the Strava developer dashboard; no code branches on a number.
+
+  ### Deliberately out of scope
+
+  - **Grid cache invalidation** — the PRD's cached grid does not exist until US-004. The command's success path is the documented single seam where US-004 will hook the invalidation; US-003 does not invent a cache key for code that is not written. Flagged here for whoever plans US-004.
+  - **Manual re-sync (FR-010)** and the dashboard's sync indicator (FR-007 / US-006) — this spec only guarantees that `sync_runs` is written correctly for US-006 to read.
+  - **`sync_runs.user_id`** — the schema US-001 shipped has no athlete column and the PRD's data model does not include one. One row per command run, counts aggregated; correct for a single-athlete instance and not worth a migration that FR-016 ("Won't") would be the only reason for.
+
+  ## Git & Branching
+
+  - Mode: `GITFLOW` (from `settings.git_mode`) — branch and atomic commits, **no automatic push, no remote PR** unless explicitly requested in session.
+  - Branch: `feature/US-003-strava-daily-sync` from `develop`.
+  - TASK-00 bootstraps the branch and drafts the internal PR description locally.
+  - One Conventional Commit per task: `type(US-003): TASK-NN summary` — never batched across tasks.
+  - ⌨️ Sarah: `develop` moved after US-002 merged; rebase onto `develop` before the first code commit, and again if it drifts. She leads any conflict resolution.
+  - Merge to `develop` only after human `larapilot-review` approval.
+
+  ## Test Data Strategy
+
+  - **No new model, no new migration, no new factory.** `ActivityFactory` (with `onDate()`, `trailRun()`, `virtualRun()`), `SyncRunFactory` (with `failed()`, `running()`, `stale()`) and `UserFactory` (`stravaConnected()`, `stravaTokenExpired()`) already cover every case this spec needs.
+  - 🧪 Anne: Strava **API payloads** are test fixtures, not factory output — a private `stravaActivityPayload()` helper per test class builds them, so a change to the API shape is fixed in one place per suite and never leaks into `database/factories`.
+  - `TrainingBlockSeeder` stays the canonical demo dataset; TASK-09 re-verifies `php artisan migrate:fresh --seed` still succeeds after the window object lands (the seeder's 16-week block and `HeatmapWindow` must agree on where the window starts).
+  - Every test signs athletes in through `allowlistedAthlete()` / `allowlistAthletes()` from `Tests\TestCase` (`.ai/rules/tests.md`) and sets `Http::preventStrayRequests()` in `setUp()`.
+
+  ## Test Strategy
+
+  - Bar: **`NORMAL`** (from `settings.testing`) — PHPUnit feature and unit tests. **No** Playwright, Dusk, Pest browser, or viewport suites. This spec has no UI, so no manual test handoff is needed beyond the README's manual-run instructions.
+  - Interleaved, not batched at the end: TASK-04 covers the client, TASK-06 the reconciliation, TASK-08 the command and the schedule registration.
+  - Retry backoff is configuration (`strava.retry_backoff_ms`), so tests set it to `[0, 0, 0]` with `Config::set()` — the backoff path is exercised without a suite that sleeps for seconds.
+  - Acceptance-criteria coverage map:
+
+  | Acceptance criterion | Covered by |
+  | --- | --- |
+  | Scheduled once daily at configured hour/timezone | TASK-08 — asserts the registered event's expression, timezone and command |
+  | Full 112-day window, `after`, pagination at max page size | TASK-04 (pagination, `after` value, page size) |
+  | Running sport types only | TASK-04 (DTO filter) + TASK-06 (nothing else persisted) |
+  | Integer metres; date from Strava local start | TASK-04 (rounding) + TASK-06 (late-evening run attribution) |
+  | Upsert on `strava_activity_id` | TASK-06 (changed distance, name, sport type) |
+  | Delete-on-absence inside the window | TASK-06 (absent activity deleted; activity outside the window untouched) |
+  | Idempotent across two runs | TASK-06 (`updated_at` unmoved) + TASK-08 (double command run) |
+  | `sync_runs` row per run with counts and error | TASK-08 (success and failure rows) |
+  | `429`/`5xx` retried with backoff; exhausted retry fails, exits non-zero, no half-applied window | TASK-04 (retry + exhaustion) + TASK-08 (exit code, empty tables, failed row) |
+  | Token refresh mid-sync | TASK-04 (`401` → refresh → retry succeeds) |
+
+  ## Quality Gate
+
+  `php artisan larapilot:quality` (Pint + Larastan level 5) must pass before each `task-done`. 👾 Andrew: Larastan level 5 with no IDE helper means every new class carries full docblocks and array-shape annotations for the Strava payloads — `.ai/rules/models.md` applies to the models already in place, and the same discipline applies to the new DTO's `@param array{...}` shapes.
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap the feature branch and draft the internal PR'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for US-003: create the feature branch from `develop` and prepare the internal PR description toward `develop`. Do **not** push — `settings.git_mode` is `GITFLOW`.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `git checkout develop` (US-002 is merged; confirm the working tree is clean)
+      2. `git checkout -b feature/US-003-strava-daily-sync`
+      3. Draft the internal PR title `US-003: Daily sync of runs from Strava` and a body listing the planned tasks and a link to `.larapilot/plans/US-003-plan.yaml`; keep it local
+      4. Anchor the branch: `git commit --allow-empty -m 'chore(US-003): TASK-00 bootstrap feature branch'`
+
+      ## Completion Criteria
+      - [x] Branch `feature/US-003-strava-daily-sync` exists locally, based on current `develop`
+      - [x] Internal PR title/body drafted locally toward `develop` (nothing pushed)
+
+      ## Test Data
+      - N/A — no application files touched
+
+      ## Git Deliverables
+      - Commit: `chore(US-003): TASK-00 bootstrap feature branch` (empty commit)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepared locally — open remotely only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+    commit:
+      sha: 8568b23b5e6f19702c0a59f09d2e72b3a1082f00
+      short_sha: 8568b23
+      subject: 'chore(US-003): TASK-00 bootstrap feature branch'
+      committed_at: '2026-09-06T11:07:45+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/8568b23b5e6f19702c0a59f09d2e72b3a1082f00'
+  -
+    id: TASK-01
+    title: 'Define the 112-day window and the Strava API client configuration'
+    body: |-
+      ## Description
+      Give the 112-day window one canonical definition that US-003, US-004 and US-005 all read, and add the Strava API settings the sync client needs — endpoints and page size as literals, retry behaviour as overridable configuration.
+
+      ## Files Involved
+      - config/heatmap.php (new)
+      - config/strava.php
+      - app/Support/Heatmap/HeatmapWindow.php (new)
+
+      ## Steps
+      1. `config/heatmap.php`: `window_weeks => 16` as a **literal** with a block comment stating why it is not an `env()` lookup — the grid is 16 rows by product definition (FR-004), and an environment file must not be able to change the span the percentile scale calibrates against. Follow the commenting style of `config/strava.php`.
+      2. `config/strava.php`, appended in the existing section style:
+         - `api_base_url => 'https://www.strava.com/api/v3'` — **literal**, same reasoning as `token_url`: pointing it elsewhere would send a live bearer token to another host
+         - `activities_per_page => 200` — literal; Strava's maximum page size, the value that makes "paginate until the response is short" cheap
+         - `max_activity_pages => 10` — literal safety stop, so a Strava change that never returns a short page cannot spin forever
+         - `retry_attempts => 3` and `retry_backoff_ms => [1000, 2000, 4000]` — literals, overridden to `[0, 0, 0]` by tests via `Config::set()`
+      3. `app/Support/Heatmap/HeatmapWindow.php` — `final readonly` class in the `App\Support\Heatmap` namespace (`.ai/rules/app.md`: sub-namespace per domain, matching `App\Support\Strava`):
+         - `public function __construct(public CarbonImmutable $startsOn, public CarbonImmutable $endsOn)`
+         - `public static function current(?CarbonInterface $today = null): self` — `startsOn` = start of the ISO week (Monday) of today, minus `window_weeks - 1` weeks; `endsOn` = end of that ISO week (Sunday). Both at start of day.
+         - `public function contains(CarbonInterface $date): bool` — inclusive on both ends, compared as dates
+         - `public function afterTimestamp(): int` — `startsOn` as a UTC epoch, for the Strava `after` query parameter
+         - `public function days(): int` — asserts the 112 the spec names, and gives US-004 its row count source
+         - Block comment on `current()` recording that the window is anchored to the ISO week rather than to "today minus 112 days", because the grid's bottom row must always be the current, in-progress week
+      4. `php artisan larapilot:quality`
+
+      ## Completion Criteria
+      - [x] `HeatmapWindow::current()` returns a Monday start and a Sunday end spanning exactly 112 days
+      - [x] `window_weeks`, the API base URL and the page size are literals — no new `env()` keys, so `.env.example` is unchanged
+      - [x] `contains()` is inclusive at both ends and ignores time of day
+      - [x] Pint and Larastan level 5 pass
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-003): TASK-01 add the heatmap window and Strava API configuration`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-00
+    commit:
+      sha: c3c36a3fba56b59b046149bb81d9d6236d61f768
+      short_sha: c3c36a3
+      subject: 'feat(US-003): TASK-01 add the heatmap window and Strava API configuration'
+      committed_at: '2026-09-06T11:08:33+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c3c36a3fba56b59b046149bb81d9d6236d61f768'
+  -
+    id: TASK-02
+    title: 'Add the StravaActivity DTO with run-only filtering at the boundary'
+    body: |-
+      ## Description
+      Carry a Strava activity across the API boundary as a readonly DTO, doing every defensive cast and the run-only filter in one place, so no raw Strava array reaches the reconciliation Action or Eloquent (`.ai/rules/data.md`).
+
+      ## Files Involved
+      - app/Data/StravaActivity.php (new)
+
+      ## Steps
+      1. `final readonly class StravaActivity` in `App\Data`, mirroring `StravaTokens`: promoted public properties `stravaActivityId` (int), `sportType` (`SportType`), `name` (string), `distanceMeters` (int), `movingTimeSeconds` (int), `startDateLocal` (`CarbonImmutable`), `activityDate` (`CarbonImmutable`).
+      2. `public static function fromApiPayload(array $payload): ?self` — named static factory, returns `null` when the payload is not a storable running activity:
+         - `sport_type` missing, non-string, or not in `SportType::values()` → `null` (FR-003: discarded at sync time, never persisted). Fall back to the legacy `type` key only if `sport_type` is absent, and document why in a block comment.
+         - `id` missing or non-numeric → `null`; a payload without an identity cannot be upserted
+         - `start_date_local` missing or not a `Y-m-d\TH:i:s\Z` string → `null`
+         - `distance` → `(int) round(...)`; Strava sends metres as a float and the column is an integer (FR-003)
+         - `moving_time` → `(int)`, defaulting to `0`
+         - `name` → cast defensively, trimmed, empty string falls back to `'Run'` (the column is `NOT NULL`)
+      3. Date handling — the load-bearing detail. Block comment inside the factory: Strava labels `start_date_local` with a `Z` although it is already the athlete's wall-clock time, so `Carbon::parse()` plus an app timezone would silently move a late-evening run to the next day. Build `startDateLocal` with `CarbonImmutable::createFromFormat('Y-m-d\TH:i:s\Z', $raw, 'UTC')` and take `activityDate` from `substr($raw, 0, 10)` — no conversion is ever applied.
+      4. `public function toAttributes(): array` — the exact attribute array `ReconcileStravaWindow` writes, with an `@return array{...}` shape for Larastan.
+      5. `@param array<string, mixed> $payload` docblocks throughout; `php artisan larapilot:quality`
+
+      ## Completion Criteria
+      - [x] Non-running sport types return `null` and can never reach persistence
+      - [x] Distances are integer metres; `activity_date` is derived from the raw local date string with no timezone conversion
+      - [x] A malformed or identity-less payload returns `null` instead of throwing — one bad row must not fail the whole run
+      - [x] Pint and Larastan level 5 pass
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-003): TASK-02 add the StravaActivity DTO with run-only filtering`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-00
+    commit:
+      sha: dbac33791dee55e72d429bbc959097ccb6876743
+      short_sha: dbac337
+      subject: 'feat(US-003): TASK-02 add the StravaActivity DTO with run-only filtering'
+      committed_at: '2026-09-06T11:09:16+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/dbac33791dee55e72d429bbc959097ccb6876743'
+  -
+    id: TASK-03
+    title: 'Add StravaClient with pagination, backoff and mid-sync token refresh'
+    body: |-
+      ## Description
+      Add the authenticated HTTP wrapper the PRD names in `### Core Components`: it is the only class that talks to the Strava activities API, and it owns the access token, pagination, retry/backoff, and the `401`-mid-sync refresh.
+
+      ## Files Involved
+      - app/Services/Strava/StravaClient.php (new)
+      - app/Exceptions/Strava/StravaApiException.php (new)
+      - app/Actions/Strava/EnsureFreshAccessToken.php
+
+      ## Steps
+      1. `StravaApiException extends RuntimeException` in `App\Exceptions\Strava`, alongside `StravaOAuthException` and in its style — named constructors `requestFailed(int $status, ?string $rateLimitUsage)`, `unreachable(ConnectionException $previous)`, `malformedResponse()`. Per `.ai/rules/app.md`, messages carry **status and rate-limit headers only** — never a token, never a response body, never a reused Guzzle message that embeds the request URL. Chain the previous exception.
+      2. `EnsureFreshAccessToken::__invoke(User $user, ?string $rejectedToken = null)`:
+         - Refresh when `needsRefresh($user)` **or** `$rejectedToken !== null && $rejectedToken === (string) $this->readToken($user, 'strava_access_token')`
+         - Extract that condition into a private `mustRefresh(User $user, ?string $rejectedToken): bool` used both before and after the lock, so the existing post-lock re-read still short-circuits: a caller whose token was already rotated by another process finds a token different from the rejected one and returns it without a second refresh
+         - Add a block comment recording why the rejected token — rather than a `bool $force` — is the argument: `force` would re-refresh unconditionally after the lock and retire the refresh token the winner just stored, which is the exact race this Action exists to prevent
+         - The docblock line reserving this seam for US-003 is now satisfied; update it to describe the argument
+      3. `StravaClient` in `App\Services\Strava`, constructor-promoted `private readonly EnsureFreshAccessToken $ensureFreshAccessToken`:
+         - `public function activitiesInWindow(User $user, HeatmapWindow $window): array` — returns `array<int, StravaActivity>`
+         - Loop pages from 1: `GET {api_base_url}/athlete/activities` with `after` = `$window->afterTimestamp()`, `per_page` = `strava.activities_per_page`, `page` = n. Stop when a page returns fewer items than the page size, when a page is empty, or at `strava.max_activity_pages` (log a warning at the cap — hitting it means the window assumption is wrong).
+         - Map each item through `StravaActivity::fromApiPayload()`, dropping `null`s, then keep only activities whose `activityDate` satisfies `$window->contains(...)`
+         - Timeouts in the same shape as `StravaOAuth`: `connectTimeout(5)`, `timeout(15)` — this runs in a scheduled command, not in front of a browser, so the read timeout is a little more generous
+      4. Retry, using Laravel 13's `retry(int $times, array|int $sleepMilliseconds, callable $when, bool $throw)`:
+         - `retry(config('strava.retry_attempts'), config('strava.retry_backoff_ms'), $when, throw: false)`
+         - `$when(Throwable $e, PendingRequest $request)`: retry on `ConnectionException`; on a `RequestException` retry when the status is `429` or `>= 500`; on `401`, call `($this->ensureFreshAccessToken)($user, rejectedToken: $currentToken)`, set the new bearer with `$request->withToken($fresh)`, update the tracked token, and retry **once** — Laravel's documented pattern for re-authenticating inside a retry
+         - Guard the `401` branch so it can only fire once per page: a token that is fresh and still rejected means the authorisation is gone, and retrying is a loop
+         - After the loop, a still-failed response throws `StravaApiException::requestFailed($response->status(), $response->header('X-RateLimit-Usage'))`. 🔗 Matt: recording `X-RateLimit-Limit` / `X-RateLimit-Usage` here is how the allowance this application actually has becomes visible in `sync_runs.error_message`, without hardcoding a number the PRD deliberately leaves open.
+         - Catch `ConnectionException` around the send and rethrow as `StravaApiException::unreachable()`, mirroring `StravaOAuth::postToTokenEndpoint()`
+         - Let `StravaReconnectRequiredException` from the refresh propagate untouched — the command turns it into a failed `sync_runs` row
+      5. `php artisan larapilot:quality`
+
+      ## Completion Criteria
+      - [x] One `after`-filtered pass paginates at `per_page=200` and stops on the first short page
+      - [x] `429` and `5xx` are retried with the configured backoff; an exhausted retry raises `StravaApiException` carrying the status and the rate-limit headers
+      - [x] A `401` mid-sync refreshes the token and re-sends the same page once; a second `401` after a fresh token fails instead of looping
+      - [x] No token value, response body, or request URL appears in any exception message or log line
+      - [x] The existing `EnsureFreshAccessToken` tests still pass unchanged — the new argument is optional and the lock semantics are untouched
+      - [x] Pint and Larastan level 5 pass
+
+      ## Test Data
+      - N/A — no model or schema changes in this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-003): TASK-03 add StravaClient with pagination, backoff and mid-sync refresh`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-01
+      - TASK-02
+    commit:
+      sha: c807c91b4a637b4daacaeb90f908e17f0aee7e86
+      short_sha: c807c91
+      subject: 'feat(US-003): TASK-03 add StravaClient with pagination, backoff and mid-sync refresh'
+      committed_at: '2026-09-06T11:11:03+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c807c91b4a637b4daacaeb90f908e17f0aee7e86'
+  -
+    id: TASK-04
+    title: 'Cover the Strava client: pagination, backoff, refresh mid-sync and filtering'
+    body: |-
+      ## Description
+      Add PHPUnit coverage for `StravaClient` and `StravaActivity` against a faked Strava API — the pagination, retry and refresh behaviour the acceptance criteria name explicitly.
+
+      ## Files Involved
+      - tests/Feature/Strava/StravaClientTest.php (new)
+      - tests/Unit/Data/StravaActivityTest.php (new)
+
+      ## Steps
+      1. `php artisan make:test --phpunit StravaClientTest` and `php artisan make:test --phpunit --unit StravaActivityTest`; move them under the `Strava` / `Data` subdirectories to match the existing layout.
+      2. `setUp()` per `.ai/rules/tests.md`: `Http::preventStrayRequests()`, `Config::set('strava.retry_backoff_ms', [0, 0, 0])` so the backoff path is exercised without a sleeping suite. Athletes come from `allowlistedAthlete()`.
+      3. A private `stravaActivityPayload(array $overrides = []): array` helper builds API-shaped payloads — do not add these shapes to `database/factories`.
+      4. `StravaClientTest` cases:
+         - a full page followed by a short page issues exactly two requests and returns both pages' activities; assert the `after`, `per_page=200` and `page` query values with `Http::assertSent()`
+         - a single short page issues exactly one request
+         - non-running sport types in the response are absent from the returned array
+         - an activity dated before `HeatmapWindow::current()->startsOn` is filtered out even though Strava returned it
+         - `429` then `200` returns the activities and sends two requests
+         - `500` on every attempt raises `StravaApiException`, having attempted `retry_attempts` times, and the message carries the status and the rate-limit header but **no** token
+         - `401` then `200`: the refresh endpoint is faked, the retry re-sends with the rotated bearer (assert the `Authorization` header changed between attempts), and the rotated pair is persisted
+         - `401` twice with a freshly refreshed token fails instead of looping
+         - the `max_activity_pages` cap stops the loop when every page comes back full
+      5. `StravaActivityTest` cases: run-only filtering including the legacy `type` fallback; float metres round to integer; a `23:40Z` local start attributes to that same calendar day under a non-UTC `app.timezone` (`Config::set('app.timezone', 'Australia/Sydney')`) — the regression this DTO exists to prevent; malformed and identity-less payloads return `null`.
+      6. `php artisan test --compact tests/Feature/Strava/StravaClientTest.php tests/Unit/Data/StravaActivityTest.php`
+
+      ## Completion Criteria
+      - [x] Pagination, `429` backoff, `5xx` exhaustion, `401` refresh-and-retry, and sport/window filtering are all covered
+      - [x] No test reaches the network — `preventStrayRequests()` is set in `setUp()`
+      - [x] The suite adds no measurable wall-clock time from backoff sleeps
+      - [x] `php artisan test` is green
+
+      ## Git Deliverables
+      - Commit: `test(US-003): TASK-04 cover the Strava client and activity DTO`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 2.5
+    dependencies:
+      - TASK-03
+    commit:
+      sha: 7114d8c5a97e816b0e167eece6749ce6fcf484c5
+      short_sha: 7114d8c
+      subject: 'test(US-003): TASK-04 cover the Strava client and activity DTO'
+      committed_at: '2026-09-06T11:14:41+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/7114d8c5a97e816b0e167eece6749ce6fcf484c5'
+  -
+    id: TASK-05
+    title: 'Add ReconcileStravaWindow: transactional upsert and delete-on-absence'
+    body: |-
+      ## Description
+      Add the Action that applies a fetched window to the database in one transaction: upsert on `strava_activity_id`, delete local activities inside the window that Strava no longer returns, and report the counts.
+
+      ## Files Involved
+      - app/Actions/Strava/ReconcileStravaWindow.php (new)
+      - app/Data/SyncOutcome.php (new)
+
+      ## Steps
+      1. `SyncOutcome` — `final readonly` class in `App\Data`: `public function __construct(public int $upserted, public int $deleted)` plus `public function plus(self $other): self` so the command can aggregate across athletes. It sits in `App\Data` as the counterpart of the inbound DTO — note in its docblock that it is a result object, not an external payload.
+      2. `ReconcileStravaWindow` — invokable Action per `.ai/rules/actions.md`: one job, `__invoke(User $user, HeatmapWindow $window, array $activities): SyncOutcome`, no authorization check (the command has already resolved which athletes may sync), no HTTP of its own.
+      3. Inside a single `DB::transaction`:
+         - Upsert each activity through the relation — `$user->activities()->updateOrCreate(['strava_activity_id' => $activity->stravaActivityId], $activity->toAttributes())` — so ownership comes from the relation, never from a mass-assigned `user_id` (`.ai/rules/models.md`, and the block comment already on `Activity`)
+         - Count as upserted only what actually changed: `wasRecentlyCreated || wasChanged()`. Block comment on why: `updateOrCreate` on an unchanged row issues no `UPDATE`, and counting it anyway would report daily churn that never happened and make the idempotency criterion untestable from `sync_runs`.
+         - Delete: `$user->activities()->whereBetween('activity_date', [$window->startsOn, $window->endsOn])->whereNotIn('strava_activity_id', $seenIds)->delete()`, capturing the affected count. Block comment: the window bounds are what keep this from deleting the athlete's history outside the visible range, and `$seenIds` must come from the **complete** fetch — reconciling page by page would delete everything not on the current page.
+         - Guard the empty-`$seenIds` case explicitly: an empty response is a legitimate "no runs in 16 weeks" and must delete the whole window, so `whereNotIn` with an empty array must not be short-circuited into a no-op by accident. Cover it in TASK-06.
+      4. Return `new SyncOutcome($upserted, $deleted)`.
+      5. `php artisan larapilot:quality`
+
+      ## Completion Criteria
+      - [x] Upsert keys on `strava_activity_id` and propagates changed distance, name and sport type
+      - [x] Local activities inside the window absent from the fetch are deleted; activities outside the window are untouched
+      - [x] The upserted count reflects real changes only, so a second identical run reports `0 / 0`
+      - [x] All writes happen in one transaction — a throw mid-apply leaves the window exactly as it was
+      - [x] `user_id` is never mass-assigned; writes go through the `activities()` relation
+      - [x] Pint and Larastan level 5 pass
+
+      ## Test Data
+      - N/A — no schema change. The existing `ActivityFactory` (`onDate()`, `trailRun()`, `virtualRun()`) covers every fixture TASK-06 needs; no factory or seeder edit is required.
+
+      ## Git Deliverables
+      - Commit: `feat(US-003): TASK-05 add the transactional window reconciliation`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2.5
+    dependencies:
+      - TASK-01
+      - TASK-02
+    commit:
+      sha: 9d367804d7181634921648542188e9c882408bd3
+      short_sha: 9d36780
+      subject: 'feat(US-003): TASK-05 add the transactional window reconciliation'
+      committed_at: '2026-09-06T11:15:13+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9d367804d7181634921648542188e9c882408bd3'
+  -
+    id: TASK-06
+    title: 'Cover reconciliation: upsert, delete-on-absence, filtering and idempotency'
+    body: |-
+      ## Description
+      Add PHPUnit coverage for `ReconcileStravaWindow` — the persistence half of the acceptance criteria, tested directly against DTOs so the assertions are about the database, not about HTTP.
+
+      ## Files Involved
+      - tests/Feature/Strava/ReconcileStravaWindowTest.php (new)
+
+      ## Steps
+      1. `php artisan make:test --phpunit ReconcileStravaWindowTest`; `use RefreshDatabase`; athletes from `allowlistedAthlete()`.
+      2. Build `StravaActivity` DTOs through `StravaActivity::fromApiPayload()` with a local payload helper, so the tests exercise the same boundary the client uses.
+      3. Cases:
+         - a new activity is created with integer metres, the right `activity_date`, and `user_id` set from the relation
+         - a changed distance, a rename, and a sport type changed `Run` → `TrailRun` all propagate on the second reconcile
+         - an activity present locally and absent from the fetch, inside the window, is deleted
+         - an activity **outside** the window is left untouched even though it is absent from the fetch
+         - an activity whose sport type was edited on Strava from `Run` to `Ride` disappears from the fetch's running set and is therefore deleted — the second-order case of FR-003
+         - an empty fetch clears the whole window and reports the deleted count
+         - **idempotency**: reconcile the same fetch twice; assert the second call reports `0 / 0`, row count is unchanged, and every `updated_at` is byte-identical to the snapshot taken after the first call
+         - a second athlete's activities are never touched by the first athlete's reconcile
+         - a failure mid-apply rolls the whole transaction back — force it by reconciling a payload that violates the `strava_activity_id` unique index against another athlete's row, then assert the first athlete's window is unchanged
+      4. `php artisan test --compact tests/Feature/Strava/ReconcileStravaWindowTest.php`
+
+      ## Completion Criteria
+      - [x] Upsert, delete-on-absence, window boundaries and cross-athlete isolation are covered
+      - [x] Idempotency is asserted on `updated_at`, not only on row counts
+      - [x] The rollback case proves no half-applied window
+      - [x] `php artisan test` is green
+
+      ## Git Deliverables
+      - Commit: `test(US-003): TASK-06 cover window reconciliation and idempotency`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 2.5
+    dependencies:
+      - TASK-05
+    commit:
+      sha: 6f2ae551bbd08e49e7f87523458faace83f09577
+      short_sha: 6f2ae55
+      subject: 'test(US-003): TASK-06 cover window reconciliation and idempotency'
+      committed_at: '2026-09-06T11:16:06+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6f2ae551bbd08e49e7f87523458faace83f09577'
+  -
+    id: TASK-07
+    title: 'Add the strava:sync command, its sync_runs lifecycle and the daily schedule'
+    body: |-
+      ## Description
+      Add the Artisan command the README already documents, wire it to the client and the reconciliation Action, record every attempt in `sync_runs`, and register it to run once a day at the configured hour and timezone.
+
+      ## Files Involved
+      - app/Console/Commands/SyncStravaActivities.php (new)
+      - routes/console.php
+
+      ## Steps
+      1. `php artisan make:command SyncStravaActivities --no-interaction`; signature `strava:sync`, description naming the 112-day reconciliation. Collaborators are constructor-promoted `private readonly` (`StravaClient`, `ReconcileStravaWindow`).
+      2. Resolve the athletes to sync: connected (`strava_athlete_id` and tokens present) **and** still on the allowlist via `AthleteAllowlist` — an athlete removed from `.env` must stop being synced, the same rule `EnsureFreshStravaToken` enforces on the web. Block comment recording that.
+      3. No connected athlete → print a clear line, write **no** `sync_runs` row, exit `SUCCESS`. Block comment: a fabricated "succeeded, 0/0" row would tell US-006's indicator that a sync happened when none did, and "never synced" is a first-run state that spec renders deliberately.
+      4. Otherwise: create the `sync_runs` row with `started_at = now()` and `status = SyncRunStatus::Running` **before** the first request, so a crashed process leaves visible evidence rather than nothing.
+      5. Per athlete: `$window = HeatmapWindow::current()`, fetch through `StravaClient::activitiesInWindow()`, then apply through `ReconcileStravaWindow`, aggregating `SyncOutcome`s. All fetching for one athlete completes before its reconcile — that ordering is what makes "no half-applied window" true.
+      6. Success: update the row with `finished_at`, `status = Succeeded`, the aggregated counts, `error_message = null`; print a one-line summary; return `SUCCESS`.
+      7. Failure — catch `StravaApiException` and `StravaReconnectRequiredException`: update the row with `finished_at`, `status = Failed`, counts `0`, and `error_message` set to the exception message (status and rate-limit headers only — `.ai/rules/app.md` forbids credentials in logs, and this string is rendered on the dashboard by US-006). `Log::warning` with the athlete id and the reason, never a token. Return `Command::FAILURE` so the scheduler's `onFailure` and any cron mail see a non-zero exit.
+      8. `routes/console.php` — register with the `Schedule` facade:
+         `Schedule::command('strava:sync')->dailyAt(sprintf('%02d:00', (int) config('strava.sync_hour')))->timezone((string) config('strava.sync_timezone'))->withoutOverlapping();`
+         Block comment: `withoutOverlapping()` because a run that outlives its window would otherwise overlap the next day's, and two concurrent reconciles of the same window race on the delete pass.
+      9. Leave a clearly marked comment at the success point identifying it as the seam where US-004 will invalidate the cached grid — no cache key is invented here.
+      10. `php artisan schedule:list` to confirm the registration, then `php artisan larapilot:quality`
+
+      ## Completion Criteria
+      - [x] `php artisan strava:sync` reconciles the 112-day window and prints a summary
+      - [x] `php artisan schedule:list` shows the command daily at the configured hour in the configured timezone
+      - [x] Every attempt writes exactly one `sync_runs` row: running → succeeded or failed, with counts and an error message
+      - [x] A failure exits non-zero and leaves the window untouched
+      - [x] An athlete removed from the allowlist is not synced
+      - [x] No token value reaches `sync_runs.error_message` or the log
+      - [x] Pint and Larastan level 5 pass
+
+      ## Test Data
+      - N/A — no schema change. `SyncRunFactory` already provides the `running()`, `failed()` and `stale()` states TASK-08 needs.
+
+      ## Git Deliverables
+      - Commit: `feat(US-003): TASK-07 add the daily strava:sync command and its schedule`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-03
+      - TASK-05
+    commit:
+      sha: 794f86094693ed97821a0a9c47fb2074cae0d5ed
+      short_sha: 794f860
+      subject: 'feat(US-003): TASK-07 add the daily strava:sync command and its schedule'
+      committed_at: '2026-09-06T11:17:15+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/794f86094693ed97821a0a9c47fb2074cae0d5ed'
+  -
+    id: TASK-08
+    title: 'Cover the sync command end to end and its schedule registration'
+    body: |-
+      ## Description
+      Add PHPUnit coverage for `strava:sync` against a faked Strava API — the demonstration the spec asks for (populate, re-run unchanged, edit and delete upstream) plus the `sync_runs` and exit-code contract, and assert the schedule registration.
+
+      ## Files Involved
+      - tests/Feature/Strava/SyncStravaActivitiesCommandTest.php (new)
+      - tests/Feature/Console/ScheduleTest.php (new)
+
+      ## Steps
+      1. `php artisan make:test --phpunit SyncStravaActivitiesCommandTest`; `use RefreshDatabase`; `setUp()` sets `Http::preventStrayRequests()` and zero backoff; athletes from `allowlistedAthlete()`.
+      2. Command cases, driven with `$this->artisan('strava:sync')`:
+         - a faked two-page response populates the window; assert the row count, that a ride in the payload was not stored, and that the `sync_runs` row is `succeeded` with the right counts
+         - running it a second time against the identical response reports `0 / 0`, leaves every `updated_at` untouched, and writes a second `sync_runs` row — the spec's "running it twice changes nothing"
+         - an activity edited upstream (distance corrected) propagates on the next run; one deleted upstream disappears
+         - `500` on every attempt: `assertExitCode(Command::FAILURE)`, the `sync_runs` row is `failed` with the status in `error_message` and no token anywhere in it, and the activities table is **unchanged** from before the run
+         - a rejected refresh token surfaces as a failed run with a reconnect message, not an unhandled exception
+         - no connected athlete: exit `SUCCESS`, no `sync_runs` row written
+         - an athlete whose id is no longer on the allowlist is skipped
+         - a crashed run leaves the `running` row visible: assert the row exists with `status = running` and `finished_at = null` at the point the client throws an unhandled error
+      3. `php artisan make:test --phpunit ScheduleTest` — resolve `Illuminate\Console\Scheduling\Schedule` from the container and assert over `events()`: exactly one event whose command contains `strava:sync`, expression `0 3 * * *` for the default hour, and the configured timezone. Add a case that sets `strava.sync_hour` to a different value and asserts the expression follows it, so the configuration is proven load-bearing rather than decorative.
+      4. `php artisan test --compact tests/Feature/Strava/SyncStravaActivitiesCommandTest.php tests/Feature/Console/ScheduleTest.php`, then the full `php artisan test`
+
+      ## Completion Criteria
+      - [x] The spec's demonstration is covered: populate, re-run unchanged, upstream edit, upstream delete
+      - [x] Failure covered: non-zero exit, failed `sync_runs` row, untouched activities table
+      - [x] The schedule is asserted for both the command and the configured hour/timezone
+      - [x] No test reaches the network
+      - [x] Full `php artisan test` is green
+
+      ## Git Deliverables
+      - Commit: `test(US-003): TASK-08 cover the sync command and its schedule`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-07
+    commit:
+      sha: 32eb893e4580e58ca5b79b90b020a3ffa75c168f
+      short_sha: 32eb893
+      subject: 'test(US-003): TASK-08 cover the sync command and its schedule'
+      committed_at: '2026-09-06T11:24:02+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/32eb893e4580e58ca5b79b90b020a3ffa75c168f'
+  -
+    id: TASK-09
+    title: 'Update the README sync section and the changelog'
+    body: |-
+      ## Description
+      The README currently states that the sync command does not exist yet. Replace that with how it actually behaves, and record the rate-limit check the PRD leaves to the owner.
+
+      ## Files Involved
+      - README.md
+      - CHANGELOG.md
+
+      ## Steps
+      1. README `## Running the sync`: remove the "not implemented yet" callout and the line saying `schedule:list` reports nothing. Document what one run does — reconciles the full 112-day window, stores only `Run` / `TrailRun` / `VirtualRun`, upserts on the Strava activity id, deletes activities removed upstream, and records the attempt in `sync_runs`. Keep the existing `php artisan strava:sync` and cron entry verbatim; add `php artisan schedule:list` as the way to confirm the daily registration.
+      2. Add a short **Rate limits** note — 🔗 Matt: one run costs one or two requests, the application hardcodes no quota, and the owner should confirm the allowance issued to this application in the Strava developer dashboard. Record that a `429` is retried with backoff and that the observed `X-RateLimit-Usage` is written into `sync_runs.error_message` when a run fails, which is where to look.
+      3. Confirm `.env.example` needs no change — the window, page size, endpoints and backoff are all literals; `STRAVA_SYNC_HOUR` and `STRAVA_SYNC_TIMEZONE` already exist and are now genuinely load-bearing.
+      4. `CHANGELOG.md` under `Unreleased` → `Added`: the daily Strava sync command, the reconciliation of the 112-day window, and the `sync_runs` audit trail.
+      5. Verify the demo dataset still stands up alongside the new window definition: `php artisan migrate:fresh --seed`, then `php artisan strava:sync` against a connected athlete with no faked API returns a recorded failure rather than a crash.
+      6. `php artisan larapilot:quality` and the full `php artisan test`
+
+      ## Completion Criteria
+      - [x] README describes the shipped command, the schedule, and how to verify it
+      - [x] The rate-limit note is present and hardcodes no number
+      - [x] CHANGELOG `Unreleased` records the user-visible change
+      - [x] `migrate:fresh --seed` succeeds and the seeded 16-week block still falls inside `HeatmapWindow::current()`
+      - [x] Quality gate and full test suite pass
+
+      ## Test Data
+      - [x] No factory or seeder change required — verified by re-running `migrate:fresh --seed`
+      - [x] Seeded block confirmed to sit inside the window `HeatmapWindow` computes
+
+      ## Git Deliverables
+      - Commit: `docs(US-003): TASK-09 document the daily sync and update the changelog`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: finalise the local PR description before handing off to review
+    type: Impl
+    status: DONE
+    assignee: Albert
+    estimate_hours: 1
+    dependencies:
+      - TASK-07
+    commit:
+      sha: 3cfdca981e23250e16c6a2f206edb92685d454b2
+      short_sha: 3cfdca9
+      subject: 'docs(US-003): TASK-09 document the daily sync and update the changelog'
+      committed_at: '2026-09-06T11:25:05+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3cfdca981e23250e16c6a2f206edb92685d454b2'
+updated_at: '2026-09-06T09:25:05+00:00'
