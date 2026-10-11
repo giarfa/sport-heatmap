@@ -1,0 +1,51 @@
+code: US-008
+title: 'Import runs from a Garmin Connect CSV with conflict review'
+epic:
+  code: EP-002
+  title: 'Activity sync'
+priority: HIGH
+points: 8
+status: TODO
+body: |
+  #### US-008: Import runs from a Garmin Connect CSV with conflict review
+
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** TODO
+  **Blocked by:** -
+  **Type:** Feature
+  **Supersedes:** US-003 criterion "Local activities inside the window that are absent from the response are deleted" — now Strava-sourced activities only, and Garmin-overwritten activities are never reverted or re-added
+  **Traces to:** FR-018 (MoSCoW: Must) · FR-002 (changed) · FR-003 · FR-008 (clarified) · FR-009 — no journey (the PRD has no `## User Journeys`)
+  **Prior art:** built-in — PHP's CSV reader (`fgetcsv` / `SplFileObject`) covers the format; no package
+
+  **User Story**
+  As the Committed Amateur Runner,
+  I want to upload the "Activities" CSV I export from the Garmin Connect website and decide what happens to each run that clashes with one already stored,
+  so that runs missing from Strava, or better recorded on Garmin, show up on my heatmap.
+
+  **Demonstrates**
+  Signed in as the owner, uploading `.larapilot/client-materials/Activities (1).csv` shows a review page with the new runs and every
+  conflict side by side; after choosing Overwrite or Skip per conflict and confirming, the dashboard shows the imported runs, the
+  hiking rows are ignored, and running the nightly sync afterwards changes none of the overwritten activities.
+
+  **Acceptance Criteria**
+  - [ ] A signed-in owner sees an "Import Garmin CSV" entry point on the dashboard; signed-out visitors do not, and a signed-out GET or POST to the import pages is refused with nothing written
+  - [ ] Garmin Connect "Activities" exports with **Italian or English** headers are accepted; a file with any other header set, missing a required column (activity type, date, title, distance, moving time), not a CSV, or larger than 5 MB is rejected with an explicit message and nothing written
+  - [ ] Garmin running types in both languages are mapped onto `Run` / `TrailRun` / `VirtualRun` (the sample's `Corsa` → `Run`); every other type — e.g. `Escursionismo` — is ignored and counted (FR-003)
+  - [ ] Distance in km (`"8.29"`) is stored as integer metres (8290); `Tempo in movimento` / `Moving Time` is stored as seconds; `Data` / `Date` is stored as `start_date_local` with its date as `activity_date`; thousands separators (`"8,240"`) and `"--"` placeholders are handled
+  - [ ] Rows outside the 112-day window and future-dated rows are skipped and counted; a row with an unparseable date or distance is skipped and listed with its reason, while the remaining rows still import
+  - [ ] A CSV row **conflicts** when a stored activity of either source starts on the same date within **±2 minutes** of it; when several are in range, the closest start is the match
+  - [ ] Before anything is written, a review page lists every conflict side by side (stored vs CSV: start, distance, moving time) with **Overwrite / Skip** per row and "overwrite all" / "skip all" shortcuts; rows without a conflict are listed as new
+  - [ ] Abandoning the review writes nothing; confirming applies every choice in a single transaction
+  - [ ] A CSV row identical to an already imported Garmin activity (same start, distance, and moving time) counts as "already imported" and is not asked about — re-importing the same file changes nothing
+  - [ ] **Skip** leaves the stored activity untouched; **Overwrite** replaces its name, distance, moving time, and start with the CSV values and marks it as Garmin-sourced
+  - [ ] **Garmin wins permanently:** after an overwrite, the nightly sync never reverts it, never re-adds its Strava twin, and never deletes it — including a sync in which Strava still returns the twin
+  - [ ] The nightly sync's delete-on-absence touches Strava-sourced activities only; Garmin-imported activities are never deleted by the sync (FR-002)
+  - [ ] After confirmation, a summary shows imported, overwritten, skipped, already-imported, ignored (non-run), outside-window, and invalid counts; the grid cache is invalidated so the dashboard reflects the import immediately
+  - [ ] Imported activities carry no Strava deep-link (FR-008); the raw uploaded file is never persisted beyond the request
+  - [ ] The upload and review pages meet FR-009: usable at 375 px, labelled form controls, the review rendered as a table with headers, light and dark themes
+  - [ ] Feature tests (sample file as fixture plus an English-header fixture; Strava HTTP faked): both header languages parse; type filtering, window cutoff, and invalid rows; conflict detection at the ±2-minute boundary (1:59 matches, 2:01 does not); overwrite and skip; the sync neither reverts, duplicates, nor deletes a Garmin-won activity; re-import is a no-op; guests are refused
+
+  **Notes for planning**
+  - 🗄️ Mike: activities gain a `source` and a nullable `strava_activity_id` (kept on an overwritten twin so the sync can skip it) — one migration, reversible.
+  - 🔎 Tom: the exact Garmin type names in both languages (`Corsa su pista` / `Track Running`, `Tapis roulant` / `Treadmill Running`, trail and virtual variants) are confirmed against real exports in planning, not guessed.
+  - 🔐 Lars: CSRF on the upload and the confirm; the parsed rows awaiting review are bound to the owner's session, never to an id a request can supply.
+  - The developer domain docs for the sync and heatmap domains are updated in this spec.

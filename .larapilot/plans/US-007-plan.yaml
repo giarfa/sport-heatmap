@@ -1,0 +1,507 @@
+code: US-007
+plan_body: |
+  ## Technical Solution
+
+  US-007 makes `GET /` a public, read-only view of one athlete's heatmap. No new route, no schema change, no new package: the existing controller, grid cache, and sync-status resolver are reused, and the only new class is the resolver that picks *which* athlete a signed-out visitor sees. Delivery target is MVP, so this is a thin vertical slice on the US-004/US-006 code — the full spec is covered, nothing is trimmed.
+
+  ### 1. Who is displayed — `ResolveDisplayedAthlete` (🔐 Lars, 📐 John)
+  - `App\Support\Strava\AthleteAllowlist` gains `athleteIds(): array<int, string>` — the allowlist **in configured order**, the single reader of `config('strava.allowed_athlete_ids')`. `allows()` is rewritten on top of it; its strict comparison and fail-closed behavior are unchanged.
+  - New `App\Support\Strava\ResolveDisplayedAthlete` (`final readonly`, `__invoke(): ?User`, same shape as `ResolveSyncStatus`):
+    - empty allowlist → `null` with **no query**;
+    - otherwise **one** query: `User::query()->select(['id', 'name', 'strava_athlete_id'])->whereIn('strava_athlete_id', $ids)->get()->keyBy('strava_athlete_id')`, then the first id of `athleteIds()` present in that map. Order comes from the allowlist, never from the database.
+    - The narrow `select` is deliberate: the encrypted token columns are **never loaded** on the guest path, so it cannot decrypt, refresh, or re-save them, even by accident. Lars's note on the spec — guests never reach `EnsureFreshAccessToken` — holds by structure, not by convention.
+    - "Connected user record" = a `users` row carrying that `strava_athlete_id`. Token state does not matter: an owner whose refresh token is dead is still displayed (AC 7 depends on that).
+    - An athlete removed from the allowlist is never selected because the `whereIn` is built from the allowlist, even while their rows remain stored.
+  - Query shape: `users.strava_athlete_id` already carries a unique index (US-001). No N+1 — one query, at most 2 rows.
+
+  ### 2. Public read path — `DashboardController` (🔧 Alex)
+  - `$athlete = Auth::user() ?? $resolveDisplayedAthlete()`. When both are `null` → `view('strava.connect')` with 200 (AC 3, which supersedes US-002's criterion).
+  - Signed-in path **unchanged**: an owner sees their own map, after the `strava.fresh` middleware has already re-checked the allowlist and the token. With one athlete on the allowlist (the PRD's single-athlete instance), guest and owner resolve the same `User` id.
+  - Shared cache by construction: `HeatmapGridCache` keys on `{user id}:{window start}:{today}`, so a guest and the owner hit the same entry; `ResolveSyncStatus` stays outside the cache and runs on every request (FR-007, AC 9). Neither class changes.
+  - The guest path writes nothing to `users`, `activities`, or `sync_runs` and makes no HTTP call. The only writes a guest request can cause are the framework's session row and a grid-cache entry, which the spec allows (shared cache).
+  - The controller's PHPDoc and the block comment on the `! Auth::check()` branch are rewritten: the "signed-out visit renders the connect screen" rationale is now the "no allowlisted athlete has connected yet" fallback.
+
+  ### 3. Dead token → public map with the banner — `EnsureFreshStravaToken` (🔧 Alex, 🔐 Lars)
+  - The `StravaReconnectRequiredException` branch keeps `endSession()` and replaces the `strava.connect` view with `redirect()->route('dashboard')->with('strava.reconnect', true)`. The flash goes into the session that `invalidate()` just regenerated, so it survives into the next request, which a guest makes. That request renders the public map (or the connect fallback) with the "Your Strava connection expired" banner.
+  - **Chosen:** Post/Redirect/Get, so the URL is `/`, a reload does not repeat the banner, and the middleware does not depend on the guarded route also serving guests. **Rejected:** carrying on with `$next($request)` as a guest in the same request. That ties the middleware to the dashboard's guest behavior and would silently render any future guarded route signed-out. **Rejected:** keeping the connect-only screen, which AC 7 forbids.
+  - The allowlist-removal branch (403 + session ended) is **unchanged** (AC 8).
+  - The guest no-op at the top of `handle()` is unchanged, and it is the guarantee behind AC 6.
+
+  ### 4. Shared notices — `<x-session-notices />` (✨ Joe)
+  - New anonymous component `resources/views/components/session-notices.blade.php` renders both flash notices the connect screen renders today: the OAuth-cancellation `session('status')` (role=status) and the reconnect banner, now driven by `session('strava.reconnect')` (role=alert, same `--warn-*` tokens and copy).
+  - Used by `strava/connect.blade.php` (replacing its inline blocks and the now-unused `$reconnect` view variable) **and** by `dashboard.blade.php`. The OAuth callback's cancel path redirects to `route('dashboard')`, and a guest now lands on the public map there whenever an athlete is connected. Without the shared component that notice would be lost.
+
+  ### 5. Guest UI (✨ Joe, 🎨 Elise, ✍️ Marika)
+  - **Discreet entry point:** a single `@guest` line at the bottom of the dashboard's `content` section: muted `Owner?` followed by a text link **Connect with Strava** to `route('strava.redirect')`, `var(--ink-muted)` with underline, `inline-flex min-h-11` for a 44 px tap target, and a visible `focus-visible` ring. It is a link, not a button. Strava orange stays reserved for the connect-screen button (mockup README). It is not added to the header: at 375 px the header already holds the mark, the sync chip, and the theme toggle, and a fourth control risks horizontal scroll (FR-009).
+  - Signed-in owners do not see it. The connect screen keeps its full button and does not get the extra line.
+  - The sync warning renders for guests exactly as for the owner: title, HTML-escaped reason, and the **Reconnect Strava** link (`x-sync-warning`, unchanged). The PRD records that choice.
+  - **Copy (Marika):** layout `<meta name="description">` drops "Private": `Training dashboard — daily running distance over the last 16 weeks.` The noindex comment in `layouts/app.blade.php` is rewritten from "private instance" to "public but not promoted (PRD → SEO & discoverability)". `<meta name="robots" content="noindex, nofollow">` stays in the layout. So does the "Powered by Strava" footer, which every screen inherits, guests included (AC 10).
+  - The 375 px layout, table semantics, accessible cell names, and light/dark themes come from US-004–US-006 components that render unchanged for guests (AC 11). No new mockup is needed: the only new element is one text line that follows the existing footer typography. Elise's annotation sits in this plan, and the manual test handoff checks it.
+
+  ### Out of scope / unchanged
+  - SEO (🔎 Emma): the PRD declares SEO & discoverability not applicable. No sitemap, no `llms.txt`, no new `robots.txt` rules; `noindex, nofollow` is the whole contract.
+  - Privacy (⚖️ Violet): the owner accepted the Strava API Agreement risk on 2026-10-11 (PRD `### Privacy & legal`), so no new legal task. No cookie beyond the existing session cookie.
+  - No new route, no Form Request, no Policy (`.ai/rules/http.md`), no new dependency (💰 Aurora: zero cost impact).
+
+  ## Git & Branching
+  - Mode: `GITFLOW` — no automatic push
+  - Branch: `feature/US-007-public-dashboard` from `develop` (TASK-00)
+  - Per task: one Conventional Commit `type(US-007): TASK-NN …`; code, tests, and domain docs ride in the same commit (except the TASK-01 catch-up, which commits alone)
+  - Push / remote PR **only** when the user asks in-session; the internal PR description toward `develop` is kept locally
+  - Merge to `develop` after `larapilot-review` approval (auto-approve is ON for autopilot)
+
+  ## Test Data Strategy
+  - No migration, model attribute, or relationship changes in this spec, so factories and seeders stay as they are.
+  - Tests reuse the existing `UserFactory` states `stravaConnected()`, `stravaTokenExpired()`, plus `ActivityFactory::onDate()` and `SyncRunFactory`, and allowlist through `Tests\TestCase::allowlistAthletes()` / `allowlistedAthlete()` (`.ai/rules/tests.md`).
+  - "Removed from the allowlist" = a connected user created by the factory **without** being passed to `allowlistAthletes()`. No new state is needed.
+  - Demo dataset: `TrainingBlockSeeder` already creates athlete `10000001` with a realistic 16-week block. To see the public map locally after `php artisan migrate:fresh --seed`, put `10000001` in the **local** `.env` `STRAVA_ALLOWED_ATHLETE_IDS` (development only — README note added in TASK-07).
+  - Verify `php artisan migrate:fresh --seed` still succeeds before TASK-07 `task-done`.
+
+  ## Test Strategy
+  - Bar: `NORMAL` — PHPUnit feature and unit tests (this project uses PHPUnit, not Pest: `php artisan make:test --phpunit`). **No** Playwright, Dusk, browser, or viewport E2E.
+  - Every test touching the dashboard sets `Http::preventStrayRequests()` in `setUp()`. Config is overridden with `Config::set()` only.
+  - Interleaved: TASK-02 brings its own resolver tests. TASK-04 (Anne) covers the guest read path right after TASK-03. TASK-05 updates `ReconnectStateTest` alongside the middleware change. TASK-06 asserts the entry point. TASK-07 runs the full suite and the quality gate.
+  - Load-bearing assertions (each AC test in the spec):
+    1. guest sees a populated map: 200, `dashboard` view, grid + week totals + legend + sync chip + sync detail;
+    2. no allowlisted athlete connected → `strava.connect`, 200;
+    3. removed athlete is never displayed, and the next allowlisted connected athlete in config order is;
+    4. **read-only:** a guest request against an athlete whose token is **expired** (`stravaTokenExpired`) leaves the `users`, `activities`, and `sync_runs` row counts and the user's `updated_at` and encrypted token columns unchanged, and `Http::assertNothingSent()`. The expired token is what proves "never triggers a token refresh";
+    5. dead-token owner → redirect to `/` → public map with the "Your Strava connection expired" banner, `assertGuest()`;
+    6. guest sees the sync warning, with a failure reason containing `<script>` rendered escaped;
+    7. guest and owner share the grid cache entry (owner warms it; the guest request does not rebuild it), and the sync status reflects a `SyncRun` created between the two requests;
+    8. guest response carries `noindex, nofollow` and "Powered by Strava".
+  - **Manual test handoff** (TASK-07): private window at 375 / 768 / 1280 px in light and dark, keyboard tab order reaches the footer link, VoiceOver reads one cell name.
+
+  ## Developer Domain Docs
+  - `data.dev_docs.documented` is `false` on a codebase with three existing domains, so **TASK-01 is the First-change catch-up** (`runtime-dev-docs-catchup.md`). It writes `strava-connection.md`, `activity-sync.md`, `heatmap-dashboard.md`, and the README index, describing the code **as it is before US-007**, in its own commit.
+  - Every later task updates the domain it touches in its own commit: `strava-connection.md` (allowlist ordering, displayed athlete, dead-token redirect) and `heatmap-dashboard.md` (public read path, shared cache, guest UI).
+
+  ## Risks
+  - **Strava API Agreement** — accepted by the owner (PRD); not re-opened.
+  - **Multi-athlete allowlist** — a second allowlisted athlete who signs in sees their own map while guests see the first one. That is the intended behavior per AC 2; it is documented in `heatmap-dashboard.md` as an invariant, not a bug.
+  - **Partial `User` model** on the guest path — the narrow `select` would make an accidental `save()` or token read fail loudly rather than write. The behavior is intended and documented in the resolver's block comment.
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch and internal PR'
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 0.5
+    dependencies: {}
+    body: |-
+      ## Description
+      Bootstrap Gitflow for US-007: create the feature branch from `develop` and prepare the internal PR description toward `develop`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `git checkout develop` (pull only if already tracking `origin/develop`)
+      2. `git checkout -b feature/US-007-public-dashboard`
+      3. Draft the internal PR title/body toward `develop`: `US-007: Public read-only dashboard on the home page`. Keep it local until push is requested
+      4. Optional empty commit for the branch anchor
+
+      ## Completion Criteria
+      - [x] Branch `feature/US-007-public-dashboard` exists locally
+      - [x] PR title/body drafted for `develop` (remote open only if the user requested push)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — no behavior change
+
+      ## Git Deliverables
+      - Commit: `chore(US-007): TASK-00 bootstrap feature branch`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `develop` — open/update the remote PR only if the user asks (empty commit allowed)
+    commit:
+      sha: 10184058cbb07dc11d26f743739b53c6dad70204
+      short_sha: '1018405'
+      subject: 'chore(US-007): TASK-00 bootstrap feature branch'
+      committed_at: '2026-10-11T14:01:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/10184058cbb07dc11d26f743739b53c6dad70204'
+  -
+    id: TASK-01
+    title: 'First-change catch-up: document the existing domains'
+    type: Impl
+    status: DONE
+    assignee: Albert
+    estimate_hours: 2.5
+    dependencies:
+      - TASK-00
+    body: |-
+      ## Description
+      `data.dev_docs.documented` is `false` while the codebase already has three domains. This task **is** the First-change catch-up that `larapilot-implement` Phase 0 requires (`runtime-dev-docs-catchup.md`): document every existing domain, **as the code is before US-007**, before any US-007 code changes. If Phase 0 has already produced the backfill commit, verify it against this checklist and `task-done` without a second commit.
+
+      ## Files Involved
+      - .larapilot/docs/devs/strava-connection.md — OAuth redirect/callback (gate order, state nonce, scope and write-scope refusal), `AthleteAllowlist` (fail-closed, strict compare), `ConnectStravaAthlete`, encrypted token storage, `EnsureFreshAccessToken` (refresh margin, cache lock, rotated refresh token, undecryptable tokens), `EnsureFreshStravaToken` middleware
+      - .larapilot/docs/devs/activity-sync.md — `SyncStravaActivities` command, schedule, `StravaClient` (pagination, retry/backoff, 429), `ReconcileStravaWindow` (upsert, delete-on-absence, idempotency), `SyncRun` lifecycle, grid-cache invalidation on success
+      - .larapilot/docs/devs/heatmap-dashboard.md — `DashboardController`, `HeatmapWindow`, `DailyRunningDistance`, `HeatmapBuilder`, `CalibrateIntensityScale` (R-7 pinned — `.ai/rules/heatmap.md`), `HeatmapGridCache` (day-keyed), `ResolveSyncStatus` / `SyncStatus` (outside the cache), Blade components, themes, a11y contract
+      - .larapilot/docs/devs/README.md — index rows for the three files
+
+      ## Steps
+      1. Read the code of each domain (paths above) and the US-001–US-006 plans under `.larapilot/plans/` for the recorded rationale
+      2. Create each file from `TEMPLATE.md`: Purpose, Functional flow (including failure paths), Technical design table, Architectural choices with rejected alternatives (lift the existing `/* … */` rationale comments, e.g. state consumed first, lock against refresh-token rotation, today in the cache key), Key decisions & invariants, Extension points & gotchas, Related
+      3. Metadata: `Introduced by` = the originating spec (US-002 / US-003 / US-004), `Last updated by` = `US-007 — {date}` (catch-up)
+      4. Replace the `_(none yet)_` row in `README.md` with the three domains
+      5. English only; env var **names** only, no values, no absolute paths
+
+      ## Completion Criteria
+      - [x] `strava-connection.md`, `activity-sync.md`, `heatmap-dashboard.md` exist, every template section filled
+      - [x] Each file describes the pre-US-007 behavior accurately (guest → connect screen; dead token → connect screen)
+      - [x] `README.md` index lists the three domains with a one-line purpose and last spec
+      - [x] Committed on its own, before TASK-02
+
+      ## Test Data
+      - N/A — documentation only
+
+      ## Domain Docs
+      - [x] This task is the domain-doc backfill itself (all three files + README index)
+      - [x] English, committed alone
+
+      ## Git Deliverables
+      - Commit: `chore(US-007): TASK-01 backfill developer domain docs`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `develop` — open/update the remote PR only if the user asks
+  -
+    id: TASK-02
+    title: 'Resolve the displayed athlete from the ordered allowlist'
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-01
+    body: |-
+      ## Description
+      Add the read-only resolver that decides which athlete a signed-out visitor sees: the first id in `STRAVA_ALLOWED_ATHLETE_IDS`, in configured order, that has a connected user record (AC 2). It must never load, decrypt, or refresh tokens.
+
+      ## Files Involved
+      - app/Support/Strava/AthleteAllowlist.php — add `athleteIds(): array<int, string>`; rewrite `allows()` on top of it
+      - app/Support/Strava/ResolveDisplayedAthlete.php — new (`php artisan make:class Support/Strava/ResolveDisplayedAthlete --no-interaction`)
+      - tests/Feature/Strava/ResolveDisplayedAthleteTest.php — new (`php artisan make:test --phpunit ResolveDisplayedAthleteTest --no-interaction`, moved under `Strava/`)
+      - tests/Unit/Support/Strava/AthleteAllowlistTest.php — add an ordering case for `athleteIds()`
+      - config/strava.php — comment on the allowlist block: order now decides the displayed athlete
+      - .env.example — comment above `STRAVA_ALLOWED_ATHLETE_IDS`: the first connected id is shown on the public home page
+
+      ## Steps
+      1. `AthleteAllowlist::athleteIds()` returns `config('strava.allowed_athlete_ids', [])` as `array<int, string>`, in order. `allows()` = `in_array($id, $this->athleteIds(), strict: true)`, behavior unchanged
+      2. `ResolveDisplayedAthlete` — `final readonly class`, constructor-promoted `private AthleteAllowlist $allowlist`, `__invoke(): ?User`:
+         - empty `athleteIds()` → return `null` before querying
+         - `User::query()->select(['id', 'name', 'strava_athlete_id'])->whereIn('strava_athlete_id', $ids)->get()->keyBy('strava_athlete_id')`
+         - iterate `$ids` in order and return the first match, else `null`
+         - block comments (`.ai/rules/app.md`): why order comes from config and not the DB, why the narrow `select` (no token columns ever reach the guest path), why token state is ignored (dead-token owner must still be displayed)
+      3. Tests (`Http::preventStrayRequests()` in `setUp()`; `Config::set` / `allowlistAthletes()`):
+         - returns `null` for an empty allowlist and runs no query (`DB::enableQueryLog()` → 0 queries)
+         - returns `null` when allowlisted ids have no user row
+         - with `['222', '111']` allowlisted and both connected → returns `222`
+         - with `['222', '111']` and only `111` connected → returns `111`
+         - a connected user **not** on the allowlist is never returned, even when they are the only row
+         - an athlete in `stravaTokenExpired()` state is still returned; the returned model has no `strava_access_token` / `strava_refresh_token` attributes loaded
+         - exactly one query when the allowlist is non-empty
+      4. `php artisan test --compact tests/Feature/Strava/ResolveDisplayedAthleteTest.php tests/Unit/Support/Strava/AthleteAllowlistTest.php`
+      5. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [x] `athleteIds()` preserves configured order; `allows()` behavior unchanged (existing tests green)
+      - [x] Resolver returns the first connected allowlisted athlete in config order, or `null`
+      - [x] Resolver never selects token columns and runs ≤ 1 query
+      - [x] `.env.example` and `config/strava.php` comments state the ordering semantics
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes; tests use `UserFactory::stravaConnected()` / `stravaTokenExpired()`
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/strava-connection.md` updated — allowlist order now selects the displayed athlete; the resolver, its single query, the narrow select, and the rejected "order by DB id" alternative
+      - [x] `README.md` index row "Last touched by" refreshed
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-007): TASK-02 resolve the displayed athlete from the ordered allowlist`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `develop` — open/update the remote PR only if the user asks
+    commit:
+      sha: 2e35efc3a052a2b81f6079cc24effdcd7e844e6e
+      short_sha: 2e35efc
+      subject: 'feat(US-007): TASK-02 resolve the displayed athlete from the ordered allowlist'
+      committed_at: '2026-10-11T14:04:32+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/2e35efc3a052a2b81f6079cc24effdcd7e844e6e'
+  -
+    id: TASK-03
+    title: 'Serve the public read-only dashboard to signed-out visitors'
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2.5
+    dependencies:
+      - TASK-02
+    body: |-
+      ## Description
+      Make `GET /` render the displayed athlete's heatmap, legend, and sync status for signed-out visitors, fall back to the connect screen when nobody is displayable, and share the flash notices between the dashboard and the connect screen (AC 1, 3, 6, 9).
+
+      ## Files Involved
+      - app/Http/Controllers/DashboardController.php
+      - resources/views/components/session-notices.blade.php — new anonymous component
+      - resources/views/strava/connect.blade.php — use `<x-session-notices />`, drop the `$reconnect` variable
+      - resources/views/dashboard.blade.php — include `<x-session-notices />` above the heading block
+      - CHANGELOG.md — `## [Unreleased]` → `### Changed`
+
+      ## Steps
+      1. `DashboardController::__invoke` adds the `ResolveDisplayedAthlete $resolveDisplayedAthlete` parameter (collaborators as `__invoke` params — `.ai/rules/http.md`):
+         - `/** @var User|null $athlete */ $athlete = Auth::user() ?? $resolveDisplayedAthlete();`
+         - `null` → `return view('strava.connect');`
+         - the rest (window, `$gridCache->remember(...)`, `$resolveSyncStatus(...)`, `view('dashboard', ...)`) stays as-is and serves both paths
+         - rewrite the PHPDoc and add a block comment: the guest path is read-only by structure. It never calls `EnsureFreshAccessToken` or `StravaClient`, the middleware is a no-op for guests, and the resolver loads no token columns. Same cache key for guest and owner, so the cache is shared. Sync status is still resolved outside the cache
+      2. `session-notices` component: move the two blocks from `strava/connect.blade.php` verbatim (cancellation `session('status')` with `role="status"`; reconnect alert `role="alert"` with `--warn-*` tokens and the copy "Your Strava connection expired. Connect again to keep the heatmap up to date."). The reconnect block now reads `session('strava.reconnect')`. Comment why the component is shared: the OAuth cancel path redirects to `dashboard`, which guests now see as the public map
+      3. `dashboard.blade.php`: render `<x-session-notices />` at the top of `content`, constrained to the dashboard width (not `max-w-sm mx-auto`) so the 375 px layout holds — pass a `class` attribute or let the component accept `$attributes->merge()`
+      4. CHANGELOG Unreleased → `### Changed`: the home page shows the owner's heatmap read-only without signing in, and signing in stays allowlist-only (US-007)
+      5. Smoke-check at 375 / 768 / 1280 px in Herd as a guest (private window) with `TrainingBlockSeeder` data and `10000001` allowlisted locally
+      6. `php artisan test --compact tests/Feature/Dashboard` — existing guest tests (no user rows) must still get `strava.connect`
+      7. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [x] Signed-out `GET /` with a connected allowlisted athlete → 200, `dashboard` view, that athlete's grid, legend, sync chip, sync detail
+      - [x] Signed-out `GET /` with no displayable athlete → 200, `strava.connect`
+      - [x] Signed-in path unchanged (`ConnectScreenTest::test_a_connected_athlete_gets_the_dashboard` green)
+      - [x] Cancellation notice renders on both the dashboard and the connect screen
+      - [x] No horizontal page scroll at 375 px for a guest (manual smoke)
+      - [x] CHANGELOG Unreleased updated
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — functional flow now has the guest branch (displayed athlete → cache → fresh sync status) and the connect fallback; shared-cache invariant; `session-notices` and why it is shared; multi-athlete note (owner sees own map, guests see the first)
+      - [x] `README.md` index row refreshed
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-007): TASK-03 serve the public read-only dashboard to guests`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `develop` — open/update the remote PR only if the user asks
+    commit:
+      sha: 5916fd521f4f73832cda17e90ef45264e40801e6
+      short_sha: 5916fd5
+      subject: 'feat(US-007): TASK-03 serve the public read-only dashboard to guests'
+      committed_at: '2026-10-11T14:06:05+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5916fd521f4f73832cda17e90ef45264e40801e6'
+  -
+    id: TASK-04
+    title: 'Cover the guest read path: populated map, fallbacks, read-only, warning, cache'
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 2.5
+    dependencies:
+      - TASK-03
+    body: |-
+      ## Description
+      Add PHPUnit feature coverage for the signed-out dashboard at the `NORMAL` bar: the spec's guest test list, minus the dead-token case, which TASK-05 owns.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/PublicDashboardTest.php — new (`php artisan make:test --phpunit PublicDashboardTest --no-interaction`, moved under `Dashboard/`)
+
+      ## Steps
+      1. `setUp()`: `Http::preventStrayRequests()`. Use existing factories (`UserFactory::stravaConnected()` / `stravaTokenExpired()`, `ActivityFactory::for($athlete)->onDate(...)`, `SyncRunFactory`) and `allowlistAthletes()`. Do not duplicate factory definitions
+      2. Cases:
+         - `test_a_guest_sees_the_displayed_athletes_populated_map` — 200, `assertViewIs('dashboard')`, a known cell's accessible name and week total, legend heading, sync chip label, sync detail
+         - `test_a_guest_gets_the_connect_screen_when_no_allowlisted_athlete_has_connected` — allowlist set, no rows → 200 `strava.connect`
+         - `test_an_athlete_removed_from_the_allowlist_is_never_displayed` — two connected athletes, only the second allowlisted → the second's distance shows, the first's never does. With only the removed athlete stored → connect screen
+         - `test_the_first_connected_id_in_configured_order_is_displayed` — allowlist `[B, A]`, both connected → B
+         - `test_a_guest_request_writes_nothing_and_sends_no_request_even_with_an_expired_token` — displayed athlete in `stravaTokenExpired()`; snapshot the row counts of `users`, `activities`, `sync_runs` and the user's raw `updated_at`, `strava_access_token`, `strava_refresh_token`, `strava_token_expires_at` (via `DB::table('users')`). After `GET /` all are identical and `Http::assertNothingSent()`
+         - `test_a_guest_sees_the_same_sync_warning_as_the_owner` — failed `SyncRun` whose `error_message` contains `<script>alert(1)</script>` → warning title, escaped reason (`assertSee` escaped, `assertDontSee` raw), `route('strava.redirect')` link
+         - `test_guests_and_the_owner_share_the_grid_cache_while_the_sync_status_stays_fresh` — owner request warms the cache; add an activity directly (no forget); the guest request shows the **cached** grid (new distance absent). Then add a newer failed `SyncRun`: the guest's next request shows the warning, so the status is uncached
+         - `test_the_public_dashboard_keeps_noindex_and_the_strava_attribution` — `<meta name="robots" content="noindex, nofollow">` and `Powered by Strava` in the guest response
+      3. `php artisan test --compact tests/Feature/Dashboard/PublicDashboardTest.php`
+      4. Do **not** add Playwright, Dusk, browser, or viewport suites
+
+      ## Completion Criteria
+      - [x] All eight cases pass
+      - [x] The read-only case would fail if the guest path refreshed a token (expired-token fixture + `preventStrayRequests`)
+      - [x] Coverage matches the `NORMAL` bar
+
+      ## Test Data
+      - N/A — existing factories and states only
+
+      ## Domain Docs
+      - N/A — tests only; no behavior change
+
+      ## Git Deliverables
+      - Commit: `test(US-007): TASK-04 cover the public dashboard guest path`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `develop` — open/update the remote PR only if the user asks
+    commit:
+      sha: c7db1fe306c185244689f2ac67aec4ae55e22de4
+      short_sha: c7db1fe
+      subject: 'test(US-007): TASK-04 cover the public dashboard guest path'
+      committed_at: '2026-10-11T14:06:46+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c7db1fe306c185244689f2ac67aec4ae55e22de4'
+  -
+    id: TASK-05
+    title: 'Land a dead-token owner on the public map with the expiry banner'
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-03
+    body: |-
+      ## Description
+      When the signed-in owner's Strava token can no longer be refreshed, end the session and redirect to `/`. The guest request that follows shows the public dashboard with the "Your Strava connection expired" banner instead of a connect-only screen (AC 7). The allowlist-removal 403 stays unchanged (AC 8).
+
+      ## Files Involved
+      - app/Http/Middleware/EnsureFreshStravaToken.php
+      - tests/Feature/Strava/ReconnectStateTest.php
+
+      ## Steps
+      1. In the `StravaReconnectRequiredException` catch: keep `$this->endSession($request);`, then `return redirect()->route('dashboard')->with('strava.reconnect', true);`
+      2. Rewrite the block comment: the flash lands in the session `invalidate()` just regenerated. Post/Redirect/Get keeps the URL `/` and does not repeat the banner on reload. Rejected alternatives: continuing `$next` as a guest (couples the middleware to a route that happens to serve guests) and the old connect-only screen (AC 7)
+      3. Update the class PHPDoc ("standing guard on every authenticated screen", "a no-op for guests") so it reflects the redirect
+      4. `ReconnectStateTest`:
+         - `test_a_dead_refresh_token_shows_the_reconnect_screen_rather_than_a_server_error` → rename to `test_a_dead_refresh_token_signs_the_owner_out_onto_the_public_map_with_the_expiry_banner`: `assertRedirect(route('dashboard'))`, `assertGuest()`, then `followingRedirects()` (or a second `get('/')` carrying the session) → 200, `dashboard` view, the owner's grid, the text `Your Strava connection expired`
+         - `test_undecryptable_tokens_show_the_reconnect_screen` → same redirect + banner expectation. The displayed athlete's tokens are undecryptable, but the guest path never reads them, so the follow-up request must still be 200 — assert it
+         - add `test_the_expiry_banner_is_shown_once` — a second guest `GET /` after the follow-up does not show the banner
+         - `test_removing_an_athlete_from_the_allowlist_ends_their_session_immediately` and `test_the_middleware_is_a_no_op_for_a_guest` stay green, unchanged
+      5. `php artisan test --compact tests/Feature/Strava/ReconnectStateTest.php tests/Feature/Dashboard`
+      6. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [x] Dead-token owner → signed out → `/` renders the public map with the banner, 200
+      - [x] Undecryptable tokens follow the same path without a 500
+      - [x] Banner is flashed once, not sticky
+      - [x] Allowlist-removal 403 unchanged
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes; uses `stravaTokenExpired()`
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/strava-connection.md` updated — dead-token flow now ends on the public dashboard via redirect + flash; rejected alternatives; invariant: the 403 allowlist branch never redirects
+      - [x] `README.md` index row refreshed
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-007): TASK-05 land a dead-token owner on the public map`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `develop` — open/update the remote PR only if the user asks
+    commit:
+      sha: 7ab62f47b291f3931070f89543ed0211670409d9
+      short_sha: 7ab62f4
+      subject: 'feat(US-007): TASK-05 land a dead-token owner on the public map'
+      committed_at: '2026-10-11T14:07:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/7ab62f47b291f3931070f89543ed0211670409d9'
+  -
+    id: TASK-06
+    title: 'Discreet guest "Connect with Strava" entry point and public-page copy'
+    type: Impl
+    status: DONE
+    assignee: Joe
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-03
+    body: |-
+      ## Description
+      Give signed-out visitors a discreet way to sign in from the public map, and update the copy that still calls the page private (AC 4, AC 10, AC 11). The OAuth flow itself is unchanged.
+
+      ## Files Involved
+      - resources/views/dashboard.blade.php — `@guest` entry-point line at the end of `content`
+      - resources/views/layouts/app.blade.php — meta description + noindex comment
+      - tests/Feature/Dashboard/ConnectScreenTest.php — entry-point assertions
+
+      ## Steps
+      1. Mobile first (375 px): at the end of the dashboard `content`, inside `@guest … @endguest`, add `<p class="mt-6 text-xs" style="color: var(--ink-muted);">Owner? <a href="{{ route('strava.redirect') }}" class="inline-flex min-h-11 items-center underline underline-offset-2 focus-visible:…">Connect with Strava</a></p>`. Use the existing focus-visible ring tokens from `resources/css/app.css`, no Strava orange (reserved for the connect-screen button), and no new header control (375 px header budget)
+      2. Block comment in the view: why a footer text link and not a header button (discreet, header width at 375 px, orange reserved)
+      3. Layout: meta description → `Training dashboard — daily running distance over the last 16 weeks.`; noindex comment → "Publicly reachable but not promoted — PRD SEO & discoverability: nothing here to index." `<meta name="robots" content="noindex, nofollow">` and the "Powered by Strava" footer stay untouched
+      4. Marika: check the copy is terse and factual, with no motivational voice (PRD Copy & tone)
+      5. `ConnectScreenTest` additions:
+         - `test_a_guest_on_the_public_map_gets_a_discreet_connect_link` — connected allowlisted athlete, guest `GET /` → `Connect with Strava` + `route('strava.redirect')` present
+         - `test_the_signed_in_owner_does_not_get_the_guest_connect_link` — `actingAs($this->allowlistedAthlete())` → `assertDontSee('Owner?')`
+         - the existing rejection and `StravaConnectFlowTest` cases stay green: an allowlisted athlete signs in, any other is rejected with nothing persisted (AC 4 — flow unchanged)
+      6. Smoke-check 320 / 375 / 768 / 1280 px, light + dark, keyboard focus reaching the link
+      7. `php artisan test --compact tests/Feature/Dashboard/ConnectScreenTest.php tests/Feature/Strava/StravaConnectFlowTest.php`
+
+      ## Completion Criteria
+      - [x] Guests see the discreet link on the public map; signed-in owners do not
+      - [x] Tap target ≥ 44 px, visible focus, AA contrast in light and dark
+      - [x] No horizontal page scroll at 375 px
+      - [x] Meta description and noindex comment no longer say "private"; robots meta and Strava attribution unchanged
+      - [x] OAuth flow tests unchanged and green
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — guest UI section: entry-point placement and why, copy, SEO contract (`noindex, nofollow` only)
+      - [x] `README.md` index row refreshed
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-007): TASK-06 add the guest connect entry point`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `develop` — open/update the remote PR only if the user asks
+    commit:
+      sha: 66b7e22191ee3e248c8f4daa7b51cef8f1136337
+      short_sha: 66b7e22
+      subject: 'feat(US-007): TASK-06 add the guest connect entry point'
+      committed_at: '2026-10-11T14:08:07+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/66b7e22191ee3e248c8f4daa7b51cef8f1136337'
+  -
+    id: TASK-07
+    title: 'Verify the spec, README, and manual test handoff'
+    type: Impl
+    status: DONE
+    assignee: Anne
+    estimate_hours: 1
+    dependencies:
+      - TASK-04
+      - TASK-05
+      - TASK-06
+    body: |-
+      ## Description
+      Close the spec: full suite, quality gate, the seeded demo, the README baseline update, and the manual test handoff for the public page.
+
+      ## Files Involved
+      - README.md — "The dashboard" section + `STRAVA_ALLOWED_ATHLETE_IDS` row
+      - .larapilot/docs/devs/heatmap-dashboard.md — final consistency pass (Related links)
+
+      ## Steps
+      1. `php artisan test --compact` — full suite green
+      2. `php artisan larapilot:quality` — Pint + Larastan level 5 clean
+      3. `php artisan migrate:fresh --seed` succeeds
+      4. README (Albert baseline):
+         - "The dashboard": the home page is public and read-only. It shows the first connected athlete of `STRAVA_ALLOWED_ATHLETE_IDS`, in order. Signing in is only needed to connect Strava
+         - env table row for `STRAVA_ALLOWED_ATHLETE_IDS`: order matters — the first connected id is displayed publicly
+         - local demo note: allowlist the seeded `10000001` in your **local** `.env` only to see the public map after seeding, and never in production
+      5. Manual test handoff (append to the PR notes): private window → `/` at 375 / 768 / 1280 px, light and dark. Tab reaches the footer "Connect with Strava". VoiceOver reads one cell's date + km. Expire the owner's token locally → the banner shows on the public map once
+      6. Final pass over `heatmap-dashboard.md` / `strava-connection.md` against the merged behavior
+
+      ## Completion Criteria
+      - [x] Full suite and `larapilot:quality` green
+      - [x] `migrate:fresh --seed` succeeds
+      - [x] README states the public home page and the allowlist-order semantics
+      - [x] Manual test handoff recorded in the PR notes
+      - [x] Domain docs match the final behavior
+
+      ## Test Data
+      - [x] `migrate:fresh --seed` verified; no factory/seeder change needed (no schema change in this spec)
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` and `strava-connection.md` final consistency pass; `README.md` index current
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-007): TASK-07 document the public dashboard and verify the spec`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `develop` — open/update the remote PR only if the user asks
+    commit:
+      sha: 4d03a27bd20975257aff329310dec231f56759dd
+      short_sha: 4d03a27
+      subject: 'chore(US-007): TASK-07 document the public dashboard and verify the spec'
+      committed_at: '2026-10-11T14:08:36+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4d03a27bd20975257aff329310dec231f56759dd'
+updated_at: '2026-10-11T12:08:36+00:00'
