@@ -8,7 +8,6 @@ use App\Enums\SportType;
 use App\Exceptions\Garmin\GarminCsvRejectedException;
 use App\Support\Garmin\ParseGarminCsv;
 use App\Support\Heatmap\HeatmapWindow;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
@@ -17,18 +16,26 @@ class ParseGarminCsvTest extends TestCase
     private const IT_HEADER = 'Tipo di attività,Data,Preferita,Titolo,Distanza,Tempo,Tempo in movimento';
 
     /**
-     * A fake upload's temp file is deleted when the UploadedFile is destroyed, so
-     * each one is held here until the test ends.
+     * Files written by this test, removed in tearDown().
      *
-     * @var array<int, UploadedFile>
+     * @var array<int, string>
      */
-    private array $uploads = [];
+    private array $temporaryFiles = [];
 
     protected function setUp(): void
     {
         parent::setUp();
 
         Carbon::setTestNow('2026-10-11 12:00:00');
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->temporaryFiles as $path) {
+            @unlink($path);
+        }
+
+        parent::tearDown();
     }
 
     public function test_the_italian_client_sample_parses_to_37_runs_and_ignores_the_hikes(): void
@@ -215,8 +222,9 @@ class ParseGarminCsvTest extends TestCase
 
     private function file(string $contents): string
     {
-        $this->uploads[] = $upload = UploadedFile::fake()->createWithContent('activities.csv', $contents);
+        $path = (string) tempnam(sys_get_temp_dir(), 'garmin-csv-');
+        file_put_contents($path, $contents);
 
-        return $upload->getRealPath();
+        return $this->temporaryFiles[] = $path;
     }
 }
