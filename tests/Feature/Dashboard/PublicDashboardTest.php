@@ -162,6 +162,18 @@ class PublicDashboardTest extends TestCase
         $response->assertSee('Powered by Strava');
     }
 
+    public function test_the_owner_sees_the_import_garmin_csv_entry_point_and_guests_do_not(): void
+    {
+        $owner = $this->allowlistedAthlete();
+
+        $this->getDashboard()->assertDontSee('Import Garmin CSV');
+
+        $this->actingAs($owner)
+            ->get('/')
+            ->assertSee('Import Garmin CSV')
+            ->assertSee('href="'.route('garmin.import.create').'"', escape: false);
+    }
+
     private function runOn(User $athlete, string $date, int $distanceMeters): void
     {
         Activity::factory()->for($athlete)->onDate(CarbonImmutable::parse($date))->create([
