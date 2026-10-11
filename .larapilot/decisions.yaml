@@ -233,4 +233,17 @@ decisions:
     source: askquestion
     spec: US-008
     supersedes: null
-updated_at: '2026-10-11T13:14:45+00:00'
+  -
+    id: 27e741c1b37d6e4a
+    ts: '2026-10-11T13:23:50+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'public dashboard displayed athlete fallback'
+    label: 'public dashboard displayed athlete fallback'
+    value: 'When no allowlisted athlete has connected, the home page shows the first stored athlete with runs, regardless of the allowlist'
+    question: null
+    rationale: 'Owner wants the dashboard instead of the Strava connect screen when only stored/imported data exists; accepts dropping the removed-athlete privacy guarantee for that case'
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-10-11T13:23:50+00:00'

@@ -145,11 +145,12 @@ Displaying non-running sports (rides, swims, strength) on the same map, and supp
 
 **MoSCoW:** Must · **Persona:** The Committed Amateur Runner
 **Actor & trigger:** anyone opening the home page, signed in or not — typically the runner on a device with no session, or someone the runner shared the link with
-**Behavior:** the home page renders the displayed athlete's last synced heatmap, weekly totals, legend, and sync status without a Strava sign-in. The displayed athlete is the first id in the allowlist, in configured order, that has a connected user record. A signed-out visit is strictly read-only.
+**Behavior:** the home page renders the displayed athlete's last synced heatmap, weekly totals, legend, and sync status without a Strava sign-in. The displayed athlete is the first id in the allowlist, in configured order, that has a connected user record; when no allowlisted athlete has connected, it is the first stored athlete (lowest id) with at least one activity of either source, whatever the allowlist says. A signed-out visit is strictly read-only.
 **Done means:**
 - a signed-out visit to the home page returns the same grid, legend, and sync status the signed-in owner sees
-- an athlete removed from the allowlist is never displayed, even while their rows remain stored
-- when no allowlisted athlete has connected yet, the home page shows the connect screen instead of an error
+- a connected allowlisted athlete is always displayed ahead of any other stored athlete
+- when no allowlisted athlete has connected, the first stored athlete with at least one activity is displayed — including one removed from the allowlist
+- when no stored athlete has any activity, the home page shows the connect screen instead of an error
 - a signed-out visit writes no row and makes no call to Strava, and never triggers a token refresh
 - the page keeps `noindex, nofollow` and the "Powered by Strava" attribution
 **Out of this FR:** SEO and any marketing surface; per-visitor maps (FR-016); any write action for signed-out visitors
@@ -275,6 +276,8 @@ Single-athlete instance holding the owner's own data, displayed publicly and rea
 
 **Accepted risk — Strava API Agreement (FR-017):** since 11 November 2024 the agreement allows a third-party app to display a user's Strava activity data only to that user. Showing the owner's heatmap to anyone with the link goes against that clause. The owner accepted the risk on 2026-10-11: the realistic consequence is that Strava revokes this application's API access, which stops the daily sync (FR-002). The sync-failure reason is shown to visitors exactly as it is shown to the owner, also by the owner's choice.
 
+**Accepted risk — fallback display (FR-017):** when no allowlisted athlete has connected, the home page publicly displays the first stored athlete with activities, even one removed from the allowlist. Removing an athlete from the allowlist therefore no longer hides their stored data on its own; deleting their rows does. The owner accepted this on 2026-10-11.
+
 ### Security _(Lars)_
 
 - OAuth tokens encrypted at rest; client credentials in `.env` only, never committed.
@@ -318,3 +321,4 @@ Not a constraint at this scale: one athlete, ~100 rows in the window, one page, 
 | 2026-09-05 | larapilot-inception | Initial PRD |
 | 2026-10-11 | larapilot-feature US-007 | Change request FR-001: sign-in no longer gates viewing (before: "Signing in to the dashboard *is* authorising Strava"). Added FR-017 Public read-only dashboard (MoSCoW: Must); Out of Scope, SEO, Auth, and Privacy & legal updated; Strava API Agreement risk accepted |
 | 2026-10-11 | larapilot-feature US-008 | Added FR-018 Garmin Connect CSV import (MoSCoW: Must). Change request FR-002: delete-on-absence now Strava-sourced only and Garmin-overwritten activities are never reverted or re-added (before: every local activity absent from the response was deleted). FR-008 clarified: no deep-link for imported activities. Data model gains activity source |
+| 2026-10-11 | larapilot-feature US-009 | Change request FR-017: when no allowlisted athlete has connected, the home page displays the first stored athlete with activities (before: "an athlete removed from the allowlist is never displayed" and "when no allowlisted athlete has connected yet, the home page shows the connect screen"). Privacy & legal: fallback-display risk accepted |
