@@ -309,3 +309,29 @@ body.sk-mockup {
   .sk-sidebar { display: none; }
   .sk-sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); background: var(--background); cursor: pointer; }
 }
+
+/* Static mockup auth — text field styled like a secret, without type=password (avoids password-manager autofill). */
+/* Credential fields are drawn, not built: a box that looks like the input.
+   A real input makes password managers offer to fill and save in every preview. */
+.mock-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+}
+
+.mock-field {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mock-field--secret {
+  letter-spacing: 0.18em;
+}
+
+.mock-field--empty {
+  opacity: 0.6;
+}

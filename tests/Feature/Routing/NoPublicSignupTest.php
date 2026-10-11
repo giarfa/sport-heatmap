@@ -19,10 +19,15 @@ class NoPublicSignupTest extends TestCase
         $this->assertFalse(Route::has('register'));
     }
 
+    /**
+     * The dev-only Larapilot dashboard is excluded: its `security/register.md`
+     * is a security findings register, not a signup page.
+     */
     public function test_no_registered_route_uri_mentions_registration(): void
     {
         $registrationRoutes = collect(Route::getRoutes()->getRoutes())
             ->map(fn (RoutingRoute $route): string => $route->uri())
+            ->reject(fn (string $uri): bool => str_starts_with($uri, 'larapilot/'))
             ->filter(fn (string $uri): bool => str_contains($uri, 'register'))
             ->values();
 

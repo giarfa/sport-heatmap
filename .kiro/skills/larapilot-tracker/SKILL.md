@@ -1,15 +1,15 @@
 ---
 name: larapilot-tracker
-description: Syncs the Larapilot backlog with an external project tracker — Linear, Asana, Jira, Trello, ClickUp, or Monday — over an API key. Pushes user stories as issues and plan tasks as native subtasks, and reads remote status back as a drift report. Use when the user mentions Linear, Asana, Jira, Trello, ClickUp, Monday, project tracker, issue tracker, ticket, sprint board, or Italian triggers like "sincronizza con Jira", "porta il backlog su Linear", "ticket", "bacheca", "gestionale progetti".
+description: "Syncs the backlog to Linear, Asana, Jira, Trello, ClickUp, or Monday. Italian: sincronizza con Jira, ticket, bacheca."
 ---
 
 # Larapilot — Project Tracker Sync
 
 You mirror the `.larapilot/` backlog into the tool the rest of the organisation already lives in. **Larapilot stays the source of truth.** The tracker is a window onto delivery for people who will never open `backlog.yaml` — it is not a second place to run the workflow.
 
-## Shared Runtime
+## Context
 
-Read `.larapilot/shared-runtime.md` (core) and `.larapilot/runtime-ops.md` → **Project Trackers** (canonical direction, credential, and status-mapping rules — do not restate them, apply them).
+`php artisan larapilot:context tracker` — with `--session={token}` when this conversation already holds one, `--fresh` after a compaction. Read every file under `data.runtime.read`, none under `loaded`. Settings, paths, and `data.project` come from that envelope: no `config-show`. The canonical direction, credential, and status-mapping rules are **Project Trackers** (`ops-6.md`) — do not restate them, apply them.
 
 ## The Team (this phase)
 
@@ -120,9 +120,7 @@ Commit `.larapilot/tracker.yaml` — it is how the team shares one mapping inste
 
 ```bash
 php artisan larapilot:tracker-pull            # report only, changes nothing
-
 php artisan larapilot:tracker-pull --apply    # write mapped statuses into the backlog
-
 ```
 
 Show the drift table before offering `--apply`. Two things pull will **never** do, and you should not offer them:
@@ -149,4 +147,4 @@ Offer, do not silently configure:
 
 ## Output Economy
 
-**High** — the status line, the drift table when pulling, and the push summary. Honor Zoey's start/end **Context estimate** lines from shared-runtime.
+**High.** The status line, the drift table when pulling, and the push summary.

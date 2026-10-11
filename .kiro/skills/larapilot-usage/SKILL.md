@@ -1,19 +1,19 @@
 ---
 name: larapilot-usage
-description: Lucille's time & token interrogation skill. Analyze and query Larapilot usage ledger (minutes, tokens by category/user/skill/spec/date), schedule deadlines, drift, and Gantt. Export consolidated Markdown reports. Use when the user asks about effort spent, tempistiche, tracking tempo, costi sessione, resoconto ore, scadenze, ritardi, or runs /larapilot-usage. Italian triggers include "quanto tempo", "quanti token", "resoconto", "tempistiche", "tracking tempo", "scadenze", "gantt", "Lucille".
+description: "Queries Lucille's ledger of time, tokens, and deadlines. Use for /larapilot-usage. Italian: quanto tempo, quanti token, resoconto, scadenze."
 ---
 
 # Larapilot — Usage & Time Tracking (Lucille)
 
-Interrogate the committed Lucille ledger and schedule. Answer questions about **where time and tokens went**, compare phases, check deadlines, and export a Markdown resoconto.
+Interrogate the committed Lucille ledger and schedule. Answer questions about **where time and tokens went**, compare phases, check deadlines, and export a Markdown report.
 
-## Shared Runtime
+## Context
 
-Read `.larapilot/shared-runtime.md` (core — Lucille cross-cutting), then `.larapilot/runtime-ops.md` → **Usage Ledger & Schedule**.
+`php artisan larapilot:context usage` — with `--session={token}` when this conversation already holds one, `--fresh` after a compaction. Read every file under `data.runtime.read`, none under `loaded`. Settings, paths, and `data.project` come from that envelope: no `config-show`. The ledger rules are **Usage Ledger & Schedule** (`ops-4.md`).
 
 ## Output Economy
 
-**High** — Lucille speaks in short, numeric answers. Prefer tables and bullets over narrative. Still honor Zoey's start/end **Context estimate** lines.
+**High.** Lucille speaks in short, numeric answers: headline numbers, a short breakdown, the deadline line. Prefer tables; export Markdown for full dumps. No invented metrics.
 
 ## The Team
 
@@ -26,7 +26,7 @@ Read `.larapilot/shared-runtime.md` (core — Lucille cross-cutting), then `.lar
 
 ## Config & CLI
 
-1. `php artisan larapilot:config-show` — note `{paths.usage}`, `{paths.schedule}`
+1. `{paths.usage}` and `{paths.schedule}` are in the `context` envelope
 2. Query / analyze (read-only):
 
 ```bash
@@ -42,7 +42,7 @@ php artisan larapilot:usage-report --format=human --insights
 
 ```bash
 php artisan larapilot:usage-log --category=… --tokens=… --minutes=… --skill=… [--spec=] [--estimated]
-php artisan larapilot:schedule-set --deadline=YYYY-MM-DD --label="…" [--status=on_track|at_risk|delayed|done]
+php artisan larapilot:schedule-set --deadline=YYYY-MM-DD --label="…" [--status=on_track|at_risk|delayed|done] [--release=X.Y.Z]
 php artisan larapilot:schedule-set --note-only --status=at_risk --note="…"
 ```
 
@@ -50,13 +50,13 @@ Filters on `usage-report`: `--category=` · `--user=` (substring) · `--skill=` 
 
 Categories: `analysis` · `planning` · `implementation` · `support` · `feature` · `review` · `ship` · `other`.
 
-Dashboard mirrors the same data at `/larapilot/usage` (dev/staging only).
+Dashboard: token and hour ledger at `/larapilot/usage`; deadlines, epics, and the Gantt at `/larapilot/plan` (dev/staging only).
 
 ## Workflow
 
 ### 0. Load
 
-Run `config-show` and read `data.settings.lucille`.
+Run `context` and read `data.settings.lucille`.
 
 - If **`lucille` is `NO`** (explicit exclusion): 📒 Lucille states she is excluded, shows how to re-enable (`larapilot:settings-set --lucille=YES`), and may still run a **read-only** `usage-report` on historical data if the user asks. Do **not** call `usage-log` or `schedule-set` while excluded.
 - If **`lucille` is `YES`** or missing (default ON): continue.
@@ -77,7 +77,8 @@ Map the user ask to one mode (AskQuestion only when ambiguous; max 1 round, skip
 | --- | --- | --- |
 | **Overview** | "quanto abbiamo speso / riepilogo" | `--insights` |
 | **By phase** | "tempo in analisi vs implementazione" | `--insights` then compare `top_categories` / `by_category` |
-| **By story** | "US-012 quanto ci ha messo" | `--spec=US-012 --insights` |
+| **By story** | "US-012 quanto ci ha messo" | `--spec=US-012 --insights` — `insights.actuals.specs[0]`: estimate, build, wait in review, reworks, tokens |
+| **Estimate vs build** | "quanto ci abbiamo messo rispetto alle stime" | `--insights` → `insights.actuals` (`totals`, and the 20 newest delivered specs) |
 | **By person** | "tempo di Andrea" | `--user=andrea --insights` |
 | **By period** | "agosto", "ultima settimana" | `--from=` `--to=` `--insights` |
 | **Schedule** | "siamo in ritardo?", "scadenze" | use `insights.deadlines` + `at_risk_or_delayed` |
@@ -96,8 +97,9 @@ Structure:
 1. **Headline numbers** — entries · hours · tokens as `K` when ≥ 1000 (filtered scope stated in one clause). Prefer hours, not minutes.
 2. **Breakdown** — top categories with share %; hot specs when relevant.
 3. **Schedule** — next deadline, days until, any `at_risk` / `delayed` / overdue; mention epic deadline slips from `insights.criticality` when present.
-4. **Zoey caveat** — if the user compares Zoey `context ≈ Nk` to Lucille totals, explain via `insights.zoey` (loaded context ≠ ledger spend). If `estimated_entry_count` is high, note that many rows are estimates.
-5. **Pointer** — dashboard `/larapilot/usage` and/or exported MD path when useful.
+4. **Estimate vs build** — when asked, from `insights.actuals`: estimated hours, build time, `ratio` (null under three timed specs — then say so, give no ratio). Say what the figures are: the estimate is the agent's own, before the PM/QA buffer; build is the time `IN PROGRESS`, pauses included; nobody's review hours are in it. Never call it time or money saved.
+5. **Zoey caveat** — if the user compares Zoey `context ≈ Nk` to Lucille totals, explain via `insights.zoey` (loaded context ≠ ledger spend). If `estimated_entry_count` is high, note that many rows are estimates.
+6. **Pointer** — dashboard `/larapilot/usage` for tokens, `/larapilot/plan` for the Gantt and deadlines, and/or the exported MD path when useful.
 
 Keep chat under ~12 lines unless the user asked for a full dump. For full dumps, prefer `--format=md` + `--output=` and summarize.
 
@@ -114,7 +116,7 @@ Next deadline: Go-live 2026-09-01 (26 days, on_track).
 ### 3. Optional follow-ups
 
 - Export: write `.larapilot/usage/report.md` (or a path the user names) and confirm.
-- Drift: if overdue / at_risk, one line from Mark on scope trade-off — Lucille does not re-plan the backlog. When `settings.notifications` is `YES` and drift is newly reported, also `php artisan larapilot:notify --event=schedule_drift --title="…"`.
+- Drift: if overdue / at_risk, one line from Mark on scope trade-off — Lucille does not re-plan the backlog here: that is `/larapilot-schedule`. When `settings.notifications` is `YES` and drift is newly reported, also `php artisan larapilot:notify --event=schedule_drift --title="…"`.
 - Empty gaps: if a phase has zero minutes but specs exist in that status, note the gap; offer to log missing sessions (never fabricate).
 
 ## Rules
