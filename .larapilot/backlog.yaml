@@ -509,11 +509,11 @@ specs:
       title: 'Heatmap dashboard'
     priority: HIGH
     points: 2
-    status: 'IN PROGRESS'
+    status: REVIEW
     body: |
       #### US-009: Home page falls back to the stored athlete when no allowlisted athlete has connected
 
-      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 2 | **Status:** IN PROGRESS
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 2 | **Status:** REVIEW
       **Blocked by:** -
       **Type:** Change request
       **Supersedes:** US-007 criteria "an athlete removed from the allowlist is never displayed, even while their rows remain stored" and "When no allowlisted athlete has connected yet, a signed-out visit renders the existing connect screen" — the connect screen now appears only when no stored athlete has any activity
@@ -549,4 +549,5 @@ specs:
     status_history:
       - { status: PLANNED, at: '2026-10-11T13:27:54+00:00' }
       - { status: 'IN PROGRESS', at: '2026-10-11T13:29:29+00:00' }
+      - { status: REVIEW, at: '2026-10-11T13:34:19+00:00' }
     rework: false

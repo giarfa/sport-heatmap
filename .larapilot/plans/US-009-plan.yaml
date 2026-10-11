@@ -63,8 +63,8 @@ tasks:
       4. Optional empty anchor commit
 
       ## Completion Criteria
-      - [ ] Branch `feature/US-009-fallback-displayed-athlete` exists locally
-      - [ ] PR title/body drafted for `develop` (remote open only if the user requests push)
+      - [x] Branch `feature/US-009-fallback-displayed-athlete` exists locally
+      - [x] PR title/body drafted for `develop` (remote open only if the user requests push)
 
       ## Test Data
       - N/A — git only
@@ -77,10 +77,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally — open/update remote only if the user requests
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 0.5
     dependencies: {}
+    commit:
+      sha: 9a0f4c15f5d42a0e091d714ab21e62dc5a55bdae
+      short_sha: 9a0f4c1
+      subject: 'chore(US-009): TASK-00 bootstrap feature branch'
+      committed_at: '2026-10-11T15:29:38+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9a0f4c15f5d42a0e091d714ab21e62dc5a55bdae'
   -
     id: TASK-01
     title: 'Fall back to the lowest-id stored athlete with activities in ResolveDisplayedAthlete'
@@ -125,32 +131,38 @@ tasks:
       7. `php artisan test --compact tests/Feature/Strava/ResolveDisplayedAthleteTest.php tests/Feature/Dashboard` then the full `php artisan test --compact`; `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] Blank allowlist or unconnected allowlist resolves the lowest `users.id` with at least one activity, Strava or Garmin
-      - [ ] A connected allowlisted athlete is still returned first, in configured order
-      - [ ] No stored activity → `null` (controller renders the connect screen with 200)
-      - [ ] The fallback selects only `id` and `strava_athlete_id`; no HTTP request; query counts 1 / 1 / 2 asserted
-      - [ ] Superseded US-007 tests rewritten, not deleted; full suite green
-      - [ ] Both domain docs and the index describe the fallback and the accepted risk
+      - [x] Blank allowlist or unconnected allowlist resolves the lowest `users.id` with at least one activity, Strava or Garmin
+      - [x] A connected allowlisted athlete is still returned first, in configured order
+      - [x] No stored activity → `null` (controller renders the connect screen with 200)
+      - [x] The fallback selects only `id` and `strava_athlete_id`; no HTTP request; query counts 1 / 1 / 2 asserted
+      - [x] Superseded US-007 tests rewritten, not deleted; full suite green
+      - [x] Both domain docs and the index describe the fallback and the accepted risk
 
       ## Test Data
       - N/A — no model/schema changes; tests use the existing `User`, `Activity` (incl. Garmin source) and `SyncRun` factory states
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/strava-connection.md` updated — displayed-athlete flow, replaced invariant, architectural choice with rejected alternatives
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — functional flow step 2, invariant, gotcha
-      - [ ] Folder `README.md` index rows updated (`US-009`)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/strava-connection.md` updated — displayed-athlete flow, replaced invariant, architectural choice with rejected alternatives
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — functional flow step 2, invariant, gotcha
+      - [x] Folder `README.md` index rows updated (`US-009`)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-009): TASK-01 fall back to the first stored athlete with activities`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: 3f75484cc82624a824a20c89f1d2430fcebd8809
+      short_sha: 3f75484
+      subject: 'feat(US-009): TASK-01 fall back to the first stored athlete with activities'
+      committed_at: '2026-10-11T15:31:25+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3f75484cc82624a824a20c89f1d2430fcebd8809'
   -
     id: TASK-02
     title: 'Cover the fallback home page: read-only, sync warning, cache switch, sign-in unchanged'
@@ -178,20 +190,26 @@ tasks:
       4. Do **not** add Playwright, Dusk, Pest browser or viewport suites.
 
       ## Completion Criteria
-      - [ ] Each case above passes against the TASK-01 implementation
-      - [ ] Every guest test runs with `Http::preventStrayRequests()` and asserts no request where relevant
-      - [ ] Coverage matches the NORMAL bar; full suite green
+      - [x] Each case above passes against the TASK-01 implementation
+      - [x] Every guest test runs with `Http::preventStrayRequests()` and asserts no request where relevant
+      - [x] Coverage matches the NORMAL bar; full suite green
 
       ## Git Deliverables
       - Commit: `test(US-009): TASK-02 cover the fallback home page`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 1.5
     dependencies:
       - TASK-01
+    commit:
+      sha: ceb360fb8ece2da258d8cd16bedc46aadeaf46ad
+      short_sha: ceb360f
+      subject: 'test(US-009): TASK-02 cover the fallback home page'
+      committed_at: '2026-10-11T15:32:08+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ceb360fb8ece2da258d8cd16bedc46aadeaf46ad'
   -
     id: TASK-03
     title: 'README fallback copy and manual test handoff'
@@ -214,9 +232,9 @@ tasks:
          - set `STRAVA_ALLOWED_ATHLETE_IDS` to an id with no user row → still the seeded map; delete the activities (`migrate:fresh` without `--seed`) → connect screen, 200.
 
       ## Completion Criteria
-      - [ ] README `.env` row, seeded-data note and dashboard section describe the fallback
-      - [ ] `larapilot:quality` clean, full suite green
-      - [ ] Manual test handoff recorded in the PR notes
+      - [x] README `.env` row, seeded-data note and dashboard section describe the fallback
+      - [x] `larapilot:quality` clean, full suite green
+      - [x] Manual test handoff recorded in the PR notes
 
       ## Test Data
       - N/A — documentation only
@@ -229,9 +247,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize the local PR notes with the manual test handoff
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 0.75
     dependencies:
       - TASK-01
-updated_at: '2026-10-11T13:27:54+00:00'
+    commit:
+      sha: d751d98e411eb6e4ba17863414bbc354ec7ab2b6
+      short_sha: d751d98
+      subject: 'docs(US-009): TASK-03 document the home page fallback in the README'
+      committed_at: '2026-10-11T15:32:20+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d751d98e411eb6e4ba17863414bbc354ec7ab2b6'
+updated_at: '2026-10-11T13:32:20+00:00'
