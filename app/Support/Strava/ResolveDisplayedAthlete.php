@@ -35,7 +35,7 @@ final readonly class ResolveDisplayedAthlete
          * public while the reconnect banner asks them to connect again.
          */
         $connectedAthletes = User::query()
-            ->select(['id', 'name', 'strava_athlete_id'])
+            ->select(['id', 'strava_athlete_id'])
             ->whereIn('strava_athlete_id', $athleteIds)
             ->get()
             ->keyBy('strava_athlete_id');

@@ -134,13 +134,30 @@ class ConnectScreenTest extends TestCase
         $response->assertSee('Strava authorization was cancelled. Nothing was stored.');
     }
 
+    public function test_the_public_map_renders_the_cancellation_notice(): void
+    {
+        $this->allowlistedAthlete();
+
+        $response = $this->withSession(['status' => 'Strava authorization was cancelled. Nothing was stored.'])
+            ->get('/');
+
+        $response->assertViewIs('dashboard');
+        $response->assertSee('Strava authorization was cancelled. Nothing was stored.');
+    }
+
     /**
      * @return array<string, TestResponse>
      */
     private function bothScreens(): array
     {
+        $connect = $this->get('/');
+
+        $this->allowlistedAthlete();
+        $guestDashboard = $this->get('/');
+
         return [
-            'connect' => $this->get('/'),
+            'connect' => $connect,
+            'guest dashboard' => $guestDashboard,
             'dashboard' => $this->actingAs($this->allowlistedAthlete())->get('/'),
         ];
     }

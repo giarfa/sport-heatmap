@@ -35,7 +35,8 @@ class DashboardController extends Controller
          * strava.fresh middleware is a no-op for guests, nothing below calls
          * EnsureFreshAccessToken or StravaClient, and the resolver selects no
          * token column. A guest request therefore cannot refresh a token,
-         * reach Strava, or write a row.
+         * reach Strava, or write a domain row — only the session and cache
+         * stores write, as they do for any request.
          */
         /** @var User|null $athlete */
         $athlete = Auth::user() ?? $resolveDisplayedAthlete();

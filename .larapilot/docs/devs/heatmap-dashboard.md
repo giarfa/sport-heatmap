@@ -43,8 +43,11 @@ share stops working.
 
 The guest branch is **read-only by structure**: the middleware is a no-op for
 guests, nothing on the path calls `EnsureFreshAccessToken` or `StravaClient`, and
-the resolver selects no token column. A guest request writes no row, sends no
-HTTP request, and never refreshes a token.
+the resolver selects no token column. A guest request writes no row to `users`,
+`activities`, or `sync_runs`, sends no HTTP request, and never refreshes a token.
+The session store and, on a grid-cache miss, the cache store still write — with
+the `database` drivers that is a `sessions` row per cookieless visit and a
+`cache` row per rebuild.
 
 `<x-session-notices />` renders above the heading on both the dashboard and the
 connect screen: the OAuth cancellation flash (`status`) and the

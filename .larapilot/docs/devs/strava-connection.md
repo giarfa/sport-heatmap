@@ -60,7 +60,7 @@ and the nightly sync can no longer read activities.
 **Displayed athlete (`ResolveDisplayedAthlete`, signed-out visitors)**
 
 1. Empty allowlist → `null`, without a query.
-2. One query: `select id, name, strava_athlete_id from users where
+2. One query: `select id, strava_athlete_id from users where
    strava_athlete_id in (…allowlist…)`.
 3. Walk the allowlist **in configured order** and return the first id that has a
    user row; none → `null` (the dashboard then falls back to the connect screen).
@@ -89,7 +89,7 @@ and the nightly sync can no longer read activities.
 | OAuth service | `app/Services/Strava/StravaOAuth.php` | Authorize URL, code exchange, refresh; 5 s connect / 10 s total timeouts |
 | Token DTO | `app/Data/StravaTokens.php` | `fromExchangeResponse()` / `fromRefreshResponse()` |
 | Allowlist | `app/Support/Strava/AthleteAllowlist.php` | `athleteIds()` in configured order; `allows(string $athleteId)`, strict compare |
-| Displayed athlete | `app/Support/Strava/ResolveDisplayedAthlete.php` | Read-only: first connected allowlisted athlete, ≤ 1 query, no token columns |
+| Displayed athlete | `app/Support/Strava/ResolveDisplayedAthlete.php` | Read-only: first connected allowlisted athlete, ≤ 1 query, selects `id` and `strava_athlete_id` only |
 | Connect action | `app/Actions/Strava/ConnectStravaAthlete.php` | The only write path of the OAuth flow |
 | Refresh action | `app/Actions/Strava/EnsureFreshAccessToken.php` | Margin, lock, rotation, undecryptable tokens |
 | Guard middleware | `app/Http/Middleware/EnsureFreshStravaToken.php` (alias `strava.fresh`) | Allowlist re-check + token freshness |
@@ -114,7 +114,7 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
 | Allowlist re-checked on every authenticated request | Checked once at connect | The session and remember-me cookie outlive a `.env` edit by weeks; removal must take effect immediately |
 | Scope and OAuth endpoints are config literals | `env()` lookups | Read-only is a product invariant (FR-001); pointing the token URL elsewhere would leak the client secret |
 | Displayed athlete = first **connected** id in allowlist order | Order by `users.id`; a separate `STRAVA_PUBLIC_ATHLETE_ID` | The allowlist is the one place the owner states who comes first; `users.id` order would display whoever connected first, and a second env var could name an athlete who is not allowed in |
-| Resolver selects `id, name, strava_athlete_id` only | Load the full model | No guest request can decrypt, refresh, or leak a token, and undecryptable tokens cannot 500 the public page |
+| Resolver selects `id, strava_athlete_id` only | Load the full model | No guest request can decrypt, refresh, or leak a token, and undecryptable tokens cannot 500 the public page |
 | Write scopes refused on the callback | Trust the requested scope | The response scope is attacker-controlled (hand-edited consent URL); read-only must be a property of what is stored |
 | State consumed first on every path | Consume only on success | An early return would leave a live, replayable nonce |
 | Separate `ConnectStravaAthlete` action, unaware of the allowlist | One long callback method | "Allowlist first, persistence second" is structural, and the "nothing persisted on rejection" criterion is assertable by counting rows |
@@ -146,8 +146,13 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
   athlete would land on a public map instead of the rejection.
 - **Invariant — guests never reach `EnsureFreshAccessToken`.** The resolver loads
   no token column, so a guest request cannot trigger a refresh or an HTTP call.
-- **Invariant — the OAuth routes are throttled.** They are the only unauthenticated
-  entry points that do work.
+- **Invariant — the OAuth routes are throttled.** Since US-007 they are no longer
+  the only unauthenticated routes that do work: the public `/` runs the
+  displayed-athlete query, the sync-status queries, possibly a grid rebuild, and
+  a session write per cookieless visit. `/` is deliberately left unthrottled — a
+  rate limiter would add a cache write to every request on the `database` cache
+  driver — and is an accepted trade-off for a single-owner instance; revisit it
+  (throttle, or a non-database session driver) if the link is shared widely.
 
 ## Extension points & gotchas
 
