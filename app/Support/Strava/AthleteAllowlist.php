@@ -15,9 +15,22 @@ class AthleteAllowlist
      */
     public function allows(string $athleteId): bool
     {
-        /** @var array<int, string> $allowed */
-        $allowed = config('strava.allowed_athlete_ids', []);
+        return in_array($athleteId, $this->athleteIds(), strict: true);
+    }
 
-        return in_array($athleteId, $allowed, strict: true);
+    /**
+     * The allowlisted athlete ids, in the order they are configured.
+     *
+     * The order is meaningful: the first connected id is the athlete the public
+     * home page displays (ResolveDisplayedAthlete).
+     *
+     * @return array<int, string>
+     */
+    public function athleteIds(): array
+    {
+        /** @var array<int, string> $athleteIds */
+        $athleteIds = config('strava.allowed_athlete_ids', []);
+
+        return array_values($athleteIds);
     }
 }

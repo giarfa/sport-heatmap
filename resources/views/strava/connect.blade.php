@@ -3,20 +3,7 @@
 @section('title', 'Connect Strava — Sport Heatmap')
 
 @section('content')
-    {{-- Set when the athlete pressed Cancel on Strava's consent screen. --}}
-    @if (session('status'))
-        <div role="status" class="card mx-auto mb-4 max-w-sm p-4 text-sm"
-             style="color: var(--ink-muted);">
-            {{ session('status') }}
-        </div>
-    @endif
-
-    @if ($reconnect ?? false)
-        <div role="alert" class="card mx-auto mb-4 max-w-sm p-4 text-sm"
-             style="background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-ink);">
-            Your Strava connection expired. Connect again to keep the heatmap up to date.
-        </div>
-    @endif
+    <x-session-notices class="mx-auto mb-4 max-w-sm" />
 
     <div class="card mx-auto max-w-sm p-6 text-center">
         <svg width="36" height="36" viewBox="0 0 32 32" aria-hidden="true" class="mx-auto">

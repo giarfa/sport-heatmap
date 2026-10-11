@@ -53,6 +53,13 @@ class AthleteAllowlistTest extends TestCase
         $this->assertFalse($this->allowlist()->allows('4821196'));
     }
 
+    public function test_athlete_ids_keep_the_configured_order(): void
+    {
+        Config::set('strava.allowed_athlete_ids', ['222', '111', '333']);
+
+        $this->assertSame(['222', '111', '333'], $this->allowlist()->athleteIds());
+    }
+
     private function allowlist(): AthleteAllowlist
     {
         return new AthleteAllowlist;

@@ -32,6 +32,27 @@ class ConnectScreenTest extends TestCase
         $response->assertSee(route('strava.redirect'), escape: false);
     }
 
+    public function test_a_guest_on_the_public_map_gets_a_discreet_connect_link(): void
+    {
+        $this->allowlistedAthlete();
+
+        $response = $this->get('/');
+
+        $response->assertViewIs('dashboard');
+        $response->assertSee('Owner?');
+        $response->assertSee('Connect with Strava');
+        $response->assertSee('href="'.route('strava.redirect').'"', escape: false);
+    }
+
+    public function test_the_signed_in_owner_does_not_get_the_guest_connect_link(): void
+    {
+        $response = $this->actingAs($this->allowlistedAthlete())->get('/');
+
+        $response->assertViewIs('dashboard');
+        $response->assertDontSee('Owner?');
+        $response->assertDontSee('Connect with Strava');
+    }
+
     public function test_a_connected_athlete_gets_the_dashboard(): void
     {
         $response = $this->actingAs($this->allowlistedAthlete())->get('/');
@@ -113,13 +134,30 @@ class ConnectScreenTest extends TestCase
         $response->assertSee('Strava authorization was cancelled. Nothing was stored.');
     }
 
+    public function test_the_public_map_renders_the_cancellation_notice(): void
+    {
+        $this->allowlistedAthlete();
+
+        $response = $this->withSession(['status' => 'Strava authorization was cancelled. Nothing was stored.'])
+            ->get('/');
+
+        $response->assertViewIs('dashboard');
+        $response->assertSee('Strava authorization was cancelled. Nothing was stored.');
+    }
+
     /**
      * @return array<string, TestResponse>
      */
     private function bothScreens(): array
     {
+        $connect = $this->get('/');
+
+        $this->allowlistedAthlete();
+        $guestDashboard = $this->get('/');
+
         return [
-            'connect' => $this->get('/'),
+            'connect' => $connect,
+            'guest dashboard' => $guestDashboard,
             'dashboard' => $this->actingAs($this->allowlistedAthlete())->get('/'),
         ];
     }

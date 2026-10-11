@@ -38,4 +38,160 @@ decisions:
     source: chat
     spec: US-004
     supersedes: null
-updated_at: '2026-09-06T15:34:42+00:00'
+  -
+    id: f71daaa7e976c188
+    ts: '2026-10-11T11:32:19+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'dashboard guest access'
+    label: 'dashboard guest access'
+    value: "Anyone can view the owner's last synced heatmap read-only without a Strava sign-in"
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: d0c135b6d9b35e0a
+    ts: '2026-10-11T11:32:19+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'public dashboard moscow'
+    label: 'public dashboard MoSCoW'
+    value: Must
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 266fb32ce073750b
+    ts: '2026-10-11T11:32:19+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'public dashboard mockup'
+    label: 'public dashboard mockup'
+    value: 'No mockup — plan directly'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 88f04507cbc7e573
+    ts: '2026-10-11T11:34:06+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'public dashboard strava api agreement risk'
+    label: 'public dashboard Strava API Agreement risk'
+    value: "Build public anyway; accept risk of Strava API revocation under the Nov 2024 'display only to that user' clause"
+    question: null
+    rationale: 'Personal instance; owner accepts the risk'
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: f75e292def892fad
+    ts: '2026-10-11T11:34:06+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'public dashboard guest sync warning'
+    label: 'public dashboard guest sync warning'
+    value: 'Guests see the same sync warning as the owner, including raw failure reason and reconnect link'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 4918d74ff18e8b0f
+    ts: '2026-10-11T11:34:06+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'public dashboard search indexing'
+    label: 'public dashboard search indexing'
+    value: 'Keep noindex, nofollow'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: c65888abe1158d4b
+    ts: '2026-10-11T11:50:03+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin import overwrite precedence'
+    label: 'garmin import overwrite precedence'
+    value: 'Garmin wins permanently: an overwritten activity is never reverted, re-added, or deleted by the Strava sync'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 2f9078f6c0954eae
+    ts: '2026-10-11T11:50:03+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin import conflict resolution'
+    label: 'garmin import conflict resolution'
+    value: 'Per-conflict review page with overwrite/skip each and apply-to-all shortcuts'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 42c9c71dc8c03131
+    ts: '2026-10-11T11:50:03+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin import moscow'
+    label: 'garmin import MoSCoW'
+    value: Must
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: b7030255a9136ff3
+    ts: '2026-10-11T11:51:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin import duplicate matching'
+    label: 'garmin import duplicate matching'
+    value: 'Same date and start time within ±2 minutes'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: df06da876b6ff3ed
+    ts: '2026-10-11T11:51:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin import languages'
+    label: 'garmin import languages'
+    value: 'Italian and English Garmin Connect exports'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 9d8324660d2326fe
+    ts: '2026-10-11T11:51:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin import mockup'
+    label: 'garmin import mockup'
+    value: 'No mockup — plan directly'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-10-11T11:51:41+00:00'
