@@ -558,3 +558,66 @@ specs:
       subject: 'chore(US-009): record the plan, backlog state and usage'
       committed_at: '2026-10-11T15:34:25+02:00'
       url: 'https://github.com/giarfa/sport-heatmap/commit/8da0628348bca206fe407c352ff7f7db8445873c'
+  -
+    code: US-010
+    title: 'Fix: home page returns 500 when the heatmap grid is served from the cache'
+    epic:
+      code: EP-004
+      title: Maintenance
+    priority: HIGH
+    points: 2
+    status: DONE
+    body: |
+      #### US-010: Fix — home page returns 500 when the heatmap grid is served from the cache
+
+      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Fix
+      **Severity:** High
+      **Security:** Lars — yes (cache deserialization allowlist); Oliver — no
+      **Related:** US-004 (introduced the grid cache), US-009
+      **Traces to:** FR-004 · FR-017 · FR-007 — no journey (the PRD has no `## User Journeys`)
+      **Promise broken:** FR-004 "The dashboard renders a fixed grid of 16 week-rows by 7 weekday-columns"; US-009 criterion "a signed-out `GET /` returns 200 and renders that athlete's grid, weekly totals, legend, sync chip, and sync detail"
+      **Logged:** `TypeError` at `app/Support/Heatmap/HeatmapGridCache.php:28` ×1, last 2026-10-11 13:40:23 (local) — "HeatmapGridCache::remember(): Return value must be of type App\Data\Heatmap\HeatmapGrid, __PHP_Incomplete_Class returned"
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want the home page to render my heatmap on every visit, not only the first one of the day,
+      so that the dashboard never answers with a server error while my grid is cached.
+
+      **Demonstrates**
+      With `CACHE_STORE=database`, opening `/` twice in a row returns the dashboard with 200 both times;
+      the second response is served from the cache. A regression test round-trips the grid through a
+      serializing cache store and fails without the fix.
+
+      **Steps to Reproduce**
+      1. Set `CACHE_STORE=database` (the `.env.example` default) and have an athlete with activities.
+      2. Open `/` — the grid is built and cached, 200.
+      3. Open `/` again within `heatmap.grid_cache_ttl` — 500, `TypeError` in `HeatmapGridCache::remember()`.
+
+      **Root cause**
+      `config/cache.php` sets `serializable_classes => false` (the Laravel 13 default), so a serializing
+      store (database, file, redis) refuses to unserialize the cached `HeatmapGrid` and its nested
+      `WeekRow`, `DayCell`, `LegendRow`, `DayCellState`, and `CarbonImmutable` values and returns
+      `__PHP_Incomplete_Class`. The test suite runs the `array` store with `serialize => false`, so no test
+      ever round-tripped the grid through serialization.
+
+      **Acceptance Criteria**
+      - [x] Bug fixed — the promise holds again: with a serializing cache store, a second `GET /` within the TTL returns 200 and renders the same grid, weekly totals, and legend as the first, for a signed-in athlete and for a signed-out visitor
+      - [x] A cached grid that cannot be restored (stored before the fix, or by an older class shape) never produces a 500: it is rebuilt and the page renders
+      - [x] The cache deserialization stays an allowlist: only the classes the cached grid needs are allowed, never `serializable_classes => true` (Lars)
+      - [x] Regression test covers the failure with a serializing cache store and fails without the fix (Anne)
+      - [x] Root cause named in the fix commit; `heatmap-dashboard.md` documents the serialization constraint on the grid cache
+      - [x] No security regression; no schema change, so no factory/seeder change
+    status_history:
+      - { status: PLANNED, at: '2026-10-11T13:43:40+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-11T13:43:46+00:00' }
+      - { status: REVIEW, at: '2026-10-11T13:51:23+00:00' }
+      - { status: DONE, at: '2026-10-11T13:52:39+00:00' }
+    rework: false
+    merge_commit:
+      sha: 4fd303b17cddc315a59a4cd5d48c9e45afee4590
+      short_sha: 4fd303b
+      subject: 'chore(US-010): record the plan, backlog state and usage'
+      committed_at: '2026-10-11T15:51:27+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4fd303b17cddc315a59a4cd5d48c9e45afee4590'

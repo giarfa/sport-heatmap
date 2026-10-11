@@ -1,5 +1,11 @@
 <?php
 
+use App\Data\Heatmap\DayCell;
+use App\Data\Heatmap\HeatmapGrid;
+use App\Data\Heatmap\IntensityScale;
+use App\Data\Heatmap\WeekRow;
+use App\Enums\DayCellState;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
 return [
@@ -126,11 +132,22 @@ return [
     |--------------------------------------------------------------------------
     |
     | This value determines the classes that can be unserialized from cache
-    | storage. By default, no PHP classes will be unserialized from your
-    | cache to prevent gadget chain attacks if your APP_KEY is leaked.
+    | storage. It is an explicit allowlist, never `true`, so a leaked APP_KEY
+    | or a writable cache table cannot turn into a gadget chain. It holds
+    | exactly what the cached heatmap grid is made of (HeatmapGridCache);
+    | legend rows are derived from the scale on render and are never stored.
+    | A class nested in the grid that is missing here fails to restore, and
+    | the grid is then rebuilt on every request — no error, no cache benefit.
     |
     */
 
-    'serializable_classes' => false,
+    'serializable_classes' => [
+        HeatmapGrid::class,
+        WeekRow::class,
+        DayCell::class,
+        IntensityScale::class,
+        DayCellState::class,
+        CarbonImmutable::class,
+    ],
 
 ];

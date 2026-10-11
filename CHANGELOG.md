@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of `STRAVA_ALLOWED_ATHLETE_IDS`, in configured order; the connect screen only appears while
   nobody has connected yet. Signing in stays allowlist-only (US-007).
 
+### Fixed
+
+- The home page no longer answers with a server error on every visit after the first of the day:
+  with a serializing cache store (`CACHE_STORE=database`, the default), the cached heatmap grid
+  could not be restored and each cache hit failed. The cache now restores only the grid's own
+  classes, and an entry it cannot restore is rebuilt instead of failing the page (US-010).
+
 ## [0.1.0] - 2026-09-07
 
 First release: the complete MVP scope — a private, single-athlete Strava running heatmap. Covers
