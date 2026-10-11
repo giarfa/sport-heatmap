@@ -36,7 +36,7 @@ Keep the table below current — it is the entry point for a new developer.
 | --- | --- | --- |
 | [activity-sync](activity-sync.md) | Nightly `strava:sync`: fetch the 112-day window, reconcile `activities`, record `sync_runs` | `US-007` (catch-up) |
 | [heatmap-dashboard](heatmap-dashboard.md) | The `/` screen: 16-week grid, intensity scale, grid cache, fresh sync status | `US-007` (catch-up) |
-| [strava-connection](strava-connection.md) | OAuth connect, athlete allowlist, encrypted tokens, refresh, the `strava.fresh` guard | `US-007` (catch-up) |
+| [strava-connection](strava-connection.md) | OAuth connect, athlete allowlist, encrypted tokens, refresh, the `strava.fresh` guard, the publicly displayed athlete | `US-007` |
 
 ## Who writes them
 

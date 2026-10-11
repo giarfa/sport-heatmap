@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-002` |
-| **Last updated by** | `US-007` — 2026-10-11 (catch-up) |
+| **Last updated by** | `US-007` — 2026-10-11 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
@@ -13,8 +13,9 @@ Connects the owner's Strava account to this instance and keeps that connection
 usable. It authenticates *a* Strava athlete through OAuth2 (authorization code),
 decides whether it is *the* athlete through an allowlist of Strava athlete ids,
 stores a read-only token pair encrypted at rest, and refreshes the access token
-before any Strava call needs it. If it stops working, nobody can sign in and the
-nightly sync can no longer read activities.
+before any Strava call needs it. The allowlist's order also decides which
+athlete the public home page displays. If it stops working, nobody can sign in
+and the nightly sync can no longer read activities.
 
 ## Functional flow
 
@@ -54,6 +55,16 @@ nightly sync can no longer read activities.
    `strava.connect` view is rendered with `reconnect: true` — the
    "Your Strava connection expired" banner above the connect card, status 200.
 
+**Displayed athlete (`ResolveDisplayedAthlete`, signed-out visitors)**
+
+1. Empty allowlist → `null`, without a query.
+2. One query: `select id, name, strava_athlete_id from users where
+   strava_athlete_id in (…allowlist…)`.
+3. Walk the allowlist **in configured order** and return the first id that has a
+   user row; none → `null` (the dashboard then falls back to the connect screen).
+4. Token state is ignored and token columns are never loaded: an owner with a
+   dead refresh token is still displayed.
+
 **Token refresh (`EnsureFreshAccessToken`)**
 
 1. A token that is valid beyond `strava.token_refresh_margin_seconds` (default
@@ -75,7 +86,8 @@ nightly sync can no longer read activities.
 | Callback controller | `app/Http/Controllers/Strava/StravaCallbackController.php` | The gate sequence above; the only place a session is created |
 | OAuth service | `app/Services/Strava/StravaOAuth.php` | Authorize URL, code exchange, refresh; 5 s connect / 10 s total timeouts |
 | Token DTO | `app/Data/StravaTokens.php` | `fromExchangeResponse()` / `fromRefreshResponse()` |
-| Allowlist | `app/Support/Strava/AthleteAllowlist.php` | `allows(string $athleteId)`, strict compare |
+| Allowlist | `app/Support/Strava/AthleteAllowlist.php` | `athleteIds()` in configured order; `allows(string $athleteId)`, strict compare |
+| Displayed athlete | `app/Support/Strava/ResolveDisplayedAthlete.php` | Read-only: first connected allowlisted athlete, ≤ 1 query, no token columns |
 | Connect action | `app/Actions/Strava/ConnectStravaAthlete.php` | The only write path of the OAuth flow |
 | Refresh action | `app/Actions/Strava/EnsureFreshAccessToken.php` | Margin, lock, rotation, undecryptable tokens |
 | Guard middleware | `app/Http/Middleware/EnsureFreshStravaToken.php` (alias `strava.fresh`) | Allowlist re-check + token freshness |
@@ -84,7 +96,7 @@ nightly sync can no longer read activities.
 | Views | `resources/views/strava/connect.blade.php`, `strava/rejected.blade.php` | Connect card (and reconnect banner), rejection screens |
 | Config | `config/strava.php` | `client_id`, `client_secret`, `redirect_uri`, literal `scope`, literal endpoints, `token_refresh_margin_seconds`, `allowed_athlete_ids` |
 | Env vars | `.env` | `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REDIRECT_URI`, `STRAVA_ALLOWED_ATHLETE_IDS`, `STRAVA_TOKEN_REFRESH_MARGIN` |
-| Tests | `tests/Feature/Strava/StravaConnectFlowTest.php`, `StravaOAuthTest.php`, `ConnectStravaAthleteTest.php`, `EnsureFreshAccessTokenTest.php`, `ReconnectStateTest.php`, `tests/Unit/Support/Strava/AthleteAllowlistTest.php`, `tests/Feature/Config/StravaConfigTest.php` | |
+| Tests | `tests/Feature/Strava/StravaConnectFlowTest.php`, `StravaOAuthTest.php`, `ConnectStravaAthleteTest.php`, `EnsureFreshAccessTokenTest.php`, `ReconnectStateTest.php`, `ResolveDisplayedAthleteTest.php`, `tests/Unit/Support/Strava/AthleteAllowlistTest.php`, `tests/Feature/Config/StravaConfigTest.php` | |
 
 `User` keeps the Strava columns out of `$fillable` and hides both tokens. The
 email column is `NOT NULL UNIQUE` but Strava exposes no email under
@@ -99,6 +111,8 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
 | Allowlist of Strava athlete ids as the only access control | Password login, registration, roles | One owner, one screen; Strava already authenticates — the app only has to decide *which* athlete |
 | Allowlist re-checked on every authenticated request | Checked once at connect | The session and remember-me cookie outlive a `.env` edit by weeks; removal must take effect immediately |
 | Scope and OAuth endpoints are config literals | `env()` lookups | Read-only is a product invariant (FR-001); pointing the token URL elsewhere would leak the client secret |
+| Displayed athlete = first **connected** id in allowlist order | Order by `users.id`; a separate `STRAVA_PUBLIC_ATHLETE_ID` | The allowlist is the one place the owner states who comes first; `users.id` order would display whoever connected first, and a second env var could name an athlete who is not allowed in |
+| Resolver selects `id, name, strava_athlete_id` only | Load the full model | No guest request can decrypt, refresh, or leak a token, and undecryptable tokens cannot 500 the public page |
 | Write scopes refused on the callback | Trust the requested scope | The response scope is attacker-controlled (hand-edited consent URL); read-only must be a property of what is stored |
 | State consumed first on every path | Consume only on success | An early return would leave a live, replayable nonce |
 | Separate `ConnectStravaAthlete` action, unaware of the allowlist | One long callback method | "Allowlist first, persistence second" is structural, and the "nothing persisted on rejection" criterion is assertable by counting rows |
@@ -120,6 +134,11 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
   carry an HTTP status, a missing key name, or an athlete id only.
 - **Invariant — undecryptable tokens are a reconnect, not a 500.** Rotating
   `APP_KEY` must lead to the reconnect path.
+- **Invariant — the displayed athlete is always on the allowlist.** An athlete
+  removed from it is never shown, even while their rows remain stored. _Breaks
+  if:_ the resolver reads `users` without the `whereIn` on the allowlist.
+- **Invariant — guests never reach `EnsureFreshAccessToken`.** The resolver loads
+  no token column, so a guest request cannot trigger a refresh or an HTTP call.
 - **Invariant — the OAuth routes are throttled.** They are the only unauthenticated
   entry points that do work.
 
