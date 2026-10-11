@@ -239,7 +239,8 @@ Strava, from the discreet "Owner? Connect with Strava" line under the map, and s
 allowlist-only. While no allowlisted athlete has connected yet, the home page shows the stored
 athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
 appears only when no stored athlete has any activity. Removing an athlete from the allowlist
-therefore no longer hides their stored runs — deleting their user row does. The page keeps `noindex, nofollow`: reachable by link, not promoted.
+therefore no longer hides their stored runs — deleting their user row does. The page keeps
+`noindex, nofollow`: reachable by link, not promoted.
 
 If the owner's Strava token can no longer be refreshed, they are signed out and land on the public
 map with a one-off "Your Strava connection expired" banner.

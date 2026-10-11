@@ -54,8 +54,9 @@ the `database` drivers that is a `sessions` row per cookieless visit and a
 `<x-session-notices />` renders above the heading on both the dashboard and the
 connect screen: the OAuth cancellation flash (`status`) and the
 "Your Strava connection expired" alert. Both views carry it because the OAuth
-cancel path redirects to `dashboard`, which a guest sees as the public map once
-an athlete has connected and as the connect screen before that.
+cancel path redirects to `dashboard`, which a guest sees as the public map
+whenever an athlete can be displayed (allowlisted and connected, else the
+stored-athlete fallback) and as the connect screen otherwise.
 
 **Guest UI.** Signed-out visitors get everything the owner sees, plus one
 line under the map: "Owner? Connect with Strava", a text link to
@@ -168,7 +169,7 @@ three small indexed queries for the sync status.
 
 ## Related
 
-- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`
-- Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`
-- Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`
+- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`
+- Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`
+- Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`, `US-009.md`
 - Other domains: `strava-connection.md`, `activity-sync.md`, `garmin-csv-import.md`

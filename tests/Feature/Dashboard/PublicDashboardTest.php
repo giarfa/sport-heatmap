@@ -106,8 +106,26 @@ class PublicDashboardTest extends TestCase
 
         $response = $this->getDashboard();
 
+        $response->assertOk();
+        $response->assertViewIs('dashboard');
         $response->assertSee('Wednesday 2 Sep 2026: 7.7 km');
         $response->assertDontSee('12.3 km');
+    }
+
+    public function test_a_guest_sees_the_stale_sync_warning_for_the_fallback_athlete(): void
+    {
+        $fallbackAthlete = User::factory()->stravaConnected()->create();
+        $this->runOn($fallbackAthlete, '2026-09-03', 12_345);
+        SyncRun::factory()->create([
+            'started_at' => now()->subHours(50)->subMinute(),
+            'finished_at' => now()->subHours(50),
+        ]);
+        $this->allowlistAthletes();
+
+        $this->getDashboard()
+            ->assertViewIs('dashboard')
+            ->assertSee('role="alert"', escape: false)
+            ->assertSee('Last successful sync was 2 days ago');
     }
 
     public function test_a_fallback_guest_request_writes_nothing_and_sends_no_request(): void
