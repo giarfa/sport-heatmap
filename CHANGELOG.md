@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- An owner-only **Garmin Connect CSV import**: upload the Activities export (Italian or English
+  headers, metric units, max 5 MB), review every run that clashes with a stored one — same date,
+  starts within ±2 minutes — side by side, choose **Overwrite** or **Skip** per run (or for all),
+  and confirm. New runs are added, non-running types are counted and listed, and a summary shows
+  every count. Nothing is written before confirming, the uploaded file is never stored, and
+  re-importing the same file changes nothing (US-008).
+
 ### Changed
+
+- The nightly sync deletes only Strava-sourced activities that Strava no longer returns: runs
+  imported from a Garmin CSV are never deleted, runs overwritten with Garmin's values are never
+  reverted or re-added, and a Strava activity that turns up later for a run imported as new is
+  linked to it instead of duplicated (US-008).
 
 - The home page is public: it shows the owner's last synced heatmap, weekly totals, legend and
   sync status read-only, without a Strava sign-in. The displayed athlete is the first connected id

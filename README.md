@@ -165,8 +165,10 @@ Every run reconciles the full 112-day window: it requests activities with `after
 start of the window and paginates at Strava's maximum page size until a page comes back short.
 Only running sport types (`Run`, `TrailRun`, `VirtualRun`) are stored; everything else is
 discarded. Activities are upserted on their Strava activity id, so an edit made on Strava
-(distance, name, sport type) propagates on the next run, and a local activity inside the window
-that Strava no longer returns is deleted — so the map always matches Strava, in both directions.
+(distance, name, sport type) propagates on the next run, and a Strava-sourced activity inside the
+window that Strava no longer returns is deleted — so the Strava part of the map always matches
+Strava, in both directions. Runs imported from a Garmin CSV are never touched by the sync (see
+[Importing runs from Garmin Connect](#importing-runs-from-garmin-connect)).
 The command is idempotent: running it twice in a row leaves the database byte-identical. Every
 attempt — success or failure — writes exactly one row to `sync_runs` (start, finish, status,
 upserted/deleted counts, and the error on failure), which is what the dashboard's sync-status
@@ -196,6 +198,35 @@ before relying on it in production. A `429` response is retried with backoff (th
 count and delays are literals in `config/strava.php`); an exhausted retry records the observed
 `X-RateLimit-Usage` response header in `sync_runs.error_message`, which is where to look if the
 daily sync starts failing.
+
+## Importing runs from Garmin Connect
+
+Runs that Strava is missing, or that Garmin recorded better, can be added by hand from a Garmin
+Connect export. Signed in as the owner, follow **Import Garmin CSV** under the map.
+
+1. On the Garmin Connect **website**, open **Activities → All activities**, scroll until every
+   run of the last 16 weeks is loaded, and press **Export CSV**. Both Italian (`Tipo di attività`,
+   `Data`, `Distanza`, …) and English (`Activity Type`, `Date`, `Distance`, …) exports are accepted.
+2. Upload the file (max 5 MB). The account must use **metric units**: Garmin writes distance in the
+   account's unit, and an imperial export cannot be told apart from a metric one.
+3. Review. Only running types are kept (every other type is counted and listed by name); rows
+   outside the 16-week window or in the future are counted and skipped; a row with an unreadable
+   date, distance or moving time is listed with its line number while the rest still import.
+   A row **clashes** with a stored run that starts on the same date within ±2 minutes (the closest
+   one). For each clash choose:
+   - **Skip** (pre-selected) — keep the stored run untouched;
+   - **Overwrite** — replace its name, distance, moving time and start with Garmin's values.
+   Runs with no clash are added as they are. A row identical to a run already imported from Garmin
+   is not asked about, so re-importing the same file changes nothing.
+4. **Confirm import** writes everything in one transaction; **Cancel**, or simply leaving the page,
+   writes nothing. A summary shows imported, overwritten, skipped, already-imported, ignored,
+   outside-window and unreadable counts, and the map updates immediately.
+
+**Garmin wins permanently.** The nightly sync never reverts an overwritten run, never re-adds its
+Strava twin, and never deletes a Garmin-imported run — even when Strava still returns the twin. If
+Strava later sends a run that starts within ±2 minutes of a run imported as new, the sync links the
+two instead of adding a duplicate, keeping Garmin's values. The uploaded file itself is never
+stored: it is read during the request and discarded. Imported runs carry no Strava link.
 
 ## The dashboard
 

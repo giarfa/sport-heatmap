@@ -222,7 +222,11 @@ comes from the `web` group.
   inlines its own rule — a run the importer called "stored" could be one the
   sync calls "new", and the day is counted twice.
 - **Invariant — Garmin wins permanently.** An overwritten or imported row is
-  `garmin_csv`, and the sync never reverts, re-adds or deletes it.
+  `garmin_csv`, and the sync never reverts it, never re-adds its Strava twin and
+  never deletes it — including a night Strava still returns the twin. A Strava
+  activity that turns up later within ±2 minutes of a run imported as new is
+  **linked** to it (its Strava id is stored, Garmin's values stay; decision
+  `7baf70c6656a936f`). See `activity-sync.md`.
 - **Invariant — all or nothing.** Every write of one confirm is in one
   transaction. _Breaks if:_ rows are created outside it — a failure halfway
   would leave half an import that a re-upload then reports as part new, part
