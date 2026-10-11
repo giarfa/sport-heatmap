@@ -124,6 +124,63 @@ class ParseGarminCsvTest extends TestCase
         $this->assertSame([['line' => 2, 'reason' => 'unreadable date']], $parsed->invalid);
     }
 
+    public function test_a_malformed_or_overflowing_distance_is_unreadable_not_missing(): void
+    {
+        $parsed = $this->parse($this->csv(self::IT_HEADER, [
+            'Corsa,2026-10-10 09:33:27,false,"Run","8,29 km","00:54:24","00:54:23"',
+            'Corsa,2026-10-09 09:33:27,false,"Run","99999999999999999999999","00:54:24","00:54:23"',
+        ]));
+
+        $this->assertSame([
+            ['line' => 2, 'reason' => 'unreadable distance'],
+            ['line' => 3, 'reason' => 'unreadable distance'],
+        ], $parsed->invalid);
+    }
+
+    public function test_columns_are_found_by_name_even_when_the_type_column_is_not_first(): void
+    {
+        $parsed = $this->parse($this->csv('Data,Titolo,Tipo di attività,Distanza,Tempo in movimento', [
+            '2026-10-10 09:33:27,"Paese Corsa",Corsa,"8.29","00:54:23"',
+        ]));
+
+        $this->assertSame(8_290, $parsed->rows[0]->distanceMeters);
+    }
+
+    public function test_more_than_a_thousand_runs_in_the_window_is_rejected(): void
+    {
+        $lines = [];
+        for ($second = 0; $second <= 1_000; $second++) {
+            $lines[] = sprintf('Corsa,2026-10-10 09:%02d:%02d,false,"Run","5.00","00:30:00","00:30:00"', intdiv($second, 60), $second % 60);
+        }
+
+        $this->assertRejected(
+            'The file has more than 1000 runs in the last 16 weeks. Export a shorter period from Garmin Connect.',
+            $this->csv(self::IT_HEADER, $lines),
+        );
+    }
+
+    public function test_more_than_a_hundred_unreadable_rows_is_rejected(): void
+    {
+        $this->assertRejected(
+            'More than 100 rows could not be read. Export the Activities list again from Garmin Connect.',
+            $this->csv(self::IT_HEADER, array_fill(0, 101, 'Corsa,not-a-date,false,"Run","5.00","00:30:00","00:30:00"')),
+        );
+    }
+
+    public function test_ignored_type_names_are_capped_in_length_and_number(): void
+    {
+        $lines = ['"'.str_repeat('X', 500).'",2026-10-10 09:33:27,false,"Long","5.00","00:30:00","00:30:00"'];
+        for ($type = 1; $type <= 60; $type++) {
+            $lines[] = "Type {$type},2026-10-10 09:33:27,false,\"Other\",\"5.00\",\"00:30:00\",\"00:30:00\"";
+        }
+
+        $parsed = $this->parse($this->csv(self::IT_HEADER, $lines));
+
+        $this->assertCount(51, $parsed->ignoredByType);
+        $this->assertArrayHasKey(str_repeat('X', 60), $parsed->ignoredByType);
+        $this->assertSame(11, $parsed->ignoredByType['(other types)']);
+    }
+
     public function test_identical_rows_within_one_file_collapse_into_one(): void
     {
         $row = 'Corsa,2026-10-10 09:33:27,false,"Paese Corsa","8.29","00:54:24","00:54:23"';

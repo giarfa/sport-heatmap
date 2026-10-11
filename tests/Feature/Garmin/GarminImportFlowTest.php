@@ -173,6 +173,46 @@ class GarminImportFlowTest extends TestCase
         $this->assertSame('Farther run', Activity::where('name', 'Farther run')->sole()->name);
     }
 
+    /**
+     * Row A is 90 s from the stored run, row B matches it to the second. Closest
+     * pairs are taken first, so B is the clash and A is new — never A claiming
+     * the run and B slipping through as a duplicate.
+     */
+    public function test_a_later_row_that_matches_closer_wins_the_stored_run(): void
+    {
+        $this->storedStravaRun('2026-10-10 10:01:30');
+
+        $this->upload($this->csv(self::IT_HEADER, [
+            'Corsa,2026-10-10 10:00:00,false,"Row A","5.00","00:30:00","00:30:00"',
+            'Corsa,2026-10-10 10:01:30,false,"Row B","6.00","00:36:00","00:36:00"',
+        ]));
+
+        $review = $this->review();
+        $review->assertSee('<div><dt>Clashes to decide</dt><dd>1</dd></div>', escape: false);
+        $review->assertSee('Row B, 10 Oct 10:01', escape: false);
+
+        $this->confirm($review);
+
+        $this->assertSame(2, Activity::count());
+        $this->assertTrue(Activity::where('name', 'Row A')->exists());
+        $this->assertFalse(Activity::where('name', 'Row B')->exists());
+    }
+
+    public function test_a_second_submit_of_the_same_review_writes_nothing_more(): void
+    {
+        $this->upload($this->fixture('activities-it.csv'));
+        $review = $this->review();
+        $pending = session('garmin_import.pending');
+
+        $this->confirm($review)->assertRedirect(route('garmin.import.summary'));
+
+        // The double click: a second request still carrying the pending import.
+        session()->put('garmin_import.pending', $pending);
+
+        $this->confirm($review)->assertRedirect(route('garmin.import.review'));
+        $this->assertSame(37, Activity::count());
+    }
+
     public function test_overwrite_replaces_the_csv_fields_marks_it_garmin_and_keeps_the_strava_id(): void
     {
         $stored = $this->storedStravaRun('2026-10-10 09:34:10', [

@@ -60,31 +60,48 @@ final readonly class PlanGarminImport
             }
         }
 
-        $newRows = [];
-        $conflicts = [];
-
         /*
-         * Each stored run answers at most one CSV row, the first in file order
-         * that finds it closest. Without claiming, two CSV runs a minute apart
-         * could both overwrite the same stored run, and one of them would be
-         * lost.
+         * Closest pairs first, across the whole file: every (row, stored run)
+         * pair within the tolerance is ranked by start difference, and each
+         * row and each stored run is taken at most once. Claiming in file order
+         * instead would let an earlier row 90 s away take a stored run that a
+         * later row matches to the second — the later row would then be
+         * planned as new, and a Skip would leave that run on the map twice.
+         * Ties go to the earlier row, then the lower stored id.
          */
+        $pairs = [];
+
         foreach ($rows as $index => $row) {
             if (isset($alreadyImported[$index])) {
                 continue;
             }
 
-            $match = $this->startTimeMatcher->closest($row->startDateLocal, $stored);
+            foreach ($stored as $activity) {
+                $difference = $this->startTimeMatcher->difference($row->startDateLocal, $activity);
 
-            if ($match === null) {
-                $newRows[$index] = $row;
+                if ($difference !== null) {
+                    $pairs[] = [$difference, $index, $activity->id];
+                }
+            }
+        }
 
+        sort($pairs);
+
+        $conflicts = [];
+        $claimed = [];
+
+        foreach ($pairs as [, $index, $activityId]) {
+            if (isset($conflicts[$index]) || isset($claimed[$activityId])) {
                 continue;
             }
 
-            $conflicts[$index] = new GarminImportConflict($index, $row, $match);
-            $stored->forget($match->id);
+            $conflicts[$index] = new GarminImportConflict($index, $rows[$index], $stored[$activityId]);
+            $claimed[$activityId] = true;
         }
+
+        ksort($conflicts);
+
+        $newRows = array_diff_key($rows, $alreadyImported, $conflicts);
 
         return new GarminImportPlan($newRows, $conflicts, $alreadyImported);
     }

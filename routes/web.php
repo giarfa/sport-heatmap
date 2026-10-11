@@ -38,7 +38,7 @@ Route::middleware(['auth', 'strava.fresh'])
         Route::get('/', ShowGarminImportFormController::class)->name('create');
         Route::post('/', UploadGarminCsvController::class)->middleware('throttle:garmin-import')->name('store');
         Route::get('/review', ShowGarminImportReviewController::class)->name('review');
-        Route::post('/confirm', ConfirmGarminImportController::class)->name('confirm');
+        Route::post('/confirm', ConfirmGarminImportController::class)->middleware('throttle:garmin-import')->name('confirm');
         Route::post('/cancel', CancelGarminImportController::class)->name('cancel');
         Route::get('/summary', ShowGarminImportSummaryController::class)->name('summary');
     });

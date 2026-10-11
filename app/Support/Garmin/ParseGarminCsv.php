@@ -23,6 +23,20 @@ final readonly class ParseGarminCsv
 {
     private const NAME_MAX_LENGTH = 255;
 
+    /*
+     * Bounds on what one upload can put in the session and in front of the
+     * planner. 5 MB of minimal rows is ~100k rows; a real 16-week export holds
+     * a few hundred runs at most, and a real export with hundreds of unreadable
+     * rows is not one this importer can help with.
+     */
+    private const MAX_RUNS = 1_000;
+
+    private const MAX_INVALID_ROWS = 100;
+
+    private const MAX_IGNORED_TYPES = 50;
+
+    private const TYPE_LABEL_MAX_LENGTH = 60;
+
     /**
      * @throws GarminCsvRejectedException
      */
@@ -61,7 +75,12 @@ final readonly class ParseGarminCsv
             $sportType = GarminRunningTypes::sportTypeFor($type);
 
             if ($sportType === null) {
-                $label = $type === '' ? '(no type)' : $type;
+                $label = $type === '' ? '(no type)' : mb_substr($type, 0, self::TYPE_LABEL_MAX_LENGTH);
+
+                if (! isset($ignoredByType[$label]) && count($ignoredByType) >= self::MAX_IGNORED_TYPES) {
+                    $label = '(other types)';
+                }
+
                 $ignoredByType[$label] = ($ignoredByType[$label] ?? 0) + 1;
 
                 continue;
@@ -71,6 +90,7 @@ final readonly class ParseGarminCsv
 
             if ($startDateLocal === null) {
                 $invalid[] = ['line' => $line, 'reason' => 'unreadable date'];
+                $this->assertWithinInvalidLimit($invalid);
 
                 continue;
             }
@@ -81,10 +101,12 @@ final readonly class ParseGarminCsv
                 continue;
             }
 
-            $distanceMeters = $this->distanceMeters((string) ($cells[$columns['distance']] ?? ''));
+            $rawDistance = trim((string) ($cells[$columns['distance']] ?? ''));
+            $distanceMeters = $this->distanceMeters($rawDistance);
 
             if ($distanceMeters === null) {
-                $invalid[] = ['line' => $line, 'reason' => 'missing distance'];
+                $invalid[] = ['line' => $line, 'reason' => in_array($rawDistance, ['', '--'], true) ? 'missing distance' : 'unreadable distance'];
+                $this->assertWithinInvalidLimit($invalid);
 
                 continue;
             }
@@ -94,6 +116,7 @@ final readonly class ParseGarminCsv
 
             if ($movingTimeSeconds === null) {
                 $invalid[] = ['line' => $line, 'reason' => 'missing moving time'];
+                $this->assertWithinInvalidLimit($invalid);
 
                 continue;
             }
@@ -113,6 +136,10 @@ final readonly class ParseGarminCsv
              * one run and double that day on the map.
              */
             $rows[$row->identityKey()] ??= $row;
+
+            if (count($rows) > self::MAX_RUNS) {
+                throw GarminCsvRejectedException::tooManyRuns(self::MAX_RUNS);
+            }
         }
 
         if ($columns === null || $dataRows === 0) {
@@ -120,6 +147,18 @@ final readonly class ParseGarminCsv
         }
 
         return new ParsedGarminCsv(array_values($rows), $ignoredByType, $outsideWindow, $invalid);
+    }
+
+    /**
+     * @param  array<int, array{line: int, reason: string}>  $invalid
+     *
+     * @throws GarminCsvRejectedException
+     */
+    private function assertWithinInvalidLimit(array $invalid): void
+    {
+        if (count($invalid) > self::MAX_INVALID_ROWS) {
+            throw GarminCsvRejectedException::tooManyInvalidRows(self::MAX_INVALID_ROWS);
+        }
     }
 
     /**
@@ -178,7 +217,11 @@ final readonly class ParseGarminCsv
     {
         $kilometres = str_replace(',', '', trim($raw));
 
-        if (! preg_match('/^\d+(\.\d+)?$/', $kilometres)) {
+        /*
+         * At most six integer digits (999,999 km): an unbounded value overflows
+         * the int cast into a negative distance that would corrupt the totals.
+         */
+        if (! preg_match('/^\d{1,6}(\.\d+)?$/', $kilometres)) {
             return null;
         }
 
@@ -190,7 +233,7 @@ final readonly class ParseGarminCsv
      */
     private function durationSeconds(string $raw): ?int
     {
-        if (! preg_match('/^(?:(\d+):)?(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/', trim($raw), $parts)) {
+        if (! preg_match('/^(?:(\d{1,4}):)?(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/', trim($raw), $parts)) {
             return null;
         }
 

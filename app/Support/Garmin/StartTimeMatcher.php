@@ -31,20 +31,13 @@ final readonly class StartTimeMatcher
      */
     public function closest(CarbonInterface $start, iterable $candidates): ?Activity
     {
-        $date = $start->format('Y-m-d');
-        $startSeconds = self::wallClockSeconds($start);
-
         $match = null;
         $matchDifference = null;
 
         foreach ($candidates as $candidate) {
-            if ($candidate->activity_date->format('Y-m-d') !== $date) {
-                continue;
-            }
+            $difference = $this->difference($start, $candidate);
 
-            $difference = abs(self::wallClockSeconds($candidate->start_date_local) - $startSeconds);
-
-            if ($difference > self::TOLERANCE_SECONDS) {
+            if ($difference === null) {
                 continue;
             }
 
@@ -59,6 +52,21 @@ final readonly class StartTimeMatcher
         }
 
         return $match;
+    }
+
+    /**
+     * Seconds between $start and the candidate's start when they are the same
+     * run by this rule — same local date, within the tolerance — else null.
+     */
+    public function difference(CarbonInterface $start, Activity $candidate): ?int
+    {
+        if ($candidate->activity_date->format('Y-m-d') !== $start->format('Y-m-d')) {
+            return null;
+        }
+
+        $difference = abs(self::wallClockSeconds($candidate->start_date_local) - self::wallClockSeconds($start));
+
+        return $difference <= self::TOLERANCE_SECONDS ? $difference : null;
     }
 
     /**

@@ -15,8 +15,8 @@ use App\Exceptions\Garmin\GarminCsvRejectedException;
 final class GarminCsvColumns
 {
     /**
-     * Canonical key => header text, per language. The first entry of each set
-     * is the export's first column and decides the language.
+     * Canonical key => header text, per language. The activity-type header
+     * decides the language.
      *
      * @var array<string, array<string, string>>
      */
@@ -62,7 +62,7 @@ final class GarminCsvColumns
             $header[0] = self::withoutByteOrderMark($header[0]);
         }
 
-        $headerSet = self::headerSetFor($header[0] ?? '');
+        $headerSet = self::headerSetFor($header);
 
         $columns = [];
 
@@ -84,14 +84,25 @@ final class GarminCsvColumns
     }
 
     /**
+     * The language whose headers the row carries, wherever they sit.
+     *
+     * Its activity-type header plus all but one of the other required headers
+     * must be present: other exports reuse single names (Strava's has
+     * "Activity Type", "Distance" and "Moving Time"), and a Garmin export
+     * missing one column should hear which one, not "unrecognised".
+     *
+     * @param  array<int, string>  $header
      * @return array<string, string>
      *
      * @throws GarminCsvRejectedException
      */
-    private static function headerSetFor(string $firstCell): array
+    private static function headerSetFor(array $header): array
     {
         foreach (self::HEADER_SETS as $headerSet) {
-            if ($headerSet['type'] === $firstCell) {
+            $required = array_diff_key($headerSet, array_flip(self::OPTIONAL_KEYS));
+            $present = array_intersect($required, $header);
+
+            if (in_array($headerSet['type'], $header, true) && count($present) >= count($required) - 1) {
                 return $headerSet;
             }
         }

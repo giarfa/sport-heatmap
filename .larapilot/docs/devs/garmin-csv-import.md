@@ -27,19 +27,29 @@ file and returns a `ParsedGarminCsv`. It writes nothing.
    and nothing is written when:
    - the file is unreadable, contains NUL bytes, or is not valid UTF-8 →
      "This is not a CSV file."
-   - the first header cell is neither `Tipo di attività` (Italian) nor
-     `Activity Type` (English) → "This is not a Garmin Connect activities
-     export…"
+   - the header carries neither `Tipo di attività` (Italian) nor
+     `Activity Type` (English) together with all but one of that language's
+     other required headers → "This is not a Garmin Connect activities
+     export…" (Strava's export shares three English names, so one shared name
+     is not enough)
    - a required column of that language is missing → the message names it
    - there is a header but no data row → "The file has no activities."
+   - more than **1,000** runs survive into the window, or more than **100**
+     rows are unreadable → the message says so. These caps bound what one 5 MB
+     upload can put in the session and in front of the planner; a real
+     16-week export holds a few hundred runs at most.
 2. **Per row**, in this order — the first rule that applies decides the row:
-   1. **Type** — not a running type → `ignoredByType[name] += 1`.
+   1. **Type** — not a running type → `ignoredByType[name] += 1` (names cut
+      to 60 characters; beyond 50 distinct names the rest count as
+      `(other types)`).
    2. **Date** — not `Y-m-d H:i:s` / `Y-m-d H:i` (or an overflowing date such
       as `2026-02-30`) → `invalid[] = {line, "unreadable date"}`.
    3. **Window** — after today, or outside the heatmap window →
       `outsideWindow += 1`.
-   4. **Distance** — `"--"`, empty or non-numeric → `invalid[] = {line,
-      "missing distance"}`.
+   4. **Distance** — `"--"` or empty → `invalid[] = {line, "missing
+      distance"}`; non-numeric or more than six integer digits →
+      `"unreadable distance"` (an unbounded value would overflow the int cast
+      into a negative distance).
    5. **Moving time** — `"--"` falls back to the `Tempo` / `Time` column; if
       that is also unreadable → `invalid[] = {line, "missing moving time"}`.
    6. **Title** — trimmed, `Run` when empty, cut to 255 characters.
@@ -53,7 +63,7 @@ rows still parse.
 
 | Key | Italian | English | Required |
 | --- | --- | --- | --- |
-| type | `Tipo di attività` | `Activity Type` | yes — and must be the first column |
+| type | `Tipo di attività` | `Activity Type` | yes — decides the language |
 | date | `Data` | `Date` | yes |
 | title | `Titolo` | `Title` | yes |
 | distance | `Distanza` | `Distance` | yes |
@@ -92,11 +102,12 @@ owner's stored activities. It reads only.
 2. **Already imported** (first pass, whole file): a stored `garmin_csv` row with
    the identical start (to the second), distance and moving time. It is not
    asked about, and that stored row is claimed.
-3. **Conflict** (second pass, file order): `StartTimeMatcher` finds a stored row
-   of **either source** on the same local date within **±2 minutes inclusive**
-   (120 s matches, 121 s does not), the closest start winning and ties going to
-   the lowest id. The matched row is **claimed**: the next CSV row is matched
-   against the remaining candidates only.
+3. **Conflict** (second pass, whole file): every (CSV row, stored row) pair
+   that `StartTimeMatcher::difference()` accepts — a stored row of **either
+   source** on the same local date within **±2 minutes inclusive** (120 s
+   matches, 121 s does not) — is ranked by start difference, and pairs are
+   taken **closest first**, each CSV row and each stored row at most once.
+   Ties go to the earlier CSV row, then the lower stored id.
 4. **New**: everything else.
 
 The result is a `GarminImportPlan` (`newRows`, `conflicts`, `alreadyImported`,
@@ -134,7 +145,7 @@ comes from the `web` group.
 | `GET /import/garmin` | `create` | Upload form |
 | `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per owner) |
 | `GET /import/garmin/review` | `review` | Re-plans the pending rows against the DB **as it is now**; renders conflicts, new rows, counts, `token`, `fingerprint` |
-| `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; re-plans; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
+| `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under a per-owner `Cache::lock`, re-plans; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
 | `POST /import/garmin/cancel` | `cancel` | Forgets the pending import → dashboard, "Import cancelled. Nothing was written." |
 | `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary`; without one → dashboard |
 
@@ -200,7 +211,8 @@ comes from the `web` group.
 | List unknown types by name in the summary (decision `56c5683061907ab8`) | Drop them silently; reject the file | Only `Corsa` is confirmed by a real export. A missed running variant must be visible to the owner so it becomes a one-line addition |
 | "Already imported" = same start, distance and moving time on a `garmin_csv` row | A hash of the CSV row as its identity | Garmin exports carry no activity id, and a re-export may add, drop or reorder columns, changing the hash of an unchanged run |
 | Identity pass before the conflict pass | One pass in file order | A row a minute away could claim the stored run first, and the row identical to it — a re-import — would be inserted a second time |
-| Claim each stored row for one CSV row | Let every CSV row match freely | Two CSV runs could both overwrite one stored run, and one of them would silently vanish |
+| Claim each stored row for one CSV row, closest pairs first | Let every CSV row match freely; claim in file order | Free matching lets two CSV runs overwrite one stored run; file order lets an earlier row 90 s away take a stored run a later row matches to the second, so the later row is planned as new and a Skip leaves that run on the map twice |
+| Per-owner lock around confirm | Rely on the token and fingerprint alone | A double-clicked confirm sends two requests carrying the same session; serialised, the second re-plans after the first committed, finds its runs already imported, fails the fingerprint and writes nothing |
 | Conflicts with **either** source | Only with Strava rows | A second, slightly different Garmin export of the same run must be reviewed, not duplicated |
 | Overwrite keeps `strava_activity_id` | Clear it | Without the id the sync no longer recognises the twin and would re-add Strava's copy the next night |
 | A missing answer is Skip | Reject the confirm | Skip is the pre-checked, non-destructive default; the Form Request already requires an answer |
@@ -250,6 +262,15 @@ comes from the `web` group.
 - **Adding a running type name:** one line in `GarminRunningTypes::TYPES`,
   lower-cased. The summary's "Ignored activity types" list is where a missing
   one shows up.
+- **Known gap — the window is fixed at upload.** A review confirmed after the
+  week rolls over still imports rows that were in the window when parsed.
+  They are older runs, and the heatmap simply does not show them.
+- **Parsed rows live in the session store.** The raw file is never stored, but
+  the parsed rows (names, starts, distances) sit in `sessions.payload` until
+  confirm, cancel, the next upload, or session expiry. Set
+  `SESSION_ENCRYPT=true` if that store is shared.
+- Rows identical within one file collapse silently; they are counted under no
+  heading, so the totals can be lower than the file's row count.
 - **Adding a language:** one more header set in `GarminCsvColumns`; the type
   map needs that language's running names too.
 - **Known limitation — metric accounts only.** Garmin exports distance in the

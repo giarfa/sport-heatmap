@@ -80,14 +80,14 @@ class ReconcileStravaWindow
                  * as new is linked, not added (decision 7baf70c6656a936f): creating
                  * it would count the same run twice on the map. Only the Strava id
                  * is stored — Garmin's values stay — and the row is claimed so a
-                 * second Strava activity cannot link to it too. strava_activity_id
-                 * is an identity column, hence forceFill.
+                 * second Strava activity cannot link to it too. Only that one
+                 * column is filled, so nothing else on the row can change.
                  */
                 if (! isset($storedStravaIds[$activity->stravaActivityId])) {
                     $twin = $this->startTimeMatcher->closest($activity->startDateLocal, $unlinkedGarmin);
 
                     if ($twin !== null) {
-                        $twin->forceFill(['strava_activity_id' => $activity->stravaActivityId])->save();
+                        $twin->fill(['strava_activity_id' => $activity->stravaActivityId])->save();
                         $unlinkedGarmin->forget($twin->id);
 
                         continue;
