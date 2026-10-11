@@ -53,18 +53,24 @@ tasks:
       4. Empty commit: `chore(US-010): TASK-00 bootstrap feature branch`
 
       ## Completion Criteria
-      - [ ] Branch `feature/US-010-fix-cached-grid-unserialize` exists locally
-      - [ ] PR title/body drafted for `develop`
+      - [x] Branch `feature/US-010-fix-cached-grid-unserialize` exists locally
+      - [x] PR title/body drafted for `develop`
 
       ## Git Deliverables
       - Commit: `chore(US-010): TASK-00 bootstrap feature branch` (empty commit allowed)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally — open/update remote only if user requests
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 0.25
     dependencies: {}
+    commit:
+      sha: 800b302c82b67c497799ce862c41affb8af0887d
+      short_sha: 800b302
+      subject: 'chore(US-010): TASK-00 bootstrap feature branch'
+      committed_at: '2026-10-11T15:43:46+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/800b302c82b67c497799ce862c41affb8af0887d'
   -
     id: TASK-01
     title: 'Allowlist the grid classes for cache unserialize and rebuild unrestorable entries'
@@ -85,30 +91,36 @@ tasks:
       3. `php artisan test` and `php artisan larapilot:quality`
 
       ## Completion Criteria
-      - [ ] A serializing store restores the cached grid as a `HeatmapGrid`
-      - [ ] A cached entry that is not a `HeatmapGrid` is rebuilt, never returned
-      - [ ] `serializable_classes` is an explicit list, never `true`
-      - [ ] Root cause named in the commit body
-      - [ ] Tests pass
+      - [x] A serializing store restores the cached grid as a `HeatmapGrid`
+      - [x] A cached entry that is not a `HeatmapGrid` is rebuilt, never returned
+      - [x] `serializable_classes` is an explicit list, never `true`
+      - [x] Root cause named in the commit body
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — grid cache section: serialization allowlist, the self-healing read, the rejected array-mapper and `true` alternatives, and the invariant that a new class nested in the grid must join the allowlist
-      - [ ] Folder `README.md` index row updated (last spec US-010)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — grid cache section: serialization allowlist, the self-healing read, the rejected array-mapper and `true` alternatives, and the invariant that a new class nested in the grid must join the allowlist
+      - [x] Folder `README.md` index row updated (last spec US-010)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `fix(US-010): TASK-01 allowlist the cached grid classes for unserialize`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
     type: Fix
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 1
     dependencies:
       - TASK-00
+    commit:
+      sha: c2a8c71536609ec65049a2354f42c622d0100b00
+      short_sha: c2a8c71
+      subject: 'fix(US-010): TASK-01 allowlist the cached grid classes for unserialize'
+      committed_at: '2026-10-11T15:46:10+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c2a8c71536609ec65049a2354f42c622d0100b00'
   -
     id: TASK-02
     title: 'Cover the cached grid round trip through a serializing store'
@@ -128,18 +140,24 @@ tasks:
       6. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites
 
       ## Completion Criteria
-      - [ ] Round-trip regression test fails without the fix and passes with it
-      - [ ] Unrestorable-entry and allowlist cases pass
-      - [ ] Full suite passes
+      - [x] Round-trip regression test fails without the fix and passes with it
+      - [x] Unrestorable-entry and allowlist cases pass
+      - [x] Full suite passes
 
       ## Git Deliverables
       - Commit: `test(US-010): TASK-02 cover the cached grid round trip`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 1
     dependencies:
       - TASK-01
-updated_at: '2026-10-11T13:43:40+00:00'
+    commit:
+      sha: d72e5f9e2327d247613d5f768345471425d80e5f
+      short_sha: d72e5f9
+      subject: 'test(US-010): TASK-02 cover the cached grid round trip'
+      committed_at: '2026-10-11T15:47:04+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d72e5f9e2327d247613d5f768345471425d80e5f'
+updated_at: '2026-10-11T13:47:04+00:00'

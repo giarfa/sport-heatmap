@@ -566,11 +566,11 @@ specs:
       title: Maintenance
     priority: HIGH
     points: 2
-    status: 'IN PROGRESS'
+    status: REVIEW
     body: |
       #### US-010: Fix — home page returns 500 when the heatmap grid is served from the cache
 
-      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** IN PROGRESS
+      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** REVIEW
       **Blocked by:** -
       **Type:** Fix
       **Severity:** High
@@ -612,4 +612,5 @@ specs:
     status_history:
       - { status: PLANNED, at: '2026-10-11T13:43:40+00:00' }
       - { status: 'IN PROGRESS', at: '2026-10-11T13:43:46+00:00' }
+      - { status: REVIEW, at: '2026-10-11T13:51:23+00:00' }
     rework: false
