@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-003` |
-| **Last updated by** | `US-007` — 2026-10-11 (catch-up) |
+| **Last updated by** | `US-008` — 2026-10-11 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
@@ -54,19 +54,39 @@ fails the run.
 | Activity DTO | `app/Data/StravaActivity.php` | `fromApiPayload()`; running sports only (`app/Enums/SportType.php`) |
 | Reconcile action | `app/Actions/Strava/ReconcileStravaWindow.php` | Upsert + delete-on-absence in one transaction |
 | Outcome DTO | `app/Data/SyncOutcome.php` | Upserted / deleted counts, summed across athletes |
-| Models / tables | `app/Models/Activity.php` (`activities`), `app/Models/SyncRun.php` (`sync_runs`) | `strava_activity_id` unique; `sync_runs` has no `user_id` |
+| Models / tables | `app/Models/Activity.php` (`activities`), `app/Models/SyncRun.php` (`sync_runs`) | `strava_activity_id` unique and nullable; `source` per `ActivitySource`; `sync_runs` has no `user_id` |
 | Run status | `app/Enums/SyncRunStatus.php` | `running`, `succeeded`, `failed`, plus detail-card label and dot modifier |
 | Exceptions | `app/Exceptions/Strava/StravaApiException.php` | HTTP status and rate-limit usage only |
 | Window | `app/Support/Heatmap/HeatmapWindow.php` | The shared 112-day window |
 | Config | `config/strava.php` | `sync_hour`, `sync_timezone`, literal `api_base_url`, `activities_per_page`, `max_activity_pages`, `retry_attempts`, `retry_backoff_ms` |
 | Env vars | `.env` | `STRAVA_SYNC_HOUR`, `STRAVA_SYNC_TIMEZONE` |
-| Factories / seeders | `database/factories/ActivityFactory.php`, `SyncRunFactory.php`, `database/seeders/TrainingBlockSeeder.php` | Local/testing demo block for athlete `10000001` |
+| Factories / seeders | `database/factories/ActivityFactory.php` (`garminImported()`, `garminOverwritten()` states), `SyncRunFactory.php`, `database/seeders/TrainingBlockSeeder.php` | Local/testing demo block for athlete `10000001`, with two Garmin-new runs and one Garmin-won twin outside the current week |
 | Tests | `tests/Feature/Strava/SyncStravaActivitiesCommandTest.php`, `StravaClientTest.php`, `ReconcileStravaWindowTest.php`, `tests/Feature/Console/ScheduleTest.php`, `tests/Unit/Data/StravaActivityTest.php` | |
 
+### Data model
+
 `activities.activity_date` is the local calendar date of the run, indexed
-together with `user_id` (`[user_id, activity_date]`) — the shape of both the
-reconcile delete and the dashboard aggregate. `sync_runs.started_at` is indexed
-and is what "latest run" is read by.
+together with `user_id` (`[user_id, activity_date]`) — the shape of the
+reconcile delete, the dashboard aggregate, and the Garmin import's conflict
+lookup. `sync_runs.started_at` is indexed and is what "latest run" is read by.
+
+Since `US-008`, `activities.source` (`app/Enums/ActivitySource.php`, default
+`strava`) says whose values a row holds, and `strava_activity_id` is nullable.
+Together they give three kinds of row:
+
+| Kind | `source` | `strava_activity_id` | Owned by |
+| --- | --- | --- | --- |
+| Strava | `strava` | set | The sync: upserted, and deleted on absence |
+| Garmin-new | `garmin_csv` | NULL | The Garmin import; the sync never deletes it |
+| Garmin-won twin | `garmin_csv` | set | The Garmin import; the id is kept only so the sync recognises the twin and leaves it alone |
+
+`Activity::stravaUrl()` returns a deep-link only for `source = strava` (FR-008):
+a Garmin-won twin's Strava page shows values that are no longer the stored ones.
+The unique index on `strava_activity_id` stays; SQLite allows any number of
+NULLs under it. No new index was added — every query filters on
+`(user_id, activity_date)` first. The `add_source_to_activities_table`
+rollback is **lossy**: Garmin-new rows cannot exist in the old NOT NULL schema,
+so `down()` deletes them first.
 
 ## Architectural choices
 

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Database;
 
+use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Enums\SyncRunStatus;
 use App\Models\Activity;
@@ -132,6 +133,22 @@ class TrainingBlockSeederTest extends TestCase
         $this->activities()->each(function (Activity $activity): void {
             $this->assertContains($activity->sport_type, SportType::cases());
         });
+    }
+
+    public function test_the_block_seeds_two_garmin_imported_runs_and_one_garmin_overwritten_twin(): void
+    {
+        $this->assertSame(2, Activity::where('source', ActivitySource::GarminCsv)->whereNull('strava_activity_id')->count());
+        $this->assertSame(1, Activity::where('source', ActivitySource::GarminCsv)->whereNotNull('strava_activity_id')->count());
+    }
+
+    public function test_no_garmin_sourced_run_sits_in_the_current_week(): void
+    {
+        $this->assertSame(
+            0,
+            Activity::where('source', ActivitySource::GarminCsv)
+                ->whereDate('activity_date', '>=', Carbon::today()->startOfWeek()->toDateString())
+                ->count(),
+        );
     }
 
     public function test_the_block_includes_days_with_two_runs(): void
