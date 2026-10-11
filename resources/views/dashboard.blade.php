@@ -43,4 +43,20 @@
             </div>
         </aside>
     </div>
+
+    {{--
+        The guest's way in is a text line under the map, not a header button:
+        it has to stay discreet on a page whose job is to show the map, the
+        375 px header has no width left for a second control, and Strava orange
+        is reserved for the connect screen's button. Signed-in owners never see
+        it — they are already connected.
+    --}}
+    @guest
+        <p class="mt-6 text-xs" style="color: var(--ink-muted);">
+            Owner?
+            <a href="{{ route('strava.redirect') }}"
+               class="inline-flex min-h-11 items-center underline underline-offset-2"
+               style="color: var(--accent);">Connect with Strava</a>
+        </p>
+    @endguest
 @endsection

@@ -8,7 +8,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    {{-- Private single-athlete instance: there is nothing here to index. --}}
+    {{-- Publicly reachable but not promoted — PRD SEO & discoverability: nothing here to index. --}}
     <meta name="robots" content="noindex, nofollow">
 
     {{--
@@ -20,7 +20,7 @@
     <meta name="referrer" content="same-origin">
 
     <title>@yield('title', 'Sport Heatmap')</title>
-    <meta name="description" content="Private training dashboard — daily running distance over the last 16 weeks.">
+    <meta name="description" content="Training dashboard — daily running distance over the last 16 weeks.">
 
     <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
 

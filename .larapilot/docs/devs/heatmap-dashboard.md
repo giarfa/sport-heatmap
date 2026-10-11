@@ -52,6 +52,16 @@ connect screen: the OAuth cancellation flash (`status`) and the
 cancel path redirects to `dashboard`, which a guest sees as the public map once
 an athlete has connected and as the connect screen before that.
 
+**Guest UI.** Signed-out visitors get everything the owner sees, plus one
+line under the map: "Owner? Connect with Strava", a text link to
+`strava.redirect` (`@guest` only; 44 px tap target; `--accent` ink, global
+`focus-visible` ring). It is not a header button: the 375 px header has no room
+for a second control, the line must stay discreet on a page whose job is the
+map, and Strava orange stays reserved for the connect screen. SEO contract:
+`<meta name="robots" content="noindex, nofollow">` only — the page is publicly
+reachable but not promoted (decision `4918d74ff18e8b0f`); the meta description
+no longer calls it private.
+
 **Sync health precedence (`SyncStatus::from`)**: no run → `NeverSynced`; last run
 failed → `Failed`; no successful run → `NeverSynced`; last success finished more
 than `strava.stale_after_hours` (48) ago → `Stale`; else `Healthy`. Every
@@ -99,6 +109,7 @@ three small indexed queries for the sync status.
 | Public read-only home page for guests (FR-017) | Keep it sign-in only | The owner checks it on any device and shares the link; the owner accepted the Strava API Agreement risk (decisions `f71daaa7e976c188`, `88f04507cbc7e573`) |
 | Guests and owner share the per-athlete grid cache | A separate guest cache | Same data, same key; a separate cache would double the rebuilds and could disagree with the owner's view |
 | Guests see the same sync warning, reason included | A reduced guest warning | Decision `f75e292def892fad`; the reason is already non-secret and HTML-escaped |
+| Guest sign-in as a footer text link | Header button; Strava-orange button on the map | Discreet, fits the 375 px header budget, keeps orange reserved for the connect screen |
 | Shared `session-notices` component | Duplicate the notices in both views | One copy of the cancellation and expiry copy; the caller only decides the width |
 | Two-letter weekday `<abbr>` | Single letters from the PRD prose | Matches the mockup (decision log) |
 
