@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-009` — 2026-10-11 |
+| **Last updated by** | `US-010` — 2026-10-11 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -35,7 +35,8 @@ share stops working.
    1. `HeatmapWindow::current()` — Monday of the week 15 weeks ago through Sunday
       of the current week (112 days).
    2. `HeatmapGridCache::remember()` returns the cached `HeatmapGrid`, or builds
-      it: `DailyRunningDistance` (one grouped `SUM` query) →
+      it — an entry that is not a `HeatmapGrid` counts as a miss and is
+      overwritten: `DailyRunningDistance` (one grouped `SUM` query) →
       `HeatmapBuilder` (rest / ran / future cells, weekly totals, partial current
       week) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
    3. `ResolveSyncStatus` reads `sync_runs` and the window's activity count
@@ -101,7 +102,7 @@ calibrated bands, upper-inclusive.
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
-| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php` | Key `heatmap:grid:{user id}:{window start}:{today}`, TTL `heatmap.grid_cache_ttl` |
+| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:{user id}:{window start}:{today}`, TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string |
 | Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
@@ -119,6 +120,8 @@ three small indexed queries for the sync status.
 | Grid as a real `<table>` with an accessible name per cell | `<div>` grid / canvas / SVG chart | FR-009: table semantics, screen-reader names, 375 px without page scroll |
 | Today's date in the cache key | Key on window only | Yesterday's grid would survive midnight and render today as a future cell — stale data shown as current (decision `4a7f0fb3e9bb61ac`) |
 | Sync status resolved outside the cache | Cache it with the grid | A cached "synced 6 hours ago" is exactly what FR-007 forbids |
+| Cache the grid DTOs, with `cache.serializable_classes` listing exactly the classes the grid is made of (US-010) | `serializable_classes => true`; caching a plain array through `toArray()` / `fromArray()` mappers | Laravel 13 defaults the list to `false`, so a serializing store (`database`, `file`, `redis`) restored the grid as `__PHP_Incomplete_Class` and every cache hit answered 500. `true` reopens the gadget-chain risk the default closes; mappers on five DTOs add code for no gain over the framework's allowlist |
+| A cached entry that is not a `HeatmapGrid` is rebuilt and overwritten (US-010) | Return it as is; `Cache::remember()` | An entry written before a class joined the grid or the allowlist would fail every request until it expires |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
 | All copy and arithmetic in DTOs / `SyncStatus` | Logic in Blade | Testable without rendering; components stay markup-only |
 | `@yield('header-status')` in the layout | View composer / shared variable | The connect and rejected screens extend the same layout and must render no chip |
@@ -144,6 +147,11 @@ three small indexed queries for the sync status.
 
 - **Invariant — the sync status is never cached.** _Breaks if:_ it moves into the
   `remember()` closure.
+- **Invariant — every class serialized inside a `HeatmapGrid` is listed in
+  `cache.serializable_classes`.** _Breaks if:_ a DTO, enum, or value object is
+  nested into the grid without joining the list — the grid then comes back
+  incomplete and is rebuilt on every request (no error, no cache benefit). The
+  list never becomes `true`.
 - **Invariant — the grid cache key carries today's date.** _Breaks if:_ the key
   drops it; the cache then outlives midnight.
 - **Invariant — the scale is calibrated once per grid build**, so cells and legend
@@ -155,6 +163,9 @@ three small indexed queries for the sync status.
 
 ## Extension points & gotchas
 
+- The test suite runs the `array` store without serialization; a test that
+  needs the real round trip sets `cache.default` to `database`
+  (`HeatmapGridCacheTest`).
 - `HeatmapBuilder` takes `$today` as an argument: test date rules by naming a
   date, not by travelling time.
 - The first-sync skeleton shows only while the first run is in flight and no
@@ -169,7 +180,7 @@ three small indexed queries for the sync status.
 
 ## Related
 
-- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`
-- Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`
-- Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`, `US-009.md`
+- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`, `US-010`
+- Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`, `US-010-plan.yaml`
+- Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`, `US-009.md`, `US-010.md`
 - Other domains: `strava-connection.md`, `activity-sync.md`, `garmin-csv-import.md`

@@ -21,14 +21,28 @@ final readonly class HeatmapGridCache
 
     /**
      * Return the cached grid, or build and store it on a miss.
+     *
+     * An entry that is not a HeatmapGrid counts as a miss and is overwritten.
+     * A serializing store restores a class missing from
+     * `cache.serializable_classes` as __PHP_Incomplete_Class, so an entry
+     * written before a class joined the grid — or the allowlist — would
+     * otherwise fail every request until it expires.
+     *
+     * @param  Closure(): HeatmapGrid  $build
      */
     public function remember(User $athlete, HeatmapWindow $window, CarbonInterface $today, Closure $build): HeatmapGrid
     {
-        return $this->cache->remember(
-            $this->key($athlete, $window, $today),
-            (int) config('heatmap.grid_cache_ttl'),
-            $build,
-        );
+        $key = $this->key($athlete, $window, $today);
+        $cached = $this->cache->get($key);
+
+        if ($cached instanceof HeatmapGrid) {
+            return $cached;
+        }
+
+        $grid = $build();
+        $this->cache->put($key, $grid, (int) config('heatmap.grid_cache_ttl'));
+
+        return $grid;
     }
 
     /**
