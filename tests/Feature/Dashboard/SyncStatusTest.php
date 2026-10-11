@@ -46,7 +46,10 @@ class SyncStatusTest extends TestCase
         $athlete = $this->allowlistedAthlete();
         $this->actingAs($athlete);
 
-        SyncRun::factory()->create(['finished_at' => now()->subHours(10)]);
+        SyncRun::factory()->create([
+            'started_at' => now()->subHours(10)->subMinute(),
+            'finished_at' => now()->subHours(10),
+        ]);
         $failedRun = SyncRun::factory()->failed()->create([
             'started_at' => now()->subHours(2)->subMinutes(1),
             'finished_at' => now()->subHours(2),
