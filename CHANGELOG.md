@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The home page is public: it shows the owner's last synced heatmap, weekly totals, legend and
+  sync status read-only, without a Strava sign-in. The displayed athlete is the first connected id
+  of `STRAVA_ALLOWED_ATHLETE_IDS`, in configured order; the connect screen only appears while
+  nobody has connected yet. Signing in stays allowlist-only (US-007).
+
 ## [0.1.0] - 2026-09-07
 
 First release: the complete MVP scope — a private, single-athlete Strava running heatmap. Covers

@@ -9,6 +9,8 @@
 @section('footer-status')· {{ $status->footerLabel() }}@endsection
 
 @section('content')
+    <x-session-notices class="mb-4" />
+
     <h1 class="text-lg font-semibold tracking-tight sm:text-xl">Last 16 weeks</h1>
     <p class="mt-0.5 text-sm" style="color: var(--ink-muted);">{{ $grid->label() }} · running distance per day</p>
 
