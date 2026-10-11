@@ -1,6 +1,6 @@
 # Sport Heatmap
 
-A private, single-athlete training heatmap. It syncs your own runs from Strava once a day and
+A single-athlete training heatmap, public and read-only. It syncs your own runs from Strava once a day and
 renders them as a GitHub-style contribution grid, so a training block is readable at a glance.
 
 One athlete, one screen, no public signup: identity comes from Strava OAuth and access is
@@ -134,7 +134,7 @@ budget into one shared bucket.
 | `STRAVA_CLIENT_ID` | Client ID of your Strava API application | `123456` |
 | `STRAVA_CLIENT_SECRET` | Client secret of that application — secret, never committed | `2f9c…` |
 | `STRAVA_REDIRECT_URI` | OAuth callback URL; its host must match the callback domain registered with Strava | `https://sport-heatmap.test/auth/strava/callback` |
-| `STRAVA_ALLOWED_ATHLETE_IDS` | Comma-separated allowlist of Strava athlete ids permitted to connect. Numeric entries only; blank means nobody. | your own athlete id |
+| `STRAVA_ALLOWED_ATHLETE_IDS` | Comma-separated allowlist of Strava athlete ids permitted to connect. Numeric entries only; blank means nobody. Order matters: the first id that has connected is displayed publicly on the home page. | your own athlete id |
 | `STRAVA_TOKEN_REFRESH_MARGIN` | Seconds before expiry at which the access token is refreshed pre-emptively | `300` |
 | `STRAVA_SYNC_HOUR` | Local hour (0–23) at which the daily sync runs | `3` |
 | `STRAVA_SYNC_TIMEZONE` | Timezone that `STRAVA_SYNC_HOUR` is expressed in | `Europe/Rome` |
@@ -154,6 +154,10 @@ php artisan migrate:fresh --seed
 This produces a full **16-week training block** for one demo athlete — including an illness
 week, a peak week and a partial current week — so the dashboard can be developed and reviewed
 without ever connecting to Strava.
+
+To see that block on the public home page without signing in, allowlist the seeded athlete id
+`10000001` in your **local** `.env` only (`STRAVA_ALLOWED_ATHLETE_IDS=10000001`) — never in
+production, where it would publish a demo athlete instead of your own.
 
 ## Running the sync
 
@@ -194,6 +198,17 @@ count and delays are literals in `config/strava.php`); an exhausted retry record
 daily sync starts failing.
 
 ## The dashboard
+
+The home page (`/`) is **public and read-only**. A signed-out visitor sees the heatmap, weekly
+totals, legend and sync status of the **first connected athlete of `STRAVA_ALLOWED_ATHLETE_IDS`, in
+configured order** — the same content the signed-in owner sees, without a Strava sign-in. A guest
+request never refreshes a token, calls Strava, or writes a row. Signing in is only needed to connect
+Strava, from the discreet "Owner? Connect with Strava" line under the map, and stays
+allowlist-only. While no allowlisted athlete has connected yet, the home page shows the connect
+screen instead. The page keeps `noindex, nofollow`: reachable by link, not promoted.
+
+If the owner's Strava token can no longer be refreshed, they are signed out and land on the public
+map with a one-off "Your Strava connection expired" banner.
 
 The heatmap grid is cached per athlete, per 16-week window and per calendar day
 (`App\Support\Heatmap\HeatmapGridCache`), so a second request the same day skips the aggregate

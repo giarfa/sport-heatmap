@@ -148,5 +148,5 @@ three small indexed queries for the sync status.
 
 - Specs: `US-004`, `US-005`, `US-006`, `US-007`
 - Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`
-- Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`
+- Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`
 - Other domains: `strava-connection.md`, `activity-sync.md`

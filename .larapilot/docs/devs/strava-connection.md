@@ -163,6 +163,6 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
 ## Related
 
 - Specs: `US-002`, `US-003`, `US-007`
-- Plans: `.larapilot/plans/US-002-plan.yaml`
-- Review: `.larapilot/docs/review/US-002.md`
+- Plans: `.larapilot/plans/US-002-plan.yaml`, `US-007-plan.yaml`
+- Review: `.larapilot/docs/review/US-002.md`, `US-007.md`
 - Other domains: `activity-sync.md`, `heatmap-dashboard.md`
