@@ -123,6 +123,48 @@ request. It returns a `GarminImportSummary`: imported, overwritten, skipped,
 already imported, ignored by type, outside window, invalid. The action does not
 authorize (`.ai/rules/actions.md`); the caller has.
 
+### 4. HTTP flow
+
+All routes sit under `import/garmin`, named `garmin.import.*`, behind
+`auth` + `strava.fresh` (the allowlist is re-checked on every request). CSRF
+comes from the `web` group.
+
+| Route | Name | Does |
+| --- | --- | --- |
+| `GET /import/garmin` | `create` | Upload form |
+| `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per owner) |
+| `GET /import/garmin/review` | `review` | Re-plans the pending rows against the DB **as it is now**; renders conflicts, new rows, counts, `token`, `fingerprint` |
+| `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; re-plans; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
+| `POST /import/garmin/cancel` | `cancel` | Forgets the pending import → dashboard, "Import cancelled. Nothing was written." |
+| `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary`; without one → dashboard |
+
+- **Guests**: `bootstrap/app.php` sets `redirectGuestsTo(route('dashboard'))`
+  (there is no login route, so the default would throw). Any guest request —
+  GET or POST — is redirected home and writes nothing.
+- **Session binding**: `PendingGarminImport` is the only reader and writer of
+  `garmin_import.pending` = `{token, parsed}` (scalars only). No route or field
+  names an import, so a request can only reach the one in its own session.
+  Abandoning the review leaves just this entry; the next upload replaces it.
+- **The file is never stored**: the controller parses
+  `$request->file('csv')->getRealPath()` and never calls `store()`; PHP deletes
+  the temporary upload when the request ends.
+- **Staleness**: confirm recomputes the plan and compares
+  `GarminImportPlan::fingerprint()` with the one the review rendered, and the
+  token with the session's (both with `hash_equals`). A mismatch redirects to
+  the review with "Your stored activities changed since this review — check
+  the conflicts again." and writes nothing. A review page left open across a
+  newer upload fails the token check the same way.
+- **Rejections** (`UploadGarminCsvRequest` or `GarminCsvRejectedException`) go
+  back to the form with the message on `csv`, linked to the input through
+  `aria-describedby`; nothing is parsed into the session.
+- **Views** (`resources/views/garmin/`) follow `.larapilot/mockups/US-008/`:
+  real `<table>`s with captions and scoped headers that reflow into stacked
+  cards below 640 px (`td[data-label]`); a fieldset per conflict with Skip
+  pre-checked; "Overwrite all" / "Skip all" rendered `hidden` and revealed by
+  `resources/js/app.js` (`data-resolve-all`); "View on Strava" only where
+  `Activity::stravaUrl()` is not null (FR-008). Formats come from
+  `GarminImportFormat` (km to one decimal, `H:MM:SS`, `HH:MM:SS` start).
+
 ## Technical design
 
 | Piece | Where | Role |
@@ -139,6 +181,13 @@ authorize (`.ai/rules/actions.md`); the caller has.
 | Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction; grid cache forgotten after commit |
 | Answer | `app/Enums/ConflictResolution.php` | `overwrite`, `skip` |
 | Summary DTO | `app/Data/Garmin/GarminImportSummary.php` | The seven counts; session round-trip for the summary page |
+| Routes | `routes/web.php` (`garmin.import.*`), guest redirect in `bootstrap/app.php`, `garmin-import` limiter in `app/Providers/AppServiceProvider.php` | |
+| Controllers | `app/Http/Controllers/Garmin/*` | Six single-action controllers |
+| Form Requests | `app/Http/Requests/Garmin/UploadGarminCsvRequest.php`, `ConfirmGarminImportRequest.php` | `required\|file\|max:5120\|mimes:csv,txt`; token, fingerprint, `resolutions.*` in `ConflictResolution` |
+| Session binding | `app/Support/Garmin/PendingGarminImport.php` | The one reader/writer of `garmin_import.pending` |
+| Formatting | `app/Support/Garmin/GarminImportFormat.php` | Shared by the review's stored and CSV sides |
+| Views / assets | `resources/views/garmin/{create,review,summary}.blade.php`, "Garmin import" block in `resources/css/app.css`, `data-resolve-all` in `resources/js/app.js` | |
+| Tests | `tests/Feature/Garmin/*`, `tests/Unit/Support/Garmin/StartTimeMatcherTest.php`, `tests/Feature/Strava/ReconcileStravaWindowTest.php` | |
 | Fixtures | `tests/Fixtures/Garmin/activities-it.csv` (client sample, verbatim), `activities-en.csv` | |
 
 ## Architectural choices
@@ -155,6 +204,10 @@ authorize (`.ai/rules/actions.md`); the caller has.
 | Conflicts with **either** source | Only with Strava rows | A second, slightly different Garmin export of the same run must be reviewed, not duplicated |
 | Overwrite keeps `strava_activity_id` | Clear it | Without the id the sync no longer recognises the twin and would re-add Strava's copy the next night |
 | A missing answer is Skip | Reject the confirm | Skip is the pre-checked, non-destructive default; the Form Request already requires an answer |
+| Pending rows in the owner's session | A `pending_imports` table | A table would persist owner data beyond the request, need cleanup of abandoned reviews, and expose an id a request could name |
+| Re-plan at confirm and compare a fingerprint | Trust the plan rendered in the review | A sync or another tab can change stored runs between review and confirm; the owner's answers must apply to the runs they saw |
+| Form Requests for upload and confirm | Inline `$request->validate()` | First user-submitted forms in the app; `.ai/rules/http.md` was amended for them |
+| Guests redirected home, never 401/403 pages | A login route | There is no login page — the owner signs in through Strava from `/` |
 | Reject the whole file only for file-level problems | Reject on the first bad row | One corrupt row must not cost the owner the other thirty-nine |
 | Wall-clock dates built in UTC | Parse with the app timezone | Same contract as Strava's `start_date_local`; a conversion moves late-evening runs to the wrong day |
 
@@ -176,6 +229,13 @@ authorize (`.ai/rules/actions.md`); the caller has.
   already imported.
 - **Invariant — re-importing the same file changes nothing.** Every row is
   already imported, so nothing is created or asked about.
+- **Invariant — the session is the only binding.** _Breaks if:_ a route or
+  form field starts naming an import — a request could then reach another
+  owner's pending rows.
+- **Invariant — the raw file is never persisted.** _Breaks if:_ the upload is
+  `store()`d — an export carries heart rate, cadence and locations.
+- **Invariant — nothing is written before confirm**, and a stale confirm writes
+  nothing.
 - **Invariant — a rejection message never echoes file content** beyond a
   column name. _Breaks if:_ a cell value is interpolated — the upload page
   would render attacker-chosen text.

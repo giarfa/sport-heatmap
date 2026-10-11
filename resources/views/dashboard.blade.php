@@ -59,4 +59,18 @@
                style="color: var(--accent);">Connect with Strava</a>
         </p>
     @endguest
+
+    {{--
+        The owner's counterpart of the guest line above: same discreet text
+        line under the map, same 44 px target. Guests never see it, and the
+        import routes refuse them regardless.
+    --}}
+    @auth
+        <p class="mt-6 text-xs" style="color: var(--ink-muted);">
+            Runs missing from Strava?
+            <a href="{{ route('garmin.import.create') }}"
+               class="inline-flex min-h-11 items-center underline underline-offset-2"
+               style="color: var(--accent);">Import Garmin CSV</a>
+        </p>
+    @endauth
 @endsection
