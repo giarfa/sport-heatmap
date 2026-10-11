@@ -220,4 +220,17 @@ decisions:
     source: askquestion
     spec: US-008
     supersedes: null
-updated_at: '2026-10-11T12:28:42+00:00'
+  -
+    id: 9f72c0d14a487bec
+    ts: '2026-10-11T13:14:45+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-review
+    topic: 'garmin export in public repo'
+    label: 'Garmin export in public repo'
+    value: 'Anonymise the real Garmin export (client material and test fixture) and rewrite unpushed US-008 history before merging and pushing'
+    question: null
+    rationale: 'Repo giarfa/sport-heatmap is public; the export carries heart rate, cadence and place names'
+    source: askquestion
+    spec: US-008
+    supersedes: null
+updated_at: '2026-10-11T13:14:45+00:00'
