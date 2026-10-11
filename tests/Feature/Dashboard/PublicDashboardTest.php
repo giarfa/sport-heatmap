@@ -51,14 +51,148 @@ class PublicDashboardTest extends TestCase
         $response->assertSee('Runs in window');
     }
 
-    public function test_a_guest_gets_the_connect_screen_when_no_allowlisted_athlete_has_connected(): void
+    public function test_a_guest_gets_the_connect_screen_when_no_stored_athlete_has_an_activity(): void
     {
+        User::factory()->stravaConnected()->create();
         $this->allowlistAthletes('10000001');
 
         $response = $this->getDashboard();
 
         $response->assertOk();
         $response->assertViewIs('strava.connect');
+    }
+
+    public function test_a_guest_sees_the_fallback_athletes_map_with_a_blank_allowlist(): void
+    {
+        $fallbackAthlete = User::factory()->stravaConnected()->create();
+        $this->runOn($fallbackAthlete, '2026-09-03', 12_345);
+        SyncRun::factory()->create([
+            'started_at' => now()->subHours(6)->subMinute(),
+            'finished_at' => now()->subHours(6),
+        ]);
+        $this->allowlistAthletes();
+
+        $response = $this->getDashboard();
+
+        $response->assertOk();
+        $response->assertViewIs('dashboard');
+        $this->assertGuest();
+        $response->assertSee('Thursday 3 Sep 2026: 12.3 km');
+        $response->assertSee('<span class="hm-total-num">12.3</span>', escape: false);
+        $response->assertSee('>Intensity</h3>', escape: false);
+        $response->assertSee('Synced 6 hours ago');
+        $response->assertSee('>Sync</h3>', escape: false);
+    }
+
+    public function test_a_guest_sees_the_fallback_athlete_when_the_listed_athlete_has_not_connected(): void
+    {
+        $fallbackAthlete = User::factory()->stravaConnected()->create();
+        $this->runOn($fallbackAthlete, '2026-09-03', 12_345);
+        $this->allowlistAthletes('10000001');
+
+        $response = $this->getDashboard();
+
+        $response->assertOk();
+        $response->assertViewIs('dashboard');
+        $response->assertSee('Thursday 3 Sep 2026: 12.3 km');
+    }
+
+    public function test_a_connected_allowlisted_athlete_beats_the_fallback(): void
+    {
+        $olderAthlete = User::factory()->stravaConnected()->create();
+        $this->runOn($olderAthlete, '2026-09-03', 12_345);
+        $displayedAthlete = $this->allowlistedAthlete();
+        $this->runOn($displayedAthlete, '2026-09-02', 7_654);
+
+        $response = $this->getDashboard();
+
+        $response->assertSee('Wednesday 2 Sep 2026: 7.7 km');
+        $response->assertDontSee('12.3 km');
+    }
+
+    public function test_a_fallback_guest_request_writes_nothing_and_sends_no_request(): void
+    {
+        $fallbackAthlete = User::factory()->stravaTokenExpired()->create();
+        $this->runOn($fallbackAthlete, '2026-09-03', 12_345);
+        SyncRun::factory()->create();
+        $this->allowlistAthletes();
+
+        $before = $this->databaseSnapshot($fallbackAthlete);
+
+        $this->getDashboard()->assertOk()->assertViewIs('dashboard');
+
+        $this->assertSame($before, $this->databaseSnapshot($fallbackAthlete));
+        Http::assertNothingSent();
+    }
+
+    public function test_switching_from_the_fallback_to_an_allowlisted_athlete_never_serves_the_cached_fallback_grid(): void
+    {
+        $fallbackAthlete = User::factory()->stravaConnected()->create();
+        $this->runOn($fallbackAthlete, '2026-09-03', 12_345);
+        $this->allowlistAthletes('10000001');
+
+        $this->getDashboard()->assertSee('Thursday 3 Sep 2026: 12.3 km');
+
+        $connectedAthlete = User::factory()->stravaConnected()->create(['strava_athlete_id' => '10000001']);
+        $this->runOn($connectedAthlete, '2026-09-02', 7_654);
+
+        $response = $this->getDashboard();
+
+        $response->assertSee('Wednesday 2 Sep 2026: 7.7 km');
+        $response->assertDontSee('12.3 km');
+    }
+
+    public function test_a_guest_sees_the_same_sync_warning_for_the_fallback_athlete(): void
+    {
+        $fallbackAthlete = User::factory()->stravaConnected()->create();
+        $this->runOn($fallbackAthlete, '2026-09-03', 12_345);
+        SyncRun::factory()->failed()->create([
+            'started_at' => now()->subHours(2)->subMinute(),
+            'finished_at' => now()->subHours(2),
+            'error_message' => 'Strava said <script>alert(1)</script>',
+        ]);
+        $this->allowlistAthletes();
+
+        $response = $this->getDashboard();
+
+        $response->assertViewIs('dashboard');
+        $response->assertSee('Last sync failed 2 hours ago');
+        $response->assertSee('Strava said <script>alert(1)</script>');
+        $response->assertDontSee('<script>alert(1)</script>', escape: false);
+        $response->assertSee('href="'.route('strava.redirect').'" class="sync-alert-action"', escape: false);
+    }
+
+    public function test_the_fallback_page_keeps_noindex_the_attribution_and_no_garmin_entry_point(): void
+    {
+        $fallbackAthlete = User::factory()->stravaConnected()->create();
+        $this->runOn($fallbackAthlete, '2026-09-03', 12_345);
+        $this->allowlistAthletes();
+
+        $response = $this->getDashboard();
+
+        $response->assertViewIs('dashboard');
+        $response->assertSee('<meta name="robots" content="noindex, nofollow">', escape: false);
+        $response->assertSee('Powered by Strava');
+        $response->assertDontSee('Import Garmin CSV');
+    }
+
+    public function test_a_signed_in_athlete_removed_from_the_allowlist_still_gets_403_while_the_fallback_would_display_them(): void
+    {
+        $removedAthlete = User::factory()->stravaConnected()->create();
+        $this->runOn($removedAthlete, '2026-09-03', 12_345);
+        $this->allowlistAthletes();
+
+        $response = $this->actingAs($removedAthlete)->getDashboard();
+
+        $response->assertForbidden();
+        $response->assertViewIs('strava.rejected');
+        $this->assertGuest();
+
+        $this->getDashboard()
+            ->assertOk()
+            ->assertViewIs('dashboard')
+            ->assertDontSee('Import Garmin CSV');
+        Http::assertNothingSent();
     }
 
     public function test_a_removed_athlete_is_displayed_until_an_allowlisted_athlete_connects(): void
