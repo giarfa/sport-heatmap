@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Dashboard;
 
+use __PHP_Incomplete_Class;
 use App\Data\Heatmap\HeatmapGrid;
 use App\Models\Activity;
 use App\Models\User;
@@ -10,8 +11,10 @@ use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
+use stdClass;
 use Tests\TestCase;
 
 /**
@@ -122,26 +125,57 @@ class HeatmapGridCacheTest extends TestCase
         $window = HeatmapWindow::current();
         $key = "heatmap:grid:{$athlete->id}:{$window->startsOn->toDateString()}:".now()->toDateString();
 
-        Cache::put($key, new \stdClass, 3_600);
-        $this->assertInstanceOf(\__PHP_Incomplete_Class::class, Cache::get($key));
+        Cache::put($key, new stdClass, 3_600);
+        $this->assertInstanceOf(__PHP_Incomplete_Class::class, Cache::get($key));
 
         $this->getDashboard()->assertOk()->assertSee('9.0 km');
 
         $this->assertInstanceOf(HeatmapGrid::class, Cache::get($key));
     }
 
+    public function test_a_cached_grid_whose_nested_value_cannot_be_restored_is_rebuilt(): void
+    {
+        $this->useTheDatabaseCacheStore();
+        $athlete = $this->athleteWithOneRun();
+
+        $this->getDashboard()->assertOk()->assertSee('9.0 km');
+
+        // A DayCellState case that no longer exists — what a renamed case leaves
+        // behind in a grid cached before the deploy. unserialize() throws on it.
+        // The database store keeps the serialized value base64-encoded.
+        $row = DB::table('cache')->where('key', 'like', '%heatmap:grid:%')->sole();
+        $payload = base64_decode($row->value, true) ?: '';
+        $this->assertStringContainsString('DayCellState:Ran"', $payload);
+        DB::table('cache')->where('key', $row->key)->update([
+            'value' => base64_encode(str_replace('DayCellState:Ran"', 'DayCellState:Xyz"', $payload)),
+        ]);
+
+        $this->addALaterRun($athlete);
+
+        $this->getDashboard()
+            ->assertOk()
+            ->assertSee('9.0 km')
+            ->assertSee('7.3 km');
+    }
+
     public function test_the_cache_restores_no_class_outside_the_allowlist(): void
     {
         $this->useTheDatabaseCacheStore();
 
-        Cache::put('serialization-probe', new \stdClass, 60);
+        Cache::put('serialization-probe', new stdClass, 60);
 
-        $this->assertInstanceOf(\__PHP_Incomplete_Class::class, Cache::get('serialization-probe'));
+        $this->assertInstanceOf(__PHP_Incomplete_Class::class, Cache::get('serialization-probe'));
     }
 
+    /**
+     * The first test of a run migrates inside setUp(), which already resolves
+     * the default store; forgetting it makes HeatmapGridCache get the database
+     * store whatever the test order.
+     */
     private function useTheDatabaseCacheStore(): void
     {
         Config::set('cache.default', 'database');
+        $this->app->forgetInstance('cache.store');
     }
 
     private function athleteWithOneRun(): User

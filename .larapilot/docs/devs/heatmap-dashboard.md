@@ -35,8 +35,9 @@ share stops working.
    1. `HeatmapWindow::current()` — Monday of the week 15 weeks ago through Sunday
       of the current week (112 days).
    2. `HeatmapGridCache::remember()` returns the cached `HeatmapGrid`, or builds
-      it — an entry that is not a `HeatmapGrid` counts as a miss and is
-      overwritten: `DailyRunningDistance` (one grouped `SUM` query) →
+      it — an entry that cannot be restored as a `HeatmapGrid` (incomplete
+      class, or `unserialize` throwing on a nested class, enum case, or date)
+      is reported, counts as a miss, and is overwritten: `DailyRunningDistance` (one grouped `SUM` query) →
       `HeatmapBuilder` (rest / ran / future cells, weekly totals, partial current
       week) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
    3. `ResolveSyncStatus` reads `sync_runs` and the window's activity count
@@ -121,7 +122,7 @@ three small indexed queries for the sync status.
 | Today's date in the cache key | Key on window only | Yesterday's grid would survive midnight and render today as a future cell — stale data shown as current (decision `4a7f0fb3e9bb61ac`) |
 | Sync status resolved outside the cache | Cache it with the grid | A cached "synced 6 hours ago" is exactly what FR-007 forbids |
 | Cache the grid DTOs, with `cache.serializable_classes` listing exactly the classes the grid is made of (US-010) | `serializable_classes => true`; caching a plain array through `toArray()` / `fromArray()` mappers | Laravel 13 defaults the list to `false`, so a serializing store (`database`, `file`, `redis`) restored the grid as `__PHP_Incomplete_Class` and every cache hit answered 500. `true` reopens the gadget-chain risk the default closes; mappers on five DTOs add code for no gain over the framework's allowlist |
-| A cached entry that is not a `HeatmapGrid` is rebuilt and overwritten (US-010) | Return it as is; `Cache::remember()` | An entry written before a class joined the grid or the allowlist would fail every request until it expires |
+| A cached entry that cannot be restored is reported, rebuilt and overwritten (US-010) | Return it as is; `Cache::remember()`; `cache:clear` in the deploy notes | An entry written by an older shape of the grid — a class not yet allowlisted, a renamed `DayCellState` case, a changed property type — would otherwise fail every request until midnight. `unserialize` throws for nested failures, so the read catches `Throwable`, not only `__PHP_Incomplete_Class` |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
 | All copy and arithmetic in DTOs / `SyncStatus` | Logic in Blade | Testable without rendering; components stay markup-only |
 | `@yield('header-status')` in the layout | View composer / shared variable | The connect and rejected screens extend the same layout and must render no chip |
@@ -149,9 +150,10 @@ three small indexed queries for the sync status.
   `remember()` closure.
 - **Invariant — every class serialized inside a `HeatmapGrid` is listed in
   `cache.serializable_classes`.** _Breaks if:_ a DTO, enum, or value object is
-  nested into the grid without joining the list — the grid then comes back
-  incomplete and is rebuilt on every request (no error, no cache benefit). The
-  list never becomes `true`.
+  nested into the grid without joining the list — the grid then fails to
+  restore and is rebuilt (and reported) on every request, with no cache
+  benefit. `LegendRow` is not listed: `IntensityScale` holds scalars and derives
+  legend rows on render. The list never becomes `true`.
 - **Invariant — the grid cache key carries today's date.** _Breaks if:_ the key
   drops it; the cache then outlives midnight.
 - **Invariant — the scale is calibrated once per grid build**, so cells and legend
