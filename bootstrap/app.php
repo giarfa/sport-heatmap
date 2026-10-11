@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'strava.fresh' => EnsureFreshStravaToken::class,
         ]);
+
+        // There is no login route — the owner signs in through Strava from the
+        // home page — so the auth middleware's default redirect would throw.
+        $middleware->redirectGuestsTo(fn (): string => route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

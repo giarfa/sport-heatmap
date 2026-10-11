@@ -194,4 +194,43 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-11T11:51:41+00:00'
+  -
+    id: 7baf70c6656a936f
+    ts: '2026-10-11T12:28:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'garmin late strava twin sync behavior'
+    label: 'garmin late strava twin sync behavior'
+    value: 'Sync links a later Strava twin (same date, ±2 min) to the Garmin-imported row: stores its strava_activity_id, keeps Garmin values, never duplicates'
+    question: null
+    rationale: 'Prevents double-counting a day on the heatmap'
+    source: askquestion
+    spec: US-008
+    supersedes: null
+  -
+    id: 56c5683061907ab8
+    ts: '2026-10-11T12:28:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'garmin running type name mapping'
+    label: 'garmin running type name mapping'
+    value: 'Map confirmed Corsa/Running plus best-known IT/EN running variants; list every unrecognised type name with its count in the import summary'
+    question: null
+    rationale: 'Public sources could not confirm the labels; unknowns stay visible'
+    source: askquestion
+    spec: US-008
+    supersedes: null
+  -
+    id: 9f72c0d14a487bec
+    ts: '2026-10-11T13:14:45+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-review
+    topic: 'garmin export in public repo'
+    label: 'Garmin export in public repo'
+    value: 'Anonymise the real Garmin export (client material and test fixture) and rewrite unpushed US-008 history before merging and pushing'
+    question: null
+    rationale: 'Repo giarfa/sport-heatmap is public; the export carries heart rate, cadence and place names'
+    source: askquestion
+    spec: US-008
+    supersedes: null
+updated_at: '2026-10-11T13:14:45+00:00'

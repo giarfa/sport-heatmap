@@ -31,6 +31,10 @@ class TrainingBlockSeeder extends Seeder
      */
     private const DOUBLE_RUN_WEEK_INDEXES = [2, 6, 10];
 
+    private const GARMIN_IMPORTED_RUNS = 2;
+
+    private const GARMIN_OVERWRITTEN_RUNS = 1;
+
     public function run(): void
     {
         // This seeder fabricates an athlete and a few dozen activities. Running it
@@ -48,9 +52,17 @@ class TrainingBlockSeeder extends Seeder
             'strava_athlete_id' => '10000001',
         ]);
 
-        foreach ($this->trainingBlock() as $runs) {
-            foreach ($runs as $run) {
-                $this->createActivity($athlete, $run['date'], $run['distance_meters']);
+        $block = $this->trainingBlock();
+        $garminRuns = $this->garminRuns($block);
+
+        foreach ($block as $weekIndex => $runs) {
+            foreach ($runs as $runIndex => $run) {
+                $this->createActivity(
+                    $athlete,
+                    $run['date'],
+                    $run['distance_meters'],
+                    $garminRuns["{$weekIndex}.{$runIndex}"] ?? null,
+                );
             }
         }
 
@@ -242,13 +254,53 @@ class TrainingBlockSeeder extends Seeder
         return (int) array_search(max($distances), $distances, true);
     }
 
-    private function createActivity(User $athlete, Carbon $date, int $distanceMeters): void
+    /**
+     * Pick the runs that came from a Garmin Connect CSV import: GARMIN_IMPORTED_RUNS
+     * imported new and GARMIN_OVERWRITTEN_RUNS overwriting a Strava twin, so the
+     * demo map exercises every activity source. Taken from completed weeks only, so
+     * the current week stays exactly what the last sync returned.
+     *
+     * @param  array<int, array<int, array{date: Carbon, distance_meters: int}>>  $block
+     * @return array<string, string> "{weekIndex}.{runIndex}" => factory state name
+     */
+    private function garminRuns(array $block): array
+    {
+        $candidates = [];
+
+        foreach ($block as $weekIndex => $runs) {
+            if ($weekIndex === self::BLOCK_WEEKS - 1) {
+                continue;
+            }
+
+            foreach (array_keys($runs) as $runIndex) {
+                $candidates[] = "{$weekIndex}.{$runIndex}";
+            }
+        }
+
+        shuffle($candidates);
+
+        $states = [
+            ...array_fill(0, self::GARMIN_IMPORTED_RUNS, 'garminImported'),
+            ...array_fill(0, self::GARMIN_OVERWRITTEN_RUNS, 'garminOverwritten'),
+        ];
+
+        return array_combine(array_slice($candidates, 0, count($states)), $states);
+    }
+
+    private function createActivity(User $athlete, Carbon $date, int $distanceMeters, ?string $garminState = null): void
     {
         $factory = Activity::factory()->for($athlete)->onDate($date);
 
         $factory = match (true) {
             fake()->boolean(15) => $factory->trailRun(),
             fake()->boolean(12) => $factory->virtualRun(),
+            default => $factory,
+        };
+
+        // Applied last, so Garmin's place-and-type name wins over the sport-type state's.
+        $factory = match ($garminState) {
+            'garminImported' => $factory->garminImported(),
+            'garminOverwritten' => $factory->garminOverwritten(),
             default => $factory,
         };
 

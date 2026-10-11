@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-007` — 2026-10-11 |
+| **Last updated by** | `US-008` — 2026-10-11 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -65,6 +65,16 @@ map, and Strava orange stays reserved for the connect screen. SEO contract:
 reachable but not promoted (decision `4918d74ff18e8b0f`); the meta description
 no longer calls it private.
 
+**Owner UI.** A signed-in owner gets the mirror of the guest line instead:
+"Runs missing from Strava? Import Garmin CSV", a text link to
+`garmin.import.create` (`@auth` only, same 44 px target and `--accent` ink).
+Guests never see it, and the import routes refuse them regardless (see
+`garmin-csv-import.md`). A confirmed import forgets the owner's cached grid
+for today (`HeatmapGridCache::forget()`), so the map shows the imported runs on
+the next request, and "Import cancelled. Nothing was written." arrives through
+`<x-session-notices />`. Garmin-imported runs are ordinary rows to the grid:
+`DailyRunningDistance` sums every source alike.
+
 **Sync health precedence (`SyncStatus::from`)**: no run → `NeverSynced`; last run
 failed → `Failed`; no successful run → `NeverSynced`; last success finished more
 than `strava.stale_after_hours` (48) ago → `Stale`; else `Healthy`. Every
@@ -112,6 +122,7 @@ three small indexed queries for the sync status.
 | Public read-only home page for guests (FR-017) | Keep it sign-in only | The owner checks it on any device and shares the link; the owner accepted the Strava API Agreement risk (decisions `f71daaa7e976c188`, `88f04507cbc7e573`) |
 | Guests and owner share the per-athlete grid cache | A separate guest cache | Same data, same key; a separate cache would double the rebuilds and could disagree with the owner's view |
 | Guests see the same sync warning, reason included | A reduced guest warning | Decision `f75e292def892fad`; the reason is already non-secret and HTML-escaped |
+| Owner's "Import Garmin CSV" as a text line under the map | A header button; a menu | The same reasoning as the guest line: discreet, no header budget at 375 px, one screen with no nav |
 | Guest sign-in as a footer text link | Header button; Strava-orange button on the map | Discreet, fits the 375 px header budget, keeps orange reserved for the connect screen |
 | Shared `session-notices` component | Duplicate the notices in both views | One copy of the cancellation and expiry copy; the caller only decides the width |
 | Two-letter weekday `<abbr>` | Single letters from the PRD prose | Matches the mockup (decision log) |
@@ -149,7 +160,7 @@ three small indexed queries for the sync status.
 
 ## Related
 
-- Specs: `US-004`, `US-005`, `US-006`, `US-007`
+- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`
 - Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`
 - Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`
-- Other domains: `strava-connection.md`, `activity-sync.md`
+- Other domains: `strava-connection.md`, `activity-sync.md`, `garmin-csv-import.md`

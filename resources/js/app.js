@@ -43,3 +43,30 @@ document.addEventListener('click', function (event) {
         toggle.setAttribute('aria-pressed', goingDark ? 'true' : 'false');
     });
 });
+
+/*
+ * Garmin import review: "Overwrite all" / "Skip all". The shortcuts are
+ * rendered hidden and only revealed here, so without JS they never appear and
+ * the per-row radios — Skip pre-checked — still submit a complete answer.
+ */
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-resolve-shortcuts]').forEach(function (shortcuts) {
+        shortcuts.hidden = false;
+    });
+});
+
+document.addEventListener('click', function (event) {
+    var button = event.target.closest('[data-resolve-all]');
+
+    if (!button || !button.form) {
+        return;
+    }
+
+    var value = button.getAttribute('data-resolve-all');
+
+    button.form.querySelectorAll('input[type="radio"][name^="resolutions["]').forEach(function (radio) {
+        if (radio.value === value) {
+            radio.checked = true;
+        }
+    });
+});

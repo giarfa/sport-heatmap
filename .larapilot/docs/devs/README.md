@@ -34,8 +34,9 @@ Keep the table below current — it is the entry point for a new developer.
 
 | Domain | What it covers | Last touched by |
 | --- | --- | --- |
-| [activity-sync](activity-sync.md) | Nightly `strava:sync`: fetch the 112-day window, reconcile `activities`, record `sync_runs` | `US-007` (catch-up) |
-| [heatmap-dashboard](heatmap-dashboard.md) | The public `/` screen: 16-week grid, intensity scale, grid cache, fresh sync status | `US-007` |
+| [activity-sync](activity-sync.md) | Nightly `strava:sync`: fetch the 112-day window, reconcile `activities`, record `sync_runs`; activity sources | `US-008` |
+| [garmin-csv-import](garmin-csv-import.md) | Owner-only Garmin Connect CSV upload: parsing, conflict review, Overwrite / Skip | `US-008` |
+| [heatmap-dashboard](heatmap-dashboard.md) | The public `/` screen: 16-week grid, intensity scale, grid cache, fresh sync status, owner's Garmin import link | `US-008` |
 | [strava-connection](strava-connection.md) | OAuth connect, athlete allowlist, encrypted tokens, refresh, the `strava.fresh` guard, the publicly displayed athlete | `US-007` |
 
 ## Who writes them

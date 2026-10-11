@@ -1,0 +1,289 @@
+# Garmin CSV import
+
+| | |
+| --- | --- |
+| **Status** | Active |
+| **Introduced by** | `US-008` |
+| **Last updated by** | `US-008` — 2026-10-11 |
+| **Owner persona** | 🔧 Alex |
+
+## Purpose
+
+Lets the owner add runs that Strava is missing, or that Garmin recorded better,
+by uploading the "Activities" CSV exported from the Garmin Connect website
+(FR-018). The file is parsed into running rows inside the 112-day window, and
+every row that clashes with a stored run is reviewed before anything is
+written. If it stops working, Garmin-only runs never reach the heatmap; the
+Strava sync is unaffected.
+
+## Functional flow
+
+### 1. Parsing (`ParseGarminCsv`)
+
+`ParseGarminCsv::__invoke($path, HeatmapWindow, $today)` reads the uploaded
+file and returns a `ParsedGarminCsv`. It writes nothing.
+
+1. **Whole-file checks** — the import stops with `GarminCsvRejectedException`
+   and nothing is written when:
+   - the file is unreadable, contains NUL bytes, or is not valid UTF-8 →
+     "This is not a CSV file."
+   - the header carries neither `Tipo di attività` (Italian) nor
+     `Activity Type` (English) together with all but one of that language's
+     other required headers → "This is not a Garmin Connect activities
+     export…" (Strava's export shares three English names, so one shared name
+     is not enough)
+   - a required column of that language is missing → the message names it
+   - there is a header but no data row → "The file has no activities."
+   - more than **1,000** runs survive into the window, or more than **100**
+     rows are unreadable → the message says so. These caps bound what one 5 MB
+     upload can put in the session and in front of the planner; a real
+     16-week export holds a few hundred runs at most.
+2. **Per row**, in this order — the first rule that applies decides the row:
+   1. **Type** — not a running type → `ignoredByType[name] += 1` (names cut
+      to 60 characters; beyond 50 distinct names the rest count as
+      `(other types)`).
+   2. **Date** — not `Y-m-d H:i:s` / `Y-m-d H:i` (or an overflowing date such
+      as `2026-02-30`) → `invalid[] = {line, "unreadable date"}`.
+   3. **Window** — after today, or outside the heatmap window →
+      `outsideWindow += 1`.
+   4. **Distance** — `"--"` or empty → `invalid[] = {line, "missing
+      distance"}`; non-numeric or more than six integer digits →
+      `"unreadable distance"` (an unbounded value would overflow the int cast
+      into a negative distance).
+   5. **Moving time** — `"--"` falls back to the `Tempo` / `Time` column; if
+      that is also unreadable → `invalid[] = {line, "missing moving time"}`.
+   6. **Title** — trimmed, `Run` when empty, cut to 255 characters.
+3. Rows identical **within the file** (same start, distance and moving time)
+   collapse into one.
+
+Invalid rows carry their 1-based line number in the file, and the remaining
+rows still parse.
+
+### Accepted headers
+
+| Key | Italian | English | Required |
+| --- | --- | --- | --- |
+| type | `Tipo di attività` | `Activity Type` | yes — decides the language |
+| date | `Data` | `Date` | yes |
+| title | `Titolo` | `Title` | yes |
+| distance | `Distanza` | `Distance` | yes |
+| moving time | `Tempo in movimento` | `Moving Time` | yes |
+| time | `Tempo` | `Time` | no — fallback for a `"--"` moving time |
+
+Columns are located **by name**, never by position. A UTF-8 BOM on the first
+cell is stripped.
+
+### Running types
+
+Matched trimmed and case-insensitively (`GarminRunningTypes`):
+
+| Stored as | Garmin names |
+| --- | --- |
+| `Run` | `Corsa`, `Running`, `Corsa su strada`, `Street Running`, `Corsa su pista`, `Track Running`, `Tapis roulant`, `Corsa su tapis roulant`, `Treadmill Running`, `Corsa indoor`, `Indoor Running` |
+| `TrailRun` | `Trail running`, `Corsa su sentiero` |
+| `VirtualRun` | `Corsa virtuale`, `Virtual Run`, `Virtual Running` |
+
+### Value rules
+
+| Column | Rule | Example |
+| --- | --- | --- |
+| Distance | km, `.` decimal, `,` thousands → `round(km × 1000)` integer metres | `"8.29"` → 8290 · `"1,005.20"` → 1 005 200 |
+| Moving time | `HH:MM:SS`, `MM:SS`, optional fractional seconds → rounded seconds | `"00:54:23"` → 3263 · `"00:40:12.6"` → 2413 |
+| Date | wall-clock, **no timezone conversion**; `activity_date` is its date part | `2026-10-10 09:33:27` |
+
+### 2. Planning (`PlanGarminImport`)
+
+`PlanGarminImport::__invoke(User, rows)` sorts the parsed rows against the
+owner's stored activities. It reads only.
+
+1. **One query** loads the owner's activities on the dates the file contains
+   (`whereIn('activity_date', …)`, served by the `(user_id, activity_date)`
+   index) — never one query per row.
+2. **Already imported** (first pass, whole file): a stored `garmin_csv` row with
+   the identical start (to the second), distance and moving time. It is not
+   asked about, and that stored row is claimed.
+3. **Conflict** (second pass, whole file): every (CSV row, stored row) pair
+   that `StartTimeMatcher::difference()` accepts — a stored row of **either
+   source** on the same local date within **±2 minutes inclusive** (120 s
+   matches, 121 s does not) — is ranked by start difference, and pairs are
+   taken **closest first**, each CSV row and each stored row at most once.
+   Ties go to the earlier CSV row, then the lower stored id.
+4. **New**: everything else.
+
+The result is a `GarminImportPlan` (`newRows`, `conflicts`, `alreadyImported`,
+all keyed by the row's index in the parsed file) with a `fingerprint()`: a
+SHA-256 of the `rowIndex => storedActivityId` conflict pairs plus the
+already-imported row indexes — what the owner was shown.
+
+### 3. Applying (`ApplyGarminImport`)
+
+`ApplyGarminImport::__invoke(User, plan, resolutions, parsed)` runs inside
+**one** `DB::transaction`:
+
+- each new row → `$user->activities()->create()` with `source = garmin_csv`
+  and no Strava id;
+- **Overwrite** → the stored row takes the CSV's name, distance, moving time,
+  start, `activity_date` and sport type, and `source` becomes `garmin_csv`.
+  `strava_activity_id` is **kept**, so the nightly sync recognises the twin and
+  skips it (see `activity-sync.md`);
+- **Skip**, or no answer at all → nothing is written.
+
+After the commit it forgets the owner's cached grid for today
+(`HeatmapGridCache::forget()`), so the dashboard shows the import on the next
+request. It returns a `GarminImportSummary`: imported, overwritten, skipped,
+already imported, ignored by type, outside window, invalid. The action does not
+authorize (`.ai/rules/actions.md`); the caller has.
+
+### 4. HTTP flow
+
+All routes sit under `import/garmin`, named `garmin.import.*`, behind
+`auth` + `strava.fresh` (the allowlist is re-checked on every request). CSRF
+comes from the `web` group.
+
+| Route | Name | Does |
+| --- | --- | --- |
+| `GET /import/garmin` | `create` | Upload form |
+| `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per owner) |
+| `GET /import/garmin/review` | `review` | Re-plans the pending rows against the DB **as it is now**; renders conflicts, new rows, counts, `token`, `fingerprint` |
+| `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under a per-owner `Cache::lock`, re-plans; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
+| `POST /import/garmin/cancel` | `cancel` | Forgets the pending import → dashboard, "Import cancelled. Nothing was written." |
+| `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary`; without one → dashboard |
+
+- **Guests**: `bootstrap/app.php` sets `redirectGuestsTo(route('dashboard'))`
+  (there is no login route, so the default would throw). Any guest request —
+  GET or POST — is redirected home and writes nothing.
+- **Session binding**: `PendingGarminImport` is the only reader and writer of
+  `garmin_import.pending` = `{token, parsed}` (scalars only). No route or field
+  names an import, so a request can only reach the one in its own session.
+  Abandoning the review leaves just this entry; the next upload replaces it.
+- **The file is never stored**: the controller parses
+  `$request->file('csv')->getRealPath()` and never calls `store()`; PHP deletes
+  the temporary upload when the request ends.
+- **Staleness**: confirm recomputes the plan and compares
+  `GarminImportPlan::fingerprint()` with the one the review rendered, and the
+  token with the session's (both with `hash_equals`). A mismatch redirects to
+  the review with "Your stored activities changed since this review — check
+  the conflicts again." and writes nothing. A review page left open across a
+  newer upload fails the token check the same way.
+- **Rejections** (`UploadGarminCsvRequest` or `GarminCsvRejectedException`) go
+  back to the form with the message on `csv`, linked to the input through
+  `aria-describedby`; nothing is parsed into the session.
+- **Views** (`resources/views/garmin/`) follow `.larapilot/mockups/US-008/`:
+  real `<table>`s with captions and scoped headers that reflow into stacked
+  cards below 640 px (`td[data-label]`); a fieldset per conflict with Skip
+  pre-checked; "Overwrite all" / "Skip all" rendered `hidden` and revealed by
+  `resources/js/app.js` (`data-resolve-all`); "View on Strava" only where
+  `Activity::stravaUrl()` is not null (FR-008). Formats come from
+  `GarminImportFormat` (km to one decimal, `H:MM:SS`, `HH:MM:SS` start).
+
+## Technical design
+
+| Piece | Where | Role |
+| --- | --- | --- |
+| Parser | `app/Support/Garmin/ParseGarminCsv.php` | File → `ParsedGarminCsv`; `SplFileObject`, no package |
+| Header sets | `app/Support/Garmin/GarminCsvColumns.php` | Language detection, column lookup by name |
+| Type map | `app/Support/Garmin/GarminRunningTypes.php` | Garmin type name → `SportType` |
+| Row DTO | `app/Data/Garmin/GarminCsvRow.php` | `toAttributes()` (always `source = garmin_csv`), `toSessionArray()` / `fromSessionArray()`, `isIdenticalTo(Activity)` |
+| Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, outside-window count, invalid list; session round-trip |
+| Rejection | `app/Exceptions/Garmin/GarminCsvRejectedException.php` | Owner-facing messages; no file content beyond a column name |
+| Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query, claiming |
+| Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id — shared with the sync |
+| Plan DTOs | `app/Data/Garmin/GarminImportPlan.php`, `GarminImportConflict.php` | The plan and its `fingerprint()` |
+| Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction; grid cache forgotten after commit |
+| Answer | `app/Enums/ConflictResolution.php` | `overwrite`, `skip` |
+| Summary DTO | `app/Data/Garmin/GarminImportSummary.php` | The seven counts; session round-trip for the summary page |
+| Routes | `routes/web.php` (`garmin.import.*`), guest redirect in `bootstrap/app.php`, `garmin-import` limiter in `app/Providers/AppServiceProvider.php` | |
+| Controllers | `app/Http/Controllers/Garmin/*` | Six single-action controllers |
+| Form Requests | `app/Http/Requests/Garmin/UploadGarminCsvRequest.php`, `ConfirmGarminImportRequest.php` | `required\|file\|max:5120\|mimes:csv,txt`; token, fingerprint, `resolutions.*` in `ConflictResolution` |
+| Session binding | `app/Support/Garmin/PendingGarminImport.php` | The one reader/writer of `garmin_import.pending` |
+| Formatting | `app/Support/Garmin/GarminImportFormat.php` | Shared by the review's stored and CSV sides |
+| Views / assets | `resources/views/garmin/{create,review,summary}.blade.php`, "Garmin import" block in `resources/css/app.css`, `data-resolve-all` in `resources/js/app.js` | |
+| Tests | `tests/Feature/Garmin/*`, `tests/Unit/Support/Garmin/StartTimeMatcherTest.php`, `tests/Feature/Strava/ReconcileStravaWindowTest.php` | |
+| Fixtures | `tests/Fixtures/Garmin/activities-it.csv` (client sample, verbatim), `activities-en.csv` | |
+
+## Architectural choices
+
+| Choice | Alternatives considered | Why this one |
+| --- | --- | --- |
+| `SplFileObject` CSV reader | `league/csv`, `maatwebsite/excel` | One flat file of ~100 rows; PHP's reader covers it and the project adds no dependency |
+| Parse inside the request | Queue a job | A whole export parses in milliseconds, and the owner is waiting on the review page anyway |
+| Locate columns by header name, per language | Fixed column positions | Garmin translates headers and changes column sets between exports; positions would silently read the wrong column |
+| List unknown types by name in the summary (decision `56c5683061907ab8`) | Drop them silently; reject the file | Only `Corsa` is confirmed by a real export. A missed running variant must be visible to the owner so it becomes a one-line addition |
+| "Already imported" = same start, distance and moving time on a `garmin_csv` row | A hash of the CSV row as its identity | Garmin exports carry no activity id, and a re-export may add, drop or reorder columns, changing the hash of an unchanged run |
+| Identity pass before the conflict pass | One pass in file order | A row a minute away could claim the stored run first, and the row identical to it — a re-import — would be inserted a second time |
+| Claim each stored row for one CSV row, closest pairs first | Let every CSV row match freely; claim in file order | Free matching lets two CSV runs overwrite one stored run; file order lets an earlier row 90 s away take a stored run a later row matches to the second, so the later row is planned as new and a Skip leaves that run on the map twice |
+| Per-owner lock around confirm | Rely on the token and fingerprint alone | A double-clicked confirm sends two requests carrying the same session; serialised, the second re-plans after the first committed, finds its runs already imported, fails the fingerprint and writes nothing |
+| Conflicts with **either** source | Only with Strava rows | A second, slightly different Garmin export of the same run must be reviewed, not duplicated |
+| Overwrite keeps `strava_activity_id` | Clear it | Without the id the sync no longer recognises the twin and would re-add Strava's copy the next night |
+| A missing answer is Skip | Reject the confirm | Skip is the pre-checked, non-destructive default; the Form Request already requires an answer |
+| Pending rows in the owner's session | A `pending_imports` table | A table would persist owner data beyond the request, need cleanup of abandoned reviews, and expose an id a request could name |
+| Re-plan at confirm and compare a fingerprint | Trust the plan rendered in the review | A sync or another tab can change stored runs between review and confirm; the owner's answers must apply to the runs they saw |
+| Form Requests for upload and confirm | Inline `$request->validate()` | First user-submitted forms in the app; `.ai/rules/http.md` was amended for them |
+| Guests redirected home, never 401/403 pages | A login route | There is no login page — the owner signs in through Strava from `/` |
+| Reject the whole file only for file-level problems | Reject on the first bad row | One corrupt row must not cost the owner the other thirty-nine |
+| Wall-clock dates built in UTC | Parse with the app timezone | Same contract as Strava's `start_date_local`; a conversion moves late-evening runs to the wrong day |
+
+## Key decisions & invariants
+
+- **Invariant — the parser writes nothing.** Planning and the owner's review
+  come first. _Breaks if:_ a write is added here — abandoning the review would
+  no longer leave the database untouched.
+- **Invariant — one definition of "the same run".** Conflicts use
+  `StartTimeMatcher`, the class the sync uses to link late twins: same local
+  date, ±2 minutes **inclusive**, closest wins. _Breaks if:_ either side
+  inlines its own rule — a run the importer called "stored" could be one the
+  sync calls "new", and the day is counted twice.
+- **Invariant — Garmin wins permanently.** An overwritten or imported row is
+  `garmin_csv`, and the sync never reverts it, never re-adds its Strava twin and
+  never deletes it — including a night Strava still returns the twin. A Strava
+  activity that turns up later within ±2 minutes of a run imported as new is
+  **linked** to it (its Strava id is stored, Garmin's values stay; decision
+  `7baf70c6656a936f`). See `activity-sync.md`.
+- **Invariant — all or nothing.** Every write of one confirm is in one
+  transaction. _Breaks if:_ rows are created outside it — a failure halfway
+  would leave half an import that a re-upload then reports as part new, part
+  already imported.
+- **Invariant — re-importing the same file changes nothing.** Every row is
+  already imported, so nothing is created or asked about.
+- **Invariant — the session is the only binding.** _Breaks if:_ a route or
+  form field starts naming an import — a request could then reach another
+  owner's pending rows.
+- **Invariant — the raw file is never persisted.** _Breaks if:_ the upload is
+  `store()`d — an export carries heart rate, cadence and locations.
+- **Invariant — nothing is written before confirm**, and a stale confirm writes
+  nothing.
+- **Invariant — a rejection message never echoes file content** beyond a
+  column name. _Breaks if:_ a cell value is interpolated — the upload page
+  would render attacker-chosen text.
+- **Invariant — `start_date_local` is never timezone-converted.**
+
+## Extension points & gotchas
+
+- **Adding a running type name:** one line in `GarminRunningTypes::TYPES`,
+  lower-cased. The summary's "Ignored activity types" list is where a missing
+  one shows up.
+- **Known gap — the window is fixed at upload.** A review confirmed after the
+  week rolls over still imports rows that were in the window when parsed.
+  They are older runs, and the heatmap simply does not show them.
+- **Parsed rows live in the session store.** The raw file is never stored, but
+  the parsed rows (names, starts, distances) sit in `sessions.payload` until
+  confirm, cancel, the next upload, or session expiry. Set
+  `SESSION_ENCRYPT=true` if that store is shared.
+- Rows identical within one file collapse silently; they are counted under no
+  heading, so the totals can be lower than the file's row count.
+- **Adding a language:** one more header set in `GarminCsvColumns`; the type
+  map needs that language's running names too.
+- **Known limitation — metric accounts only.** Garmin exports distance in the
+  account's unit setting, and an imperial export cannot be told apart from the
+  CSV (pace and distance stay self-consistent in either unit). The PRD is
+  metric-only; the upload hint says "metric units".
+- Garmin writes thousands separators in **both** languages (`"8,240"` steps in
+  the Italian sample), so `,` is never a decimal mark here.
+
+## Related
+
+- Specs: `US-008`
+- Plans: `.larapilot/plans/US-008-plan.yaml`
+- Mockups: `.larapilot/mockups/US-008/`
+- Decisions: `7baf70c6656a936f` (late Strava twin links to the Garmin row), `56c5683061907ab8` (running type names; unknowns surfaced)
+- Other domains: `activity-sync.md`, `heatmap-dashboard.md`
