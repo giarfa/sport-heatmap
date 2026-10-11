@@ -1,8 +1,9 @@
 {{--
     The one-off notices a redirect can land on the home page with. Shared by the
     dashboard and the connect screen because the OAuth cancel path redirects to
-    `dashboard`, which a signed-out visitor now sees as the public map whenever
-    an athlete has connected — and as the connect screen otherwise. Both must
+    `dashboard`, which a signed-out visitor sees as the public map whenever an
+    athlete can be displayed — an allowlisted one who has connected, else a
+    stored athlete with activities — and as the connect screen otherwise. Both must
     show the notice; the caller only decides the width.
 
     `strava.reconnect` is flashed by EnsureFreshStravaToken when it signs an

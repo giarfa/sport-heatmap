@@ -21,8 +21,9 @@ class AthleteAllowlist
     /**
      * The allowlisted athlete ids, in the order they are configured.
      *
-     * The order is meaningful: the first connected id is the athlete the public
-     * home page displays (ResolveDisplayedAthlete).
+     * The order is meaningful: among connected allowlisted athletes, the first
+     * is the one the public home page displays. With none connected, the home
+     * page falls back to a stored athlete (ResolveDisplayedAthlete).
      *
      * @return array<int, string>
      */

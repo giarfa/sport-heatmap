@@ -1,0 +1,261 @@
+code: US-009
+plan_body: |-
+  ## Technical Solution
+
+  US-009 changes **who** a signed-out visitor sees, nothing else. The whole behavioural change lives in `App\Support\Strava\ResolveDisplayedAthlete`; `DashboardController`, `HeatmapGridCache`, `ResolveSyncStatus`, the views, routes and middleware keep their code (the controller only gets its docblock refreshed).
+
+  **Resolver after this spec** (`ResolveDisplayedAthlete::__invoke(): ?User`):
+  1. Non-empty allowlist → the existing query (`select id, strava_athlete_id … whereIn strava_athlete_id`) and the walk in configured order. A hit is returned unchanged — a connected allowlisted athlete always beats the fallback, even while other stored athletes have activities (AC1).
+  2. Otherwise (blank allowlist, or no listed id has a user row) → the **fallback**: `User::query()->select(['id', 'strava_athlete_id'])->whereHas('activities')->orderBy('id')->first()` — the lowest `users.id` with at least one activity of either source (Strava or Garmin CSV), whatever the allowlist says (AC2, FR-017).
+  3. Fallback empty → `null`; the controller keeps rendering `strava.connect` with 200 (AC3).
+
+  **Query shape (John / Mike):** blank allowlist = 1 query (the fallback); allowlist hit = 1 query (unchanged); allowlist miss = 2 queries. The `whereHas` compiles to `exists (select * from activities where users.id = activities.user_id)`, served by the existing `(user_id, activity_date)` index — no migration, no new index. No N+1: the resolver returns one model; `DailyRunningDistance` and `ResolveSyncStatus` already query by `user_id`.
+
+  **Read-only (Lars, AC4):** the fallback selects only `id` and `strava_athlete_id` exactly like the allowlist query, so no guest request can decrypt or refresh a token; nothing on the guest path calls `EnsureFreshAccessToken` or `StravaClient`; no write. Tests assert the absence of the token attributes on the resolved model and an unchanged database snapshot plus `Http::assertNothingSent()`.
+
+  **Unchanged by construction:**
+  - Sign-in (AC5): the allowlist still gates `StravaCallbackController`, and the `strava.fresh` middleware still ends the session and answers 403 for a signed-in athlete removed from the allowlist — the fallback runs only when `Auth::user()` is null. Guests never see the Garmin import entry point (view checks `auth()`).
+  - Sync status (AC6): resolved outside the grid cache on every request; `sync_runs` is instance-wide, so the fallback athlete gets the same warning (title, escaped reason, reconnect link) as the owner.
+  - Cache switch (AC7): `HeatmapGridCache` keys on `heatmap:grid:{athlete id}:{window start}:{today}`, so when an allowlisted athlete connects the next visit resolves a different id and misses the fallback athlete's cache entry. Needs a regression test only, no code (Tom's planning note answered).
+  - `noindex, nofollow`, "Powered by Strava", the 375 px layout, table semantics and themes (AC8 / FR-008 / FR-009) live in `layouts/app.blade.php` and the grid component, which this spec does not touch.
+
+  **Accepted risk (Violet):** the fallback can publicly display an athlete removed from the allowlist — accepted by the owner on 2026-10-11 (PRD `### Privacy & legal`, "Accepted risk — fallback display"). Not reopened here; the domain docs replace the old "displayed athlete is always on the allowlist" invariant with this one and point to the PRD.
+
+  **Superseded US-007 behaviour:** existing tests that assert the old rule are rewritten in TASK-01 (not deleted silently), so every commit keeps the suite green:
+  - `ResolveDisplayedAthleteTest::test_an_empty_allowlist_displays_nobody_without_querying` → an empty allowlist with no activities displays nobody in exactly one query.
+  - `ResolveDisplayedAthleteTest::test_a_connected_athlete_off_the_allowlist_is_never_displayed` → an athlete off the allowlist **without activities** is never displayed; a new case shows one **with** activities is displayed by the fallback.
+  - `PublicDashboardTest::test_an_athlete_removed_from_the_allowlist_is_never_displayed` → the removed athlete with a run is displayed while nobody allowlisted has connected, then the allowlisted athlete replaces them.
+
+  ## Git & Branching
+  - Mode: GITFLOW (no automatic push)
+  - Branch: `feature/US-009-fallback-displayed-athlete` from `develop`
+  - TASK-00: bootstrap
+  - Per task: one Conventional Commit `type(US-009): TASK-NN …`; code, tests and domain docs ride in the same commit
+  - Push / remote PR only when the user asks in-session
+  - Merge into `develop` after `larapilot-review` approval (auto-approve is ON)
+
+  ## Test Data Strategy
+  - No model, migration, enum or relationship change — factories and seeders stay as they are (`N/A` in every task).
+  - The Demonstrates scenario already works from the existing `TrainingBlockSeeder`: `migrate:fresh --seed` creates athlete `10000001` with the 16-week block and the sync runs; with `STRAVA_ALLOWED_ATHLETE_IDS` blank the fallback displays it.
+  - Tests build their scenarios with the existing `User::factory()->stravaConnected()` / `stravaTokenExpired()`, `Activity::factory()->for($athlete)->onDate(...)` (plus `garminImported()` for the "either source" case), and `SyncRun::factory()` / `->failed()`.
+
+  ## Test Strategy
+  - Bar: NORMAL — PHPUnit feature tests, Strava HTTP faked with `Http::preventStrayRequests()` in `setUp()`; config overridden with `Config::set()` through the `allowlistAthletes()` / `allowlistedAthlete()` helpers. No Playwright, Dusk, browser or viewport suites.
+  - Resolver level (TASK-01, `tests/Feature/Strava/ResolveDisplayedAthleteTest.php`): fallback with a blank allowlist; fallback when the listed id has no user row; allowlisted connected athlete beats an older athlete with activities; lowest `users.id` wins among several; a Garmin-only athlete qualifies; athletes without activities never qualify; token attributes absent on the fallback model; query counts (1 / 1 / 2).
+  - Page level (TASK-02, `tests/Feature/Dashboard/PublicDashboardTest.php`): the six cases the spec lists plus the sync warning, noindex/attribution and no-Garmin-entry for the fallback athlete, and the signed-in removed-athlete 403.
+  - Manual test handoff (TASK-03): the Demonstrates walk-through in a private window, then the 375 px / dark-theme smoke check — FR-009 is unchanged code, verified by eye rather than a new suite.
+  - Gate: `php artisan test --compact` green and `php artisan larapilot:quality` (Pint + Larastan level 5) clean before `spec-review`.
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch and internal PR'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for US-009: create the feature branch from `develop` and prepare the internal PR description toward `develop`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `git checkout develop` (pull only if it tracks a remote)
+      2. `git checkout -b feature/US-009-fallback-displayed-athlete`
+      3. Draft the internal PR title/body toward `develop`: "US-009 — Home page falls back to the stored athlete when no allowlisted athlete has connected" with the acceptance criteria as a checklist (keep local)
+      4. Optional empty anchor commit
+
+      ## Completion Criteria
+      - [x] Branch `feature/US-009-fallback-displayed-athlete` exists locally
+      - [x] PR title/body drafted for `develop` (remote open only if the user requests push)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — no behaviour change
+
+      ## Git Deliverables
+      - Commit: `chore(US-009): TASK-00 bootstrap feature branch` (empty commit allowed)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally — open/update remote only if the user requests
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 0.5
+    dependencies: {}
+    commit:
+      sha: 9a0f4c15f5d42a0e091d714ab21e62dc5a55bdae
+      short_sha: 9a0f4c1
+      subject: 'chore(US-009): TASK-00 bootstrap feature branch'
+      committed_at: '2026-10-11T15:29:38+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9a0f4c15f5d42a0e091d714ab21e62dc5a55bdae'
+  -
+    id: TASK-01
+    title: 'Fall back to the lowest-id stored athlete with activities in ResolveDisplayedAthlete'
+    body: |-
+      ## Description
+      Extend `ResolveDisplayedAthlete` so that, when no allowlisted athlete has a user row (blank allowlist or every listed id unconnected), it returns the stored athlete with the lowest `users.id` that has at least one activity of either source — selecting only `id` and `strava_athlete_id` — and `null` only when no stored athlete has any activity. Rewrite the US-007 tests that assert the superseded rule, add resolver-level coverage, and update both domain docs that carry the old invariant. Traces to FR-017 (AC1–AC4).
+
+      ## Files Involved
+      - app/Support/Strava/ResolveDisplayedAthlete.php
+      - app/Http/Controllers/DashboardController.php (docblock only)
+      - app/Support/Strava/AthleteAllowlist.php (docblock of `athleteIds()` only — the order still decides among connected allowlisted athletes)
+      - tests/Feature/Strava/ResolveDisplayedAthleteTest.php
+      - tests/Feature/Dashboard/PublicDashboardTest.php (rewrite `test_an_athlete_removed_from_the_allowlist_is_never_displayed` only)
+      - .larapilot/docs/devs/strava-connection.md
+      - .larapilot/docs/devs/heatmap-dashboard.md
+      - .larapilot/docs/devs/README.md
+
+      ## Steps
+      1. In `ResolveDisplayedAthlete::__invoke()`:
+         - keep the allowlist branch as is when the allowlist is non-empty; return its hit unchanged (a connected allowlisted athlete always wins);
+         - drop the early `return null` for an empty allowlist — it now falls through to the fallback;
+         - add a private method (e.g. `firstStoredAthleteWithActivities(): ?User`) running `User::query()->select(['id', 'strava_athlete_id'])->whereHas('activities')->orderBy('id')->first()`;
+         - add a `/* … */` block comment at the fallback stating why: FR-017 shows stored data rather than the connect screen; lowest `users.id` is a stable, documented tie-break; only `id` and `strava_athlete_id` are selected so no guest request can decrypt or refresh a token; the owner accepted displaying a removed athlete (PRD "Accepted risk — fallback display");
+         - rewrite the class docblock: allowlisted first in configured order, otherwise the fallback, read-only by construction.
+      2. `DashboardController` docblock: the connect screen now appears only when no stored athlete has any activity. No logic change.
+      3. `AthleteAllowlist::athleteIds()` docblock: the order decides among connected allowlisted athletes; with none connected the home page falls back (see `ResolveDisplayedAthlete`).
+      4. `ResolveDisplayedAthleteTest` (keep `Http::preventStrayRequests()` in `setUp()`):
+         - rewrite `test_an_empty_allowlist_displays_nobody_without_querying` → `test_an_empty_allowlist_with_no_activities_displays_nobody_in_one_query`;
+         - rewrite `test_a_connected_athlete_off_the_allowlist_is_never_displayed` → `test_an_athlete_off_the_allowlist_without_activities_is_never_displayed`;
+         - keep `test_allowlisted_ids_without_a_user_row_display_nobody` (no activities stored → still `null`);
+         - add `test_a_blank_allowlist_falls_back_to_the_lowest_id_athlete_with_activities` (two athletes with activities + one older athlete without → the lowest id **with** activities);
+         - add `test_an_unconnected_allowlist_falls_back_to_a_stored_athlete_with_activities`;
+         - add `test_a_connected_allowlisted_athlete_beats_an_older_athlete_with_activities` (allowlisted athlete has no activity and a higher id → still displayed);
+         - add `test_a_garmin_only_athlete_qualifies_for_the_fallback` (`Activity::factory()->garminImported()`);
+         - add `test_the_fallback_athlete_is_resolved_without_its_tokens_or_any_request` (`stravaTokenExpired` state; token attributes absent; `Http::assertNothingSent()`);
+         - keep `test_a_non_empty_allowlist_costs_exactly_one_query` for the hit case; add `test_an_unconnected_allowlist_costs_two_queries`.
+      5. `PublicDashboardTest::test_an_athlete_removed_from_the_allowlist_is_never_displayed` → `test_a_removed_athlete_is_displayed_until_an_allowlisted_athlete_connects`: with a blank allowlist the removed athlete's 12.3 km run is shown on `dashboard`; after `allowlistedAthlete()` connects with its own run, the page shows 7.7 km and not 12.3 km.
+      6. Domain docs (English):
+         - `strava-connection.md` → **Displayed athlete** flow: step 1 becomes "empty allowlist → skip to the fallback", add the fallback step and the query counts; replace the invariant "the displayed athlete is always on the allowlist" with "a connected allowlisted athlete is always displayed ahead of the fallback; the fallback selects no token column" (_Breaks if:_ the fallback runs before the allowlist walk, or widens its `select`); add an Architectural choices row: fallback = lowest `users.id` with an activity — rejected: connect screen (US-007 behaviour; shows nothing although data exists), most recent activity (the displayed athlete would flip daily), a new `STRAVA_PUBLIC_ATHLETE_ID` env var; reference the PRD accepted risk; `Last updated by: US-009`.
+         - `heatmap-dashboard.md` → Functional flow step 2 (signed-out branch + new fallback + connect screen only with no activities at all); replace the "displayed athlete is on the allowlist" invariant; refresh the "Several allowlisted athletes" gotcha; `Last updated by: US-009`.
+         - `README.md` index rows of both domains → last spec `US-009`.
+      7. `php artisan test --compact tests/Feature/Strava/ResolveDisplayedAthleteTest.php tests/Feature/Dashboard` then the full `php artisan test --compact`; `vendor/bin/pint --dirty --format agent`.
+
+      ## Completion Criteria
+      - [x] Blank allowlist or unconnected allowlist resolves the lowest `users.id` with at least one activity, Strava or Garmin
+      - [x] A connected allowlisted athlete is still returned first, in configured order
+      - [x] No stored activity → `null` (controller renders the connect screen with 200)
+      - [x] The fallback selects only `id` and `strava_athlete_id`; no HTTP request; query counts 1 / 1 / 2 asserted
+      - [x] Superseded US-007 tests rewritten, not deleted; full suite green
+      - [x] Both domain docs and the index describe the fallback and the accepted risk
+
+      ## Test Data
+      - N/A — no model/schema changes; tests use the existing `User`, `Activity` (incl. Garmin source) and `SyncRun` factory states
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/strava-connection.md` updated — displayed-athlete flow, replaced invariant, architectural choice with rejected alternatives
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — functional flow step 2, invariant, gotcha
+      - [x] Folder `README.md` index rows updated (`US-009`)
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-009): TASK-01 fall back to the first stored athlete with activities`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-00
+    commit:
+      sha: 3f75484cc82624a824a20c89f1d2430fcebd8809
+      short_sha: 3f75484
+      subject: 'feat(US-009): TASK-01 fall back to the first stored athlete with activities'
+      committed_at: '2026-10-11T15:31:25+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3f75484cc82624a824a20c89f1d2430fcebd8809'
+  -
+    id: TASK-02
+    title: 'Cover the fallback home page: read-only, sync warning, cache switch, sign-in unchanged'
+    body: |-
+      ## Description
+      Add page-level PHPUnit coverage in `tests/Feature/Dashboard/PublicDashboardTest.php` for every fallback behaviour the spec lists (AC2–AC9), using a guest `GET /` with Strava HTTP faked. Traces to FR-017, FR-007, FR-008.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/PublicDashboardTest.php
+      - tests/Feature/Strava/StravaConnectFlowTest.php (only if the removed-athlete 403 case fits better beside the existing guard tests)
+
+      ## Steps
+      1. Reuse the existing `runOn()`, `databaseSnapshot()` and `getDashboard()` helpers, the `allowlistAthletes()` / `allowlistedAthlete()` TestCase helpers and existing factory states — no new factory definitions. `Http::preventStrayRequests()` stays in `setUp()`.
+      2. Add, one behaviour per test:
+         - `test_a_guest_sees_the_fallback_athletes_map_with_a_blank_allowlist` — 200, `dashboard` view, grid cell accessible name, week total, `>Intensity</h3>` legend, sync chip ("Synced 6 hours ago") and `>Sync</h3>` detail;
+         - `test_a_guest_sees_the_fallback_athlete_when_the_listed_athlete_has_not_connected`;
+         - `test_a_connected_allowlisted_athlete_beats_the_fallback` — older athlete with a run vs allowlisted athlete; only the allowlisted run is visible;
+         - keep `test_a_guest_gets_the_connect_screen_when_no_allowlisted_athlete_has_connected` and rename it to `test_a_guest_gets_the_connect_screen_when_no_stored_athlete_has_an_activity` (a connected athlete without activities is also present);
+         - `test_a_fallback_guest_request_writes_nothing_and_sends_no_request` — `stravaTokenExpired` fallback athlete, blank allowlist, `databaseSnapshot()` unchanged, `Http::assertNothingSent()`;
+         - `test_switching_from_the_fallback_to_an_allowlisted_athlete_never_serves_the_cached_fallback_grid` — visit once (fallback grid cached), connect an allowlisted athlete, visit again: their run visible, the fallback run absent;
+         - `test_a_guest_sees_the_same_sync_warning_for_the_fallback_athlete` — failed `SyncRun` with `<script>` reason: title, escaped reason, reconnect link;
+         - `test_the_fallback_page_keeps_noindex_the_attribution_and_no_garmin_entry_point`;
+         - `test_a_signed_in_athlete_removed_from_the_allowlist_still_gets_403_while_the_fallback_would_display_them` — removed athlete with activities, `actingAs`, blank allowlist → 403 `strava.rejected`, guest afterwards.
+      3. `php artisan test --compact tests/Feature/Dashboard/PublicDashboardTest.php`, then the full suite.
+      4. Do **not** add Playwright, Dusk, Pest browser or viewport suites.
+
+      ## Completion Criteria
+      - [x] Each case above passes against the TASK-01 implementation
+      - [x] Every guest test runs with `Http::preventStrayRequests()` and asserts no request where relevant
+      - [x] Coverage matches the NORMAL bar; full suite green
+
+      ## Git Deliverables
+      - Commit: `test(US-009): TASK-02 cover the fallback home page`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-01
+    commit:
+      sha: ceb360fb8ece2da258d8cd16bedc46aadeaf46ad
+      short_sha: ceb360f
+      subject: 'test(US-009): TASK-02 cover the fallback home page'
+      committed_at: '2026-10-11T15:32:08+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ceb360fb8ece2da258d8cd16bedc46aadeaf46ad'
+  -
+    id: TASK-03
+    title: 'README fallback copy and manual test handoff'
+    body: |-
+      ## Description
+      Update the README wherever it states the old rule, then run the quality gate and record the manual test handoff for the unchanged UI (FR-009). Traces to AC10.
+
+      ## Files Involved
+      - README.md
+
+      ## Steps
+      1. README, `.env` table row `STRAVA_ALLOWED_ATHLETE_IDS`: still "blank means nobody may connect"; add that the home page shows the first connected listed id, otherwise the first stored athlete (lowest id) with at least one activity, whatever the allowlist says.
+      2. README, seeded-data note under `migrate:fresh --seed`: replace "allowlist the seeded athlete id `10000001` in your local `.env`" with: with `STRAVA_ALLOWED_ATHLETE_IDS` blank the seeded athlete is shown by the fallback; once your own allowlisted athlete connects, they replace it. Keep the warning that seeding production publishes a demo athlete.
+      3. README, **The dashboard** section: replace "While no allowlisted athlete has connected yet, the home page shows the connect screen instead" with the fallback rule, the connect screen only when no stored athlete has any activity, and one line on the accepted risk (removing an athlete from the allowlist no longer hides their stored rows; deleting them does).
+      4. Copy stays terse and factual (Marika's register in the PRD).
+      5. `php artisan larapilot:quality` (Pint + Larastan level 5) and `php artisan test --compact` — both clean.
+      6. Manual test handoff (write into the PR notes):
+         - `php artisan migrate:fresh --seed`, `STRAVA_ALLOWED_ATHLETE_IDS=` blank, open the Herd URL `/` in a private window → 16-week heatmap, weekly totals, legend, sync chip/detail, "Owner? Connect with Strava" line, no Garmin import link;
+         - same page at 375 px (no page scroll), 768 and 1280 px, light and dark theme;
+         - set `STRAVA_ALLOWED_ATHLETE_IDS` to an id with no user row → still the seeded map; delete the activities (`migrate:fresh` without `--seed`) → connect screen, 200.
+
+      ## Completion Criteria
+      - [x] README `.env` row, seeded-data note and dashboard section describe the fallback
+      - [x] `larapilot:quality` clean, full suite green
+      - [x] Manual test handoff recorded in the PR notes
+
+      ## Test Data
+      - N/A — documentation only
+
+      ## Domain Docs
+      - N/A — the domain docs were updated with the behaviour change in TASK-01
+
+      ## Git Deliverables
+      - Commit: `docs(US-009): TASK-03 document the home page fallback in the README`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: finalize the local PR notes with the manual test handoff
+    type: Impl
+    status: DONE
+    assignee: Albert
+    estimate_hours: 0.75
+    dependencies:
+      - TASK-01
+    commit:
+      sha: d751d98e411eb6e4ba17863414bbc354ec7ab2b6
+      short_sha: d751d98
+      subject: 'docs(US-009): TASK-03 document the home page fallback in the README'
+      committed_at: '2026-10-11T15:32:20+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d751d98e411eb6e4ba17863414bbc354ec7ab2b6'
+updated_at: '2026-10-11T13:32:20+00:00'

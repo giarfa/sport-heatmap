@@ -6,7 +6,9 @@ use App\Models\User;
 
 /**
  * Decides whose heatmap a signed-out visitor sees on the public home page: the
- * first allowlisted athlete, in configured order, who has connected Strava.
+ * first allowlisted athlete, in configured order, who has connected Strava —
+ * otherwise the stored athlete with the lowest id who has at least one
+ * activity, so stored data is shown rather than the connect screen.
  *
  * Read-only by construction — it never loads, decrypts, or refreshes a token.
  */
@@ -21,7 +23,7 @@ final readonly class ResolveDisplayedAthlete
         $athleteIds = $this->allowlist->athleteIds();
 
         if ($athleteIds === []) {
-            return null;
+            return $this->firstStoredAthleteWithActivities();
         }
 
         /*
@@ -53,6 +55,27 @@ final readonly class ResolveDisplayedAthlete
             }
         }
 
-        return null;
+        return $this->firstStoredAthleteWithActivities();
+    }
+
+    private function firstStoredAthleteWithActivities(): ?User
+    {
+        /*
+         * The fallback runs only after the allowlist walk found nobody, so a
+         * connected allowlisted athlete always wins. Without it the page would
+         * show the connect screen although runs are stored (FR-017).
+         *
+         * The lowest users.id is a stable tie-break: ordering by the latest
+         * activity would flip the displayed athlete whenever someone runs. The
+         * select is as narrow as the allowlist query's, for the same reason —
+         * no guest request may load a token. The owner accepted that this can
+         * display an athlete removed from the allowlist (PRD "Accepted risk —
+         * fallback display").
+         */
+        return User::query()
+            ->select(['id', 'strava_athlete_id'])
+            ->whereHas('activities')
+            ->orderBy('id')
+            ->first();
     }
 }

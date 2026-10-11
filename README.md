@@ -134,7 +134,7 @@ budget into one shared bucket.
 | `STRAVA_CLIENT_ID` | Client ID of your Strava API application | `123456` |
 | `STRAVA_CLIENT_SECRET` | Client secret of that application — secret, never committed | `2f9c…` |
 | `STRAVA_REDIRECT_URI` | OAuth callback URL; its host must match the callback domain registered with Strava | `https://sport-heatmap.test/auth/strava/callback` |
-| `STRAVA_ALLOWED_ATHLETE_IDS` | Comma-separated allowlist of Strava athlete ids permitted to connect. Numeric entries only; blank means nobody. Order matters: the first id that has connected is displayed publicly on the home page. | your own athlete id |
+| `STRAVA_ALLOWED_ATHLETE_IDS` | Comma-separated allowlist of Strava athlete ids permitted to connect. Numeric entries only; blank means nobody may connect. Order matters: the first id that has connected is displayed publicly on the home page; with none connected, the home page shows the stored athlete with the lowest id who has at least one activity, whatever the allowlist says. | your own athlete id |
 | `STRAVA_TOKEN_REFRESH_MARGIN` | Seconds before expiry at which the access token is refreshed pre-emptively | `300` |
 | `STRAVA_SYNC_HOUR` | Local hour (0–23) at which the daily sync runs | `3` |
 | `STRAVA_SYNC_TIMEZONE` | Timezone that `STRAVA_SYNC_HOUR` is expressed in | `Europe/Rome` |
@@ -155,9 +155,10 @@ This produces a full **16-week training block** for one demo athlete — includi
 week, a peak week and a partial current week — so the dashboard can be developed and reviewed
 without ever connecting to Strava.
 
-To see that block on the public home page without signing in, allowlist the seeded athlete id
-`10000001` in your **local** `.env` only (`STRAVA_ALLOWED_ATHLETE_IDS=10000001`) — never in
-production, where it would publish a demo athlete instead of your own.
+With `STRAVA_ALLOWED_ATHLETE_IDS` blank, the public home page shows that block without signing
+in: no allowlisted athlete has connected, so the page falls back to the seeded athlete. Once your
+own allowlisted athlete connects, they replace it. Never seed production — it would publish a demo
+athlete until you connect.
 
 ## Running the sync
 
@@ -235,8 +236,11 @@ totals, legend and sync status of the **first connected athlete of `STRAVA_ALLOW
 configured order** — the same content the signed-in owner sees, without a Strava sign-in. A guest
 request never refreshes a token, calls Strava, or writes a row. Signing in is only needed to connect
 Strava, from the discreet "Owner? Connect with Strava" line under the map, and stays
-allowlist-only. While no allowlisted athlete has connected yet, the home page shows the connect
-screen instead. The page keeps `noindex, nofollow`: reachable by link, not promoted.
+allowlist-only. While no allowlisted athlete has connected yet, the home page shows the stored
+athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
+appears only when no stored athlete has any activity. Removing an athlete from the allowlist
+therefore no longer hides their stored runs — deleting their user row does. The page keeps
+`noindex, nofollow`: reachable by link, not promoted.
 
 If the owner's Strava token can no longer be refreshed, they are signed out and land on the public
 map with a one-off "Your Strava connection expired" banner.

@@ -1,0 +1,64 @@
+code: US-009
+title: 'Home page falls back to the stored athlete when no allowlisted athlete has connected'
+epic:
+  code: EP-003
+  title: 'Heatmap dashboard'
+priority: HIGH
+points: 2
+status: DONE
+body: |
+  #### US-009: Home page falls back to the stored athlete when no allowlisted athlete has connected
+
+  **Epic:** EP-003 | **Priority:** HIGH | **Points:** 2 | **Status:** DONE
+  **Blocked by:** -
+  **Type:** Change request
+  **Supersedes:** US-007 criteria "an athlete removed from the allowlist is never displayed, even while their rows remain stored" and "When no allowlisted athlete has connected yet, a signed-out visit renders the existing connect screen" — the connect screen now appears only when no stored athlete has any activity
+  **Traces to:** FR-017 (MoSCoW: Must, changed) · FR-007 · FR-008 · FR-009 — no journey (the PRD has no `## User Journeys`)
+  **Prior art:** built-in — one more query in `ResolveDisplayedAthlete`; no package involved
+
+  **User Story**
+  As the Committed Amateur Runner,
+  I want the home page to show my stored runs even when no allowlisted athlete is connected to Strava,
+  so that I see the heatmap instead of the Strava connect screen whenever there is data to show.
+
+  **Demonstrates**
+  With `STRAVA_ALLOWED_ATHLETE_IDS` blank and the seeded demo athlete in the database (`php artisan migrate:fresh --seed`),
+  opening `/` in a private window shows the seeded 16-week heatmap, weekly totals, legend, and sync status instead of
+  the Strava connect screen.
+
+  **Acceptance Criteria**
+  - [x] When an allowlisted athlete has connected, the home page is unchanged: the first allowlisted connected athlete, in configured order, is displayed, even while other stored athletes have activities
+  - [x] When no allowlisted athlete has connected (blank allowlist, or no listed id has a user record) and at least one stored athlete has an activity of either source, a signed-out `GET /` returns 200 and renders that athlete's grid, weekly totals, legend, sync chip, and sync detail; "first" is the lowest `users.id` with at least one activity
+  - [x] When no stored athlete has any activity, a signed-out visit renders the existing connect screen with 200, not an error
+  - [x] The fallback is strictly read-only: it writes no row to `users`, `activities`, or `sync_runs`, sends no HTTP request to Strava, never triggers a token refresh, and never selects the token columns
+  - [x] Sign-in is unchanged: the allowlist still gates the OAuth callback, a signed-in athlete removed from the allowlist still gets the 403 with the session ended, and signed-out visitors still see no Garmin import entry point
+  - [x] The fallback athlete's sync status is read fresh on every request; a failed or stale sync shows the same warning — title, HTML-escaped reason, reconnect link — as for the owner (FR-007)
+  - [x] When an allowlisted athlete connects after the fallback was displayed, the next visit renders their grid, never the fallback athlete's cached grid
+  - [x] The page keeps `<meta name="robots" content="noindex, nofollow">` and the "Powered by Strava" attribution (FR-008); FR-009 holds — 375 px layout without page scroll, table semantics with an accessible name per cell, light and dark themes
+  - [x] Feature tests (Strava HTTP faked): fallback with a blank allowlist; fallback when the listed athlete has not connected; an allowlisted connected athlete beats the fallback; no activities → connect screen; a fallback guest request writes nothing and sends no HTTP request; switching from the fallback to an allowlisted athlete never serves the cached fallback grid
+  - [x] README (the `STRAVA_ALLOWED_ATHLETE_IDS` row and the local-dev note on the seeded athlete) and the dashboard developer domain doc describe the fallback
+
+  **Notes for planning**
+  - ⚖️ Violet: the owner accepted on 2026-10-11 that the fallback can display an athlete removed from the allowlist — PRD `### Privacy & legal`, "Accepted risk — fallback display". Do not reopen it in planning.
+  - 🔐 Lars: the fallback query selects only `id` and `strava_athlete_id`, like the allowlist query — no guest request may load a token.
+  - 🔎 Tom: check how the grid cache is keyed before planning criterion 7; if it is keyed per athlete, the criterion holds already and needs only its test.
+status_history:
+  -
+    status: PLANNED
+    at: '2026-10-11T13:27:54+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-10-11T13:29:29+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-11T13:34:19+00:00'
+  -
+    status: DONE
+    at: '2026-10-11T13:38:25+00:00'
+rework: false
+merge_commit:
+  sha: 8da0628348bca206fe407c352ff7f7db8445873c
+  short_sha: 8da0628
+  subject: 'chore(US-009): record the plan, backlog state and usage'
+  committed_at: '2026-10-11T15:34:25+02:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/8da0628348bca206fe407c352ff7f7db8445873c'

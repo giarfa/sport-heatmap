@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-008` — 2026-10-11 |
+| **Last updated by** | `US-009` — 2026-10-11 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -24,9 +24,11 @@ share stops working.
 2. The athlete to render is resolved:
    - signed in → the signed-in athlete (their own map);
    - signed out → `ResolveDisplayedAthlete`: the first id of
-     `STRAVA_ALLOWED_ATHLETE_IDS`, in configured order, that has a user row
+     `STRAVA_ALLOWED_ATHLETE_IDS`, in configured order, that has a user row;
+     with none (blank allowlist, or no listed id connected), the stored athlete
+     with the lowest `users.id` who has at least one activity of either source
      (see `strava-connection.md`);
-   - nobody resolvable (no allowlisted athlete has connected) → the
+   - nobody resolvable (no stored athlete has any activity) → the
      `strava.connect` view, 200 — there is no login page, and a redirect would
      loop.
 3. For that athlete, identically for owner and guest:
@@ -52,8 +54,9 @@ the `database` drivers that is a `sessions` row per cookieless visit and a
 `<x-session-notices />` renders above the heading on both the dashboard and the
 connect screen: the OAuth cancellation flash (`status`) and the
 "Your Strava connection expired" alert. Both views carry it because the OAuth
-cancel path redirects to `dashboard`, which a guest sees as the public map once
-an athlete has connected and as the connect screen before that.
+cancel path redirects to `dashboard`, which a guest sees as the public map
+whenever an athlete can be displayed (allowlisted and connected, else the
+stored-athlete fallback) and as the connect screen otherwise.
 
 **Guest UI.** Signed-out visitors get everything the owner sees, plus one
 line under the map: "Owner? Connect with Strava", a text link to
@@ -92,7 +95,7 @@ calibrated bands, upper-inclusive.
 | --- | --- | --- |
 | Route | `routes/web.php` → `dashboard` (`/`, `strava.fresh`) | The only screen |
 | Controller | `app/Http/Controllers/DashboardController.php` | Signed-in athlete or displayed athlete → grid + status; nobody → connect screen |
-| Displayed athlete | `app/Support/Strava/ResolveDisplayedAthlete.php` | Guest path only; read-only, ≤ 1 query |
+| Displayed athlete | `app/Support/Strava/ResolveDisplayedAthlete.php` | Guest path only; read-only, ≤ 2 queries; allowlist first, then the stored-athlete fallback |
 | Window | `app/Support/Heatmap/HeatmapWindow.php` | ISO-week anchored 112-day window |
 | Daily totals | `app/Support/Heatmap/DailyRunningDistance.php` | One grouped aggregate query |
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals |
@@ -132,8 +135,12 @@ three small indexed queries for the sync status.
 - **Invariant — a guest request is strictly read-only.** _Breaks if:_ anything on
   the guest path calls `EnsureFreshAccessToken`, `StravaClient`, or loads a token
   column — a guest could then trigger a refresh, an HTTP call, or a write.
-- **Invariant — the displayed athlete is on the allowlist.** An athlete removed
-  from it is never shown, even while their rows remain stored.
+- **Invariant — a connected allowlisted athlete beats the fallback.** The
+  fallback (lowest `users.id` with an activity) applies only while no allowlisted
+  athlete has connected, so it can show an athlete removed from the allowlist —
+  an accepted risk (PRD "Accepted risk — fallback display"). The grid cache is
+  keyed per athlete, so switching from the fallback to an allowlisted athlete
+  never serves the fallback's cached grid.
 
 - **Invariant — the sync status is never cached.** _Breaks if:_ it moves into the
   `remember()` closure.
@@ -154,13 +161,15 @@ three small indexed queries for the sync status.
   success exists (`SyncStatus::showsSkeleton()`).
 - `sync_runs` is instance-wide; the status is the same for every athlete.
 - Several allowlisted athletes: each signed-in athlete sees their own map, guests
-  see the first connected one in allowlist order.
+  see the first connected one in allowlist order. With none connected, guests see
+  the lowest-id stored athlete with activities — on a fresh
+  `migrate:fresh --seed`, the seeded demo athlete.
 - Strava orange (`#fc4c02`) is reserved for the connect button and never used as
   a data colour.
 
 ## Related
 
-- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`
-- Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`
-- Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`
+- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`
+- Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`
+- Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`, `US-009.md`
 - Other domains: `strava-connection.md`, `activity-sync.md`, `garmin-csv-import.md`
