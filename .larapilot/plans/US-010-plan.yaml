@@ -1,0 +1,145 @@
+code: US-010
+plan_body: |-
+  ## Technical Solution
+
+  Root cause: `config/cache.php` keeps the Laravel 13 default `serializable_classes => false`, so every serializing store (`database` in `.env.example`, `file`, `redis`) calls `unserialize()` with no allowed classes and turns the cached `HeatmapGrid` into `__PHP_Incomplete_Class`. `HeatmapGridCache::remember()` declares a `HeatmapGrid` return type, so every cache hit throws a `TypeError` and `GET /` answers 500. The suite runs the `array` store with `serialize => false`, which is why no test caught it since US-004.
+
+  Fix, two layers:
+
+  1. **Allowlist** (`config/cache.php`) — `serializable_classes` lists exactly the classes a cached grid is made of: `App\Data\Heatmap\HeatmapGrid`, `WeekRow`, `DayCell`, `LegendRow`, `IntensityScale`, `App\Enums\DayCellState`, `Carbon\CarbonImmutable` (verified: CarbonImmutable serializes to scalar props only and restores with only itself allowed). Never `true` — the default exists to stop gadget chains if `APP_KEY` leaks (Lars).
+  2. **Self-healing read** (`HeatmapGridCache::remember()`) — read the entry; when it is not a `HeatmapGrid` (written before the fix, by an older class shape, or by a class later removed from the allowlist), build the grid and overwrite the entry instead of returning it. The method keeps its signature, so the controller and the sync command do not change.
+
+  Rejected: caching the grid as a plain array with `toArray()/fromArray()` mappers — more code across five DTOs for no gain over an allowlist the framework already provides; `serializable_classes => true` — reopens the gadget-chain risk the default closes.
+
+  Query shape unchanged: no new query on the dashboard path.
+
+  ## Git & Branching
+  - Mode: GITFLOW
+  - Branch: `feature/US-010-fix-cached-grid-unserialize` from `develop`
+  - TASK-00: bootstrap
+  - Per task: one Conventional Commit; push/PR remote only when the user asks
+  - Merge after `larapilot-review` approval
+
+  ## Test Data Strategy
+  - No model or schema change: factories and seeders stay as they are
+  - Tests use the existing `User` and `Activity` factories and the TestCase athlete helpers
+  - `migrate:fresh --seed` keeps producing the seeded demo athlete used in the manual check
+
+  ## Test Strategy
+  - Bar: NORMAL — Pest/PHPUnit feature tests, no browser or viewport suites
+  - Regression: `tests/Feature/Dashboard/HeatmapGridCacheTest.php` switches to the serializing `database` store with `Config::set()` and requests `/` twice — both 200, same grid; fails on `develop` without the fix
+  - Self-healing: an entry that is not a `HeatmapGrid` under the grid key is rebuilt and the page renders 200
+  - Allowlist: a class outside the list (e.g. `stdClass`) still comes back as `__PHP_Incomplete_Class` from the database store
+  - Full suite + `larapilot:quality` before each commit
+
+  ## Manual test handoff
+  1. `CACHE_STORE=database`, open `/` twice (signed out and signed in) → 200 both times.
+  2. With an entry cached before the fix still in the `cache` table, open `/` → 200 without clearing the cache.
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch and internal PR'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for this spec: create the feature branch from `develop` and prepare the internal PR description toward `develop`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `git checkout develop`
+      2. `git checkout -b feature/US-010-fix-cached-grid-unserialize`
+      3. Draft internal PR title/body toward `develop` (keep local until push is requested)
+      4. Empty commit: `chore(US-010): TASK-00 bootstrap feature branch`
+
+      ## Completion Criteria
+      - [ ] Branch `feature/US-010-fix-cached-grid-unserialize` exists locally
+      - [ ] PR title/body drafted for `develop`
+
+      ## Git Deliverables
+      - Commit: `chore(US-010): TASK-00 bootstrap feature branch` (empty commit allowed)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally — open/update remote only if user requests
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 0.25
+    dependencies: {}
+  -
+    id: TASK-01
+    title: 'Allowlist the grid classes for cache unserialize and rebuild unrestorable entries'
+    body: |-
+      ## Description
+      Fix: the cached heatmap grid cannot be unserialized under `serializable_classes => false`, so every cache hit on `/` throws a `TypeError` (500).
+
+      ## Files Involved
+      - config/cache.php
+      - app/Support/Heatmap/HeatmapGridCache.php
+      - .larapilot/docs/devs/heatmap-dashboard.md
+      - .larapilot/docs/devs/README.md
+      - CHANGELOG.md
+
+      ## Steps
+      1. `config/cache.php`: replace `'serializable_classes' => false` with an explicit list — `HeatmapGrid`, `WeekRow`, `DayCell`, `LegendRow`, `IntensityScale`, `DayCellState`, `CarbonImmutable` — and rewrite the comment block to say why each is there and why the list must never become `true`
+      2. `HeatmapGridCache::remember()`: read the key; return it when it is a `HeatmapGrid`; otherwise build via the closure, `put` it with the same TTL, and return it. Keep the signature and PHPDoc style
+      3. `php artisan test` and `php artisan larapilot:quality`
+
+      ## Completion Criteria
+      - [ ] A serializing store restores the cached grid as a `HeatmapGrid`
+      - [ ] A cached entry that is not a `HeatmapGrid` is rebuilt, never returned
+      - [ ] `serializable_classes` is an explicit list, never `true`
+      - [ ] Root cause named in the commit body
+      - [ ] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — grid cache section: serialization allowlist, the self-healing read, the rejected array-mapper and `true` alternatives, and the invariant that a new class nested in the grid must join the allowlist
+      - [ ] Folder `README.md` index row updated (last spec US-010)
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `fix(US-010): TASK-01 allowlist the cached grid classes for unserialize`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update local notes
+    type: Fix
+    status: TODO
+    assignee: Alex
+    estimate_hours: 1
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-02
+    title: 'Cover the cached grid round trip through a serializing store'
+    body: |-
+      ## Description
+      Add regression coverage for the cached-grid 500 with a serializing cache store.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/HeatmapGridCacheTest.php
+
+      ## Steps
+      1. Use existing factories and the TestCase athlete helpers — no new factory definitions
+      2. `Config::set('cache.default', 'database')` in the new tests (never edit `.env` or `phpunit.xml`)
+      3. Cases: a signed-out visitor and a signed-in athlete request `/` twice — both 200, the second served from the cache with the same weekly totals; an entry under the grid key that is not a `HeatmapGrid` is rebuilt and the page renders 200; a class outside the allowlist (`stdClass`) still comes back from the database store as `__PHP_Incomplete_Class`
+      4. Confirm the round-trip test fails with `serializable_classes => false`
+      5. `php artisan test --filter=HeatmapGridCacheTest`, then the full suite
+      6. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites
+
+      ## Completion Criteria
+      - [ ] Round-trip regression test fails without the fix and passes with it
+      - [ ] Unrestorable-entry and allowlist cases pass
+      - [ ] Full suite passes
+
+      ## Git Deliverables
+      - Commit: `test(US-010): TASK-02 cover the cached grid round trip`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update local notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 1
+    dependencies:
+      - TASK-01
+updated_at: '2026-10-11T13:43:40+00:00'
