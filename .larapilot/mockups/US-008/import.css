@@ -1,0 +1,127 @@
+/* ---- Garmin import mockups — shared stylesheet ------------------------------
+   Tokens are copied verbatim from resources/css/app.css (which transcribes
+   ../heatmap-dashboard/README.md). Nothing here introduces a new colour: the
+   import screens reuse the card surface, ink, accent (links + focus only) and
+   the amber warn palette. The component rules below the tokens are the ones
+   Alex ports into resources/css/app.css under "Garmin import". */
+:root {
+  --surface-page: #f8fafc;
+  --surface-card: #ffffff;
+  --hairline: #e2e8f0;
+  --ink: #0f172a;
+  --ink-muted: #64748b;
+  --accent: #4338ca;
+  --warn-bg: #fffbeb;
+  --warn-border: #fcd34d;
+  --warn-ink: #92400e;
+  --ok-dot: #0ca30c;
+  --control-border: #94a3b8; /* slate-400: 3:1 non-text contrast on white */
+}
+html.dark {
+  --surface-page: #020617;
+  --surface-card: #0f172a;
+  --hairline: #1e293b;
+  --ink: #f8fafc;
+  --ink-muted: #94a3b8;
+  --accent: #a5b4fc;
+  --warn-bg: #2a1f05;
+  --warn-border: #854d0e;
+  --warn-ink: #fcd34d;
+  --ok-dot: #22c55e;
+  --control-border: #64748b; /* slate-500: 3.7:1 on slate-900 */
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--surface-page); color: var(--ink); font: 16px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+:where(a, button, input, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 0.375rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* Layout shell — mirrors layouts/app.blade.php */
+.top { position: sticky; top: 0; z-index: 10; background: var(--surface-card); border-bottom: 1px solid var(--hairline); }
+.top-in { max-width: 64rem; margin: 0 auto; height: 3.5rem; padding: 0 0.75rem; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 0.5rem; color: var(--ink); text-decoration: none; font-size: 0.875rem; font-weight: 600; }
+.icon-btn { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 0; border-radius: 0.5rem; background: none; color: var(--ink-muted); cursor: pointer; }
+main { max-width: 64rem; margin: 0 auto; padding: 1.5rem 0.75rem; }
+footer { max-width: 64rem; margin: 0 auto; padding: 0 0.75rem 2rem; font-size: 0.75rem; color: var(--ink-muted); }
+@media (min-width: 640px) { .top-in, main, footer { padding-inline: 1.5rem; } }
+.card { background: var(--surface-card); border: 1px solid var(--hairline); border-radius: 0.75rem; }
+h1 { margin: 0; font-size: 1.125rem; font-weight: 600; letter-spacing: -0.01em; }
+@media (min-width: 640px) { h1 { font-size: 1.25rem; } }
+.lede { margin: 0.125rem 0 0; font-size: 0.875rem; color: var(--ink-muted); }
+.back { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: 0.875rem; }
+
+/* ---- Garmin import components (port these) -------------------------------- */
+.imp { max-width: 40rem; }
+.imp--wide { max-width: none; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 1rem; border-radius: 0.5rem; font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn--primary { background: var(--ink); color: var(--surface-card); border: 1px solid var(--ink); }
+.btn--secondary { background: transparent; color: var(--ink); border: 1px solid var(--control-border); }
+.btn-row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.25rem; }
+
+.field-label { display: block; font-size: 0.875rem; font-weight: 600; }
+.field-hint { margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--ink-muted); }
+.file-input { display: block; width: 100%; margin-top: 0.5rem; min-height: 2.75rem; padding: 0.5rem; border: 1px solid var(--control-border); border-radius: 0.5rem; background: var(--surface-page); color: var(--ink); font: inherit; font-size: 0.875rem; }
+.file-input::file-selector-button { min-height: 2rem; margin-right: 0.75rem; padding: 0 0.75rem; border: 1px solid var(--control-border); border-radius: 0.375rem; background: var(--surface-card); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.file-input[aria-invalid="true"] { border-color: var(--warn-ink); }
+.field-error { margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; border: 1px solid var(--warn-border); border-radius: 0.5rem; background: var(--warn-bg); color: var(--warn-ink); font-size: 0.875rem; }
+
+.notice { padding: 0.75rem 1rem; border: 1px solid var(--warn-border); border-radius: 0.75rem; background: var(--warn-bg); color: var(--warn-ink); font-size: 0.875rem; }
+
+/* Count strip: the tally so far (review) and the result (summary). */
+.tally { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem 1rem; margin: 0; font-size: 0.8125rem; }
+@media (min-width: 640px) { .tally { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.tally div { display: flex; flex-direction: column-reverse; }
+.tally dt { color: var(--ink-muted); }
+.tally dd { margin: 0; font-size: 1.125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.section-title { margin: 0; font-size: 0.9375rem; font-weight: 600; }
+.section-note { margin: 0.125rem 0 0; font-size: 0.8125rem; color: var(--ink-muted); }
+
+/* Comparison table. ≥ 640 px a real 4-column table; below, each <tr> becomes a
+   stacked card and every <td> prints its column name from data-label, so the
+   headers screen readers announce are the same ones sighted users read. */
+.cmp { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.cmp caption { text-align: left; }
+.cmp th, .cmp td { text-align: left; vertical-align: top; padding: 0.75rem 0.5rem; border-top: 1px solid var(--hairline); }
+.cmp thead th { padding-top: 0; font-size: 0.75rem; font-weight: 600; color: var(--ink-muted); border-top: 0; }
+.cmp th[scope="row"] { font-weight: 600; }
+.cmp .run-date { display: block; font-size: 0.75rem; font-weight: 500; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.cmp .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.side { margin: 0; display: grid; gap: 0.125rem; }
+.side div { display: flex; gap: 0.375rem; }
+.side dt { min-width: 3.25rem; color: var(--ink-muted); }
+.side dd { margin: 0; font-variant-numeric: tabular-nums; }
+.side-source { margin-top: 0.25rem; font-size: 0.75rem; color: var(--ink-muted); }
+.side-source a { display: inline-flex; align-items: center; min-height: 2.75rem; }
+
+@media (max-width: 639.98px) {
+  .cmp thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .cmp tr { display: block; padding: 0.75rem 0; border-top: 1px solid var(--hairline); }
+  .cmp th, .cmp td { display: block; padding: 0.25rem 0; border: 0; }
+  .cmp td[data-label]::before { content: attr(data-label); display: block; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
+  .cmp .cmp-pair { display: inline-block; width: 49%; vertical-align: top; }
+}
+
+/* Overwrite / Skip — two radios drawn as a segmented control. The native input
+   stays in the tab order (visually hidden, not display:none) so arrow keys move
+   between the pair; the label is the 44 px target. */
+.choice { margin: 0; padding: 0; border: 0; min-width: 0; }
+.choice legend { padding: 0; font-size: 0.75rem; color: var(--ink-muted); }
+.seg { display: inline-flex; margin-top: 0.25rem; border: 1px solid var(--control-border); border-radius: 0.5rem; overflow: hidden; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg label { display: inline-flex; align-items: center; min-height: 2.75rem; min-width: 5.5rem; justify-content: center; padding: 0 0.75rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; color: var(--ink); }
+.seg label + input + label { border-left: 1px solid var(--control-border); }
+.seg input:checked + label { background: var(--ink); color: var(--surface-card); font-weight: 600; }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: 0.375rem; }
+
+.shortcuts { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.shortcuts[hidden] { display: none; }
+
+.list-plain { margin: 0.5rem 0 0; padding: 0; list-style: none; font-size: 0.875rem; }
+.list-plain li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; border-top: 1px solid var(--hairline); }
+.list-plain li:first-child { border-top: 0; }
+.list-plain .muted { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+
+.mock-annot { margin: 2rem 0 0; padding: 0.75rem 1rem; border: 1px dashed var(--control-border); border-radius: 0.5rem; font-size: 0.75rem; color: var(--ink-muted); }

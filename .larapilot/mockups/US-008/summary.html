@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Import complete — Sport Heatmap</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="import.css">
+<script>if (location.hash === '#dark') document.documentElement.classList.add('dark');</script>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <a href="../heatmap-dashboard/index.html" class="brand">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="17" width="12" height="12" rx="3" fill="#86b6ef"/><rect x="17" y="17" width="12" height="12" rx="3" fill="#2a78d6"/><rect x="3" y="3" width="12" height="12" rx="3" fill="#3987e5"/><rect x="17" y="3" width="12" height="12" rx="3" fill="#104281"/></svg>
+      Heatmap
+    </a>
+    <button type="button" class="icon-btn" aria-pressed="false" onclick="document.documentElement.classList.toggle('dark'); this.setAttribute('aria-pressed', document.documentElement.classList.contains('dark'))">
+      <span class="sr-only">Toggle dark mode</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+  <div class="imp">
+    <h1>Import complete</h1>
+    <p class="lede" role="status">35 runs added, 1 overwritten. The heatmap is up to date.</p>
+
+    <section class="card" style="margin-top:1rem; padding:1rem 1.25rem;" aria-labelledby="res-h">
+      <h2 id="res-h" class="section-title">Result</h2>
+      <dl class="tally" style="margin-top:0.75rem;">
+        <div><dt>Imported</dt><dd>35</dd></div>
+        <div><dt>Overwritten</dt><dd>1</dd></div>
+        <div><dt>Skipped</dt><dd>1</dd></div>
+        <div><dt>Already imported</dt><dd>0</dd></div>
+        <div><dt>Not runs, ignored</dt><dd>3</dd></div>
+        <div><dt>Outside 16 weeks</dt><dd>0</dd></div>
+        <div><dt>Unreadable rows</dt><dd>1</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" style="margin-top:1rem; padding:1rem 1.25rem;" aria-labelledby="ign-h">
+      <h2 id="ign-h" class="section-title">Ignored activity types</h2>
+      <p class="section-note">Only runs go on the heatmap. If one of these is a run, tell us its name.</p>
+      <ul class="list-plain">
+        <li><span>Escursionismo</span><span class="muted">3</span></li>
+      </ul>
+    </section>
+
+    <section class="card" style="margin-top:1rem; padding:1rem 1.25rem;" aria-labelledby="inv-h">
+      <h2 id="inv-h" class="section-title">Unreadable rows</h2>
+      <p class="section-note">Skipped. The rest of the file was imported.</p>
+      <ul class="list-plain">
+        <li><span>Line 14</span><span class="muted">missing distance</span></li>
+      </ul>
+    </section>
+
+    <div class="btn-row">
+      <a href="../heatmap-dashboard/index.html" class="btn btn--primary">Back to heatmap</a>
+    </div>
+
+    <p class="mock-annot">The two lists render only when non-empty. A re-import of the same file reads “Nothing new — every run was already imported.” in the status line.</p>
+  </div>
+</main>
+
+<footer><a href="https://www.strava.com">Powered by Strava</a> · runs only · distances in kilometres</footer>
+</body>
+</html>
