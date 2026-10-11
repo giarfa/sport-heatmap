@@ -566,11 +566,11 @@ specs:
       title: Maintenance
     priority: HIGH
     points: 2
-    status: REVIEW
+    status: DONE
     body: |
       #### US-010: Fix — home page returns 500 when the heatmap grid is served from the cache
 
-      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** REVIEW
+      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** DONE
       **Blocked by:** -
       **Type:** Fix
       **Severity:** High
@@ -603,14 +603,21 @@ specs:
       ever round-tripped the grid through serialization.
 
       **Acceptance Criteria**
-      - [ ] Bug fixed — the promise holds again: with a serializing cache store, a second `GET /` within the TTL returns 200 and renders the same grid, weekly totals, and legend as the first, for a signed-in athlete and for a signed-out visitor
-      - [ ] A cached grid that cannot be restored (stored before the fix, or by an older class shape) never produces a 500: it is rebuilt and the page renders
-      - [ ] The cache deserialization stays an allowlist: only the classes the cached grid needs are allowed, never `serializable_classes => true` (Lars)
-      - [ ] Regression test covers the failure with a serializing cache store and fails without the fix (Anne)
-      - [ ] Root cause named in the fix commit; `heatmap-dashboard.md` documents the serialization constraint on the grid cache
-      - [ ] No security regression; no schema change, so no factory/seeder change
+      - [x] Bug fixed — the promise holds again: with a serializing cache store, a second `GET /` within the TTL returns 200 and renders the same grid, weekly totals, and legend as the first, for a signed-in athlete and for a signed-out visitor
+      - [x] A cached grid that cannot be restored (stored before the fix, or by an older class shape) never produces a 500: it is rebuilt and the page renders
+      - [x] The cache deserialization stays an allowlist: only the classes the cached grid needs are allowed, never `serializable_classes => true` (Lars)
+      - [x] Regression test covers the failure with a serializing cache store and fails without the fix (Anne)
+      - [x] Root cause named in the fix commit; `heatmap-dashboard.md` documents the serialization constraint on the grid cache
+      - [x] No security regression; no schema change, so no factory/seeder change
     status_history:
       - { status: PLANNED, at: '2026-10-11T13:43:40+00:00' }
       - { status: 'IN PROGRESS', at: '2026-10-11T13:43:46+00:00' }
       - { status: REVIEW, at: '2026-10-11T13:51:23+00:00' }
+      - { status: DONE, at: '2026-10-11T13:52:39+00:00' }
     rework: false
+    merge_commit:
+      sha: 4fd303b17cddc315a59a4cd5d48c9e45afee4590
+      short_sha: 4fd303b
+      subject: 'chore(US-010): record the plan, backlog state and usage'
+      committed_at: '2026-10-11T15:51:27+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4fd303b17cddc315a59a4cd5d48c9e45afee4590'
