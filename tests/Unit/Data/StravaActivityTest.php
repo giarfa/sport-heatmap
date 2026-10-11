@@ -3,6 +3,7 @@
 namespace Tests\Unit\Data;
 
 use App\Data\StravaActivity;
+use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
@@ -17,6 +18,17 @@ class StravaActivityTest extends TestCase
         $this->assertSame(12_345_678, $activity->stravaActivityId);
         $this->assertSame(SportType::Run, $activity->sportType);
         $this->assertSame('Morning Run', $activity->name);
+    }
+
+    /**
+     * The sync writes source explicitly, so an upsert can never leave a row it owns
+     * marked as anything but Strava-sourced.
+     */
+    public function test_its_attributes_mark_the_row_as_strava_sourced(): void
+    {
+        $activity = StravaActivity::fromApiPayload($this->stravaActivityPayload());
+
+        $this->assertSame(ActivitySource::Strava, $activity?->toAttributes()['source']);
     }
 
     public function test_a_non_running_sport_type_is_discarded(): void

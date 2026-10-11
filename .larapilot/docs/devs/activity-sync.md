@@ -11,7 +11,8 @@
 
 Keeps the local `activities` table equal to what Strava reports for the 112-day
 heatmap window, once a night. It fetches every running activity in the window,
-upserts it, deletes local rows Strava no longer returns, and records each attempt
+upserts it, deletes local Strava-sourced rows Strava no longer returns, leaves
+runs imported or won by a Garmin CSV import alone, and records each attempt
 in `sync_runs` so the dashboard can say whether the map is current. If it stops
 working, the map freezes at the last good sync and the dashboard warns about it.
 
@@ -32,6 +33,22 @@ working, the map freezes at the last good sync and the dashboard warns about it.
    2. Each item becomes a `StravaActivity` DTO; non-running sports and dates
       outside the window are dropped.
    3. `ReconcileStravaWindow` applies the complete fetch in one transaction.
+      It first loads, in **one** query, every stored row it may touch (the
+      window, plus any row already carrying a fetched id), then decides each
+      fetched activity in this order:
+      1. **Skip** — its id sits on a `garmin_csv` row (a Garmin-won twin).
+         Nothing is written: Garmin wins permanently.
+      2. **Link** — its id is not stored anywhere and `StartTimeMatcher` finds
+         an unlinked Garmin-new row (NULL Strava id) on the same date within
+         ±2 minutes. Only `strava_activity_id` is set on that row; its Garmin
+         values stay, nothing is created, and the row is claimed so a second
+         Strava activity cannot link to it.
+      3. **Upsert** — otherwise, `updateOrCreate` on `strava_activity_id` with
+         `source = strava`.
+
+      Then delete-on-absence removes rows in the window whose id was not
+      fetched — **`source = strava` rows only**. Skipped and linked rows count
+      as neither upserted nor deleted.
 5. On success the row becomes `succeeded` with the summed `activities_upserted`
    / `activities_deleted`, and every synced athlete's cached grid for today is
    forgotten (`HeatmapGridCache::forget()`).
@@ -52,7 +69,8 @@ fails the run.
 | Schedule | `routes/console.php` | Daily, timezone-aware, `withoutOverlapping()` |
 | HTTP client | `app/Services/Strava/StravaClient.php` | Token, pagination, retry/backoff, mid-sync 401 |
 | Activity DTO | `app/Data/StravaActivity.php` | `fromApiPayload()`; running sports only (`app/Enums/SportType.php`) |
-| Reconcile action | `app/Actions/Strava/ReconcileStravaWindow.php` | Upsert + delete-on-absence in one transaction |
+| Reconcile action | `app/Actions/Strava/ReconcileStravaWindow.php` | Skip / link / upsert, then Strava-only delete-on-absence, in one transaction |
+| Start-time matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest start, ties to the lowest id — shared with the Garmin import |
 | Outcome DTO | `app/Data/SyncOutcome.php` | Upserted / deleted counts, summed across athletes |
 | Models / tables | `app/Models/Activity.php` (`activities`), `app/Models/SyncRun.php` (`sync_runs`) | `strava_activity_id` unique and nullable; `source` per `ActivitySource`; `sync_runs` has no `user_id` |
 | Run status | `app/Enums/SyncRunStatus.php` | `running`, `succeeded`, `failed`, plus detail-card label and dot modifier |
@@ -96,6 +114,9 @@ so `down()` deletes them first.
 | Delete-on-absence bounded to the window | Never delete; delete everything not seen | Strava deletions and sport changes must disappear from the map, but history outside the window must never be touched |
 | Count only created or changed rows as upserted | Count every `updateOrCreate` | An idempotent re-run must report 0 churn, or `sync_runs` cannot prove idempotency |
 | No `sync_runs` row when nobody is eligible | Write "succeeded 0/0" | A fabricated success would tell the dashboard a sync happened; "never synced" must stay visible |
+| Skip a Garmin-won twin outright | Upsert it and let Garmin's values be re-applied | An upsert writes Strava's values and `source = strava` back; there is no later step that could restore Garmin's, so the owner's Overwrite would last until the next night |
+| Link a late Strava twin to a Garmin-new row (decision `7baf70c6656a936f`) | Create it as a separate Strava row; replace the Garmin row with Strava's | A separate row counts the same run twice on the map; replacing would silently undo the import the owner confirmed |
+| Delete-on-absence scoped to `source = strava` (FR-002) | Delete every row in the window not returned | A Garmin-new run was never on Strava and would be deleted the first night after its import |
 | Synchronous Artisan command on the scheduler | Queued jobs | One athlete, one nightly run; a queue adds a worker to operate for no gain |
 | Literal `api_base_url` | `env()` | Pointing it elsewhere would send a live bearer token to another host |
 | Window anchored to the ISO week | Rolling "today − 112 days" | The bottom row must always be the current week, independent of the sync weekday |
@@ -104,6 +125,13 @@ so `down()` deletes them first.
 
 - **Invariant — reconciliation is idempotent.** Running twice against the same
   Strava data changes nothing and reports `0 upserted, 0 deleted`.
+- **Invariant — Garmin wins permanently.** Once a row is `garmin_csv` the sync
+  never reverts it, never re-adds its Strava twin, and never deletes it —
+  including on a night Strava still returns the twin.
+- **Invariant — one definition of "the same run".** Same local date, starts
+  within ±2 minutes **inclusive** (120 s matches, 121 s does not), closest wins.
+  The sync and the Garmin import both call `StartTimeMatcher`; never inline a
+  second copy of the rule.
 - **Invariant — `error_message` is safe to render.** It carries HTTP status and
   rate-limit usage only; it is shown on the dashboard (HTML-escaped).
 - **Invariant — the grid cache is forgotten on success only.** A failed run must
@@ -118,6 +146,9 @@ so `down()` deletes them first.
 - `PendingRequest::retry()` accepts an array only as its first argument; the
   backoff array is indexed inside the sleep closure on purpose.
 - Tests zero `retry_backoff_ms` with `Config::set()` so the suite does not sleep.
+- Start times are compared as **wall-clock** readings: the DTOs build them in
+  UTC while Eloquent reads the column back in the app timezone, so comparing
+  instants would shift one side by the app's UTC offset.
 - `activities.user_id` is not mass-assignable; write through
   `$user->activities()`.
 - `sync_runs` is instance-wide (no `user_id`): a multi-athlete instance shares one
@@ -125,7 +156,7 @@ so `down()` deletes them first.
 
 ## Related
 
-- Specs: `US-003`, `US-006`
-- Plans: `.larapilot/plans/US-003-plan.yaml`
+- Specs: `US-003`, `US-006`, `US-008`
+- Plans: `.larapilot/plans/US-003-plan.yaml`, `.larapilot/plans/US-008-plan.yaml`
 - Review: `.larapilot/docs/review/US-003.md`
-- Other domains: `strava-connection.md`, `heatmap-dashboard.md`
+- Other domains: `strava-connection.md`, `heatmap-dashboard.md`, `garmin-csv-import.md`
