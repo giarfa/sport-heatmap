@@ -51,9 +51,11 @@ and the nightly sync can no longer read activities.
    `strava.rejected` (`reason=allowlist`) with 403.
 3. It then calls `EnsureFreshAccessToken`. If that throws
    `StravaReconnectRequiredException` (refresh token rejected, no refresh token,
-   undecryptable tokens, lock timeout), the session is ended and the
-   `strava.connect` view is rendered with `reconnect: true` — the
-   "Your Strava connection expired" banner above the connect card, status 200.
+   undecryptable tokens, lock timeout), the session is ended and the response is
+   a redirect to `dashboard` with the flash `strava.reconnect`. The follow-up
+   request is a guest one: the public map of the displayed athlete (normally
+   the owner themselves) with the "Your Strava connection expired" banner, once
+   — a reload no longer shows it.
 
 **Displayed athlete (`ResolveDisplayedAthlete`, signed-out visitors)**
 
@@ -120,6 +122,7 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
 | Cache lock around refresh | No lock | Strava retires the old refresh token on refresh; a lost race persists a dead token and forces a full re-authorization |
 | `rejectedToken` argument for forced refresh | `bool $force` | A plain force would re-refresh after the lock and retire the token the race winner just stored |
 | Session teardown in the middleware | `render()` on the exception | Rendering a reconnect screen while signed in with a dead token loops; teardown belongs where the request is |
+| Dead token → redirect to `/` + flash (Post/Redirect/Get) | Continue with `$next` as a guest; render the connect-only screen | Continuing couples the middleware to a route that happens to serve guests; the connect-only screen hid the owner's own public map (US-007). The flash lands in the freshly regenerated session and does not repeat on reload |
 
 ## Key decisions & invariants
 
@@ -137,6 +140,10 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
 - **Invariant — the displayed athlete is always on the allowlist.** An athlete
   removed from it is never shown, even while their rows remain stored. _Breaks
   if:_ the resolver reads `users` without the `whereIn` on the allowlist.
+- **Invariant — the allowlist-removal branch never redirects.** It ends the
+  session and answers 403 with `strava.rejected` in the same response; only the
+  dead-token branch redirects. _Breaks if:_ both branches are merged — a removed
+  athlete would land on a public map instead of the rejection.
 - **Invariant — guests never reach `EnsureFreshAccessToken`.** The resolver loads
   no token column, so a guest request cannot trigger a refresh or an HTTP call.
 - **Invariant — the OAuth routes are throttled.** They are the only unauthenticated

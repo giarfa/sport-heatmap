@@ -3,7 +3,7 @@
 @section('title', 'Connect Strava — Sport Heatmap')
 
 @section('content')
-    <x-session-notices class="mx-auto mb-4 max-w-sm" :reconnect="$reconnect ?? false" />
+    <x-session-notices class="mx-auto mb-4 max-w-sm" />
 
     <div class="card mx-auto max-w-sm p-6 text-center">
         <svg width="36" height="36" viewBox="0 0 32 32" aria-hidden="true" class="mx-auto">

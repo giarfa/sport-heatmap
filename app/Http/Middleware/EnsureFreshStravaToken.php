@@ -12,13 +12,15 @@ use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The standing guard on every authenticated screen.
+ * The standing guard on every signed-in request.
  *
  * It does two things on each request, in this order: re-checks that the signed-in
  * athlete is still allowed in at all, then makes sure their Strava token is usable
- * for whatever the route does next.
+ * for whatever the route does next. A dead token signs the athlete out and sends
+ * them to the public home page with a one-off expiry banner.
  *
- * A no-op for guests, and free while the stored token is still valid.
+ * A no-op for guests — the public dashboard's read path must never reach the
+ * token refresh — and free while the stored token is still valid.
  */
 class EnsureFreshStravaToken
 {
@@ -58,16 +60,23 @@ class EnsureFreshStravaToken
 
         /*
          * This middleware, not the exception's own render(), is what tears the
-         * session down: rendering a reconnect screen while leaving the athlete
+         * session down: rendering a reconnect prompt while leaving the athlete
          * signed in with a dead token is a loop, and the teardown belongs where
          * the request is, not inside an exception.
+         *
+         * Then Post/Redirect/Get onto the public home page: the flash lands in
+         * the session invalidate() has just regenerated, the URL stays /, and a
+         * reload does not repeat the banner. Rejected: continuing with $next as
+         * a guest, which would couple this middleware to the fact that the
+         * current route happens to serve guests; and the old connect-only
+         * screen, which hid the owner's own map behind a sign-in (US-007).
          */
         try {
             ($this->ensureFreshAccessToken)($user);
         } catch (StravaReconnectRequiredException) {
             $this->endSession($request);
 
-            return response()->view('strava.connect', ['reconnect' => true]);
+            return redirect()->route('dashboard')->with('strava.reconnect', true);
         }
 
         return $next($request);
