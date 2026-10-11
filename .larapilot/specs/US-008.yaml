@@ -5,11 +5,11 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 8
-status: 'IN PROGRESS'
+status: REVIEW
 body: |
   #### US-008: Import runs from a Garmin Connect CSV with conflict review
 
-  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** IN PROGRESS
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** REVIEW
   **Blocked by:** -
   **Type:** Feature
   **Supersedes:** US-003 criterion "Local activities inside the window that are absent from the response are deleted" — now Strava-sourced activities only, and Garmin-overwritten activities are never reverted or re-added
@@ -56,4 +56,7 @@ status_history:
   -
     status: 'IN PROGRESS'
     at: '2026-10-11T12:47:21+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-11T13:09:56+00:00'
 rework: false

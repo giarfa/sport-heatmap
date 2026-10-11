@@ -164,9 +164,9 @@ tasks:
       4. Draft the internal PR title/body toward `develop` (keep it local until push is requested)
 
       ## Completion Criteria
-      - [ ] Branch `feature/US-008-garmin-csv-import` exists locally
-      - [ ] The sample CSV is committed on the feature branch
-      - [ ] PR title/body drafted for `develop`
+      - [x] Branch `feature/US-008-garmin-csv-import` exists locally
+      - [x] The sample CSV is committed on the feature branch
+      - [x] PR title/body drafted for `develop`
 
       ## Test Data
       - N/A: no model or schema changes
@@ -178,10 +178,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 0.25
     dependencies: {}
+    commit:
+      sha: 7c974c56a88c8d37a0eb004baea184fe9f87bcfb
+      short_sha: 7c974c5
+      subject: 'chore(US-008): TASK-00 bootstrap feature branch'
+      committed_at: '2026-10-11T14:47:30+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/7c974c56a88c8d37a0eb004baea184fe9f87bcfb'
   -
     id: TASK-01
     title: 'Activity source column and nullable Strava id (migration, enum, model, factory, seeder)'
@@ -221,33 +227,39 @@ tasks:
       7. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Migration up and down both run; existing rows read as `source = strava`
-      - [ ] `strava_activity_id` nullable, unique index intact
-      - [ ] `Activity` docblock, casts, `#[Fillable]` in sync with the migration (Larastan level 5 clean)
-      - [ ] `stravaUrl()` returns null for Garmin-sourced rows
-      - [ ] Factory states `garminImported()` / `garminOverwritten()` produce valid rows
-      - [ ] `migrate:fresh --seed` succeeds with coherent Garmin demo rows
-      - [ ] Tests pass
+      - [x] Migration up and down both run; existing rows read as `source = strava`
+      - [x] `strava_activity_id` nullable, unique index intact
+      - [x] `Activity` docblock, casts, `#[Fillable]` in sync with the migration (Larastan level 5 clean)
+      - [x] `stravaUrl()` returns null for Garmin-sourced rows
+      - [x] Factory states `garminImported()` / `garminOverwritten()` produce valid rows
+      - [x] `migrate:fresh --seed` succeeds with coherent Garmin demo rows
+      - [x] Tests pass
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` updated: default `source`, plus the `garminImported()` and `garminOverwritten()` states
-      - [ ] `TrainingBlockSeeder` seeds two Garmin-imported runs and one Garmin-overwritten twin
-      - [ ] Factory updated in **this same task** as the migration
+      - [x] `database/factories/ActivityFactory.php` updated: default `source`, plus the `garminImported()` and `garminOverwritten()` states
+      - [x] `TrainingBlockSeeder` seeds two Garmin-imported runs and one Garmin-overwritten twin
+      - [x] Factory updated in **this same task** as the migration
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/activity-sync.md`: data model section rewritten for `source` and the nullable Strava id. Covers the three row kinds (Strava, Garmin-new, Garmin-won twin), the lossy rollback, and why no new index.
-      - [ ] `.larapilot/docs/devs/README.md` index row "Last touched by" set to `US-008`
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/activity-sync.md`: data model section rewritten for `source` and the nullable Strava id. Covers the three row kinds (Strava, Garmin-new, Garmin-won twin), the lossy rollback, and why no new index.
+      - [x] `.larapilot/docs/devs/README.md` index row "Last touched by" set to `US-008`
+      - [x] English, committed with this task
       ## Git Deliverables
       - Commit: `feat(US-008): TASK-01 add activity source and nullable Strava id`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 2.5
     dependencies:
       - TASK-00
+    commit:
+      sha: 0102e94f7faf7d89858f23974c1ac25414b7d07e
+      short_sha: '0102e94'
+      subject: 'feat(US-008): TASK-01 add activity source and nullable Strava id'
+      committed_at: '2026-10-11T14:49:10+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0102e94f7faf7d89858f23974c1ac25414b7d07e'
   -
     id: TASK-02
     title: 'Source-aware sync: StartTimeMatcher, Garmin-won skip, late-twin linking, Strava-only deletes'
@@ -285,32 +297,38 @@ tasks:
       4. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] A Strava id owned by a `garmin_csv` row is never upserted or deleted
-      - [ ] A late Strava twin of a Garmin-new row links to it (one row, Garmin values kept)
-      - [ ] Delete-on-absence scoped to `source = strava`
-      - [ ] Still one transaction; stored-row lookup is a single query
-      - [ ] Existing sync tests pass
+      - [x] A Strava id owned by a `garmin_csv` row is never upserted or deleted
+      - [x] A late Strava twin of a Garmin-new row links to it (one row, Garmin values kept)
+      - [x] Delete-on-absence scoped to `source = strava`
+      - [x] Still one transaction; stored-row lookup is a single query
+      - [x] Existing sync tests pass
 
       ## Test Data
       - N/A: no schema change (factory states come from TASK-01)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/activity-sync.md`:
+      - [x] `.larapilot/docs/devs/activity-sync.md`:
         - functional flow: the skip, link and upsert decision order, and Strava-only deletes
         - architectural choices: link vs duplicate (cite decision `7baf70c6656a936f`) and why skip rather than a no-op upsert
         - invariants: "Garmin wins permanently", and the ±2-min inclusive tolerance being shared with the importer
-      - [ ] README index row updated
-      - [ ] English, committed with this task
+      - [x] README index row updated
+      - [x] English, committed with this task
       ## Git Deliverables
       - Commit: `feat(US-008): TASK-02 make the Strava sync source-aware`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-01
+    commit:
+      sha: 6f207ecf4ccf93d2ef11173e6cb191081b444777
+      short_sha: 6f207ec
+      subject: 'feat(US-008): TASK-02 make the Strava sync source-aware'
+      committed_at: '2026-10-11T14:50:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6f207ecf4ccf93d2ef11173e6cb191081b444777'
   -
     id: TASK-03
     title: 'Cover the source-aware sync and the start-time matcher'
@@ -342,19 +360,25 @@ tasks:
       6. No Playwright, Dusk or browser suites.
 
       ## Completion Criteria
-      - [ ] Every case above passes
-      - [ ] Coverage matches the `NORMAL` bar
-      - [ ] No stray HTTP (preventStrayRequests on)
+      - [x] Every case above passes
+      - [x] Coverage matches the `NORMAL` bar
+      - [x] No stray HTTP (preventStrayRequests on)
       ## Git Deliverables
       - Commit: `test(US-008): TASK-03 cover the source-aware sync`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2.5
     dependencies:
       - TASK-02
+    commit:
+      sha: b340667beb9c461874688f31a14788b2da0cf5f1
+      short_sha: b340667
+      subject: 'test(US-008): TASK-03 cover the source-aware sync'
+      committed_at: '2026-10-11T14:51:40+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/b340667beb9c461874688f31a14788b2da0cf5f1'
   -
     id: TASK-04
     title: 'Mockups: upload, conflict review, and summary screens (mobile first, light + dark)'
@@ -390,9 +414,9 @@ tasks:
       5. README: breakpoint behavior (375 / 768 / 1280), the `data-resolve-all` JS hook and its no-JS fallback (shortcuts hidden), focus and error states, terse copy per PRD tone, and the mapping to Blade views
 
       ## Completion Criteria
-      - [ ] Three screens; review shown at mobile and desktop, plus a dark variant
-      - [ ] README documents breakpoints, a11y annotations, and copy
-      - [ ] No credential inputs (not applicable: no auth screens)
+      - [x] Three screens; review shown at mobile and desktop, plus a dark variant
+      - [x] README documents breakpoints, a11y annotations, and copy
+      - [x] No credential inputs (not applicable: no auth screens)
 
       ## Test Data
       - N/A: static mockups
@@ -404,11 +428,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Elise
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: 6b9c1ad59b922deca55935f4449fb528edc65418
+      short_sha: 6b9c1ad
+      subject: 'docs(US-008): TASK-04 add Garmin import mockups'
+      committed_at: '2026-10-11T14:54:08+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6b9c1ad59b922deca55935f4449fb528edc65418'
   -
     id: TASK-05
     title: 'Garmin CSV parser: header sets, running-type map, value parsing, rejection exception, DTOs'
@@ -459,33 +489,39 @@ tasks:
       8. `vendor/bin/pint --dirty --format agent`, then `php artisan larapilot:quality`
 
       ## Completion Criteria
-      - [ ] The IT sample parses to 37 `Run` rows and ignores 3 `Escursionismo` (with `now` = 2026-10-11)
-      - [ ] EN headers parse; types map to Run / TrailRun / VirtualRun; `Hiking` counted as ignored by name
-      - [ ] `"8.29"` gives 8290 m; `"00:54:23"` gives 3263 s; `start_date_local` stored without tz shift
-      - [ ] An unknown header set, a missing required column, or a non-CSV file each throw with an explicit message
-      - [ ] Invalid rows listed with line + reason; remaining rows still returned
-      - [ ] Larastan level 5 clean
+      - [x] The IT sample parses to 37 `Run` rows and ignores 3 `Escursionismo` (with `now` = 2026-10-11)
+      - [x] EN headers parse; types map to Run / TrailRun / VirtualRun; `Hiking` counted as ignored by name
+      - [x] `"8.29"` gives 8290 m; `"00:54:23"` gives 3263 s; `start_date_local` stored without tz shift
+      - [x] An unknown header set, a missing required column, or a non-CSV file each throw with an explicit message
+      - [x] Invalid rows listed with line + reason; remaining rows still returned
+      - [x] Larastan level 5 clean
 
       ## Test Data
       - N/A: no model or schema change (CSV fixtures are added under `tests/Fixtures/Garmin/`)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` created from `TEMPLATE.md`, parsing half:
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` created from `TEMPLATE.md`, parsing half:
         - accepted header sets, the running-type table and its "unknowns are surfaced" rule
         - value rules (km/thousands/`--`/duration/no-tz date), window and future cutoff
         - the metric-account limitation
-      - [ ] `.larapilot/docs/devs/README.md` gets a new `garmin-csv-import` index row
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/README.md` gets a new `garmin-csv-import` index row
+      - [x] English, committed with this task
       ## Git Deliverables
       - Commit: `feat(US-008): TASK-05 parse Garmin Connect activity exports`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 4
     dependencies:
       - TASK-01
+    commit:
+      sha: c3a8210bdb18b4034c27ae2f8291a0fbd6e61874
+      short_sha: c3a8210
+      subject: 'feat(US-008): TASK-05 parse Garmin Connect activity exports'
+      committed_at: '2026-10-11T14:56:57+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c3a8210bdb18b4034c27ae2f8291a0fbd6e61874'
   -
     id: TASK-06
     title: 'Cover the Garmin CSV parser (both languages, types, window, invalid rows, rejections)'
@@ -513,18 +549,24 @@ tasks:
       5. No browser or E2E suites.
 
       ## Completion Criteria
-      - [ ] All cases pass
-      - [ ] Coverage matches the `NORMAL` bar
+      - [x] All cases pass
+      - [x] Coverage matches the `NORMAL` bar
       ## Git Deliverables
       - Commit: `test(US-008): TASK-06 cover the Garmin CSV parser`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
       - TASK-05
+    commit:
+      sha: 326809f9d1ec55292c17c238b7d3299c0cfc0df6
+      short_sha: 326809f
+      subject: 'test(US-008): TASK-06 cover the Garmin CSV parser'
+      committed_at: '2026-10-11T14:57:36+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/326809f9d1ec55292c17c238b7d3299c0cfc0df6'
   -
     id: TASK-07
     title: 'Plan and apply an import: conflict detection, already-imported, Overwrite/Skip in one transaction'
@@ -565,33 +607,39 @@ tasks:
       5. Quick feature checks go in TASK-09's flow tests. Here, keep `php artisan test --compact` green and run `php artisan larapilot:quality`.
 
       ## Completion Criteria
-      - [ ] Classification is correct for new / conflict / already-imported, with closest-match claiming
-      - [ ] Planning runs exactly one activities query regardless of row count
-      - [ ] Overwrite replaces the CSV-carried fields and marks `garmin_csv`, keeping the Strava id; Skip writes nothing
-      - [ ] All writes in one transaction; grid cache forgotten after commit
-      - [ ] Larastan level 5 clean
+      - [x] Classification is correct for new / conflict / already-imported, with closest-match claiming
+      - [x] Planning runs exactly one activities query regardless of row count
+      - [x] Overwrite replaces the CSV-carried fields and marks `garmin_csv`, keeping the Strava id; Skip writes nothing
+      - [x] All writes in one transaction; grid cache forgotten after commit
+      - [x] Larastan level 5 clean
 
       ## Test Data
       - N/A: no schema change (uses the TASK-01 factory states)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`, planning half:
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`, planning half:
         - the conflict rule (same date, ±2 min inclusive, closest, claiming) and the "already imported" identity (start + distance + moving time)
         - what Overwrite replaces and why the Strava id is kept, plus the single transaction
         - rejected alternative: the CSV row hash as an identity, rejected because Garmin exports carry no activity id and a re-export may reorder columns
-      - [ ] README index row updated
-      - [ ] English, committed with this task
+      - [x] README index row updated
+      - [x] English, committed with this task
       ## Git Deliverables
       - Commit: `feat(US-008): TASK-07 plan and apply Garmin imports`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3.5
     dependencies:
       - TASK-02
       - TASK-05
+    commit:
+      sha: 31e5d699a3d521b1e023b3b24f15805e7505f750
+      short_sha: 31e5d69
+      subject: 'feat(US-008): TASK-07 plan and apply Garmin imports'
+      committed_at: '2026-10-11T14:59:16+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/31e5d699a3d521b1e023b3b24f15805e7505f750'
   -
     id: TASK-08
     title: 'Owner-only import routes, Form Requests, session-bound review, views, and dashboard entry point'
@@ -663,38 +711,44 @@ tasks:
       12. Smoke-check on Herd (`get-absolute-url`) at 375, 768 and 1280 px in light and dark. Then `vendor/bin/pint --dirty --format agent`, `php artisan larapilot:quality` and `php artisan test --compact`.
 
       ## Completion Criteria
-      - [ ] Owner sees "Import Garmin CSV" on the dashboard; guests do not
-      - [ ] Guest GET to any import route redirects to `/`; guest POST is refused; nothing written
-      - [ ] Upload rejects non-CSV, >5 MB, unknown headers, and missing columns with explicit messages
-      - [ ] Review lists conflicts side by side with Overwrite / Skip per row, the shortcuts, and the new rows; nothing written before confirm
-      - [ ] Confirm applies in one transaction; a stale review writes nothing; cancel clears the pending import
-      - [ ] Summary shows all seven counts, ignored type names, and invalid rows with reasons
-      - [ ] Raw file never persisted; pending rows live only in the owner's session
-      - [ ] FR-009: usable at 375 px, labelled controls, table semantics, light + dark (manual smoke)
-      - [ ] Tests pass
+      - [x] Owner sees "Import Garmin CSV" on the dashboard; guests do not
+      - [x] Guest GET to any import route redirects to `/`; guest POST is refused; nothing written
+      - [x] Upload rejects non-CSV, >5 MB, unknown headers, and missing columns with explicit messages
+      - [x] Review lists conflicts side by side with Overwrite / Skip per row, the shortcuts, and the new rows; nothing written before confirm
+      - [x] Confirm applies in one transaction; a stale review writes nothing; cancel clears the pending import
+      - [x] Summary shows all seven counts, ignored type names, and invalid rows with reasons
+      - [x] Raw file never persisted; pending rows live only in the owner's session
+      - [x] FR-009: usable at 375 px, labelled controls, table semantics, light + dark (manual smoke)
+      - [x] Tests pass
 
       ## Test Data
       - N/A: no model or schema change
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`, HTTP half:
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`, HTTP half:
         - routes and middleware, session binding (`PendingGarminImport`)
         - the fingerprint staleness check, file never stored, Form Requests
         - rejected alternative: a `pending_imports` table, rejected because it would persist owner data beyond the request and need cleanup
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md`: the owner-only "Import Garmin CSV" entry point, and that an import invalidates the grid cache
-      - [ ] README index rows updated (`garmin-csv-import`, `heatmap-dashboard`)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md`: the owner-only "Import Garmin CSV" entry point, and that an import invalidates the grid cache
+      - [x] README index rows updated (`garmin-csv-import`, `heatmap-dashboard`)
+      - [x] English, committed with this task
       ## Git Deliverables
       - Commit: `feat(US-008): TASK-08 add the owner-only Garmin import flow`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
       - TASK-04
       - TASK-07
+    commit:
+      sha: da9989beaf3db10b51c6f15f1cde7d2d8c0d32b2
+      short_sha: da9989b
+      subject: 'feat(US-008): TASK-08 add the owner-only Garmin import flow'
+      committed_at: '2026-10-11T15:04:28+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/da9989beaf3db10b51c6f15f1cde7d2d8c0d32b2'
   -
     id: TASK-09
     title: 'Cover the import flow over HTTP (conflicts, boundary, overwrite/skip, re-import, guests, sync interplay)'
@@ -733,21 +787,27 @@ tasks:
       5. No Playwright, Dusk or browser suites.
 
       ## Completion Criteria
-      - [ ] All cases pass
-      - [ ] Coverage matches the `NORMAL` bar
-      - [ ] No stray HTTP
+      - [x] All cases pass
+      - [x] Coverage matches the `NORMAL` bar
+      - [x] No stray HTTP
       ## Git Deliverables
       - Commit: `test(US-008): TASK-09 cover the Garmin import flow`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3.5
     dependencies:
       - TASK-08
       - TASK-03
       - TASK-06
+    commit:
+      sha: 14d647dffab2f78d9497fad88b4561c09bcc4475
+      short_sha: 14d647d
+      subject: 'test(US-008): TASK-09 cover the Garmin import flow'
+      committed_at: '2026-10-11T15:04:56+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/14d647dffab2f78d9497fad88b4561c09bcc4475'
   -
     id: TASK-10
     title: 'README, CHANGELOG, domain-doc consistency pass, and manual test handoff'
@@ -770,24 +830,30 @@ tasks:
       4. Manual test handoff, appended to the PR notes: on Herd, upload `client-materials/Activities (1).csv` at 375 / 768 / 1280 px in light and dark, use the Overwrite-all / Skip-all shortcuts, confirm, check the dashboard, then run `php artisan strava:sync` and confirm the overwritten runs are unchanged.
 
       ## Completion Criteria
-      - [ ] README and CHANGELOG updated
-      - [ ] Domain docs consistent and current; index updated
-      - [ ] Manual test steps recorded in the PR notes
+      - [x] README and CHANGELOG updated
+      - [x] Domain docs consistent and current; index updated
+      - [x] Manual test steps recorded in the PR notes
 
       ## Test Data
       - N/A
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/*` consistency pass (activity-sync, garmin-csv-import, heatmap-dashboard, README index)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/*` consistency pass (activity-sync, garmin-csv-import, heatmap-dashboard, README index)
+      - [x] English, committed with this task
       ## Git Deliverables
       - Commit: `docs(US-008): TASK-10 document the Garmin CSV import`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `develop` — remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 1
     dependencies:
       - TASK-09
-updated_at: '2026-10-11T12:33:18+00:00'
+    commit:
+      sha: c2cf17354916aff1de1b8c4988bc9a01adff876f
+      short_sha: c2cf173
+      subject: 'docs(US-008): TASK-10 document the Garmin CSV import'
+      committed_at: '2026-10-11T15:05:21+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c2cf17354916aff1de1b8c4988bc9a01adff876f'
+updated_at: '2026-10-11T13:05:21+00:00'
