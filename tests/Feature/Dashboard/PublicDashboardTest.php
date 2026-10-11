@@ -61,13 +61,13 @@ class PublicDashboardTest extends TestCase
         $response->assertViewIs('strava.connect');
     }
 
-    public function test_an_athlete_removed_from_the_allowlist_is_never_displayed(): void
+    public function test_a_removed_athlete_is_displayed_until_an_allowlisted_athlete_connects(): void
     {
         $removedAthlete = User::factory()->stravaConnected()->create();
         $this->runOn($removedAthlete, '2026-09-03', 12_345);
 
         $this->allowlistAthletes();
-        $this->getDashboard()->assertOk()->assertViewIs('strava.connect');
+        $this->getDashboard()->assertOk()->assertViewIs('dashboard')->assertSee('Thursday 3 Sep 2026: 12.3 km');
 
         $displayedAthlete = $this->allowlistedAthlete();
         $this->runOn($displayedAthlete, '2026-09-02', 7_654);

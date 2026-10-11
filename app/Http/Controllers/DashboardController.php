@@ -18,10 +18,11 @@ class DashboardController extends Controller
      * The single screen of this product, public and read-only.
      *
      * The signed-in athlete sees their own map. A signed-out visitor sees the
-     * displayed athlete's — the first connected id of the allowlist — and only
-     * falls back to the connect screen when nobody has connected yet. That
-     * fallback renders rather than redirects: there is no login page, and a
-     * redirect loop is the failure mode this route exists to avoid.
+     * displayed athlete's — the first connected id of the allowlist, else the
+     * lowest-id stored athlete with an activity — and only gets the connect
+     * screen when no stored athlete has any activity. The connect screen
+     * renders rather than redirects: there is no login page, and a redirect
+     * loop is the failure mode this route exists to avoid.
      */
     public function __invoke(
         DailyRunningDistance $dailyDistance,
