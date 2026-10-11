@@ -445,11 +445,11 @@ specs:
       title: 'Activity sync'
     priority: HIGH
     points: 8
-    status: TODO
+    status: 'IN PROGRESS'
     body: |
       #### US-008: Import runs from a Garmin Connect CSV with conflict review
 
-      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** TODO
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** IN PROGRESS
       **Blocked by:** -
       **Type:** Feature
       **Supersedes:** US-003 criterion "Local activities inside the window that are absent from the response are deleted" — now Strava-sourced activities only, and Garmin-overwritten activities are never reverted or re-added
@@ -489,3 +489,7 @@ specs:
       - 🔎 Tom: the exact Garmin type names in both languages (`Corsa su pista` / `Track Running`, `Tapis roulant` / `Treadmill Running`, trail and virtual variants) are confirmed against real exports in planning, not guessed.
       - 🔐 Lars: CSRF on the upload and the confirm; the parsed rows awaiting review are bound to the owner's session, never to an id a request can supply.
       - The developer domain docs for the sync and heatmap domains are updated in this spec.
+    status_history:
+      - { status: PLANNED, at: '2026-10-11T12:33:18+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-11T12:47:21+00:00' }
+    rework: false
