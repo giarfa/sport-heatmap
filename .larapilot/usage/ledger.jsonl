@@ -46,3 +46,4 @@
 {"id":"0bfdb9644324a3bd","ts":"2026-10-12T19:47:27+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"other","tokens":11000,"minutes":1,"skill":"larapilot-settings","spec":null,"note":null,"estimated":true}
 {"id":"7b36c6fd37073629","ts":"2026-10-12T19:47:42+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"other","tokens":10000,"minutes":1,"skill":"larapilot-release","spec":null,"note":null,"estimated":true}
 {"id":"1a703736e06a3720","ts":"2026-10-12T19:51:00+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"other","tokens":16000,"minutes":4,"skill":"larapilot-release","spec":null,"note":"release mode on; 0.1.0 imported, 1.0.0 + 2.0.0 planned","estimated":true}
+{"id":"0115b2788f6601ed","ts":"2026-10-12T19:53:47+00:00","user":"git:giarfa <giarfa@outlook.com>","category":"other","tokens":40000,"minutes":8,"skill":"larapilot-release","spec":null,"note":"release 1.0.0 shipped locally, tag v1.0.0","estimated":true}

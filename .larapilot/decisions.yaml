@@ -441,4 +441,17 @@ decisions:
     source: askquestion
     spec: null
     supersedes: 993cc3e365241349
-updated_at: '2026-10-12T19:51:30+00:00'
+  -
+    id: 431cb548e00d3ceb
+    ts: '2026-10-12T19:53:47+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 1.0.0 ship'
+    label: 'release 1.0.0 ship'
+    value: 'shipped 2026-10-12 via release-ship from release/1.0.0 cut at 4007fbd (US-011 excluded); not pushed'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-10-12T19:53:47+00:00'
