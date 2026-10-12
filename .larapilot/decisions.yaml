@@ -311,4 +311,134 @@ decisions:
     source: askquestion
     spec: US-011
     supersedes: null
-updated_at: '2026-10-12T19:15:04+00:00'
+  -
+    id: 2bf701d5b4e5cc1d
+    ts: '2026-10-12T19:42:16+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'activity metrics display surface'
+    label: 'activity metrics display surface'
+    value: 'Day cell detail (build FR-011 in the same spec)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 0e75c44a46e3f8f0
+    ts: '2026-10-12T19:42:16+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'activity metrics source'
+    label: 'activity metrics source'
+    value: 'Garmin CSV and Strava sync both store avg pace, total ascent, avg HR'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: e68e6805296f2e88
+    ts: '2026-10-12T19:42:16+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'activity metrics moscow'
+    label: 'activity metrics MoSCoW'
+    value: Must
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: c148c677511f0230
+    ts: '2026-10-12T19:43:05+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'average heart rate public visibility'
+    label: 'average heart rate public visibility'
+    value: 'Shown to every visitor; accepted privacy risk (health data on public dashboard)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 5707f23aa83acff5
+    ts: '2026-10-12T19:43:05+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'day cell detail mockup'
+    label: 'day cell detail mockup'
+    value: 'No mockup; plan directly'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 330f1ac3885d9fe8
+    ts: '2026-10-12T19:47:27+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-settings
+    topic: 'release mode'
+    label: 'release mode'
+    value: 'YES'
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 993cc3e365241349
+    ts: '2026-10-12T19:47:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 1.0.0 scope'
+    label: 'release 1.0.0 scope'
+    value: 'v1.0 (1.0.0) = US-001..US-010, status planned'
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 4bdebdf2e0f2956b
+    ts: '2026-10-12T19:48:57+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 2.0.0 scope'
+    label: 'release 2.0.0 scope'
+    value: 'v2.0 (2.0.0) = US-011, status planned'
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 6e4275753050307b
+    ts: '2026-10-12T19:51:00+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 0.1.0 import'
+    label: 'release 0.1.0 import'
+    value: '0.1.0 registered as shipped from tag v0.1.0 (2026-09-07)'
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 570d5332edcdb0b0
+    ts: '2026-10-12T19:51:30+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 1.0.0 scope'
+    label: 'release 1.0.0 scope'
+    value: 'v1.0 (1.0.0) = US-007..US-010; US-001..US-006 belong to shipped 0.1.0'
+    question: null
+    rationale: 'v0.1.0 tag already contains US-001..US-006'
+    source: askquestion
+    spec: null
+    supersedes: 993cc3e365241349
+updated_at: '2026-10-12T19:51:30+00:00'

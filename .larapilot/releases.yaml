@@ -1,0 +1,37 @@
+releases:
+  -
+    version: 0.1.0
+    title: 'Release 0.1.0'
+    status: shipped
+    branch: release/0.1.0
+    specs:
+      - US-001
+      - US-002
+      - US-003
+      - US-004
+      - US-005
+      - US-006
+    created_at: '2026-10-12T19:50:56+00:00'
+    shipped_at: '2026-09-07T09:10:37+02:00'
+  -
+    version: 1.0.0
+    title: v1.0
+    status: planned
+    branch: release/1.0.0
+    specs:
+      - US-007
+      - US-008
+      - US-009
+      - US-010
+    created_at: '2026-10-12T19:47:39+00:00'
+    shipped_at: null
+  -
+    version: 2.0.0
+    title: v2.0
+    status: planned
+    branch: release/2.0.0
+    specs:
+      - US-011
+    created_at: '2026-10-12T19:48:57+00:00'
+    shipped_at: null
+updated_at: '2026-10-12T19:51:27+00:00'
