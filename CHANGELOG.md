@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-12
+
+A public, read-only dashboard and a Garmin Connect CSV import alongside the Strava sync. Covers
+US-007 through US-010 (EP-002 Activity sync, EP-003 Heatmap, EP-004 Maintenance).
+
 ### Added
 
 - An owner-only **Garmin Connect CSV import**: upload the Activities export (Italian or English
