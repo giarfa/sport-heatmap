@@ -65,21 +65,30 @@ whenever an athlete can be displayed (allowlisted and connected, else the
 stored-athlete fallback) and as the connect screen otherwise.
 
 **Guest UI.** Signed-out visitors get everything the owner sees, plus one
-line under the map: "Owner? Connect with Strava", a text link to
-`strava.redirect` (`@guest` only; 44 px tap target; `--accent` ink, global
-`focus-visible` ring). It is not a header button: the 375 px header has no room
+line under the map: "Owner? Connect with Strava · Import Garmin CSV" — text
+links to `strava.redirect` and `garmin.import.create` (44 px tap targets;
+`--accent` ink, global `focus-visible` ring; the `·` separator is
+`aria-hidden`). It is not a header button: the 375 px header has no room
 for a second control, the line must stay discreet on a page whose job is the
 map, and Strava orange stays reserved for the connect screen. SEO contract:
 `<meta name="robots" content="noindex, nofollow">` only — the page is publicly
 reachable but not promoted (decision `4918d74ff18e8b0f`); the meta description
 no longer calls it private.
 
-**Owner UI.** A signed-in owner gets the mirror of the guest line instead:
-"Runs missing from Strava? Import Garmin CSV", a text link to
-`garmin.import.create` (`@auth` only, same 44 px target and `--accent` ink).
-Guests never see it, and the import routes refuse them regardless (see
-`garmin-csv-import.md`). A confirmed import forgets the owner's cached grid
-for today (`HeatmapGridCache::forget()`), so the map shows the imported runs on
+**Owner UI.** A signed-in owner gets the same line without the Strava link:
+"Runs missing from Strava? Import Garmin CSV" (same 44 px target and
+`--accent` ink). Every visitor can import since US-011 (see
+`garmin-csv-import.md`).
+
+**Connect screen.** When no athlete can be displayed, `strava/connect.blade.php`
+says "Connect Strava or import a Garmin Connect CSV to build your 16-week
+heatmap." and offers, under the Strava-orange button, a full-width secondary
+"Import Garmin CSV" control (`btn btn--secondary`, 44 px, the neutral outline
+of the import screens). Strava orange stays on the Strava button only. A
+guest's first confirmed import creates the CSV-only athlete, and the next
+visit to `/` shows that athlete's map instead of this screen.
+
+A confirmed import forgets the written athlete's cached grid for today (`HeatmapGridCache::forget()`), so the map shows the imported runs on
 the next request, and "Import cancelled. Nothing was written." arrives through
 `<x-session-notices />`. Garmin-imported runs are ordinary rows to the grid:
 `DailyRunningDistance` sums every source alike.
@@ -144,7 +153,8 @@ three small indexed queries for the sync status.
 | Public read-only home page for guests (FR-017) | Keep it sign-in only | The owner checks it on any device and shares the link; the owner accepted the Strava API Agreement risk (decisions `f71daaa7e976c188`, `88f04507cbc7e573`) |
 | Guests and owner share the per-athlete grid cache | A separate guest cache | Same data, same key; a separate cache would double the rebuilds and could disagree with the owner's view |
 | Guests see the same sync warning, reason included | A reduced guest warning | Decision `f75e292def892fad`; the reason is already non-secret and HTML-escaped |
-| Owner's "Import Garmin CSV" as a text line under the map | A header button; a menu | The same reasoning as the guest line: discreet, no header budget at 375 px, one screen with no nav |
+| "Import Garmin CSV" for every visitor as a text line under the map (US-011) | A header button; a menu; owner-only | The same reasoning as the guest line: discreet, no header budget at 375 px, one screen with no nav. Open to guests by the owner's choice so the map works with CSV imports only |
+| Connect screen: Garmin import as a secondary outline button below the Strava one | A second orange button; a text link | Strava's brand guidelines put orange on the connect button only; a full-width 44 px control reads as an equal way in on a phone |
 | Guest sign-in as a footer text link | Header button; Strava-orange button on the map | Discreet, fits the 375 px header budget, keeps orange reserved for the connect screen |
 | Shared `session-notices` component | Duplicate the notices in both views | One copy of the cancellation and expiry copy; the caller only decides the width |
 | Two-letter weekday `<abbr>` | Single letters from the PRD prose | Matches the mockup (decision log) |
@@ -156,7 +166,8 @@ three small indexed queries for the sync status.
   excluding `CsvOnly`. Its "Imported …" stamp means "data last changed by an
   import": a re-import that changes nothing does not move it.
 
-- **Invariant — a guest request is strictly read-only.** _Breaks if:_ anything on
+- **Invariant — a guest view of `/` is strictly read-only.** Only a confirmed
+  Garmin import writes (US-011), never the page itself. _Breaks if:_ anything on
   the guest path calls `EnsureFreshAccessToken`, `StravaClient`, or loads a token
   column — a guest could then trigger a refresh, an HTTP call, or a write.
 - **Invariant — a connected allowlisted athlete beats the fallback.** The

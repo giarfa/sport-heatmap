@@ -180,7 +180,7 @@ class PublicDashboardTest extends TestCase
         $response->assertSee('href="'.route('strava.redirect').'" class="sync-alert-action"', escape: false);
     }
 
-    public function test_the_fallback_page_keeps_noindex_the_attribution_and_no_garmin_entry_point(): void
+    public function test_the_fallback_page_keeps_noindex_the_attribution_and_offers_the_garmin_import(): void
     {
         $fallbackAthlete = User::factory()->stravaConnected()->create();
         $this->runOn($fallbackAthlete, '2026-09-03', 12_345);
@@ -191,7 +191,7 @@ class PublicDashboardTest extends TestCase
         $response->assertViewIs('dashboard');
         $response->assertSee('<meta name="robots" content="noindex, nofollow">', escape: false);
         $response->assertSee('Powered by Strava');
-        $response->assertDontSee('Import Garmin CSV');
+        $response->assertSee('Import Garmin CSV');
     }
 
     public function test_a_signed_in_athlete_removed_from_the_allowlist_still_gets_403_while_the_fallback_would_display_them(): void
@@ -208,8 +208,7 @@ class PublicDashboardTest extends TestCase
 
         $this->getDashboard()
             ->assertOk()
-            ->assertViewIs('dashboard')
-            ->assertDontSee('Import Garmin CSV');
+            ->assertViewIs('dashboard');
         Http::assertNothingSent();
     }
 
@@ -314,11 +313,13 @@ class PublicDashboardTest extends TestCase
         $response->assertSee('Powered by Strava');
     }
 
-    public function test_the_owner_sees_the_import_garmin_csv_entry_point_and_guests_do_not(): void
+    public function test_a_guest_and_the_owner_both_see_the_import_garmin_csv_entry_point(): void
     {
         $owner = $this->allowlistedAthlete();
 
-        $this->getDashboard()->assertDontSee('Import Garmin CSV');
+        $this->getDashboard()
+            ->assertSee('Import Garmin CSV')
+            ->assertSee('href="'.route('garmin.import.create').'"', escape: false);
 
         $this->actingAs($owner)
             ->get('/')
