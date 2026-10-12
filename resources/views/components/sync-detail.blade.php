@@ -2,10 +2,10 @@
 
 {{-- Markup only: every value comes from SyncStatus — no date arithmetic here. --}}
 <div class="sync-detail">
-    <h3 class="text-xs font-semibold">Sync</h3>
+    <h3 class="text-xs font-semibold">{{ $status->detailHeading() }}</h3>
     <dl>
         <div class="sync-detail-row">
-            <dt>Last run</dt>
+            <dt>{{ $status->lastRunHeading() }}</dt>
             <dd class="sync-detail-value">
                 {{ $status->lastRunLabel() }}
                 @if ($status->lastRunRelative() !== null)

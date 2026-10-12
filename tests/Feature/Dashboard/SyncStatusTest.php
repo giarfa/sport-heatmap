@@ -4,6 +4,7 @@ namespace Tests\Feature\Dashboard;
 
 use App\Models\Activity;
 use App\Models\SyncRun;
+use App\Models\User;
 use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -170,5 +171,29 @@ class SyncStatusTest extends TestCase
     private function getDashboard(): TestResponse
     {
         return $this->get('/');
+    }
+
+    public function test_a_displayed_csv_only_athlete_renders_the_map_and_the_import_status_with_no_alert(): void
+    {
+        $athlete = User::factory()->csvOnly()->create();
+        Activity::factory()->garminImported()->for($athlete)->create([
+            'activity_date' => now()->subDay()->toDateString(),
+            'distance_meters' => 12_345,
+            'updated_at' => now()->subHours(3),
+        ]);
+        SyncRun::factory()->failed()->create();
+        $this->allowlistAthletes();
+        $counts = [User::count(), Activity::count(), SyncRun::count()];
+
+        $response = $this->getDashboard();
+
+        $response->assertOk()->assertViewIs('dashboard');
+        $response->assertSee('12.3 km');
+        $response->assertSee('Imported 3 hours ago');
+        $response->assertSee('Last import');
+        $response->assertSee('Garmin CSV');
+        $response->assertDontSee('role="alert"', escape: false);
+        $this->assertSame($counts, [User::count(), Activity::count(), SyncRun::count()]);
+        Http::assertNothingSent();
     }
 }

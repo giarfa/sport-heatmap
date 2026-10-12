@@ -16,8 +16,8 @@
         <h1 class="mt-3 text-base font-semibold">See your training at a glance</h1>
 
         <p class="mt-1.5 text-sm" style="color: var(--ink-muted);">
-            Connect Strava to build your 16-week heatmap. Read-only access to your activities —
-            nothing is ever posted on your behalf.
+            Connect Strava or import a Garmin Connect CSV to build your 16-week heatmap.
+            Read-only access to your activities — nothing is ever posted on your behalf.
         </p>
 
         {{--
@@ -28,6 +28,12 @@
         <a href="{{ route('strava.redirect') }}"
            class="mt-4 inline-flex h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white"
            style="background: #fc4c02;">Connect with Strava</a>
+
+        {{--
+            The CSV way in is the secondary control: the neutral outline button of
+            the import screens, so Strava orange stays on the Strava button only.
+        --}}
+        <a href="{{ route('garmin.import.create') }}" class="btn btn--secondary mt-3 w-full">Import Garmin CSV</a>
 
         <p class="mt-3 text-xs" style="color: var(--ink-muted);">
             Requests the <code>activity:read_all</code> scope.

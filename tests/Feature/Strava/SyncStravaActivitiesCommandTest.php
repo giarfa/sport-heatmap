@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -253,5 +254,35 @@ class SyncStravaActivitiesCommandTest extends TestCase
             'moving_time' => 2_400,
             'start_date_local' => now()->format('Y-m-d\TH:i:s\Z'),
         ], $overrides);
+    }
+
+    public function test_a_csv_only_athlete_is_skipped_without_a_sync_run_or_a_log_line(): void
+    {
+        $athlete = User::factory()->csvOnly()->create();
+        Activity::factory()->garminImported()->for($athlete)->create();
+        $log = Log::spy();
+
+        $this->artisan('strava:sync')->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame(0, SyncRun::count());
+        $this->assertSame(1, $athlete->activities()->count());
+        $log->shouldNotHaveReceived('warning');
+        $log->shouldNotHaveReceived('error');
+        Http::assertNothingSent();
+    }
+
+    public function test_only_the_connected_athlete_is_fetched_beside_a_csv_only_one(): void
+    {
+        $connected = $this->allowlistedAthlete();
+        $csvOnly = User::factory()->csvOnly()->create();
+        $csvRun = Activity::factory()->garminImported()->for($csvOnly)->create(['activity_date' => now()->subDay()->toDateString()]);
+        Http::fake(['www.strava.com/api/v3/athlete/activities*' => Http::response([$this->stravaActivityPayload()])]);
+
+        $this->artisan('strava:sync')->assertExitCode(Command::SUCCESS);
+
+        Http::assertSentCount(1);
+        $this->assertSame(1, $connected->activities()->count());
+        $this->assertSame([$csvRun->id], $csvOnly->activities()->pluck('id')->all());
+        $this->assertSame(SyncRunStatus::Succeeded, SyncRun::sole()->status);
     }
 }

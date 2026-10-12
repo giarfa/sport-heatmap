@@ -44,6 +44,7 @@ intensity-ramp colours appear on these screens: the ramp is data, and these scre
   `aria-invalid="true"` and the message joins `aria-describedby` (`hint error`). The message sits directly under the input.
 - **Review:** each table is a real `<table>` with an `sr-only` `<caption>`, `<th scope="col">` headers and a
   `<th scope="row">` run name (date + title), so every cell is announced with its row and column.
+- **Review, guest variant:** the Stored cell shows only the start and "Clashes with a stored run" (same `.side` / `.side-source` classes); no name, distance, moving time or Strava link.
 - **Overwrite / Skip:** one `<fieldset>` per clash, `<legend>` names the run ("Paese Corsa, 10 Oct 09:33"). The
   radios are visually hidden but **not** `display:none`, so they keep keyboard focus and arrow-key movement; the
   `<label>` is the 44 × 44 px target. Focus is drawn on the label (`input:focus-visible + label`). **Skip is pre-checked** —

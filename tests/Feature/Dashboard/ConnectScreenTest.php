@@ -32,7 +32,7 @@ class ConnectScreenTest extends TestCase
         $response->assertSee(route('strava.redirect'), escape: false);
     }
 
-    public function test_a_guest_on_the_public_map_gets_a_discreet_connect_link(): void
+    public function test_a_guest_on_the_public_map_gets_a_discreet_connect_link_beside_the_garmin_import(): void
     {
         $this->allowlistedAthlete();
 
@@ -42,6 +42,28 @@ class ConnectScreenTest extends TestCase
         $response->assertSee('Owner?');
         $response->assertSee('Connect with Strava');
         $response->assertSee('href="'.route('strava.redirect').'"', escape: false);
+        $response->assertSee('Import Garmin CSV');
+        $response->assertSee('href="'.route('garmin.import.create').'"', escape: false);
+    }
+
+    public function test_the_connect_screen_also_offers_the_garmin_import(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertViewIs('strava.connect');
+        $response->assertSee('Connect with Strava');
+        $response->assertSee('Connect Strava or import a Garmin Connect CSV to build your 16-week heatmap.');
+        $response->assertSee('<a href="'.route('garmin.import.create').'" class="btn btn--secondary mt-3 w-full">Import Garmin CSV</a>', escape: false);
+    }
+
+    public function test_the_import_form_keeps_noindex_and_the_strava_attribution_for_a_guest(): void
+    {
+        $response = $this->get(route('garmin.import.create'));
+
+        $response->assertOk();
+        $response->assertSee('<meta name="robots" content="noindex, nofollow">', escape: false);
+        $response->assertSee('Powered by Strava');
     }
 
     public function test_the_signed_in_owner_does_not_get_the_guest_connect_link(): void

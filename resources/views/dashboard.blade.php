@@ -28,7 +28,7 @@
                 <h2 id="grid-heading" class="sr-only">Daily running distance, 16 weeks by weekday</h2>
                 @if ($status->runsInWindow === 0)
                     <p class="mb-3 text-sm" style="color: var(--ink-muted);">
-                        No runs found in the last 16 weeks. The map fills in after your next activity syncs.
+                        {{ $status->emptyWindowNote() }}
                     </p>
                 @endif
                 <x-heatmap-grid :grid="$grid" />
@@ -45,32 +45,25 @@
     </div>
 
     {{--
-        The guest's way in is a text line under the map, not a header button:
-        it has to stay discreet on a page whose job is to show the map, the
-        375 px header has no width left for a second control, and Strava orange
-        is reserved for the connect screen's button. Signed-in owners never see
-        it — they are already connected.
+        The ways in are one text line under the map, not header buttons: it has
+        to stay discreet on a page whose job is to show the map, the 375 px
+        header has no width left for a second control, and Strava orange is
+        reserved for the connect screen's button. Every visitor can import a
+        Garmin CSV (US-011); a guest also gets the Strava sign-in, a signed-in
+        owner — already connected — does not.
     --}}
-    @guest
-        <p class="mt-6 text-xs" style="color: var(--ink-muted);">
+    <p class="mt-6 text-xs" style="color: var(--ink-muted);">
+        @guest
             Owner?
             <a href="{{ route('strava.redirect') }}"
                class="inline-flex min-h-11 items-center underline underline-offset-2"
                style="color: var(--accent);">Connect with Strava</a>
-        </p>
-    @endguest
-
-    {{--
-        The owner's counterpart of the guest line above: same discreet text
-        line under the map, same 44 px target. Guests never see it, and the
-        import routes refuse them regardless.
-    --}}
-    @auth
-        <p class="mt-6 text-xs" style="color: var(--ink-muted);">
+            <span aria-hidden="true">·</span>
+        @else
             Runs missing from Strava?
-            <a href="{{ route('garmin.import.create') }}"
-               class="inline-flex min-h-11 items-center underline underline-offset-2"
-               style="color: var(--accent);">Import Garmin CSV</a>
-        </p>
-    @endauth
+        @endguest
+        <a href="{{ route('garmin.import.create') }}"
+           class="inline-flex min-h-11 items-center underline underline-offset-2"
+           style="color: var(--accent);">Import Garmin CSV</a>
+    </p>
 @endsection

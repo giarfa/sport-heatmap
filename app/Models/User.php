@@ -60,6 +60,15 @@ class User extends Authenticatable
     }
 
     /**
+     * Whether this athlete exists only to own Garmin CSV imports: no Strava
+     * identity, so no token, no sync, and no sign-in.
+     */
+    public function isCsvOnly(): bool
+    {
+        return $this->strava_athlete_id === null;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

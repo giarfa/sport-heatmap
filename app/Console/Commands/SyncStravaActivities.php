@@ -109,7 +109,9 @@ class SyncStravaActivities extends Command
      * Athletes eligible to sync: connected (Strava identity and tokens present)
      * and still on the allowlist. An athlete removed from the allowlist must
      * stop being synced, the same rule EnsureFreshStravaToken enforces on the
-     * web.
+     * web. The CSV-only athlete a guest's Garmin import creates (US-011) has
+     * no Strava id and is never selected, so nothing is fetched or logged for
+     * it — skipping it is not a failure.
      *
      * @return Collection<int, User>
      */

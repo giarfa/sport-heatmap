@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-003` |
-| **Last updated by** | `US-008` — 2026-10-11 |
+| **Last updated by** | `US-011` — 2026-10-12 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
@@ -21,7 +21,10 @@ working, the map freezes at the last good sync and the dashboard warns about it.
 1. The scheduler runs `strava:sync` daily at `strava.sync_hour`:00 in
    `strava.sync_timezone` (defaults 3 and `Europe/Rome`), `withoutOverlapping()`.
 2. The command selects **connected, allowlisted** athletes: Strava id and both
-   tokens present, and `AthleteAllowlist::allows()` true.
+   tokens present, and `AthleteAllowlist::allows()` true. The **CSV-only
+   athlete** a guest's Garmin import creates (US-011, no Strava id, no tokens)
+   is never selected: nothing is fetched, nothing is logged, and its runs are
+   never reconciled or deleted. With only that athlete stored, step 3 applies.
 3. No eligible athlete → prints an info line and exits successfully **without**
    writing a `sync_runs` row.
 4. Otherwise it creates a `sync_runs` row with status `running`, then for each
@@ -138,6 +141,10 @@ so `down()` deletes them first.
   leave the last good grid in place.
 - **Invariant — an athlete removed from the allowlist stops being synced**, the
   same rule the web guard enforces.
+- **Invariant — skipping a CSV-only athlete is not a failure.** No warning or
+  error is logged and no `sync_runs` row is written for it. _Breaks if:_ the
+  selection stops requiring a Strava id — the sync would try to fetch with no
+  token and fail the whole run.
 - **Invariant — `withoutOverlapping()` stays on the schedule.** Two concurrent
   reconciles of one window race on the delete pass.
 
@@ -156,7 +163,7 @@ so `down()` deletes them first.
 
 ## Related
 
-- Specs: `US-003`, `US-006`, `US-008`
+- Specs: `US-003`, `US-006`, `US-008`, `US-011`
 - Plans: `.larapilot/plans/US-003-plan.yaml`, `.larapilot/plans/US-008-plan.yaml`
 - Review: `.larapilot/docs/review/US-003.md`
 - Other domains: `strava-connection.md`, `heatmap-dashboard.md`, `garmin-csv-import.md`

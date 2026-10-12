@@ -14,7 +14,7 @@ use Illuminate\Http\UploadedFile;
 class UploadGarminCsvController extends Controller
 {
     /**
-     * Parse the upload and park the result in the owner's session for review.
+     * Parse the upload and park the result in the visitor's session for review.
      * Nothing reaches the database here.
      */
     public function __invoke(

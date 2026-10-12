@@ -34,10 +34,10 @@ Keep the table below current — it is the entry point for a new developer.
 
 | Domain | What it covers | Last touched by |
 | --- | --- | --- |
-| [activity-sync](activity-sync.md) | Nightly `strava:sync`: fetch the 112-day window, reconcile `activities`, record `sync_runs`; activity sources | `US-008` |
-| [garmin-csv-import](garmin-csv-import.md) | Owner-only Garmin Connect CSV upload: parsing, conflict review, Overwrite / Skip | `US-008` |
-| [heatmap-dashboard](heatmap-dashboard.md) | The public `/` screen: 16-week grid, intensity scale, grid cache, fresh sync status, owner's Garmin import link | `US-010` |
-| [strava-connection](strava-connection.md) | OAuth connect, athlete allowlist, encrypted tokens, refresh, the `strava.fresh` guard, the publicly displayed athlete and its stored-athlete fallback | `US-009` |
+| [activity-sync](activity-sync.md) | Nightly `strava:sync`: fetch the 112-day window, reconcile `activities`, record `sync_runs`; activity sources; CSV-only athletes skipped | `US-011` |
+| [garmin-csv-import](garmin-csv-import.md) | Garmin Connect CSV upload: parsing, import target, CSV-only athlete, conflict review, Overwrite / Skip | `US-011` |
+| [heatmap-dashboard](heatmap-dashboard.md) | The public `/` screen: 16-week grid, intensity scale, grid cache, fresh sync status (CSV-only import status), Garmin import entry points for every visitor | `US-011` |
+| [strava-connection](strava-connection.md) | OAuth connect, athlete allowlist, encrypted tokens, refresh, the `strava.fresh` guard, the publicly displayed athlete (also the guest import target) and its stored-athlete fallback | `US-011` |
 
 ## Who writes them
 

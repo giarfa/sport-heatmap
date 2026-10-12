@@ -8,7 +8,7 @@ use Illuminate\View\View;
 class ShowGarminImportFormController extends Controller
 {
     /**
-     * The upload form. Owner-only: the route sits behind auth and strava.fresh.
+     * The upload form, open to every visitor (US-011).
      */
     public function __invoke(): View
     {
