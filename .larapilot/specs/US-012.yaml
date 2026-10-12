@@ -1,0 +1,54 @@
+code: US-012
+title: 'Average pace, total ascent and average heart rate per run, shown in the day cell detail'
+epic:
+  code: EP-003
+  title: 'Heatmap dashboard'
+priority: HIGH
+points: 8
+status: TODO
+body: |
+  #### US-012: Average pace, total ascent and average heart rate per run, shown in the day cell detail
+
+  **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** TODO
+  **Blocked by:** -
+  **Type:** Feature
+  **Traces to:** FR-011 (MoSCoW: Must — raised from Should) · FR-018 (extended) · FR-003 (extended) · FR-008 · FR-009 · FR-017 — no journey (the PRD has no `## User Journeys`)
+  **Prior art:** built-in — the existing Garmin CSV parser gains three optional columns; Strava's activity summary already returns `average_speed`, `total_elevation_gain`, `average_heartrate` under the current `activity:read_all` scope; no package
+
+  **User Story**
+  As the Committed Amateur Runner,
+  I want each run's average pace, total ascent, and average heart rate imported from my Garmin CSV and synced from Strava, and shown when I open a day on the heatmap,
+  so that I can see how each run went, not only how far it was.
+
+  **Demonstrates**
+  Importing a Garmin export whose `Passo medio`, `Ascesa totale`, and `FC Media` columns hold values, then tapping one of those days on the
+  dashboard, opens a detail listing each run with distance, moving time, `5:23 /km`-style pace, ascent in metres, and heart rate in bpm;
+  a Strava run on another day shows the same metrics after the nightly sync and links to Strava, while the sample export's `--` values read `—`.
+
+  **Acceptance Criteria**
+
+  _Import and sync_
+  - [ ] A Garmin export with `Passo medio` / `Ascesa totale` / `FC Media` (Italian) or `Avg Pace` / `Total Ascent` / `Avg HR` (English) stores them per run: pace as seconds per km (`"5:23"` → 323), ascent as whole metres (thousands separators handled), heart rate as whole bpm
+  - [ ] The three columns are optional: a file without them, or with `--` in them (every row of `client-materials/Activities (1).csv`), still imports and the metrics stay empty — never `0`
+  - [ ] An unreadable metric value (e.g. pace `"abc"`) leaves only that metric empty; the row still imports and is not counted as invalid
+  - [ ] The nightly Strava sync stores the same metrics for Strava runs: pace from `average_speed` (rounded to whole s/km; empty when the speed is 0 or absent), ascent from `total_elevation_gain` (rounded), heart rate from `average_heartrate` when present; Strava runs already stored gain them on the next sync
+  - [ ] **Overwrite** replaces the three metrics with the CSV's; a `--` metric in the CSV keeps the stored value; the nightly sync never reverts a Garmin-won run's metrics (FR-002)
+  - [ ] A CSV row matching an already-imported Garmin run (counted "already imported") fills only that run's empty metrics from the CSV and changes nothing already set; re-importing the same file still changes nothing
+  - [ ] The conflict review page shows pace, ascent, and heart rate side by side for the stored run and the CSV row
+
+  _Day cell detail (FR-011)_
+  - [ ] Tapping, clicking, or pressing Enter/Space on a day with runs opens its detail: for each run, the name, distance (km, one decimal), moving time, pace (`5:23 /km`), ascent (`45 m`), and heart rate (`152 bpm`); a missing metric reads `—`
+  - [ ] A Strava-sourced run links to its Strava activity; a Garmin-imported run has no link (FR-008)
+  - [ ] Days with no run and future days open no detail
+  - [ ] A signed-out visitor sees the same detail, heart rate included (accepted privacy risk, PRD Privacy & legal); opening it writes no row and calls no Strava endpoint (FR-017)
+  - [ ] FR-009: usable at 375 px without horizontal page scrolling; keyboard-operable (Esc closes and returns focus to the cell); every value labelled with its unit; light and dark themes meet WCAG 2.2 AA; no imperial unit anywhere
+  - [ ] After a sync or a confirmed import the detail agrees with the grid (same cache invalidation as the grid)
+
+  _Tests_
+  - [ ] Feature tests (Strava HTTP faked): new Italian and English fixtures with metric values; the sample's `--` rows import empty metrics; an unreadable metric; Strava runs with and without heart rate and with zero speed; Overwrite keeping a stored value on `--`; backfill of an already-imported run; the day detail for a Strava run (link) and a Garmin run (no link); a signed-out view writes nothing
+
+  **Notes for planning**
+  - 🗄️ Mike: one reversible migration adds nullable integers `average_pace_seconds_per_km`, `total_ascent_meters`, `average_heart_rate` to `activities`.
+  - 🔎 Tom: confirm the exact English Garmin header texts (`Avg Pace`, `Total Ascent`, `Avg HR`) against a real English export in planning, not guessed; a pace may arrive as `m:ss` or `h:mm:ss`.
+  - ✨ Joe: the app has no Alpine or Livewire — the detail is server-rendered with the cached grid and opened with native elements or a small vanilla script; no new JS dependency.
+  - The developer domain docs for the sync, Garmin import, and heatmap domains are updated in this spec.
