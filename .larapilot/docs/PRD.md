@@ -25,7 +25,7 @@ The product deliberately stays personal and small: one athlete, one screen, no s
 
 ### FR-001: Strava OAuth connection and sign-in
 
-Signing in is how the owner connects Strava, not how the dashboard is viewed: the dashboard itself is public and read-only (FR-017). A single "Connect with Strava" action starts the official Strava OAuth2 authorization-code flow requesting the read-only `activity:read_all` scope; on callback the application stores the athlete id, access token, refresh token, and token expiry, then establishes the local session. The stored tokens are what the daily sync (FR-002) runs on, with or without a session.
+Signing in is how the owner connects Strava, not how the dashboard is viewed: the dashboard itself is public (FR-017), and runs can reach it from a Garmin CSV import with no Strava sign-in at all (FR-018). A single "Connect with Strava" action starts the official Strava OAuth2 authorization-code flow requesting the read-only `activity:read_all` scope; on callback the application stores the athlete id, access token, refresh token, and token expiry, then establishes the local session. The stored tokens are what the daily sync (FR-002) runs on, with or without a session.
 
 Access is restricted to an allowlist of Strava athlete ids configured in the environment: any other athlete completing the flow is rejected with an explicit message and no session, no stored tokens, and no persisted athlete record. The access token is refreshed transparently via the refresh token whenever it is expired or within a safety margin of expiring.
 
@@ -145,32 +145,36 @@ Displaying non-running sports (rides, swims, strength) on the same map, and supp
 
 **MoSCoW:** Must · **Persona:** The Committed Amateur Runner
 **Actor & trigger:** anyone opening the home page, signed in or not — typically the runner on a device with no session, or someone the runner shared the link with
-**Behavior:** the home page renders the displayed athlete's last synced heatmap, weekly totals, legend, and sync status without a Strava sign-in. The displayed athlete is the first id in the allowlist, in configured order, that has a connected user record; when no allowlisted athlete has connected, it is the first stored athlete (lowest id) with at least one activity of either source, whatever the allowlist says. A signed-out visit is strictly read-only.
+**Behavior:** the home page renders the displayed athlete's last synced heatmap, weekly totals, legend, and sync status without a Strava sign-in. The displayed athlete is the first id in the allowlist, in configured order, that has a connected user record; when no allowlisted athlete has connected, it is the first stored athlete (lowest id) with at least one activity of either source, whatever the allowlist says. Viewing is read-only; the one write a signed-out visitor can make is the Garmin CSV import (FR-018), offered on the dashboard and on the connect screen.
 **Done means:**
 - a signed-out visit to the home page returns the same grid, legend, and sync status the signed-in owner sees
 - a connected allowlisted athlete is always displayed ahead of any other stored athlete
 - when no allowlisted athlete has connected, the first stored athlete with at least one activity is displayed — including one removed from the allowlist
-- when no stored athlete has any activity, the home page shows the connect screen instead of an error
-- a signed-out visit writes no row and makes no call to Strava, and never triggers a token refresh
+- when no stored athlete has any activity, the home page shows the connect screen instead of an error, and the connect screen offers the Garmin CSV import
+- every visitor, signed in or not, sees the "Import Garmin CSV" entry point on the dashboard
+- viewing the home page signed out writes no row and makes no call to Strava, and never triggers a token refresh; only a confirmed Garmin import writes
+- an athlete with no Strava connection (CSV-only) shows no stale or failed sync warning; the status reflects the latest import
 - the page keeps `noindex, nofollow` and the "Powered by Strava" attribution
-**Out of this FR:** SEO and any marketing surface; per-visitor maps (FR-016); any write action for signed-out visitors
+**Out of this FR:** SEO and any marketing surface; per-visitor maps (FR-016); any signed-out write other than the Garmin CSV import (FR-018)
 **Depends on:** FR-001 (connected athlete and stored tokens), FR-002 (data), FR-007 (sync status)
 **Source:** interview — larapilot-feature, 2026-10-11
 
 ### FR-018: Garmin Connect CSV import
 
 **MoSCoW:** Must · **Persona:** The Committed Amateur Runner
-**Actor & trigger:** the signed-in owner, uploading an "Activities" CSV exported from the Garmin Connect website
-**Behavior:** parses Italian or English Garmin Connect exports, keeps only running types inside the 112-day window (FR-003), and stores them as Garmin-sourced activities. A CSV row whose start falls on the same date within ±2 minutes of a stored activity of either source is a conflict: before anything is written, the owner reviews every conflict side by side and chooses Overwrite or Skip per row, with apply-to-all shortcuts. An overwritten activity is Garmin's permanently (FR-002).
+**Actor & trigger:** any visitor, signed in or not, uploading an "Activities" CSV exported from the Garmin Connect website — typically the runner using the dashboard with CSV imports only
+**Behavior:** parses Italian or English Garmin Connect exports, keeps only running types inside the 112-day window (FR-003), and stores them as Garmin-sourced activities. A signed-in owner imports into their own athlete; a signed-out visitor imports into the displayed athlete (FR-017), and when none is displayed the first confirmed import creates a local CSV-only athlete with no Strava connection. A signed-out import never calls Strava. A CSV row whose start falls on the same date within ±2 minutes of a stored activity of either source is a conflict: before anything is written, the importer reviews every conflict side by side and chooses Overwrite or Skip per row, with apply-to-all shortcuts. An overwritten activity is Garmin's permanently (FR-002).
 **Done means:**
 - the sample export (`client-materials/Activities (1).csv`) imports its `Corsa` rows as runs and ignores its `Escursionismo` rows
 - an unrecognised header set, a missing required column, or a non-CSV file is rejected with an explicit message and nothing written
-- no conflicting row is written until the owner confirms the review; abandoning it writes nothing
+- no conflicting row is written until the importer confirms the review; abandoning it writes nothing
+- a signed-out visitor completes the whole import without a Strava sign-in; the pending upload is bound to that visitor's session and never visible to another
+- with no athlete stored, the first confirmed import creates a CSV-only athlete that the home page then displays, and the nightly sync skips it without an error
 - Skip leaves the stored activity untouched; Overwrite replaces it with the CSV values, and the next sync neither reverts nor duplicates it
 - re-importing the same file changes nothing
 - a summary reports imported, overwritten, skipped, already-imported, ignored, outside-window, and invalid counts
 **Out of this FR:** Garmin Connect API or automatic sync; FIT/GPX/TCX files; exports in languages other than Italian and English; history beyond the 112-day window
-**Depends on:** FR-001 (signed-in owner), FR-002 (source-aware reconciliation), FR-003 (run-only filter)
+**Depends on:** FR-002 (source-aware reconciliation), FR-003 (run-only filter), FR-017 (displayed athlete)
 **Source:** interview — larapilot-feature, 2026-10-11 · client-materials/Activities (1).csv
 
 ## MVP Scope
@@ -285,6 +289,7 @@ Single-athlete instance holding the owner's own data, displayed publicly and rea
 - Rate limiting on the OAuth callback route and on the manual re-sync trigger (FR-010).
 - Read-only Strava scope; no write capability is ever requested.
 - `SECURITY.md` and a `security.txt` are deferred while the instance is private; both become required before any public deployment.
+- **Accepted risk — open Garmin import (FR-018):** the CSV import is open to any visitor, with no sign-in and no passphrase, by the owner's choice on 2026-10-12. Anyone who reaches the site can import runs and overwrite stored ones. Kept: CSRF, the 5 MB limit, throttling on upload and confirm, and pending rows bound to the visitor's session. Acceptable only while the instance is private; it must be re-decided before any public deployment.
 - **Oliver:** no red-team pass at inception — deferred to `larapilot-ship`, and only if the instance is ever exposed publicly.
 
 ### Documentation _(Albert)_
@@ -322,3 +327,4 @@ Not a constraint at this scale: one athlete, ~100 rows in the window, one page, 
 | 2026-10-11 | larapilot-feature US-007 | Change request FR-001: sign-in no longer gates viewing (before: "Signing in to the dashboard *is* authorising Strava"). Added FR-017 Public read-only dashboard (MoSCoW: Must); Out of Scope, SEO, Auth, and Privacy & legal updated; Strava API Agreement risk accepted |
 | 2026-10-11 | larapilot-feature US-008 | Added FR-018 Garmin Connect CSV import (MoSCoW: Must). Change request FR-002: delete-on-absence now Strava-sourced only and Garmin-overwritten activities are never reverted or re-added (before: every local activity absent from the response was deleted). FR-008 clarified: no deep-link for imported activities. Data model gains activity source |
 | 2026-10-11 | larapilot-feature US-009 | Change request FR-017: when no allowlisted athlete has connected, the home page displays the first stored athlete with activities (before: "an athlete removed from the allowlist is never displayed" and "when no allowlisted athlete has connected yet, the home page shows the connect screen"). Privacy & legal: fallback-display risk accepted |
+| 2026-10-12 | larapilot-feature US-011 | Change request FR-017: the Garmin CSV import is the one signed-out write, offered on the dashboard and connect screen; CSV-only athletes show no stale-sync warning (before: "A signed-out visit is strictly read-only", no write action for signed-out visitors). Change request FR-018: actor is any visitor (before: "the signed-in owner"); signed-out imports go to the displayed athlete or a new CSV-only athlete. FR-001 clarified. Security: open-import risk accepted |
