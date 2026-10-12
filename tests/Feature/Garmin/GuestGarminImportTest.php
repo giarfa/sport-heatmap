@@ -5,6 +5,7 @@ namespace Tests\Feature\Garmin;
 use App\Enums\ActivitySource;
 use App\Models\Activity;
 use App\Models\User;
+use App\Support\Garmin\GarminImportFormat;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -99,6 +100,39 @@ class GuestGarminImportTest extends TestCase
         $this->assertSame(1, Activity::count());
         $this->assertSame(ActivitySource::GarminCsv, $stored->fresh()->source);
         $this->assertSame(8_290, $stored->fresh()->distance_meters);
+    }
+
+    public function test_a_guest_review_masks_the_stored_side_of_a_clash(): void
+    {
+        $stored = $this->storedClashingRun($this->allowlistedAthlete());
+
+        $this->upload($this->csv([self::SAMPLE_FIRST_ROW]));
+        $review = $this->review();
+
+        $review->assertSee('Clashes with a stored run');
+        $review->assertSee(GarminImportFormat::start($stored->start_date_local));
+        $review->assertDontSee($stored->name);
+        $review->assertDontSee(GarminImportFormat::distance(12_340));
+        $review->assertDontSee(GarminImportFormat::duration(3_725));
+        $review->assertDontSee($stored->stravaUrl(), escape: false);
+        $review->assertDontSee('View on Strava');
+        $review->assertSee('value="overwrite"', escape: false);
+        $this->confirm($review)->assertRedirect(route('garmin.import.summary'));
+    }
+
+    public function test_the_signed_in_owner_review_still_shows_every_stored_detail(): void
+    {
+        $owner = $this->allowlistedAthlete();
+        $stored = $this->storedClashingRun($owner);
+
+        $this->actingAs($owner)->post(route('garmin.import.store'), ['csv' => $this->csv([self::SAMPLE_FIRST_ROW])]);
+        $review = $this->actingAs($owner)->get(route('garmin.import.review'))->assertOk();
+
+        $review->assertSee($stored->name);
+        $review->assertSee(GarminImportFormat::distance(12_340));
+        $review->assertSee(GarminImportFormat::duration(3_725));
+        $review->assertSee($stored->stravaUrl(), escape: false);
+        $review->assertDontSee('Clashes with a stored run');
     }
 
     public function test_a_guest_re_importing_the_same_file_changes_nothing(): void
@@ -213,6 +247,18 @@ class GuestGarminImportTest extends TestCase
         $response->assertSessionHas('garmin_import.stale', 'Another import is being saved — confirm again in a moment.');
         $this->assertSame(0, Activity::count());
         $this->assertNotNull(session('garmin_import.pending'));
+    }
+
+    private function storedClashingRun(User $athlete): Activity
+    {
+        return Activity::factory()->for($athlete)->create([
+            'name' => 'Private tempo with Giulia',
+            'start_date_local' => '2026-10-10 09:34:10',
+            'activity_date' => '2026-10-10',
+            'strava_activity_id' => 4_242,
+            'distance_meters' => 12_340,
+            'moving_time_seconds' => 3_725,
+        ]);
     }
 
     private function upload(UploadedFile $file): TestResponse

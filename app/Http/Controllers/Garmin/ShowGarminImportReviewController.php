@@ -31,10 +31,16 @@ class ShowGarminImportReviewController extends Controller
 
         $plan = $planGarminImport($resolveImportTarget($request->user()), $parsed->rows);
 
+        /*
+         * A signed-in owner reviews their own athlete; a guest reviews the displayed athlete's
+         * runs and must not enumerate them (name, distance, time, Strava link) by uploading
+         * crafted rows that clash. Decided once here so the view never re-derives auth.
+         */
         return view('garmin.review', [
             'parsed' => $parsed,
             'plan' => $plan,
             'token' => $token,
+            'showsStoredRunDetails' => $request->user() !== null,
         ]);
     }
 }

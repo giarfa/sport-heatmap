@@ -202,6 +202,10 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 - **Rejections** (`UploadGarminCsvRequest` or `GarminCsvRejectedException`) go
   back to the form with the message on `csv`, linked to the input through
   `aria-describedby`; nothing is parsed into the session.
+- **Guest masking**: the review controller passes
+  `showsStoredRunDetails` (`$request->user() !== null`) once; the view only
+  branches on it. The owner's review is unchanged; the Garmin-file side and the
+  Overwrite / Skip choice are the same for everyone.
 - **Views** (`resources/views/garmin/`) follow `.larapilot/mockups/US-008/`:
   real `<table>`s with captions and scoped headers that reflow into stacked
   cards below 640 px (`td[data-label]`); a fieldset per conflict with Skip
@@ -261,6 +265,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | CSV-only athlete with placeholder `name` / `email` | A migration making `users.name` / `users.email` nullable | No migration for one row; the fixed `.invalid` address plus the existing UNIQUE index makes a second CSV-only athlete impossible |
 | Create the CSV-only athlete inside the import transaction, only with rows | Create it on upload or on review | Upload and review write nothing; a failed insert must not leave an empty athlete, and an empty one would never be displayed |
 | Fingerprint carries the target id | Compare the conflicts only | A plan with no conflicts hashes the same for every athlete, so a target change between review and confirm would go unnoticed |
+| Masked stored side for guests (start + "Clashes with a stored run") | Accept the disclosure (rejected by the owner, decision journal); hide clashes from guests entirely | Hiding clashes would stop the visitor making an informed Overwrite / Skip choice; the start time is enough to recognise the run |
 | Wall-clock dates built in UTC | Parse with the app timezone | Same contract as Strava's `start_date_local`; a conversion moves late-evening runs to the wrong day |
 
 ## Key decisions & invariants
@@ -294,11 +299,14 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 - **Invariant — the session is the only binding.** _Breaks if:_ a route or
   form field starts naming an import or an athlete — a request could then
   reach another visitor's pending rows or write to a chosen athlete.
-- **Open (review, Medium) — the conflict review shows stored-run details to
-  guests.** A guest whose rows land within ±2 minutes of stored runs sees their
-  name, exact start, moving time and Strava link, which the public map does
-  not show. Awaiting the owner's decision: accept it in PRD Security, or reduce
-  the stored side for guests.
+- **Invariant — a guest never sees a stored run's details.** The review shows
+  a guest only the start of a clashing stored run and "Clashes with a stored
+  run" — no name, distance, moving time, Strava link or source label. Reason:
+  crafted rows within ±2 minutes would otherwise enumerate the displayed
+  athlete's names, distances, moving times and Strava links, private activities
+  included, without confirming anything. _Breaks if:_ the view decides from
+  anything but `showsStoredRunDetails`, or a new stored field is added outside
+  the owner branch.
 - **Accepted risk — anyone can import.** Any visitor can add or overwrite runs
   on the displayed athlete's map. Bounded by CSRF, 5 MB, the per-IP throttle,
   and the review step; re-decide before deploying to a public URL that others

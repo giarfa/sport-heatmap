@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   import lands on the displayed athlete's map; on a fresh install the first confirmed import
   creates a local CSV-only athlete (no Strava connection) that the home page then displays, with
   an "Imported …" status instead of a sync warning. The nightly sync skips that athlete. CSRF,
-  the 5 MB limit, the per-IP throttle and the review step still apply (US-011).
+  the 5 MB limit, the per-IP throttle and the review step still apply. A signed-out visitor's
+  review shows only the start of a clashing stored run (US-011).
 
 - The nightly sync deletes only Strava-sourced activities that Strava no longer returns: runs
   imported from a Garmin CSV are never deleted, runs overwritten with Garmin's values are never
