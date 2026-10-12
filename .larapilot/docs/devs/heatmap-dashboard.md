@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-010` — 2026-10-11 |
+| **Last updated by** | `US-011` — 2026-10-12 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -41,7 +41,11 @@ share stops working.
       `HeatmapBuilder` (rest / ran / future cells, weekly totals, partial current
       week) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
    3. `ResolveSyncStatus` reads `sync_runs` and the window's activity count
-      **outside** the cache and returns a `SyncStatus`.
+      **outside** the cache and returns a `SyncStatus`. For a **CSV-only
+      athlete** (`User::isCsvOnly()`, no Strava id — US-011) it reads no
+      `sync_runs` at all: the latest import is the newest `updated_at` among
+      the athlete's `garmin_csv` activities, and the status is
+      `SyncStatus::forCsvOnly()`.
    4. `dashboard.blade.php` renders the chip, an optional warning, the grid (or
       the skeleton during a first sync), the legend, and the sync detail card.
 
@@ -87,6 +91,15 @@ non-healthy state shows the banner (title, HTML-escaped reason, "Reconnect
 Strava" link to `strava.redirect`) and hides the redundant chip from screen
 readers.
 
+**CSV-only status (`SyncStatus::forCsvOnly`, `SyncHealth::CsvOnly`)**: never
+warns, never shows the skeleton. The chip reads "Imported {relative}" ("Never
+imported" without a stamp), the detail card "Import / Last import / Outcome:
+Garmin CSV / Runs in window", and the empty-window line "…after your next
+import." instead of "…after your next activity syncs.". Headings and that line
+come from `SyncStatus` (`detailHeading()`, `lastRunHeading()`,
+`emptyWindowNote()`), so Blade stays markup-only and the Strava copy is
+unchanged.
+
 **Intensity scale**: fewer than 4 running days → fixed bands (5 / 10 / 20 km)
 with a "too few" note; p25 = p75 → fixed bands with a "too alike" note; otherwise
 calibrated bands, upper-inclusive.
@@ -104,7 +117,7 @@ calibrated bands, upper-inclusive.
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
 | Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:{user id}:{window start}:{today}`, TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
-| Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string |
+| Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
 | Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Config | `config/heatmap.php` | Literal `window_weeks` (16) and `grid_cache_ttl` (86 400) |
@@ -124,6 +137,8 @@ three small indexed queries for the sync status.
 | Cache the grid DTOs, with `cache.serializable_classes` listing exactly the classes the grid is made of (US-010) | `serializable_classes => true`; caching a plain array through `toArray()` / `fromArray()` mappers | Laravel 13 defaults the list to `false`, so a serializing store (`database`, `file`, `redis`) restored the grid as `__PHP_Incomplete_Class` and every cache hit answered 500. `true` reopens the gadget-chain risk the default closes; mappers on five DTOs add code for no gain over the framework's allowlist |
 | A cached entry that cannot be restored is reported, rebuilt and overwritten (US-010) | Return it as is; `Cache::remember()`; `cache:clear` in the deploy notes | An entry written by an older shape of the grid — a class not yet allowlisted, a renamed `DayCellState` case, a changed property type — would otherwise fail every request until midnight. `unserialize` throws for nested failures, so the read catches `Throwable`, not only `__PHP_Incomplete_Class` |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
+| CSV-only athlete: latest import = newest `updated_at` of its `garmin_csv` activities (US-011) | A `users.garmin_imported_at` column | No migration for one stamp; the cost is that a re-import that changes nothing does not move it |
+| CSV-only athlete ignores `sync_runs` | Show the instance-wide sync state | `sync_runs` describe the Strava sync, which never selects this athlete — a failed or stale sync of someone else would put a false warning over a map only imports change |
 | All copy and arithmetic in DTOs / `SyncStatus` | Logic in Blade | Testable without rendering; components stay markup-only |
 | `@yield('header-status')` in the layout | View composer / shared variable | The connect and rejected screens extend the same layout and must render no chip |
 | Public read-only home page for guests (FR-017) | Keep it sign-in only | The owner checks it on any device and shares the link; the owner accepted the Strava API Agreement risk (decisions `f71daaa7e976c188`, `88f04507cbc7e573`) |
@@ -135,6 +150,11 @@ three small indexed queries for the sync status.
 | Two-letter weekday `<abbr>` | Single letters from the PRD prose | Matches the mockup (decision log) |
 
 ## Key decisions & invariants
+
+- **Invariant — a CSV-only athlete never gets a sync warning.** _Breaks if:_
+  `ResolveSyncStatus` reads `sync_runs` for it, or `needsWarning()` stops
+  excluding `CsvOnly`. Its "Imported …" stamp means "data last changed by an
+  import": a re-import that changes nothing does not move it.
 
 - **Invariant — a guest request is strictly read-only.** _Breaks if:_ anything on
   the guest path calls `EnsureFreshAccessToken`, `StravaClient`, or loads a token
@@ -182,7 +202,7 @@ three small indexed queries for the sync status.
 
 ## Related
 
-- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`, `US-010`
+- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`, `US-010`, `US-011`
 - Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`, `US-010-plan.yaml`
 - Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`, `US-009.md`, `US-010.md`
 - Other domains: `strava-connection.md`, `activity-sync.md`, `garmin-csv-import.md`

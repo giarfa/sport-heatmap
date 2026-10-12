@@ -28,7 +28,7 @@
                 <h2 id="grid-heading" class="sr-only">Daily running distance, 16 weeks by weekday</h2>
                 @if ($status->runsInWindow === 0)
                     <p class="mb-3 text-sm" style="color: var(--ink-muted);">
-                        No runs found in the last 16 weeks. The map fills in after your next activity syncs.
+                        {{ $status->emptyWindowNote() }}
                     </p>
                 @endif
                 <x-heatmap-grid :grid="$grid" />

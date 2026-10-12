@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Support\Sync;
 
+use App\Enums\SyncHealth;
 use App\Models\Activity;
 use App\Models\SyncRun;
 use App\Models\User;
@@ -60,6 +61,28 @@ class ResolveSyncStatusTest extends TestCase
 
         $status = (new ResolveSyncStatus)($athlete, $window, now());
 
+        $this->assertSame(2, $status->runsInWindow);
+    }
+
+    public function test_a_csv_only_athlete_ignores_a_failed_and_a_stale_sync_history(): void
+    {
+        $athlete = User::factory()->csvOnly()->create();
+        Activity::factory()->garminImported()->for($athlete)->create([
+            'activity_date' => now()->subDays(3)->toDateString(),
+            'updated_at' => now()->subHours(2),
+        ]);
+        Activity::factory()->garminImported()->for($athlete)->create([
+            'activity_date' => now()->subDays(5)->toDateString(),
+            'updated_at' => now()->subDays(4),
+        ]);
+        SyncRun::factory()->stale()->create();
+        SyncRun::factory()->failed()->create();
+
+        $status = app(ResolveSyncStatus::class)($athlete, HeatmapWindow::current(), now());
+
+        $this->assertSame(SyncHealth::CsvOnly, $status->health);
+        $this->assertFalse($status->needsWarning());
+        $this->assertSame('Imported 2 hours ago', $status->chipLabel());
         $this->assertSame(2, $status->runsInWindow);
     }
 }
