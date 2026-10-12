@@ -45,6 +45,16 @@ plan_body: |
   - `heatmap-dashboard.md` — CSV-only sync status, entry points for every visitor and on the connect screen (TASK-04, TASK-05)
   - `strava-connection.md` — the displayed athlete may be a CSV-only athlete; `redirectGuestsTo` no longer serves a route (TASK-02)
   - `README.md` index rows refreshed in each task that touches a file
+
+  ## Rework (2026-10-12) — mask stored-run details for guests
+
+  Review feedback (Robert + Lars, Medium): with the import open, a guest can upload crafted rows within ±2 minutes of stored runs and the conflict review discloses the displayed athlete's activity name, distance, moving time and Strava link (private activities included) without confirming anything. Owner decision (decision journal, topic `guest conflict review disclosure`, 2026-10-12): **mask it**.
+
+  - **One switch, decided once.** `ShowGarminImportReviewController` passes `showsStoredRunDetails` (`$request->user() !== null`) to `garmin.review`, with a `/* … */` block stating why: the import target of a signed-in owner is always their own athlete, a guest's is someone else's. Blade branches on the flag only — no `@auth`/`@guest`, no `auth()` in the view. The confirm path re-renders through the same controller (stale/lock redirects), so it inherits the flag.
+  - **Masked cell (guest).** The "Stored" `<td>` keeps `data-label="Stored"` and the `.side` list with the single `Start` row (stored `start_date_local`, so the visitor can tell which clash is which), then `<p class="side-source">Clashes with a stored run</p>`. No name, distance, moving time, Strava link, or source label ("Strava" / "Garmin import"). The Garmin-file side, the row header (the file's own run name), the `<fieldset>` legend (file data), and Overwrite/Skip are unchanged. Signed-in owner: byte-identical to today.
+  - **What is still visible to a guest, on purpose:** the existence and start time of a stored run that clashes with a row they uploaded, and the tally counts — needed to make an informed Overwrite/Skip choice, and already implied by the accepted "anyone can import/overwrite" risk. Recorded as the invariant in `garmin-csv-import.md`.
+  - **FR-009 on the masked cell:** same tokens and classes, no new CSS; at 375 px the stacked card keeps Stored/Garmin side by side at 49 %; light and dark via the existing variables.
+  - DONE tasks TASK-00…TASK-06 are preserved. TASK-07 (Fix) ships the mask with its tests and docs in one commit; TASK-08 (Anne) re-runs the full suite and the quality gate and extends the manual handoff.
 tasks:
   -
     id: TASK-00
@@ -84,12 +94,6 @@ tasks:
     assignee: Alex
     estimate_hours: 0.5
     dependencies: {}
-    commit:
-      sha: 24dbe6b0b13d4cf863721f7dbf49a7b18eae28df
-      short_sha: 24dbe6b
-      subject: 'chore(US-011): TASK-00 bootstrap feature branch and record the spec'
-      committed_at: '2026-10-12T09:25:24+02:00'
-      url: 'https://github.com/giarfa/sport-heatmap/commit/24dbe6b0b13d4cf863721f7dbf49a7b18eae28df'
   -
     id: TASK-01
     title: 'Import target resolution and the CSV-only athlete'
@@ -98,10 +102,10 @@ tasks:
       Give the import pipeline one target athlete — the signed-in owner, else the displayed athlete, else none — and let a confirmed first import create a local CSV-only athlete inside the import transaction. Traces to FR-018, FR-017, FR-001 (clarified). No HTTP change yet: the owner flow must stay green.
 
       ## Files Involved
-      - `app/Support/Garmin/ResolveGarminImportTarget.php` (new, `final readonly`, `__invoke(?User $signedIn): ?User` → `$signedIn ?? ($this->resolveDisplayedAthlete)()`)
+      - `app/Support/Garmin/ResolveGarminImportTarget.php` (new, `final readonly`, `__invoke(?User $signedIn): ?User` `$signedIn ?? ($this->resolveDisplayedAthlete)()`)
       - `app/Actions/Garmin/CreateCsvOnlyAthlete.php` (new action: `firstOrCreate` on `email = 'csv-athlete@garmin.invalid'` with `name = 'Garmin CSV athlete'`; Strava columns, password, `email_verified_at` left null; class constants for both placeholders)
       - `app/Models/User.php` (`isCsvOnly(): bool` — `strava_athlete_id === null`; docblock unchanged, no column change)
-      - `app/Support/Garmin/PlanGarminImport.php` (`?User $athlete`; null → no stored activities, every row new, still zero queries)
+      - `app/Support/Garmin/PlanGarminImport.php` (`?User $athlete`; null no stored activities, every row new, still zero queries)
       - `app/Data/Garmin/GarminImportPlan.php` (carries `?int $athleteId`; `fingerprint()` hashes it alongside conflicts and already-imported rows)
       - `app/Actions/Garmin/ApplyGarminImport.php` (`?User $athlete`; when null and `newRows` is non-empty, create the athlete via `CreateCsvOnlyAthlete` **inside** the existing `DB::transaction`; when null and nothing to write, write nothing; forget the grid cache of the athlete actually written; never `save()` the passed user — it may be the narrow `id, strava_athlete_id` select)
       - `database/factories/UserFactory.php` (`csvOnly()` state)
@@ -145,12 +149,6 @@ tasks:
     estimate_hours: 4
     dependencies:
       - TASK-00
-    commit:
-      sha: 748ce900aa6275ca00a3a56c9b76ea5e05da8fe5
-      short_sha: 748ce90
-      subject: 'feat(US-011): TASK-01 resolve the import target and create a CSV-only athlete'
-      committed_at: '2026-10-12T09:28:03+02:00'
-      url: 'https://github.com/giarfa/sport-heatmap/commit/748ce900aa6275ca00a3a56c9b76ea5e05da8fe5'
   -
     id: TASK-02
     title: 'Open the import routes to signed-out visitors'
@@ -172,7 +170,7 @@ tasks:
 
       ## Steps
       1. Change the route group; keep `throttle:garmin-import` on `store` and `confirm`
-      2. Switch both controllers to the resolver; move target resolution inside the confirm lock; rename `$owner` → `$athlete` / `$target` so the code no longer claims an owner
+      2. Switch both controllers to the resolver; move target resolution inside the confirm lock; rename `$owner` `$athlete` / `$target` so the code no longer claims an owner
       3. Rewrite the docblocks and the project rule listed above
       4. Rewrite `GarminImportAccessTest`: a guest reaches the upload form (200) and the review/summary GETs redirect to the form/dashboard only for lack of a pending import or summary (never for lack of sign-in); the `garmin.import.*` routes gather `web` (CSRF) and `throttle:garmin-import` on `store`/`confirm` and not `auth`; an 11th guest upload in a minute is `429`; a guest upload over 5 MB is rejected with nothing written; a signed-in athlete removed from the allowlist is still refused (`strava.fresh`); the signed-in owner still reaches the form
       5. `php artisan route:list --path=import` to confirm the middleware; `php artisan test --compact tests/Feature/Garmin`
@@ -192,7 +190,7 @@ tasks:
       ## Domain Docs
       - [x] `.larapilot/docs/devs/garmin-csv-import.md` — `HTTP flow` (middleware, guests, instance-wide lock, target inside the lock, stale review on a target change), `Key decisions & invariants` (open import is an accepted risk to re-decide before a public deployment)
       - [x] `.larapilot/docs/devs/strava-connection.md` — `redirectGuestsTo` no longer serves a route; the displayed athlete is also the guest import target and may be CSV-only
-      - [x] Folder `README.md` index rows updated (`garmin-csv-import` purpose no longer "Owner-only"; `strava-connection` → `US-011`)
+      - [x] Folder `README.md` index rows updated (`garmin-csv-import` purpose no longer "Owner-only"; `strava-connection` `US-011`)
       - [x] English, committed with this task
 
       ## Git Deliverables
@@ -205,12 +203,6 @@ tasks:
     estimate_hours: 3
     dependencies:
       - TASK-01
-    commit:
-      sha: d2c2f16d8c31b9e3ed109777ca7d499f518b0408
-      short_sha: d2c2f16
-      subject: 'feat(US-011): TASK-02 open the Garmin import routes to signed-out visitors'
-      committed_at: '2026-10-12T09:29:39+02:00'
-      url: 'https://github.com/giarfa/sport-heatmap/commit/d2c2f16d8c31b9e3ed109777ca7d499f518b0408'
   -
     id: TASK-03
     title: 'Cover the guest import flow end to end'
@@ -224,13 +216,13 @@ tasks:
 
       ## Steps
       1. `setUp()`: `Http::preventStrayRequests()`, `Http::fake()` for Strava hosts with an assertion helper that no request was sent, `Carbon::setTestNow('2026-10-11 12:00:00')` like the sibling tests; factories only (`UserFactory::stravaConnected()`, `csvOnly()`, `ActivityFactory`)
-      2. Guest import into the displayed athlete, both fixtures (data provider): upload → review → confirm → summary counts; rows belong to the displayed athlete; no CSV-only athlete created
+      2. Guest import into the displayed athlete, both fixtures (data provider): upload review confirm summary counts; rows belong to the displayed athlete; no CSV-only athlete created
       3. Guest import with no stored athlete, both fixtures: confirm creates exactly one CSV-only athlete (null Strava id and tokens) holding the runs; `GET /` then shows that athlete's map, not the connect screen
       4. Every FR-018 behavior holds for a guest: ±2-minute conflict review with Overwrite/Skip, idempotent re-import, abandoning writes nothing, the raw file is never stored
       5. A guest import makes no Strava request and never reads or refreshes a token: the displayed athlete has an **expired** token; after the import its token columns and `strava_token_expires_at` are byte-identical and `Http::assertNothingSent()`
       6. Two guest sessions stay isolated: session A uploads the Italian file, the session is captured and flushed (`flushSession()`), session B uploads the English file; B's review shows only B's rows; confirming in B with A's token fails and writes nothing; restoring A (`withSession()`) confirms A's rows only
-      7. Target change mid-review: a guest reviews against no athlete (or the fallback athlete), an allowlisted athlete connects before confirm → confirm redirects to the review with the stale notice and writes nothing
-      8. Concurrent first import: two pending guest imports confirmed back to back with no stored athlete → one CSV-only athlete; the second confirm is sent back to review
+      7. Target change mid-review: a guest reviews against no athlete (or the fallback athlete), an allowlisted athlete connects before confirm confirm redirects to the review with the stale notice and writes nothing
+      8. Concurrent first import: two pending guest imports confirmed back to back with no stored athlete one CSV-only athlete; the second confirm is sent back to review
       9. The signed-in owner flow is unchanged: the existing `GarminImportFlowTest` still passes untouched
       10. `php artisan test --compact tests/Feature/Garmin`; do **not** add Playwright, Dusk, or browser suites
 
@@ -252,12 +244,6 @@ tasks:
     estimate_hours: 4
     dependencies:
       - TASK-02
-    commit:
-      sha: 594b2ad293da8c455ba9d064349056c4309e05ff
-      short_sha: 594b2ad
-      subject: 'test(US-011): TASK-03 cover the signed-out Garmin import'
-      committed_at: '2026-10-12T09:30:44+02:00'
-      url: 'https://github.com/giarfa/sport-heatmap/commit/594b2ad293da8c455ba9d064349056c4309e05ff'
   -
     id: TASK-04
     title: 'Sync status and nightly sync for a CSV-only athlete'
@@ -310,12 +296,6 @@ tasks:
     estimate_hours: 4
     dependencies:
       - TASK-01
-    commit:
-      sha: 72f41211d69d3f9ed2cdf9a8cf62c4419be812b4
-      short_sha: 72f4121
-      subject: 'feat(US-011): TASK-04 show import status for a CSV-only athlete'
-      committed_at: '2026-10-12T09:33:03+02:00'
-      url: 'https://github.com/giarfa/sport-heatmap/commit/72f41211d69d3f9ed2cdf9a8cf62c4419be812b4'
   -
     id: TASK-05
     title: '"Import Garmin CSV" entry points for every visitor'
@@ -325,15 +305,15 @@ tasks:
 
       ## Files Involved
       - `resources/views/dashboard.blade.php` (replace the `@guest` / `@auth` pair with one discreet text line under the map: guests get "Owner? Connect with Strava · Import Garmin CSV", a signed-in owner "Runs missing from Strava? Import Garmin CSV"; both links `inline-flex min-h-11`, `var(--accent)`, underlined; the Blade comment rewritten)
-      - `resources/views/strava/connect.blade.php` (intro: "Connect Strava or import a Garmin Connect CSV to build your 16-week heatmap."; below the Strava button a secondary full-width `h-11` control "Import Garmin CSV" → `garmin.import.create`, using the existing `btn btn--secondary` (`--control-border`) from US-008 so Strava orange stays on the Strava button only; the read-only scope line stays)
-      - `resources/views/garmin/create.blade.php`, `review.blade.php`, `summary.blade.php` (copy check only: no "owner" or "your Strava" wording that a guest would misread; "← Back to heatmap" stays)
-      - `CHANGELOG.md` (`[Unreleased]` → `Changed`: the Garmin import is open to signed-out visitors; a first import creates a CSV-only athlete)
+      - `resources/views/strava/connect.blade.php` (intro: "Connect Strava or import a Garmin Connect CSV to build your 16-week heatmap."; below the Strava button a secondary full-width `h-11` control "Import Garmin CSV" `garmin.import.create`, using the existing `btn btn--secondary` (`--control-border`) from US-008 so Strava orange stays on the Strava button only; the read-only scope line stays)
+      - `resources/views/garmin/create.blade.php`, `review.blade.php`, `summary.blade.php` (copy check only: no "owner" or "your Strava" wording that a guest would misread; " Back to heatmap" stays)
+      - `CHANGELOG.md` (`[Unreleased]` `Changed`: the Garmin import is open to signed-out visitors; a first import creates a CSV-only athlete)
       - `tests/Feature/Dashboard/PublicDashboardTest.php`, `tests/Feature/Dashboard/ConnectScreenTest.php` (rewritten/extended)
       - `.larapilot/docs/devs/heatmap-dashboard.md`, `.larapilot/docs/devs/README.md`
 
       ## Steps
       1. Implement **mobile-first** per `.larapilot/mockups/US-008/README.md` and `.larapilot/mockups/heatmap-dashboard/` tokens (no new tokens, no new component); smoke-check at 375, 768, 1280 px, light and dark, keyboard focus visible on both links/controls
-      2. Rewrite `PublicDashboardTest::test_the_fallback_page_keeps_noindex_the_attribution_and_no_garmin_entry_point` → keeps noindex and attribution **and** shows the entry point; `test_the_owner_sees_the_import_garmin_csv_entry_point_and_guests_do_not` → a guest and the owner both see it, the guest also sees "Connect with Strava"
+      2. Rewrite `PublicDashboardTest::test_the_fallback_page_keeps_noindex_the_attribution_and_no_garmin_entry_point` keeps noindex and attribution **and** shows the entry point; `test_the_owner_sees_the_import_garmin_csv_entry_point_and_guests_do_not` a guest and the owner both see it, the guest also sees "Connect with Strava"
       3. `ConnectScreenTest`: the connect screen offers "Import Garmin CSV" linking to `garmin.import.create`, keeps "Connect with Strava", `noindex, nofollow`, "Powered by Strava", one `h1`, and the skip link; the import screens keep `noindex` and the attribution for a guest
       4. `php artisan test --compact tests/Feature/Dashboard`
       5. `npm run build` if the Vite manifest needs it; `vendor/bin/pint --dirty --format agent`
@@ -365,12 +345,6 @@ tasks:
     dependencies:
       - TASK-02
       - TASK-04
-    commit:
-      sha: 3ec32d5f87bb38d277f33fb97a9fa50d8a609c65
-      short_sha: 3ec32d5
-      subject: 'feat(US-011): TASK-05 offer the Garmin import to every visitor'
-      committed_at: '2026-10-12T09:34:07+02:00'
-      url: 'https://github.com/giarfa/sport-heatmap/commit/3ec32d5f87bb38d277f33fb97a9fa50d8a609c65'
   -
     id: TASK-06
     title: 'Full-suite verification and manual test handoff'
@@ -386,7 +360,7 @@ tasks:
       2. `php artisan larapilot:quality` — Pint and Larastan level 5 clean
       3. `php artisan migrate:fresh --seed` succeeds and the demo dashboard still renders the seeded Strava athlete
       4. Robert's freshness check by hand: every domain whose code moved (`garmin-csv-import`, `heatmap-dashboard`, `activity-sync`, `strava-connection`) has its doc and `README.md` row updated on this branch (`git diff develop --stat -- .larapilot/docs/devs`)
-      5. Write the **manual test handoff** into the PR notes: (a) on a fresh database (`migrate:fresh`, no seed), signed out, open the Herd URL → connect screen shows "Import Garmin CSV" → upload `.larapilot/client-materials/Activities (1).csv` → review → confirm → the home page shows the imported runs, chip "Imported …", no warning; (b) re-upload the same file → summary all already-imported; (c) `migrate:fresh --seed`, signed out, import the file into the displayed seeded athlete and resolve a clash with Overwrite and with Skip; (d) a second browser profile sees none of the first one's pending upload; (e) each screen at 375 / 768 / 1280 px, light and dark
+      5. Write the **manual test handoff** into the PR notes: (a) on a fresh database (`migrate:fresh`, no seed), signed out, open the Herd URL connect screen shows "Import Garmin CSV" upload `.larapilot/client-materials/Activities (1).csv` review confirm the home page shows the imported runs, chip "Imported …", no warning; (b) re-upload the same file summary all already-imported; (c) `migrate:fresh --seed`, signed out, import the file into the displayed seeded athlete and resolve a clash with Overwrite and with Skip; (d) a second browser profile sees none of the first one's pending upload; (e) each screen at 375 / 768 / 1280 px, light and dark
       6. Do **not** add Playwright, Dusk, or browser suites (`testing: NORMAL`)
 
       ## Completion Criteria
@@ -406,4 +380,101 @@ tasks:
     dependencies:
       - TASK-03
       - TASK-05
-updated_at: '2026-10-12T07:34:26+00:00'
+  -
+    id: TASK-07
+    title: "Mask stored-run details in a guest's conflict review"
+    body: |-
+      ## Description
+      Fix: guest disclosure of stored-run details in the conflict review (`resources/views/garmin/review.blade.php:66-76`, Robert + Lars Medium). For a guest, the "Stored" side of each clash shows only the stored start time and "Clashes with a stored run"; the signed-in owner's review is unchanged. Owner decision: decision journal, topic `guest conflict review disclosure` (2026-10-12). Traces to FR-018, FR-017, FR-009.
+
+      ## Files Involved
+      - `app/Http/Controllers/Garmin/ShowGarminImportReviewController.php` — add `'showsStoredRunDetails' => $request->user() !== null` to the view data; `/* … */` block above it: a signed-in owner reviews their own athlete, a guest reviews the displayed athlete's runs and must not enumerate them by crafting clashing rows (`.ai/rules/app.md`)
+      - `resources/views/garmin/review.blade.php` — inside the "Stored" `<td data-label="Stored" class="cmp-pair">`: `@if ($showsStoredRunDetails)` the current `.side` list (Start, Distance, Moving) + `.side-source` (name · Strava link / Garmin import), unchanged; `@else` a `.side` list with only `<div><dt>Start</dt><dd>{{ GarminImportFormat::start($conflict->stored->start_date_local) }}</dd></div>` and `<p class="side-source">Clashes with a stored run</p>`. Nothing else in the view changes (row header, Garmin-file side, legend, Overwrite/Skip, shortcuts, tally, `<caption>`)
+      - `tests/Feature/Garmin/GuestGarminImportTest.php` — two new tests (below)
+      - `CHANGELOG.md` — `[Unreleased]` `Changed`: the US-011 entry gains "a signed-out visitor's review shows only the start of a clashing stored run"
+      - `.larapilot/mockups/US-008/README.md` — one line under the review screen: guest variant of the Stored cell (start only + "Clashes with a stored run"), same classes
+      - `.larapilot/docs/devs/garmin-csv-import.md`, `.larapilot/docs/devs/README.md`, `.larapilot/docs/review/US-011.md`
+
+      ## Steps
+      1. Controller flag + block comment; keep the controller single-action with collaborators on `__invoke` (`.ai/rules/http.md`)
+      2. View branch on `$showsStoredRunDetails` only — no `@auth`, `@guest`, or `auth()` in Blade (rework feedback: decide the switch once)
+      3. Tests in `GuestGarminImportTest` (factories only; reuse `upload()` / `review()` / `csv()` helpers and `SAMPLE_FIRST_ROW`; `Http::preventStrayRequests()` already in `setUp()`):
+         - `test_a_guest_review_masks_the_stored_side_of_a_clash` — displayed athlete via `allowlistedAthlete()` then sign out (or create the Strava athlete without signing in, like the sibling tests), one stored Strava run `start_date_local` `2026-10-10 09:34:10`, a distinctive `name` (e.g. "Private tempo with Giulia"), `distance_meters` 12_340, `moving_time_seconds` 3_725, `strava_activity_id` 4_242 — values the file row cannot produce; guest uploads `SAMPLE_FIRST_ROW`; review `assertSee('Clashes with a stored run')`, `assertSee(GarminImportFormat::start($stored->start_date_local))`, `assertDontSee($stored->name)`, `assertDontSee(GarminImportFormat::distance(12_340))`, `assertDontSee(GarminImportFormat::duration(3_725))`, `assertDontSee($stored->stravaUrl())`, `assertDontSee('View on Strava')`; Overwrite/Skip radios still present and confirming with Skip still succeeds
+         - `test_the_signed_in_owner_review_still_shows_every_stored_detail` — same data, owner signed in via `allowlistedAthlete()`: `assertSee` name, distance, moving time, Strava URL; `assertDontSee('Clashes with a stored run')`
+      4. `php artisan test --compact tests/Feature/Garmin`
+      5. Smoke the review with a clash as a guest at 375 / 768 / 1280 px, light and dark (Herd URL via Boost `get-absolute-url`): masked cell aligned with the Garmin-file side, no horizontal scroll
+      6. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [x] A guest's clash shows only the stored start and "Clashes with a stored run" — no name, distance, moving time, Strava link, or source label
+      - [x] The Garmin-file side and the Overwrite/Skip choice are unchanged for guests
+      - [x] The signed-in owner's review is unchanged
+      - [x] The guest/owner switch is decided once in the controller; Blade has no auth check
+      - [x] FR-009 holds on the masked cell: 375 px, light and dark (manual smoke)
+      - [x] New tests pass; existing Garmin tests stay green
+      - [x] Rework feedback addressed
+
+      ## Test Data
+      - N/A — no model, schema, factory, or seeder change; tests use the existing `UserFactory` / `ActivityFactory`
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — replace the "Open (review, Medium)" bullet in `Key decisions & invariants` with **Invariant — a guest never sees a stored run's details**: the review shows a guest only the start of a clashing stored run and "Clashes with a stored run"; reason (crafted rows within ±2 min would otherwise enumerate the displayed athlete's names, distances, moving times and Strava links, private activities included); _Breaks if:_ the view decides from anything but `showsStoredRunDetails`, or a new stored field is added outside the owner branch. `HTTP flow`: the review controller passes the flag. `Architectural choices`: masked cell vs accepting the disclosure (rejected by the owner, decision journal) vs hiding clashes entirely from guests (rejected — the visitor could not make an informed Overwrite/Skip choice)
+      - [x] `.larapilot/docs/devs/README.md` — `garmin-csv-import` row: last touched `US-011` (rework)
+      - [x] `.larapilot/docs/review/US-011.md` — drop the guest-disclosure item from `Open (Medium)` in `## Parent actions`; record it under `Fixed:` with the test names
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `fix(US-011): TASK-07 mask stored-run details in a guest's conflict review`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local notes only
+    type: Fix
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-06
+    commit:
+      sha: ed18ef4e26cf519225a33e7a654fc9d171bb8d4a
+      short_sha: ed18ef4
+      subject: "fix(US-011): TASK-07 mask stored-run details in a guest's conflict review"
+      committed_at: '2026-10-12T21:20:10+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ed18ef4e26cf519225a33e7a654fc9d171bb8d4a'
+  -
+    id: TASK-08
+    title: 'Re-verify the spec and extend the manual handoff'
+    body: |-
+      ## Description
+      Re-verify the whole spec after the rework at the `NORMAL` bar and extend the manual test handoff with the guest clash review.
+
+      ## Files Involved
+      - `.larapilot/docs/review/US-011.md` (`## Verification`, `## Manual test handoff`)
+
+      ## Steps
+      1. `php artisan test --compact` — the whole suite; the only accepted failure is the pre-existing date-dependent `ReconnectStateTest::test_a_dead_refresh_token_signs_the_owner_out_onto_the_public_map_with_the_expiry_banner` already recorded (fails on `develop` too); any other failure blocks
+      2. `php artisan larapilot:quality` — Pint + Larastan level 5 clean
+      3. Update `## Verification` with the new counts
+      4. Add to `## Manual test handoff`: "Signed out, `php artisan migrate:fresh --seed`, upload a CSV whose run starts within 2 minutes of a seeded run → the Stored side shows only its start and 'Clashes with a stored run'; sign in as the owner and repeat → name, distance, moving time and the Strava link are shown" — at 375 / 768 / 1280 px, light and dark
+      5. Do **not** add Playwright, Dusk, or browser suites
+
+      ## Completion Criteria
+      - [x] Full suite green except the recorded pre-existing failure
+      - [x] Quality gate clean
+      - [x] Manual handoff covers the masked guest review and the unchanged owner review
+
+      ## Git Deliverables
+      - Commit: `test(US-011): TASK-08 re-verify after the guest review mask`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local notes only
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 1
+    dependencies:
+      - TASK-07
+    commit:
+      sha: ebf614760218b47c816c8f4b094196d4d7b06287
+      short_sha: ebf6147
+      subject: 'test(US-011): TASK-08 re-verify after the guest review mask'
+      committed_at: '2026-10-12T21:20:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ebf614760218b47c816c8f4b094196d4d7b06287'
+updated_at: '2026-10-12T19:20:23+00:00'

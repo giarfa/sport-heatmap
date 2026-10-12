@@ -5,11 +5,11 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 5
-status: REVIEW
-body: |
+status: DONE
+body: |-
   #### US-011: Garmin CSV import open to signed-out visitors (CSV-only dashboard)
 
-  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** REVIEW
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** DONE
   **Blocked by:** -
   **Type:** Change request
   **Supersedes:** US-008 criterion "A signed-in owner sees an "Import Garmin CSV" entry point on the dashboard; signed-out visitors do not, and a signed-out GET or POST to the import pages is refused with nothing written" · US-007 / FR-017 promise "A signed-out visit is strictly read-only"
@@ -28,24 +28,33 @@ body: |
   the imported runs with no stale-sync warning; with an athlete already displayed, a signed-out import lands on that athlete's map.
 
   **Acceptance Criteria**
-  - [ ] Every visitor, signed in or not, sees "Import Garmin CSV" on the dashboard; a signed-out visitor sees it alongside "Connect with Strava"
-  - [ ] The connect screen (no stored athlete has any activity) also offers "Import Garmin CSV"
-  - [ ] A signed-out visitor can GET and POST every import page — upload, review, confirm, cancel, summary — with no Strava sign-in; every FR-018 behavior holds unchanged: Italian/English headers, run-only filter, 112-day window, ±2-minute conflict review with Overwrite/Skip, single transaction, idempotent re-import, summary counts, raw file never kept
-  - [ ] A signed-in owner's import still targets their own athlete; a signed-out import targets the displayed athlete (FR-017 rules); when no athlete is displayed, confirming the first import creates a local CSV-only athlete (no Strava id, no tokens) that the home page then displays
-  - [ ] A signed-out import never calls Strava and never reads or refreshes a token
-  - [ ] Pending rows are bound to the visitor's own session: two concurrent signed-out sessions never see or confirm each other's upload, and no route accepts an import id
-  - [ ] CSRF, the 5 MB limit, and the `garmin-import` throttle on upload and confirm stay in force for signed-out requests
-  - [ ] The nightly sync skips an athlete with no Strava connection without logging an error or warning
-  - [ ] A CSV-only athlete shows no stale or failed sync warning on the dashboard; the sync status reflects the latest import (FR-007)
-  - [ ] Viewing the home page signed out stays read-only — no row written, no Strava call, no token refresh; only a confirmed import writes, and it invalidates the grid cache
-  - [ ] The entry points and import pages meet FR-009: usable at 375 px, 44 px targets, labelled controls, light and dark themes; `noindex, nofollow` and "Powered by Strava" stay
-  - [ ] Feature tests (Strava HTTP faked, stray requests prevented): a guest sees the link on the dashboard and on the connect screen; a guest import end to end with both header-language fixtures into the displayed athlete and into a newly created CSV-only athlete; two guest sessions stay isolated; a guest import makes no Strava request; the sync skips a CSV-only athlete; no stale warning for a CSV-only athlete; the signed-in owner flow is unchanged
-  - [ ] The developer domain docs for the import, sync, and heatmap domains are updated
+  - [x] Every visitor, signed in or not, sees "Import Garmin CSV" on the dashboard; a signed-out visitor sees it alongside "Connect with Strava"
+  - [x] The connect screen (no stored athlete has any activity) also offers "Import Garmin CSV"
+  - [x] A signed-out visitor can GET and POST every import page — upload, review, confirm, cancel, summary — with no Strava sign-in; every FR-018 behavior holds unchanged: Italian/English headers, run-only filter, 112-day window, ±2-minute conflict review with Overwrite/Skip, single transaction, idempotent re-import, summary counts, raw file never kept
+  - [x] A signed-in owner's import still targets their own athlete; a signed-out import targets the displayed athlete (FR-017 rules); when no athlete is displayed, confirming the first import creates a local CSV-only athlete (no Strava id, no tokens) that the home page then displays
+  - [x] A signed-out import never calls Strava and never reads or refreshes a token
+  - [x] Pending rows are bound to the visitor's own session: two concurrent signed-out sessions never see or confirm each other's upload, and no route accepts an import id
+  - [x] CSRF, the 5 MB limit, and the `garmin-import` throttle on upload and confirm stay in force for signed-out requests
+  - [x] The nightly sync skips an athlete with no Strava connection without logging an error or warning
+  - [x] A CSV-only athlete shows no stale or failed sync warning on the dashboard; the sync status reflects the latest import (FR-007)
+  - [x] Viewing the home page signed out stays read-only — no row written, no Strava call, no token refresh; only a confirmed import writes, and it invalidates the grid cache
+  - [x] The entry points and import pages meet FR-009: usable at 375 px, 44 px targets, labelled controls, light and dark themes; `noindex, nofollow` and "Powered by Strava" stay
+  - [x] Feature tests (Strava HTTP faked, stray requests prevented): a guest sees the link on the dashboard and on the connect screen; a guest import end to end with both header-language fixtures into the displayed athlete and into a newly created CSV-only athlete; two guest sessions stay isolated; a guest import makes no Strava request; the sync skips a CSV-only athlete; no stale warning for a CSV-only athlete; the signed-in owner flow is unchanged
+  - [x] The developer domain docs for the import, sync, and heatmap domains are updated
 
   **Notes for planning**
   - 🗄️ Mike: `users.strava_athlete_id` and the token columns are already nullable; `name` and `email` are not — the CSV-only athlete needs a placeholder for both, settled in planning. No migration expected.
   - 🔐 Lars: drop `auth` from the `garmin.import.*` group; `strava.fresh` stays (a no-op for guests, still guards a signed-in owner). The `Authenticate` redirect for import GETs in `bootstrap/app.php` becomes dead for these routes.
   - 🔎 Tom: the controllers resolve the owner from `$request->user()` (`ShowGarminImportReviewController`, `ConfirmGarminImportController`); the target athlete must be resolved once and the same on review and confirm — the displayed athlete can change between them only if an allowlisted athlete connects mid-review, which re-runs the review.
+
+
+  ## Rework Feedback
+
+  - resources/views/garmin/review.blade.php:66-76 — [Medium, Robert + Lars] guest disclosure of stored-run details. A signed-out visitor can upload crafted rows within ±2 min of stored runs and the conflict review shows the displayed athlete's activity name, distance, moving time and Strava link (private activities included) without confirming anything. Owner decision (2026-10-12): mask it. For a guest (no signed-in user), the "Stored" side of each clash shows only the stored start time and "Clashes with a stored run" — no name, no distance, no moving time, no Strava link, no source label. The Garmin-file side (the visitor's own data) and the Overwrite/Skip choice stay as they are. The signed-in owner's review is unchanged.
+  - Decide the guest/owner switch once (controller or a view flag from `$request->user()`), not by re-deriving auth in Blade.
+  - tests/Feature/Garmin/GuestGarminImportTest.php — add: a guest's review with a clash does not contain the stored run's name, distance, moving time or Strava URL, and does show "Clashes with a stored run" and the stored start; the signed-in owner's review still shows all stored details.
+  - .larapilot/docs/devs/garmin-csv-import.md — replace the "open (Medium)" disclosure note with the masking rule and its reason; drop it from the open items in .larapilot/docs/review/US-011.md.
+  - FR-009 still holds on the masked cell: 375 px layout, light and dark.
 status_history:
   -
     status: PLANNED
@@ -56,4 +65,25 @@ status_history:
   -
     status: REVIEW
     at: '2026-10-12T07:38:54+00:00'
+  -
+    status: TODO
+    at: '2026-10-12T19:15:04+00:00'
+  -
+    status: PLANNED
+    at: '2026-10-12T19:17:44+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-10-12T19:19:25+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-12T19:21:19+00:00'
+  -
+    status: DONE
+    at: '2026-10-12T19:23:10+00:00'
 rework: false
+merge_commit:
+  sha: 84d1938e344640be1760eede949822f765553570
+  short_sha: 84d1938
+  subject: 'docs(US-011): record the rework review findings'
+  committed_at: '2026-10-12T21:21:17+02:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/84d1938e344640be1760eede949822f765553570'

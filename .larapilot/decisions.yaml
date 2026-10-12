@@ -298,4 +298,17 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-12T07:12:39+00:00'
+  -
+    id: 9f7901704fd28766
+    ts: '2026-10-12T19:15:04+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-review
+    topic: 'guest conflict review disclosure'
+    label: 'guest conflict review disclosure'
+    value: "mask stored-run details for guests: stored side shows only start time and 'Clashes with a stored run'; owner view unchanged"
+    question: null
+    rationale: "Guests could enumerate the displayed athlete's private activity details via crafted CSV rows; the accepted PRD risk covers import/overwrite, not disclosure"
+    source: askquestion
+    spec: US-011
+    supersedes: null
+updated_at: '2026-10-12T19:15:04+00:00'
