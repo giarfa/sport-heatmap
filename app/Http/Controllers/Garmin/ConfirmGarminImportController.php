@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\Cache;
 class ConfirmGarminImportController extends Controller
 {
     /**
-     * Apply the reviewed import, provided the owner is still answering the
-     * review they were shown.
+     * Apply the reviewed import, provided the visitor is still answering the
+     * review they were shown, for the athlete it was planned against.
      */
     public function __invoke(
         ConfirmGarminImportRequest $request,
@@ -32,27 +32,35 @@ class ConfirmGarminImportController extends Controller
             return redirect()->route('garmin.import.create')->with('status', 'Upload a Garmin CSV to review an import.');
         }
 
-        /** @var User $owner */
-        $owner = $request->user();
-
         /*
-         * One confirm per owner at a time. A double-clicked "Confirm import"
-         * sends two requests that both carry the pending import in their
-         * session; serialised, the second re-plans after the first committed,
-         * finds its new runs already imported, fails the fingerprint and
-         * writes nothing.
+         * One confirm at a time for the whole instance, not per athlete: a
+         * guest's first import has no athlete to key on until the CSV-only
+         * athlete exists, and this is a single-athlete instance, so the
+         * serialisation costs nothing. A double-clicked "Confirm import", or
+         * two guests confirming a first import at once, therefore run one
+         * after the other; the second re-plans after the first committed —
+         * against the athlete it just created, or with its runs already
+         * imported — fails the fingerprint and writes nothing.
+         *
+         * The target is resolved inside the lock for the same reason: read
+         * before it, the second request would still see "no athlete" and
+         * plan against a target that no longer exists.
          */
-        return Cache::lock("garmin-import:confirm:{$owner->id}", 30)->block(10, function () use ($request, $owner, $parsed, $token, $pendingImport, $planGarminImport, $applyGarminImport, $resolveImportTarget): RedirectResponse {
-            $athlete = $resolveImportTarget($owner);
+        return Cache::lock('garmin-import:confirm', 30)->block(10, function () use ($request, $parsed, $token, $pendingImport, $planGarminImport, $applyGarminImport, $resolveImportTarget): RedirectResponse {
+            /** @var User|null $signedIn */
+            $signedIn = $request->user();
+            $athlete = $resolveImportTarget($signedIn);
 
             /*
              * The plan is recomputed from the session rows against the database
              * as it is now, never taken from the form. A sync or a second tab
-             * may have changed the stored runs since the review rendered; if the
-             * conflicts no longer pair the same rows with the same stored runs,
-             * the owner's answers could land on runs they never saw, so nothing
-             * is written. The token ties the form to this upload: a review page
-             * left open across a newer upload cannot confirm it.
+             * may have changed the stored runs since the review rendered; if
+             * the conflicts no longer pair the same rows with the same stored
+             * runs, the visitor's answers could land on runs they never saw, so
+             * nothing is written. The fingerprint carries the target athlete
+             * too, so a target that changed since the review fails the same
+             * way. The token ties the form to this upload: a review page left
+             * open across a newer upload cannot confirm it.
              */
             $plan = $planGarminImport($athlete, $parsed->rows);
 

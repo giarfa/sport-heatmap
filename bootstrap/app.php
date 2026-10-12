@@ -17,8 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'strava.fresh' => EnsureFreshStravaToken::class,
         ]);
 
-        // There is no login route — the owner signs in through Strava from the
-        // home page — so the auth middleware's default redirect would throw.
+        // No route uses auth today (the Garmin import opened to guests in
+        // US-011). Kept so a future auth route cannot throw on the missing
+        // login route: the owner signs in through Strava from the home page.
         $middleware->redirectGuestsTo(fn (): string => route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -11,7 +11,9 @@
 
 Lets the owner add runs that Strava is missing, or that Garmin recorded better,
 by uploading the "Activities" CSV exported from the Garmin Connect website
-(FR-018). The file is parsed into running rows inside the 112-day window, and
+(FR-018). Since US-011 any visitor can import, signed in or not: a guest
+imports into the displayed athlete, or — on a fresh install — creates a local
+CSV-only athlete, so the heatmap works with CSV imports only. The file is parsed into running rows inside the 112-day window, and
 every row that clashes with a stored run is reviewed before anything is
 written. If it stops working, Garmin-only runs never reach the heatmap; the
 Strava sync is unaffected.
@@ -155,24 +157,33 @@ authorize (`.ai/rules/actions.md`); the caller has.
 ### 4. HTTP flow
 
 All routes sit under `import/garmin`, named `garmin.import.*`, behind
-`auth` + `strava.fresh` (the allowlist is re-checked on every request). CSRF
-comes from the `web` group.
+`strava.fresh` only — **open to signed-out visitors** by the owner's choice
+(US-011; PRD Security, accepted risk). `strava.fresh` is a no-op for guests and
+still re-checks a signed-in owner's allowlist and token. CSRF comes from the
+`web` group.
 
 | Route | Name | Does |
 | --- | --- | --- |
 | `GET /import/garmin` | `create` | Upload form |
-| `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per owner) |
-| `GET /import/garmin/review` | `review` | Re-plans the pending rows against the DB **as it is now**; renders conflicts, new rows, counts, `token`, `fingerprint` |
-| `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under a per-owner `Cache::lock`, re-plans; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
+| `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per signed-in owner, else per IP) |
+| `GET /import/garmin/review` | `review` | Resolves the target, re-plans the pending rows against the DB **as it is now**; renders conflicts, new rows, counts, `token`, `fingerprint` |
+| `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under the **instance-wide** `Cache::lock('garmin-import:confirm')`, resolves the target, re-plans; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
 | `POST /import/garmin/cancel` | `cancel` | Forgets the pending import → dashboard, "Import cancelled. Nothing was written." |
 | `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary`; without one → dashboard |
 
-- **Guests**: `bootstrap/app.php` sets `redirectGuestsTo(route('dashboard'))`
-  (there is no login route, so the default would throw). Any guest request —
-  GET or POST — is redirected home and writes nothing.
+- **Guests** reach every page. A guest's target is the displayed athlete
+  (narrow model, no token column), else none — the confirm then creates the
+  CSV-only athlete. A guest request never calls Strava and never reads or
+  refreshes a token.
+- **Instance-wide confirm lock**: one confirm at a time on the whole instance,
+  with the target resolved **inside** the lock. A per-athlete key cannot exist
+  before the CSV-only athlete does; serialised, a second concurrent first
+  import re-plans against the athlete the first just created, fails the
+  fingerprint and goes back to the review.
 - **Session binding**: `PendingGarminImport` is the only reader and writer of
   `garmin_import.pending` = `{token, parsed}` (scalars only). No route or field
-  names an import, so a request can only reach the one in its own session.
+  names an import or an athlete, so a request can only reach the one in its
+  own session — this is what keeps two signed-out visitors apart.
   Abandoning the review leaves just this entry; the next upload replaces it.
 - **The file is never stored**: the controller parses
   `$request->file('csv')->getRealPath()` and never calls `store()`; PHP deletes
@@ -182,7 +193,9 @@ comes from the `web` group.
   token with the session's (both with `hash_equals`). A mismatch redirects to
   the review with "Your stored activities changed since this review — check
   the conflicts again." and writes nothing. A review page left open across a
-  newer upload fails the token check the same way.
+  newer upload fails the token check the same way, and so does a target that
+  changed since the review (an allowlisted athlete connected, the visitor
+  signed in, another guest created the CSV-only athlete).
 - **Rejections** (`UploadGarminCsvRequest` or `GarminCsvRejectedException`) go
   back to the form with the message on `csv`, linked to the input through
   `aria-describedby`; nothing is parsed into the session.
@@ -212,7 +225,7 @@ comes from the `web` group.
 | Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction, CSV-only athlete created inside it; grid cache forgotten after commit |
 | Answer | `app/Enums/ConflictResolution.php` | `overwrite`, `skip` |
 | Summary DTO | `app/Data/Garmin/GarminImportSummary.php` | The seven counts; session round-trip for the summary page |
-| Routes | `routes/web.php` (`garmin.import.*`), guest redirect in `bootstrap/app.php`, `garmin-import` limiter in `app/Providers/AppServiceProvider.php` | |
+| Routes | `routes/web.php` (`garmin.import.*`, `strava.fresh` only), `garmin-import` limiter in `app/Providers/AppServiceProvider.php` | |
 | Controllers | `app/Http/Controllers/Garmin/*` | Six single-action controllers |
 | Form Requests | `app/Http/Requests/Garmin/UploadGarminCsvRequest.php`, `ConfirmGarminImportRequest.php` | `required\|file\|max:5120\|mimes:csv,txt`; token, fingerprint, `resolutions.*` in `ConflictResolution` |
 | Session binding | `app/Support/Garmin/PendingGarminImport.php` | The one reader/writer of `garmin_import.pending` |
@@ -232,14 +245,14 @@ comes from the `web` group.
 | "Already imported" = same start, distance and moving time on a `garmin_csv` row | A hash of the CSV row as its identity | Garmin exports carry no activity id, and a re-export may add, drop or reorder columns, changing the hash of an unchanged run |
 | Identity pass before the conflict pass | One pass in file order | A row a minute away could claim the stored run first, and the row identical to it — a re-import — would be inserted a second time |
 | Claim each stored row for one CSV row, closest pairs first | Let every CSV row match freely; claim in file order | Free matching lets two CSV runs overwrite one stored run; file order lets an earlier row 90 s away take a stored run a later row matches to the second, so the later row is planned as new and a Skip leaves that run on the map twice |
-| Per-owner lock around confirm | Rely on the token and fingerprint alone | A double-clicked confirm sends two requests carrying the same session; serialised, the second re-plans after the first committed, finds its runs already imported, fails the fingerprint and writes nothing |
+| Instance-wide lock around confirm, target resolved inside it | Rely on the token and fingerprint alone; a per-athlete lock | A double-clicked confirm sends two requests carrying the same session; serialised, the second re-plans after the first committed, finds its runs already imported, fails the fingerprint and writes nothing. A per-athlete key cannot exist before a guest's first import creates the athlete, and a single-athlete instance loses nothing by serialising |
+| Import open to signed-out visitors (US-011) | Keep it owner-only behind `auth` | The owner's choice, recorded in the decision journal and PRD Security as an accepted risk: the heatmap must work with CSV imports only, with no Strava sign-in |
 | Conflicts with **either** source | Only with Strava rows | A second, slightly different Garmin export of the same run must be reviewed, not duplicated |
 | Overwrite keeps `strava_activity_id` | Clear it | Without the id the sync no longer recognises the twin and would re-add Strava's copy the next night |
 | A missing answer is Skip | Reject the confirm | Skip is the pre-checked, non-destructive default; the Form Request already requires an answer |
 | Pending rows in the owner's session | A `pending_imports` table | A table would persist owner data beyond the request, need cleanup of abandoned reviews, and expose an id a request could name |
 | Re-plan at confirm and compare a fingerprint | Trust the plan rendered in the review | A sync or another tab can change stored runs between review and confirm; the owner's answers must apply to the runs they saw |
 | Form Requests for upload and confirm | Inline `$request->validate()` | First user-submitted forms in the app; `.ai/rules/http.md` was amended for them |
-| Guests redirected home, never 401/403 pages | A login route | There is no login page — the owner signs in through Strava from `/` |
 | Reject the whole file only for file-level problems | Reject on the first bad row | One corrupt row must not cost the owner the other thirty-nine |
 | One resolver for the import target, used by review and confirm | Each controller reading `$request->user()` | A guest has no user; two copies of "owner, else displayed athlete" could drift and plan against one athlete while writing to another |
 | CSV-only athlete with placeholder `name` / `email` | A migration making `users.name` / `users.email` nullable | No migration for one row; the fixed `.invalid` address plus the existing UNIQUE index makes a second CSV-only athlete impossible |
@@ -276,8 +289,12 @@ comes from the `web` group.
 - **Invariant — re-importing the same file changes nothing.** Every row is
   already imported, so nothing is created or asked about.
 - **Invariant — the session is the only binding.** _Breaks if:_ a route or
-  form field starts naming an import — a request could then reach another
-  owner's pending rows.
+  form field starts naming an import or an athlete — a request could then
+  reach another visitor's pending rows or write to a chosen athlete.
+- **Accepted risk — anyone can import.** Any visitor can add or overwrite runs
+  on the displayed athlete's map. Bounded by CSRF, 5 MB, the per-IP throttle,
+  and the review step; re-decide before deploying to a public URL that others
+  know (PRD Security).
 - **Invariant — the raw file is never persisted.** _Breaks if:_ the upload is
   `store()`d — an export carries heart rate, cadence and locations.
 - **Invariant — nothing is written before confirm**, and a stale confirm writes

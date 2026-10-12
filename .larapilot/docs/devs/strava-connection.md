@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-002` |
-| **Last updated by** | `US-009` — 2026-10-11 |
+| **Last updated by** | `US-011` — 2026-10-12 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
@@ -71,6 +71,16 @@ and the nightly sync can no longer read activities.
    `null` (the dashboard then renders the connect screen).
 5. Token state is ignored and token columns are never loaded: an owner with a
    dead refresh token is still displayed, and so is a fallback athlete.
+6. The displayed athlete is also the **target of a signed-out Garmin import**
+   (US-011, `ResolveGarminImportTarget`, see `garmin-csv-import.md`), and the
+   fallback may return the **CSV-only athlete** (`User::isCsvOnly()`: no Strava
+   id, no tokens) that a guest's first import created. A connected allowlisted
+   athlete still wins over it.
+
+**Guests and `auth`.** No route uses the `auth` middleware since US-011 opened
+the Garmin import to guests. `bootstrap/app.php` keeps
+`redirectGuestsTo(route('dashboard'))` only as a safety net, so a future `auth`
+route cannot throw on the missing login route.
 
 Query cost: allowlist hit → 1; empty allowlist → 1; non-empty allowlist with
 nobody connected → 2.
@@ -178,7 +188,7 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
 
 ## Related
 
-- Specs: `US-002`, `US-003`, `US-007`, `US-009`
+- Specs: `US-002`, `US-003`, `US-007`, `US-009`, `US-011`
 - Plans: `.larapilot/plans/US-002-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`
 - Review: `.larapilot/docs/review/US-002.md`, `US-007.md`, `US-009.md`
 - Other domains: `activity-sync.md`, `heatmap-dashboard.md`
