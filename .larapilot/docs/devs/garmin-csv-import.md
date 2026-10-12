@@ -179,7 +179,10 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
   with the target resolved **inside** the lock. A per-athlete key cannot exist
   before the CSV-only athlete does; serialised, a second concurrent first
   import re-plans against the athlete the first just created, fails the
-  fingerprint and goes back to the review.
+  fingerprint and goes back to the review. A confirm that waits out the 10 s
+  block (`LockTimeoutException`) writes nothing and goes back to the review
+  with "Another import is being saved — confirm again in a moment."; the upload
+  stays pending.
 - **Session binding**: `PendingGarminImport` is the only reader and writer of
   `garmin_import.pending` = `{token, parsed}` (scalars only). No route or field
   names an import or an athlete, so a request can only reach the one in its
@@ -291,6 +294,11 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 - **Invariant — the session is the only binding.** _Breaks if:_ a route or
   form field starts naming an import or an athlete — a request could then
   reach another visitor's pending rows or write to a chosen athlete.
+- **Open (review, Medium) — the conflict review shows stored-run details to
+  guests.** A guest whose rows land within ±2 minutes of stored runs sees their
+  name, exact start, moving time and Strava link, which the public map does
+  not show. Awaiting the owner's decision: accept it in PRD Security, or reduce
+  the stored side for guests.
 - **Accepted risk — anyone can import.** Any visitor can add or overwrite runs
   on the displayed athlete's map. Bounded by CSRF, 5 MB, the per-IP throttle,
   and the review step; re-decide before deploying to a public URL that others

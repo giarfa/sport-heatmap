@@ -8,8 +8,10 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -175,7 +177,7 @@ class GuestGarminImportTest extends TestCase
         $this->assertSame(1, User::count());
     }
 
-    public function test_two_concurrent_first_imports_create_one_csv_only_athlete(): void
+    public function test_a_first_import_confirmed_after_another_goes_back_to_review_leaving_one_csv_only_athlete(): void
     {
         $this->upload($this->fixture('activities-it.csv'));
         $reviewA = $this->review();
@@ -196,6 +198,21 @@ class GuestGarminImportTest extends TestCase
 
         $this->assertSame(1, User::count());
         $this->assertSame(37, Activity::count());
+    }
+
+    public function test_a_confirm_that_waits_out_the_instance_wide_lock_goes_back_to_the_review(): void
+    {
+        Sleep::fake(syncWithCarbon: true);
+        $this->upload($this->fixture('activities-it.csv'));
+        $review = $this->review();
+        Cache::lock('garmin-import:confirm', 30)->get();
+
+        $response = $this->confirm($review);
+
+        $response->assertRedirect(route('garmin.import.review'));
+        $response->assertSessionHas('garmin_import.stale', 'Another import is being saved — confirm again in a moment.');
+        $this->assertSame(0, Activity::count());
+        $this->assertNotNull(session('garmin_import.pending'));
     }
 
     private function upload(UploadedFile $file): TestResponse

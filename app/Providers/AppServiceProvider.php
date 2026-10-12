@@ -26,10 +26,9 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * The OAuth entry points are the only unauthenticated routes in the product,
-     * so they are the only thing worth brute-forcing. Ten attempts a minute is
-     * far more than a real athlete ever needs. The Garmin upload is limited per
-     * signed-in owner, else per IP.
+     * The OAuth entry points are limited per IP: ten attempts a minute is far
+     * more than a real athlete ever needs. The Garmin upload and confirm, open
+     * to guests since US-011, are limited per signed-in owner, else per IP.
      */
     private function registerRateLimiters(): void
     {
