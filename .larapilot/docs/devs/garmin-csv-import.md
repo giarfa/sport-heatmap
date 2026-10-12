@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-008` |
-| **Last updated by** | `US-008` — 2026-10-11 |
+| **Last updated by** | `US-011` — 2026-10-12 |
 | **Owner persona** | 🔧 Alex |
 
 ## Purpose
@@ -91,10 +91,21 @@ Matched trimmed and case-insensitively (`GarminRunningTypes`):
 | Moving time | `HH:MM:SS`, `MM:SS`, optional fractional seconds → rounded seconds | `"00:54:23"` → 3263 · `"00:40:12.6"` → 2413 |
 | Date | wall-clock, **no timezone conversion**; `activity_date` is its date part | `2026-10-10 09:33:27` |
 
-### 2. Planning (`PlanGarminImport`)
+### 2. Target and planning (`ResolveGarminImportTarget`, `PlanGarminImport`)
 
-`PlanGarminImport::__invoke(User, rows)` sorts the parsed rows against the
-owner's stored activities. It reads only.
+`ResolveGarminImportTarget::__invoke(?User $signedIn)` picks the athlete the
+import plans against and writes to:
+
+1. the **signed-in owner**, when there is one;
+2. else the **displayed athlete** (`ResolveDisplayedAthlete`, FR-017) — the
+   narrow `id, strava_athlete_id` model, so no token is ever loaded;
+3. else **null** — no stored athlete has an activity yet.
+
+The review and the confirm both resolve through it.
+
+`PlanGarminImport::__invoke(?User, rows)` sorts the parsed rows against the
+target's stored activities. It reads only. With a **null target** every row is
+new and no query runs.
 
 1. **One query** loads the owner's activities on the dates the file contains
    (`whereIn('activity_date', …)`, served by the `(user_id, activity_date)`
@@ -111,15 +122,20 @@ owner's stored activities. It reads only.
 4. **New**: everything else.
 
 The result is a `GarminImportPlan` (`newRows`, `conflicts`, `alreadyImported`,
-all keyed by the row's index in the parsed file) with a `fingerprint()`: a
-SHA-256 of the `rowIndex => storedActivityId` conflict pairs plus the
-already-imported row indexes — what the owner was shown.
+all keyed by the row's index in the parsed file, plus the target's
+`athleteId`, null when there is none) with a `fingerprint()`: a SHA-256 of the
+target id, the `rowIndex => storedActivityId` conflict pairs, and the
+already-imported row indexes — what the visitor was shown.
 
 ### 3. Applying (`ApplyGarminImport`)
 
-`ApplyGarminImport::__invoke(User, plan, resolutions, parsed)` runs inside
+`ApplyGarminImport::__invoke(?User, plan, resolutions, parsed)` runs inside
 **one** `DB::transaction`:
 
+- **null target with new rows** → `CreateCsvOnlyAthlete` first, inside the
+  transaction: `firstOrCreate` on `email = csv-athlete@garmin.invalid`,
+  `name = Garmin CSV athlete`, no password, no Strava id, no tokens. A null
+  target with nothing to add writes nothing and creates no athlete;
 - each new row → `$user->activities()->create()` with `source = garmin_csv`
   and no Strava id;
 - **Overwrite** → the stored row takes the CSV's name, distance, moving time,
@@ -128,7 +144,9 @@ already-imported row indexes — what the owner was shown.
   skips it (see `activity-sync.md`);
 - **Skip**, or no answer at all → nothing is written.
 
-After the commit it forgets the owner's cached grid for today
+The passed athlete is only read, never `save()`d — it may be the narrow
+displayed-athlete model. After the commit it forgets the cached grid for today
+of the athlete actually written to
 (`HeatmapGridCache::forget()`), so the dashboard shows the import on the next
 request. It returns a `GarminImportSummary`: imported, overwritten, skipped,
 already imported, ignored by type, outside window, invalid. The action does not
@@ -186,10 +204,12 @@ comes from the `web` group.
 | Row DTO | `app/Data/Garmin/GarminCsvRow.php` | `toAttributes()` (always `source = garmin_csv`), `toSessionArray()` / `fromSessionArray()`, `isIdenticalTo(Activity)` |
 | Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, outside-window count, invalid list; session round-trip |
 | Rejection | `app/Exceptions/Garmin/GarminCsvRejectedException.php` | Owner-facing messages; no file content beyond a column name |
-| Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query, claiming |
+| Target | `app/Support/Garmin/ResolveGarminImportTarget.php` | Signed-in owner, else displayed athlete, else null |
+| Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query, claiming; all new with no target |
+| CSV-only athlete | `app/Actions/Garmin/CreateCsvOnlyAthlete.php`, `User::isCsvOnly()`, `UserFactory::csvOnly()` | Placeholder identity (`NAME`, `EMAIL` constants), reused by `firstOrCreate` |
 | Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id — shared with the sync |
 | Plan DTOs | `app/Data/Garmin/GarminImportPlan.php`, `GarminImportConflict.php` | The plan and its `fingerprint()` |
-| Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction; grid cache forgotten after commit |
+| Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction, CSV-only athlete created inside it; grid cache forgotten after commit |
 | Answer | `app/Enums/ConflictResolution.php` | `overwrite`, `skip` |
 | Summary DTO | `app/Data/Garmin/GarminImportSummary.php` | The seven counts; session round-trip for the summary page |
 | Routes | `routes/web.php` (`garmin.import.*`), guest redirect in `bootstrap/app.php`, `garmin-import` limiter in `app/Providers/AppServiceProvider.php` | |
@@ -221,6 +241,10 @@ comes from the `web` group.
 | Form Requests for upload and confirm | Inline `$request->validate()` | First user-submitted forms in the app; `.ai/rules/http.md` was amended for them |
 | Guests redirected home, never 401/403 pages | A login route | There is no login page — the owner signs in through Strava from `/` |
 | Reject the whole file only for file-level problems | Reject on the first bad row | One corrupt row must not cost the owner the other thirty-nine |
+| One resolver for the import target, used by review and confirm | Each controller reading `$request->user()` | A guest has no user; two copies of "owner, else displayed athlete" could drift and plan against one athlete while writing to another |
+| CSV-only athlete with placeholder `name` / `email` | A migration making `users.name` / `users.email` nullable | No migration for one row; the fixed `.invalid` address plus the existing UNIQUE index makes a second CSV-only athlete impossible |
+| Create the CSV-only athlete inside the import transaction, only with rows | Create it on upload or on review | Upload and review write nothing; a failed insert must not leave an empty athlete, and an empty one would never be displayed |
+| Fingerprint carries the target id | Compare the conflicts only | A plan with no conflicts hashes the same for every athlete, so a target change between review and confirm would go unnoticed |
 | Wall-clock dates built in UTC | Parse with the app timezone | Same contract as Strava's `start_date_local`; a conversion moves late-evening runs to the wrong day |
 
 ## Key decisions & invariants
@@ -243,6 +267,12 @@ comes from the `web` group.
   transaction. _Breaks if:_ rows are created outside it — a failure halfway
   would leave half an import that a re-upload then reports as part new, part
   already imported.
+- **Invariant — at most one CSV-only athlete**, created only together with at
+  least one run. _Breaks if:_ its email changes per import, or it is created
+  outside the transaction.
+- **Invariant — the fingerprint carries the target.** _Breaks if:_ the athlete
+  id is dropped from it — a confirm could write to an athlete the review never
+  planned against.
 - **Invariant — re-importing the same file changes nothing.** Every row is
   already imported, so nothing is created or asked about.
 - **Invariant — the session is the only binding.** _Breaks if:_ a route or
@@ -282,8 +312,8 @@ comes from the `web` group.
 
 ## Related
 
-- Specs: `US-008`
-- Plans: `.larapilot/plans/US-008-plan.yaml`
+- Specs: `US-008`, `US-011`
+- Plans: `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-011-plan.yaml`
 - Mockups: `.larapilot/mockups/US-008/`
 - Decisions: `7baf70c6656a936f` (late Strava twin links to the Garmin row), `56c5683061907ab8` (running type names; unknowns surfaced)
 - Other domains: `activity-sync.md`, `heatmap-dashboard.md`

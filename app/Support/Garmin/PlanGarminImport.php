@@ -12,7 +12,7 @@ use Carbon\CarbonImmutable;
 /**
  * Sorts parsed Garmin rows against the athlete's stored activities into new
  * rows, conflicts, and rows already imported. Reads only; nothing is written
- * until the owner confirms the review.
+ * until the visitor confirms the review. With no athlete yet, every row is new.
  */
 final readonly class PlanGarminImport
 {
@@ -21,8 +21,12 @@ final readonly class PlanGarminImport
     /**
      * @param  array<int, GarminCsvRow>  $rows
      */
-    public function __invoke(User $athlete, array $rows): GarminImportPlan
+    public function __invoke(?User $athlete, array $rows): GarminImportPlan
     {
+        if ($athlete === null) {
+            return new GarminImportPlan($rows, [], [], null);
+        }
+
         $dates = array_values(array_unique(array_map(
             static fn (GarminCsvRow $row): string => $row->activityDate->toDateString(),
             $rows,
@@ -103,6 +107,6 @@ final readonly class PlanGarminImport
 
         $newRows = array_diff_key($rows, $alreadyImported, $conflicts);
 
-        return new GarminImportPlan($newRows, $conflicts, $alreadyImported);
+        return new GarminImportPlan($newRows, $conflicts, $alreadyImported, $athlete->id);
     }
 }

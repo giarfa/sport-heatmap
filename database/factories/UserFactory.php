@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Actions\Garmin\CreateCsvOnlyAthlete;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -41,6 +42,24 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the athlete is the local CSV-only athlete a signed-out
+     * Garmin import creates: the placeholder identity, no Strava id, no tokens.
+     */
+    public function csvOnly(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'name' => CreateCsvOnlyAthlete::NAME,
+            'email' => CreateCsvOnlyAthlete::EMAIL,
+            'email_verified_at' => null,
+            'password' => null,
+            'strava_athlete_id' => null,
+            'strava_access_token' => null,
+            'strava_refresh_token' => null,
+            'strava_token_expires_at' => null,
         ]);
     }
 

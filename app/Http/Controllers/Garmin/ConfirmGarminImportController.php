@@ -8,6 +8,7 @@ use App\Http\Requests\Garmin\ConfirmGarminImportRequest;
 use App\Models\User;
 use App\Support\Garmin\PendingGarminImport;
 use App\Support\Garmin\PlanGarminImport;
+use App\Support\Garmin\ResolveGarminImportTarget;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
 
@@ -22,6 +23,7 @@ class ConfirmGarminImportController extends Controller
         PendingGarminImport $pendingImport,
         PlanGarminImport $planGarminImport,
         ApplyGarminImport $applyGarminImport,
+        ResolveGarminImportTarget $resolveImportTarget,
     ): RedirectResponse {
         $parsed = $pendingImport->parsed();
         $token = $pendingImport->token();
@@ -40,7 +42,9 @@ class ConfirmGarminImportController extends Controller
          * finds its new runs already imported, fails the fingerprint and
          * writes nothing.
          */
-        return Cache::lock("garmin-import:confirm:{$owner->id}", 30)->block(10, function () use ($request, $owner, $parsed, $token, $pendingImport, $planGarminImport, $applyGarminImport): RedirectResponse {
+        return Cache::lock("garmin-import:confirm:{$owner->id}", 30)->block(10, function () use ($request, $owner, $parsed, $token, $pendingImport, $planGarminImport, $applyGarminImport, $resolveImportTarget): RedirectResponse {
+            $athlete = $resolveImportTarget($owner);
+
             /*
              * The plan is recomputed from the session rows against the database
              * as it is now, never taken from the form. A sync or a second tab
@@ -50,7 +54,7 @@ class ConfirmGarminImportController extends Controller
              * is written. The token ties the form to this upload: a review page
              * left open across a newer upload cannot confirm it.
              */
-            $plan = $planGarminImport($owner, $parsed->rows);
+            $plan = $planGarminImport($athlete, $parsed->rows);
 
             if (! hash_equals($token, (string) $request->validated('token'))
                 || ! hash_equals($plan->fingerprint(), (string) $request->validated('fingerprint'))) {
@@ -65,7 +69,7 @@ class ConfirmGarminImportController extends Controller
                     ->withErrors(['resolutions' => 'Choose Overwrite or Skip for every clash.']);
             }
 
-            $summary = $applyGarminImport($owner, $plan, $resolutions, $parsed);
+            $summary = $applyGarminImport($athlete, $plan, $resolutions, $parsed);
 
             $pendingImport->forget();
 
