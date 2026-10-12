@@ -5,11 +5,11 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 5
-status: 'IN PROGRESS'
+status: REVIEW
 body: |
   #### US-011: Garmin CSV import open to signed-out visitors (CSV-only dashboard)
 
-  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** IN PROGRESS
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** REVIEW
   **Blocked by:** -
   **Type:** Change request
   **Supersedes:** US-008 criterion "A signed-in owner sees an "Import Garmin CSV" entry point on the dashboard; signed-out visitors do not, and a signed-out GET or POST to the import pages is refused with nothing written" · US-007 / FR-017 promise "A signed-out visit is strictly read-only"
@@ -53,4 +53,7 @@ status_history:
   -
     status: 'IN PROGRESS'
     at: '2026-10-12T07:25:21+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-12T07:38:54+00:00'
 rework: false
