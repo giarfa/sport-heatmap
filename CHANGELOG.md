@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-12
+
+A public, read-only dashboard and a Garmin Connect CSV import alongside the Strava sync. Covers
+US-007 through US-010 (EP-002 Activity sync, EP-003 Heatmap, EP-004 Maintenance).
+
+### Added
+
+- An owner-only **Garmin Connect CSV import**: upload the Activities export (Italian or English
+  headers, metric units, max 5 MB), review every run that clashes with a stored one — same date,
+  starts within ±2 minutes — side by side, choose **Overwrite** or **Skip** per run (or for all),
+  and confirm. New runs are added, non-running types are counted and listed, and a summary shows
+  every count. Nothing is written before confirming, the uploaded file is never stored, and
+  re-importing the same file changes nothing (US-008).
+
+### Changed
+
+- The nightly sync deletes only Strava-sourced activities that Strava no longer returns: runs
+  imported from a Garmin CSV are never deleted, runs overwritten with Garmin's values are never
+  reverted or re-added, and a Strava activity that turns up later for a run imported as new is
+  linked to it instead of duplicated (US-008).
+
+- The home page is public: it shows the owner's last synced heatmap, weekly totals, legend and
+  sync status read-only, without a Strava sign-in. The displayed athlete is the first connected id
+  of `STRAVA_ALLOWED_ATHLETE_IDS`, in configured order; the connect screen only appears while
+  nobody has connected yet. Signing in stays allowlist-only (US-007).
+
+### Fixed
+
+- The home page no longer answers with a server error on every visit after the first of the day:
+  with a serializing cache store (`CACHE_STORE=database`, the default), the cached heatmap grid
+  could not be restored and each cache hit failed. The cache now restores only the grid's own
+  classes, and an entry it cannot restore is rebuilt instead of failing the page (US-010).
+
 ## [0.1.0] - 2026-09-07
 
 First release: the complete MVP scope — a private, single-athlete Strava running heatmap. Covers

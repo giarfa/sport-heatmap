@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
@@ -47,7 +48,33 @@ class ActivityFactory extends Factory
             'moving_time_seconds' => (int) round($distanceMeters / 1_000 * $secondsPerKilometre),
             'start_date_local' => $startDateLocal,
             'activity_date' => $startDateLocal->toDateString(),
+            'source' => ActivitySource::Strava,
         ];
+    }
+
+    /**
+     * A run imported new from a Garmin Connect CSV: it never existed on Strava, so it
+     * has no Strava id. Garmin names a run after its place and type.
+     */
+    public function garminImported(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'source' => ActivitySource::GarminCsv,
+            'strava_activity_id' => null,
+            'name' => fake()->randomElement(['Paese Corsa', 'Verona Corsa', 'Bolzano Corsa', 'Lazise Corsa']),
+        ]);
+    }
+
+    /**
+     * A Strava twin the owner overwrote with Garmin's values: the Strava id stays, so
+     * the sync recognises the twin and leaves it alone.
+     */
+    public function garminOverwritten(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'source' => ActivitySource::GarminCsv,
+            'name' => fake()->randomElement(['Paese Corsa', 'Verona Corsa', 'Bolzano Corsa', 'Lazise Corsa']),
+        ]);
     }
 
     /**

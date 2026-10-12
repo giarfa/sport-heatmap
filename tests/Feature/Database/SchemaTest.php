@@ -81,6 +81,23 @@ class SchemaTest extends TestCase
         $this->assertTrue($this->hasIndexOn('activities', ['strava_activity_id'], unique: true));
     }
 
+    public function test_activities_source_is_a_string_defaulting_to_strava(): void
+    {
+        $this->assertSame('varchar', $this->columnTypeName('activities', 'source'));
+        $this->assertFalse($this->columnIsNullable('activities', 'source'));
+        $this->assertSame("'strava'", $this->columnDefault('activities', 'source'));
+    }
+
+    /**
+     * Garmin-imported runs have no Strava id, but an overwritten twin keeps its id,
+     * so the column is nullable and the unique index must survive the change.
+     */
+    public function test_activities_strava_activity_id_is_nullable_and_still_unique(): void
+    {
+        $this->assertTrue($this->columnIsNullable('activities', 'strava_activity_id'));
+        $this->assertTrue($this->hasIndexOn('activities', ['strava_activity_id'], unique: true));
+    }
+
     public function test_sync_runs_table_has_every_required_column(): void
     {
         foreach ([
@@ -114,6 +131,17 @@ class SchemaTest extends TestCase
         foreach (Schema::getColumns($table) as $definition) {
             if ($definition['name'] === $column) {
                 return $definition['type_name'];
+            }
+        }
+
+        return null;
+    }
+
+    private function columnDefault(string $table, string $column): ?string
+    {
+        foreach (Schema::getColumns($table) as $definition) {
+            if ($definition['name'] === $column) {
+                return $definition['default'];
             }
         }
 

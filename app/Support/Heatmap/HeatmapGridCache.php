@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Contracts\Cache\Repository;
+use Throwable;
 
 /**
  * Owns the cached grid's key and TTL, so the dashboard controller and the sync
@@ -21,14 +22,35 @@ final readonly class HeatmapGridCache
 
     /**
      * Return the cached grid, or build and store it on a miss.
+     *
+     * An entry that cannot be restored as a HeatmapGrid counts as a miss and is
+     * overwritten. A serializing store restores a class missing from
+     * `cache.serializable_classes` as __PHP_Incomplete_Class, and throws while
+     * unserializing when the missing class, an enum case, or a date sits inside
+     * the grid — so an entry written by an older shape of the grid would
+     * otherwise fail every request until it expires.
+     *
+     * @param  Closure(): HeatmapGrid  $build
      */
     public function remember(User $athlete, HeatmapWindow $window, CarbonInterface $today, Closure $build): HeatmapGrid
     {
-        return $this->cache->remember(
-            $this->key($athlete, $window, $today),
-            (int) config('heatmap.grid_cache_ttl'),
-            $build,
-        );
+        $key = $this->key($athlete, $window, $today);
+
+        try {
+            $cached = $this->cache->get($key);
+        } catch (Throwable $exception) {
+            report($exception);
+            $cached = null;
+        }
+
+        if ($cached instanceof HeatmapGrid) {
+            return $cached;
+        }
+
+        $grid = $build();
+        $this->cache->put($key, $grid, (int) config('heatmap.grid_cache_ttl'));
+
+        return $grid;
     }
 
     /**

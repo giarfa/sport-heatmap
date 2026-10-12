@@ -7,6 +7,7 @@ use App\Support\Heatmap\DailyRunningDistance;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
+use App\Support\Strava\ResolveDisplayedAthlete;
 use App\Support\Sync\ResolveSyncStatus;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -14,27 +15,45 @@ use Illuminate\View\View;
 class DashboardController extends Controller
 {
     /**
-     * The single screen of this product.
+     * The single screen of this product, public and read-only.
      *
-     * A signed-out visit renders the connect screen rather than redirecting to a
-     * login page — there is no login page, and a redirect loop is the failure
-     * mode this route exists to avoid.
+     * The signed-in athlete sees their own map. A signed-out visitor sees the
+     * displayed athlete's — the first connected id of the allowlist, else the
+     * lowest-id stored athlete with an activity — and only gets the connect
+     * screen when no stored athlete has any activity. The connect screen
+     * renders rather than redirects: there is no login page, and a redirect
+     * loop is the failure mode this route exists to avoid.
      */
     public function __invoke(
         DailyRunningDistance $dailyDistance,
         HeatmapBuilder $buildGrid,
         HeatmapGridCache $gridCache,
         ResolveSyncStatus $resolveSyncStatus,
+        ResolveDisplayedAthlete $resolveDisplayedAthlete,
     ): View {
-        if (! Auth::check()) {
+        /*
+         * The guest branch is read-only by structure, not by care: the
+         * strava.fresh middleware is a no-op for guests, nothing below calls
+         * EnsureFreshAccessToken or StravaClient, and the resolver selects no
+         * token column. A guest request therefore cannot refresh a token,
+         * reach Strava, or write a domain row — only the session and cache
+         * stores write, as they do for any request.
+         */
+        /** @var User|null $athlete */
+        $athlete = Auth::user() ?? $resolveDisplayedAthlete();
+
+        if ($athlete === null) {
             return view('strava.connect');
         }
 
-        /** @var User $athlete */
-        $athlete = Auth::user();
         $window = HeatmapWindow::current();
         $today = now();
 
+        /*
+         * The cache key is per athlete, not per viewer, so guests and the
+         * signed-in owner share one cached grid — a guest visit never costs a
+         * rebuild the owner has already paid for, and vice versa.
+         */
         $grid = $gridCache->remember(
             $athlete,
             $window,

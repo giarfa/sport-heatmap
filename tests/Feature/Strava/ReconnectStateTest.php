@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Strava;
 
+use App\Models\Activity;
 use App\Models\User;
+use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -27,20 +29,40 @@ class ReconnectStateTest extends TestCase
         Http::preventStrayRequests();
     }
 
-    public function test_a_dead_refresh_token_shows_the_reconnect_screen_rather_than_a_server_error(): void
+    public function test_a_dead_refresh_token_signs_the_owner_out_onto_the_public_map_with_the_expiry_banner(): void
+    {
+        Http::fake(['www.strava.com/oauth/token' => Http::response(['message' => 'Unauthorized'], 401)]);
+
+        $user = $this->allowlistedAthlete(factoryState: 'stravaTokenExpired');
+        Activity::factory()->for($user)->onDate(HeatmapWindow::current()->endsOn->subDays(2))->create([
+            'distance_meters' => 12_345,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertGuest();
+
+        $followUp = $this->get(route('dashboard'));
+
+        $followUp->assertOk();
+        $followUp->assertViewIs('dashboard');
+        $followUp->assertSee('12.3 km');
+        $followUp->assertSee('Your Strava connection expired');
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_the_expiry_banner_is_shown_once(): void
     {
         Http::fake(['www.strava.com/oauth/token' => Http::response(['message' => 'Unauthorized'], 401)]);
 
         $user = $this->allowlistedAthlete(factoryState: 'stravaTokenExpired');
 
-        $response = $this->actingAs($user)->get(route('dashboard'));
+        $this->actingAs($user)->get(route('dashboard'))->assertRedirect(route('dashboard'));
+        $this->get(route('dashboard'))->assertSee('Your Strava connection expired');
 
-        $response->assertOk();
-        $response->assertViewIs('strava.connect');
-        $response->assertSee('Connect with Strava');
-        $response->assertSee('expired', escape: false);
-
-        $this->assertGuest();
+        $this->get(route('dashboard'))->assertOk()->assertDontSee('Your Strava connection expired');
     }
 
     public function test_a_successful_refresh_renders_the_dashboard_and_stores_the_new_tokens(): void
@@ -114,7 +136,7 @@ class ReconnectStateTest extends TestCase
      * different one — makes every stored token undecryptable. That is a
      * reconnect, not a 500 on the only screen this product has.
      */
-    public function test_undecryptable_tokens_show_the_reconnect_screen(): void
+    public function test_undecryptable_tokens_sign_the_owner_out_onto_the_public_map(): void
     {
         $user = $this->allowlistedAthlete();
 
@@ -126,11 +148,19 @@ class ReconnectStateTest extends TestCase
 
         $response = $this->actingAs($user->fresh())->get(route('dashboard'));
 
-        $response->assertOk();
-        $response->assertViewIs('strava.connect');
-        $response->assertSee('expired', escape: false);
-
+        $response->assertRedirect(route('dashboard'));
         $this->assertGuest();
+
+        /*
+         * The displayed athlete's tokens are still undecryptable, but the guest
+         * path never reads them — so the public map must render, not 500.
+         */
+        $followUp = $this->get(route('dashboard'));
+
+        $followUp->assertOk();
+        $followUp->assertViewIs('dashboard');
+        $followUp->assertSee('Your Strava connection expired');
+
         Http::assertNothingSent();
     }
 

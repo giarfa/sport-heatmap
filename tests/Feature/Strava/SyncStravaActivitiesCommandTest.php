@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Strava;
 
+use App\Enums\ActivitySource;
 use App\Enums\SyncRunStatus;
 use App\Models\Activity;
 use App\Models\SyncRun;
@@ -55,6 +56,40 @@ class SyncStravaActivitiesCommandTest extends TestCase
         $this->assertSame(2, $syncRun->activities_upserted);
         $this->assertSame(0, $syncRun->activities_deleted);
         $this->assertNull($syncRun->error_message);
+    }
+
+    public function test_a_garmin_won_activity_survives_the_sync_and_is_excluded_from_the_run_counts(): void
+    {
+        $athlete = $this->allowlistedAthlete();
+
+        $twin = Activity::factory()->for($athlete)->garminOverwritten()->onDate(now())->create([
+            'strava_activity_id' => 42,
+            'name' => 'Paese Corsa',
+            'distance_meters' => 8_290,
+        ]);
+        $imported = Activity::factory()->for($athlete)->garminImported()->onDate(now()->subDays(3))->create();
+
+        Http::fake([
+            'www.strava.com/api/v3/athlete/activities*' => Http::response([
+                $this->stravaActivityPayload(['id' => 42, 'name' => 'Morning Run', 'distance' => 8_150.0]),
+                $this->stravaActivityPayload(['id' => 1]),
+            ]),
+        ]);
+
+        $this->artisan('strava:sync')->assertExitCode(Command::SUCCESS);
+
+        $this->assertSame(3, Activity::count());
+
+        $twin->refresh();
+        $this->assertSame(ActivitySource::GarminCsv, $twin->source);
+        $this->assertSame('Paese Corsa', $twin->name);
+        $this->assertSame(8_290, $twin->distance_meters);
+        $this->assertTrue(Activity::whereKey($imported->id)->exists());
+
+        $syncRun = SyncRun::sole();
+        $this->assertSame(SyncRunStatus::Succeeded, $syncRun->status);
+        $this->assertSame(1, $syncRun->activities_upserted);
+        $this->assertSame(0, $syncRun->activities_deleted);
     }
 
     public function test_running_it_twice_against_the_same_response_reports_zero_zero_the_second_time(): void

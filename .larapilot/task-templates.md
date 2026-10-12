@@ -1,17 +1,19 @@
 # Larapilot — Task body templates
 
-Copy these structures into `larapilot-plan` task bodies. Every **Impl** and **Fix** task MUST include **## Git Deliverables** when `settings.git_mode` is `GITFLOW` or `GITFLOW_PUSH`; every task that touches Eloquent models MUST include **## Test Data** (factory + seeder). Anne's test tasks omit Git/Test Data unless they add seed-only fixtures.
+Copy these structures into `larapilot-plan` task bodies. Every **Impl** and **Fix** task MUST include **## Git Deliverables** when `settings.git_mode` is `GITFLOW` or `GITFLOW_PUSH`; every task that touches Eloquent models MUST include **## Test Data** (factory + seeder); every task that changes a domain's behavior MUST include **## Domain Docs** (`.larapilot/runtime-dev-docs.md`) — at every effort level, `ECO` included. Anne's test tasks omit Git/Test Data unless they add seed-only fixtures.
 
-**Read `data.settings` from `config-show` before planning and honor it** — canonical matrices in `.larapilot/shared-runtime.md` → **Project Settings**; canonical Git/TASK-00 prose in `.larapilot/runtime-delivery.md` → **Git Workflow**. Template selection follows the settings: `NO_GITFLOW` omits TASK-00 and all Push/PR lines; `GITFLOW` includes TASK-00 without Push (PR prepared locally); `GITFLOW_PUSH` includes TASK-00 with push + remote PR; `testing` picks the matching Anne template depth; `effort: ECO` means fewer/shorter tasks and deferred docs except OpenAPI; `effort: MAX` adds verification/docs tasks and a deeper Test Strategy.
+The templates below are the ones the settings of the project call for: the Git lines follow `settings.git_mode`, the test task follows `settings.testing`. Under `effort: ECO` write fewer and shorter tasks and defer docs except OpenAPI and the domain docs; under `effort: MAX` add verification and docs tasks and a deeper Test Strategy. Canonical Git and TASK-00 prose: **Git Workflow** in `runtime-delivery.md`.
 
 Replace `{US-XXX}`, `{TASK-NN}`, `{Model}`, and placeholders with real values.
 
 ---
 
+<!-- when: git_mode!=NO_GITFLOW -->
 ## TASK-00 — Git bootstrap (first task — Gitflow modes only)
 
-Use when `git_mode` is `GITFLOW` or `GITFLOW_PUSH` and the spec has no open `feature/US-XXX-*` branch yet. **Skip entirely when `NO_GITFLOW`.**
+Use when the spec has no open `feature/US-XXX-*` branch yet.
 
+<!-- when: git_mode=GITFLOW -->
 ### `GITFLOW` (no automatic push)
 
 ```markdown
@@ -36,7 +38,8 @@ Bootstrap Gitflow for this spec: create the feature branch from `develop` and pr
 - Push: **skip** (`git_mode: GITFLOW`)
 - PR: prepare locally — open/update remote only if user requests
 ```
-
+<!-- end -->
+<!-- when: git_mode=GITFLOW_PUSH -->
 ### `GITFLOW_PUSH`
 
 ```markdown
@@ -61,6 +64,48 @@ Bootstrap Gitflow for this spec: create the feature branch from `develop`, push 
 - Push: `origin feature/US-XXX-short-desc`
 - PR: open or update — reference `US-XXX` + `TASK-00`
 ```
+<!-- end -->
+<!-- end -->
+
+---
+
+<!-- when: release_mode=YES and git_mode!=NO_GITFLOW -->
+## TASK-00 — Release branch variant (release_mode + Gitflow)
+
+Use when **`settings.release_mode` is `YES`**, `git_mode` is `GITFLOW` or `GITFLOW_PUSH`, and the spec body carries **`Release: x.y.z`** (assigned to an `in_progress` release — `release-feature` opens the release branch if it is still `planned`). Branch **from** `release/x.y.z`, merge **into** `release/x.y.z` — **not** `develop`. One Artisan command; do not run the git steps by hand.
+
+Replace `{RELEASE}` with the semver (e.g. `1.2.0`).
+
+### `GITFLOW` (no automatic push)
+
+```markdown
+## Description
+Bootstrap Gitflow for this spec on release `{RELEASE}`: create `feature/US-XXX-*` from `release/{RELEASE}` and prepare the internal PR description toward `release/{RELEASE}`. Do **not** push unless the user asks.
+
+## Files Involved
+- (git only — no application files)
+
+## Steps
+1. `php artisan larapilot:release-feature --semver={RELEASE} --spec=US-XXX --slug=short-desc`
+2. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`.
+3. Draft internal PR title/body toward `base` (`release/{RELEASE}`)
+
+## Completion Criteria
+- [ ] `release-feature` returned `ok: true` and `checked_out: true`
+- [ ] PR title/body drafted toward `release/{RELEASE}` (not `develop`)
+
+## Git Deliverables
+- Commit: `chore(US-XXX): TASK-00 bootstrap feature branch for release/{RELEASE}` (only if the command did not already leave you on the new branch with a commit — an empty commit is optional)
+- Push: **skip** (`git_mode: GITFLOW`)
+- PR: prepare locally toward `release/{RELEASE}` — open remote only if user requests
+```
+
+### `GITFLOW_PUSH`
+
+Same as above, but pass `--push` on `release-feature` and open/update the PR toward **`release/{RELEASE}`** (`base` from the command).
+
+When the spec has **no** `Release:` line, use the standard **TASK-00 — Git bootstrap** templates toward `develop`.
+<!-- end -->
 
 ---
 
@@ -98,6 +143,11 @@ Add `{Model}` with migration, factory, and seeder entries so the demo dataset st
 - [ ] `DatabaseSeeder` (or dedicated seeder) calls `{Model}::factory()` with meaningful volumes/states
 - [ ] Factory updated in **this same task** as migration/model changes
 
+## Domain Docs
+- [ ] `{paths.dev_docs}/{domain}.md` updated (or created from `TEMPLATE.md`) — data model, invariants, and the schema choices that were rejected
+- [ ] Folder `README.md` index row updated
+- [ ] English, committed with this task
+
 ## Git Deliverables
 - Commit: `feat(US-XXX): TASK-NN add {Model} with factory and seeder`
 - Push: {`origin feature/…` only if `git_mode: GITFLOW_PUSH`; otherwise **skip**}
@@ -130,6 +180,11 @@ Use when the task does not add or change Eloquent models.
 ## Test Data
 - N/A — no model/schema changes in this task
 
+## Domain Docs
+- [ ] `{paths.dev_docs}/{domain}.md` updated (or created from `TEMPLATE.md`) — functional flow, technical design, architectural choices
+- [ ] Folder `README.md` index row updated
+- [ ] English, committed with this task
+
 ## Git Deliverables
 - Commit: `feat(US-XXX): TASK-NN {short summary}`
 - Push: {only if `GITFLOW_PUSH`; else **skip**}
@@ -140,8 +195,9 @@ Use when the task does not add or change Eloquent models.
 
 ## Test task (Anne)
 
-Scale steps to `settings.testing`.
+Steps scaled to `settings.testing`.
 
+<!-- when: testing!=BEST -->
 ### `MINIMAL` / `NORMAL`
 
 ```markdown
@@ -167,7 +223,8 @@ Add Pest coverage for {feature/API/policy}.
 - Push: {only if `GITFLOW_PUSH`; else **skip**}
 - PR: {remote update only if `GITFLOW_PUSH`}
 ```
-
+<!-- end -->
+<!-- when: testing=BEST -->
 ### `BEST`
 
 ```markdown
@@ -196,10 +253,11 @@ Add Pest coverage for {feature/API/policy}, including responsive/browser checks 
 - Push: {only if `GITFLOW_PUSH`; else **skip**}
 - PR: {remote update only if `GITFLOW_PUSH`}
 ```
+<!-- end -->
 
 ---
 
-## Fix / evolutiva task (rework)
+## Fix / enhancement task (rework)
 
 ```markdown
 ## Description
@@ -221,6 +279,10 @@ Fix: {one-line from rework feedback}
 ## Test Data
 - [ ] Factory/seeder updated when applicable; otherwise `N/A`
 
+## Domain Docs
+- [ ] `{paths.dev_docs}/{domain}.md` corrected when the fix changed how the domain behaves; otherwise `N/A`
+- [ ] English, committed with this task
+
 ## Git Deliverables
 - Commit: `fix(US-XXX): TASK-NN {short summary}`
 - Push: {only if `GITFLOW_PUSH`; else **skip**}
@@ -229,34 +291,40 @@ Fix: {one-line from rework feedback}
 
 ---
 
+<!-- when: frontend=external -->
 ## Frontend task — external repo (`repo: frontend`)
 
-Use when **Frontend Topology** is `API + external frontend` and the task implements UI in the configured FE repo. Set `repo: frontend` on the task in the plan JSON. Paths are relative to `data.frontend.repo_path` from `config-show`.
+Use when **Frontend Topology** is `API + external frontend` and the task implements UI in the configured FE repo. Set `"repo": "frontend"` on the task in the plan JSON, `"project": "<name>"` when `frontend-scan` reports a monorepo, and `"shared": ["<library>"]` when the task must change a library in `write_scope.shared`. Paths are relative to the scan's `root` (the workspace; `repo_path` only when the repository is its own workspace). Fill the braces from `frontend-scan` — never from habit — and follow **Frontend Companion** (`frontend.md`).
 
 ```markdown
 ## Description
-{UI work — map to mockups/OpenAPI; honor existing FE conventions from frontend-scan}
+{UI work — map to mockups/OpenAPI. Project `{project}` ({stack} {framework.version}). Shared libraries changed and the apps that depend on them, or "none".}
 
 ## Files Involved
-- src/...  _(paths under the external FE repo)_
+- {owned root}/...  _(under `write_scope.owned`; model each new file on the exemplar of its kind)_
+
+## Frontend Rules
+- {`rules.must_read` paths, plus `frontend-rules --file=` for the files above — the repository's rules win on code}
 
 ## Steps
-1. Read mockups at `{paths.mockups}/{code}/` and product OpenAPI
-2. Implement components/pages/routes in the FE repo
-3. Wire API client (auth, error/loading states) — no undocumented endpoints
-4. Run FE tests: `npm test` / `pnpm test` / `vitest run` from the FE root
+1. Read mockups at `{paths.mockups}/{code}/` and the product OpenAPI
+2. Generate with the workspace generators (`generators.local` first, `--dry-run`), then implement as `observed` and the exemplars show
+3. Wire the API: regenerate the generated client (`api_client.regenerate`) or extend the HTTP layer the project has — loading, empty, and error states; no undocumented endpoint
+4. Verify: {`target_projects[].commands` — lint, typecheck, test, build} then {`commands.affected`}
 
 ## Completion Criteria
 - [ ] UI matches mockups / acceptance criteria
-- [ ] API calls match documented contract
-- [ ] FE test suite passes
+- [ ] API calls match the documented contract
+- [ ] The frontend rules that govern the files are respected
+- [ ] Lint, tests, and build green for the project and what depends on it
 
 ## Git Deliverables
-- Repo: frontend (`git -C {data.frontend.repo_path} …`)
-- Commit: `feat(US-XXX): TASK-NN {short summary}`
+- Repo: frontend (`git -C {git_root} …` — `target_projects[].git_root` when set, else `git.root` of the scan) — its hooks run, never `--no-verify`
+- Commit: `git.commits.pattern` from the scan, in the language and style of its `samples`, with `US-XXX TASK-NN` in the subject — in `git_root` when the project has one
 - Push: {only if `GITFLOW_PUSH`; else **skip**}
 - PR: {remote update only if `GITFLOW_PUSH`}
 ```
+<!-- end -->
 
 ---
 

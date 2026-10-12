@@ -378,3 +378,246 @@ specs:
       subject: 'chore(US-006): record usage ledger updates'
       committed_at: '2026-09-06T22:35:30+02:00'
       url: 'https://github.com/giarfa/sport-heatmap/commit/023f7e359656903a6fae85304ebed274beeb18ef'
+  -
+    code: US-007
+    title: 'Public read-only dashboard on the home page'
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: HIGH
+    points: 3
+    status: DONE
+    body: |
+      #### US-007: Public read-only dashboard on the home page
+
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 3 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Change request
+      **Supersedes:** US-002 criterion "Visiting the dashboard while signed out renders the connect screen, not an error" — now only when no allowlisted athlete has connected yet
+      **Traces to:** FR-017 (MoSCoW: Must) · FR-001 (changed) · FR-007 · FR-008 · FR-009 — no journey (the PRD has no `## User Journeys`)
+      **Prior art:** built-in — a public route on the existing controller and cache; no package involved
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want my heatmap to open on the home page without a Strava sign-in,
+      so that I can check it on any device instantly and share the link with anyone.
+
+      **Demonstrates**
+      Opening `/` in a private browser window, with no session, shows the owner's last synced 16-week heatmap,
+      weekly totals, legend, and sync status. Signing in is still possible from a discreet "Connect with Strava"
+      entry point, and still restricted to the allowlist.
+
+      **Acceptance Criteria**
+      - [x] A signed-out `GET /` returns 200 and renders the displayed athlete's heatmap grid, weekly totals, legend, sync chip, and sync detail — the same content the signed-in owner sees
+      - [x] The displayed athlete is the first id in `STRAVA_ALLOWED_ATHLETE_IDS`, in configured order, that has a connected user record; an athlete removed from the allowlist is never displayed, even while their rows remain stored
+      - [x] When no allowlisted athlete has connected yet, a signed-out visit renders the existing connect screen with 200, not an error
+      - [x] Signed-out visitors see a discreet "Connect with Strava" entry point; the OAuth flow is unchanged — an allowlisted athlete signs in, any other athlete is rejected with nothing persisted
+      - [x] When the last sync failed or is stale, signed-out visitors see the same warning as the owner — title, failure reason (HTML-escaped), and reconnect link
+      - [x] A signed-out request is strictly read-only: it writes no row to `users`, `activities`, or `sync_runs`, sends no HTTP request to Strava, and never triggers a token refresh
+      - [x] A signed-in owner whose token can no longer be refreshed is signed out and lands on the public dashboard with the "Your Strava connection expired" banner, not on a connect-only screen
+      - [x] A signed-in athlete removed from the allowlist still gets the 403 rejection with the session ended (unchanged)
+      - [x] Signed-out visitors and the owner share the same grid cache; the sync status is still read fresh on every request (FR-007)
+      - [x] The page keeps `<meta name="robots" content="noindex, nofollow">`, and the "Powered by Strava" attribution is visible to signed-out visitors (FR-008)
+      - [x] FR-009 holds for signed-out visitors: the 375 px layout without page scroll, table semantics with an accessible name per cell, light and dark themes
+      - [x] Feature tests (Strava HTTP faked): guest sees a populated map; no-athlete-connected fallback; removed athlete not displayed; a guest request writes nothing and sends no HTTP request; dead-token owner lands on the public map with the banner; guest sees the sync warning
+
+      **Notes for planning**
+      - ⚖️ Violet: the owner accepted the Strava API Agreement risk ("display a user's data only to that user") on 2026-10-11 — PRD `### Privacy & legal`. Do not reopen it in planning.
+      - 🔐 Lars: guests must never reach `EnsureFreshAccessToken` — the displayed athlete is resolved for reading only.
+      - The developer domain doc for the dashboard/auth domain is updated in this spec.
+    status_history:
+      - { status: PLANNED, at: '2026-10-11T11:59:37+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-11T12:01:23+00:00' }
+      - { status: REVIEW, at: '2026-10-11T12:11:09+00:00' }
+      - { status: DONE, at: '2026-10-11T12:23:20+00:00' }
+    rework: false
+    merge_commit:
+      sha: ff6bc87111b680bf5daee105359ed813c724af79
+      short_sha: ff6bc87
+      subject: 'docs(US-007): record the Robert and Lars review findings'
+      committed_at: '2026-10-11T14:11:09+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ff6bc87111b680bf5daee105359ed813c724af79'
+  -
+    code: US-008
+    title: 'Import runs from a Garmin Connect CSV with conflict review'
+    epic:
+      code: EP-002
+      title: 'Activity sync'
+    priority: HIGH
+    points: 8
+    status: DONE
+    body: |
+      #### US-008: Import runs from a Garmin Connect CSV with conflict review
+
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Feature
+      **Supersedes:** US-003 criterion "Local activities inside the window that are absent from the response are deleted" — now Strava-sourced activities only, and Garmin-overwritten activities are never reverted or re-added
+      **Traces to:** FR-018 (MoSCoW: Must) · FR-002 (changed) · FR-003 · FR-008 (clarified) · FR-009 — no journey (the PRD has no `## User Journeys`)
+      **Prior art:** built-in — PHP's CSV reader (`fgetcsv` / `SplFileObject`) covers the format; no package
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want to upload the "Activities" CSV I export from the Garmin Connect website and decide what happens to each run that clashes with one already stored,
+      so that runs missing from Strava, or better recorded on Garmin, show up on my heatmap.
+
+      **Demonstrates**
+      Signed in as the owner, uploading `.larapilot/client-materials/Activities (1).csv` shows a review page with the new runs and every
+      conflict side by side; after choosing Overwrite or Skip per conflict and confirming, the dashboard shows the imported runs, the
+      hiking rows are ignored, and running the nightly sync afterwards changes none of the overwritten activities.
+
+      **Acceptance Criteria**
+      - [x] A signed-in owner sees an "Import Garmin CSV" entry point on the dashboard; signed-out visitors do not, and a signed-out GET or POST to the import pages is refused with nothing written
+      - [x] Garmin Connect "Activities" exports with **Italian or English** headers are accepted; a file with any other header set, missing a required column (activity type, date, title, distance, moving time), not a CSV, or larger than 5 MB is rejected with an explicit message and nothing written
+      - [x] Garmin running types in both languages are mapped onto `Run` / `TrailRun` / `VirtualRun` (the sample's `Corsa` → `Run`); every other type — e.g. `Escursionismo` — is ignored and counted (FR-003)
+      - [x] Distance in km (`"8.29"`) is stored as integer metres (8290); `Tempo in movimento` / `Moving Time` is stored as seconds; `Data` / `Date` is stored as `start_date_local` with its date as `activity_date`; thousands separators (`"8,240"`) and `"--"` placeholders are handled
+      - [x] Rows outside the 112-day window and future-dated rows are skipped and counted; a row with an unparseable date or distance is skipped and listed with its reason, while the remaining rows still import
+      - [x] A CSV row **conflicts** when a stored activity of either source starts on the same date within **±2 minutes** of it; when several are in range, the closest start is the match
+      - [x] Before anything is written, a review page lists every conflict side by side (stored vs CSV: start, distance, moving time) with **Overwrite / Skip** per row and "overwrite all" / "skip all" shortcuts; rows without a conflict are listed as new
+      - [x] Abandoning the review writes nothing; confirming applies every choice in a single transaction
+      - [x] A CSV row identical to an already imported Garmin activity (same start, distance, and moving time) counts as "already imported" and is not asked about — re-importing the same file changes nothing
+      - [x] **Skip** leaves the stored activity untouched; **Overwrite** replaces its name, distance, moving time, and start with the CSV values and marks it as Garmin-sourced
+      - [x] **Garmin wins permanently:** after an overwrite, the nightly sync never reverts it, never re-adds its Strava twin, and never deletes it — including a sync in which Strava still returns the twin
+      - [x] The nightly sync's delete-on-absence touches Strava-sourced activities only; Garmin-imported activities are never deleted by the sync (FR-002)
+      - [x] After confirmation, a summary shows imported, overwritten, skipped, already-imported, ignored (non-run), outside-window, and invalid counts; the grid cache is invalidated so the dashboard reflects the import immediately
+      - [x] Imported activities carry no Strava deep-link (FR-008); the raw uploaded file is never persisted beyond the request
+      - [x] The upload and review pages meet FR-009: usable at 375 px, labelled form controls, the review rendered as a table with headers, light and dark themes
+      - [x] Feature tests (sample file as fixture plus an English-header fixture; Strava HTTP faked): both header languages parse; type filtering, window cutoff, and invalid rows; conflict detection at the ±2-minute boundary (1:59 matches, 2:01 does not); overwrite and skip; the sync neither reverts, duplicates, nor deletes a Garmin-won activity; re-import is a no-op; guests are refused
+
+      **Notes for planning**
+      - 🗄️ Mike: activities gain a `source` and a nullable `strava_activity_id` (kept on an overwritten twin so the sync can skip it) — one migration, reversible.
+      - 🔎 Tom: the exact Garmin type names in both languages (`Corsa su pista` / `Track Running`, `Tapis roulant` / `Treadmill Running`, trail and virtual variants) are confirmed against real exports in planning, not guessed.
+      - 🔐 Lars: CSRF on the upload and the confirm; the parsed rows awaiting review are bound to the owner's session, never to an id a request can supply.
+      - The developer domain docs for the sync and heatmap domains are updated in this spec.
+    status_history:
+      - { status: PLANNED, at: '2026-10-11T12:33:18+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-11T12:47:21+00:00' }
+      - { status: REVIEW, at: '2026-10-11T13:09:56+00:00' }
+      - { status: DONE, at: '2026-10-11T13:13:07+00:00' }
+    rework: false
+    merge_commit:
+      sha: 7239b877291d0d66c200490b71885f2707087d29
+      short_sha: 7239b87
+      subject: 'chore(US-008): record the plan, backlog state and usage'
+      committed_at: '2026-10-11T15:10:01+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/7239b877291d0d66c200490b71885f2707087d29'
+  -
+    code: US-009
+    title: 'Home page falls back to the stored athlete when no allowlisted athlete has connected'
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: HIGH
+    points: 2
+    status: DONE
+    body: |
+      #### US-009: Home page falls back to the stored athlete when no allowlisted athlete has connected
+
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 2 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Change request
+      **Supersedes:** US-007 criteria "an athlete removed from the allowlist is never displayed, even while their rows remain stored" and "When no allowlisted athlete has connected yet, a signed-out visit renders the existing connect screen" — the connect screen now appears only when no stored athlete has any activity
+      **Traces to:** FR-017 (MoSCoW: Must, changed) · FR-007 · FR-008 · FR-009 — no journey (the PRD has no `## User Journeys`)
+      **Prior art:** built-in — one more query in `ResolveDisplayedAthlete`; no package involved
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want the home page to show my stored runs even when no allowlisted athlete is connected to Strava,
+      so that I see the heatmap instead of the Strava connect screen whenever there is data to show.
+
+      **Demonstrates**
+      With `STRAVA_ALLOWED_ATHLETE_IDS` blank and the seeded demo athlete in the database (`php artisan migrate:fresh --seed`),
+      opening `/` in a private window shows the seeded 16-week heatmap, weekly totals, legend, and sync status instead of
+      the Strava connect screen.
+
+      **Acceptance Criteria**
+      - [x] When an allowlisted athlete has connected, the home page is unchanged: the first allowlisted connected athlete, in configured order, is displayed, even while other stored athletes have activities
+      - [x] When no allowlisted athlete has connected (blank allowlist, or no listed id has a user record) and at least one stored athlete has an activity of either source, a signed-out `GET /` returns 200 and renders that athlete's grid, weekly totals, legend, sync chip, and sync detail; "first" is the lowest `users.id` with at least one activity
+      - [x] When no stored athlete has any activity, a signed-out visit renders the existing connect screen with 200, not an error
+      - [x] The fallback is strictly read-only: it writes no row to `users`, `activities`, or `sync_runs`, sends no HTTP request to Strava, never triggers a token refresh, and never selects the token columns
+      - [x] Sign-in is unchanged: the allowlist still gates the OAuth callback, a signed-in athlete removed from the allowlist still gets the 403 with the session ended, and signed-out visitors still see no Garmin import entry point
+      - [x] The fallback athlete's sync status is read fresh on every request; a failed or stale sync shows the same warning — title, HTML-escaped reason, reconnect link — as for the owner (FR-007)
+      - [x] When an allowlisted athlete connects after the fallback was displayed, the next visit renders their grid, never the fallback athlete's cached grid
+      - [x] The page keeps `<meta name="robots" content="noindex, nofollow">` and the "Powered by Strava" attribution (FR-008); FR-009 holds — 375 px layout without page scroll, table semantics with an accessible name per cell, light and dark themes
+      - [x] Feature tests (Strava HTTP faked): fallback with a blank allowlist; fallback when the listed athlete has not connected; an allowlisted connected athlete beats the fallback; no activities → connect screen; a fallback guest request writes nothing and sends no HTTP request; switching from the fallback to an allowlisted athlete never serves the cached fallback grid
+      - [x] README (the `STRAVA_ALLOWED_ATHLETE_IDS` row and the local-dev note on the seeded athlete) and the dashboard developer domain doc describe the fallback
+
+      **Notes for planning**
+      - ⚖️ Violet: the owner accepted on 2026-10-11 that the fallback can display an athlete removed from the allowlist — PRD `### Privacy & legal`, "Accepted risk — fallback display". Do not reopen it in planning.
+      - 🔐 Lars: the fallback query selects only `id` and `strava_athlete_id`, like the allowlist query — no guest request may load a token.
+      - 🔎 Tom: check how the grid cache is keyed before planning criterion 7; if it is keyed per athlete, the criterion holds already and needs only its test.
+    status_history:
+      - { status: PLANNED, at: '2026-10-11T13:27:54+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-11T13:29:29+00:00' }
+      - { status: REVIEW, at: '2026-10-11T13:34:19+00:00' }
+      - { status: DONE, at: '2026-10-11T13:38:25+00:00' }
+    rework: false
+    merge_commit:
+      sha: 8da0628348bca206fe407c352ff7f7db8445873c
+      short_sha: 8da0628
+      subject: 'chore(US-009): record the plan, backlog state and usage'
+      committed_at: '2026-10-11T15:34:25+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/8da0628348bca206fe407c352ff7f7db8445873c'
+  -
+    code: US-010
+    title: 'Fix: home page returns 500 when the heatmap grid is served from the cache'
+    epic:
+      code: EP-004
+      title: Maintenance
+    priority: HIGH
+    points: 2
+    status: DONE
+    body: |
+      #### US-010: Fix — home page returns 500 when the heatmap grid is served from the cache
+
+      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Fix
+      **Severity:** High
+      **Security:** Lars — yes (cache deserialization allowlist); Oliver — no
+      **Related:** US-004 (introduced the grid cache), US-009
+      **Traces to:** FR-004 · FR-017 · FR-007 — no journey (the PRD has no `## User Journeys`)
+      **Promise broken:** FR-004 "The dashboard renders a fixed grid of 16 week-rows by 7 weekday-columns"; US-009 criterion "a signed-out `GET /` returns 200 and renders that athlete's grid, weekly totals, legend, sync chip, and sync detail"
+      **Logged:** `TypeError` at `app/Support/Heatmap/HeatmapGridCache.php:28` ×1, last 2026-10-11 13:40:23 (local) — "HeatmapGridCache::remember(): Return value must be of type App\Data\Heatmap\HeatmapGrid, __PHP_Incomplete_Class returned"
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want the home page to render my heatmap on every visit, not only the first one of the day,
+      so that the dashboard never answers with a server error while my grid is cached.
+
+      **Demonstrates**
+      With `CACHE_STORE=database`, opening `/` twice in a row returns the dashboard with 200 both times;
+      the second response is served from the cache. A regression test round-trips the grid through a
+      serializing cache store and fails without the fix.
+
+      **Steps to Reproduce**
+      1. Set `CACHE_STORE=database` (the `.env.example` default) and have an athlete with activities.
+      2. Open `/` — the grid is built and cached, 200.
+      3. Open `/` again within `heatmap.grid_cache_ttl` — 500, `TypeError` in `HeatmapGridCache::remember()`.
+
+      **Root cause**
+      `config/cache.php` sets `serializable_classes => false` (the Laravel 13 default), so a serializing
+      store (database, file, redis) refuses to unserialize the cached `HeatmapGrid` and its nested
+      `WeekRow`, `DayCell`, `LegendRow`, `DayCellState`, and `CarbonImmutable` values and returns
+      `__PHP_Incomplete_Class`. The test suite runs the `array` store with `serialize => false`, so no test
+      ever round-tripped the grid through serialization.
+
+      **Acceptance Criteria**
+      - [x] Bug fixed — the promise holds again: with a serializing cache store, a second `GET /` within the TTL returns 200 and renders the same grid, weekly totals, and legend as the first, for a signed-in athlete and for a signed-out visitor
+      - [x] A cached grid that cannot be restored (stored before the fix, or by an older class shape) never produces a 500: it is rebuilt and the page renders
+      - [x] The cache deserialization stays an allowlist: only the classes the cached grid needs are allowed, never `serializable_classes => true` (Lars)
+      - [x] Regression test covers the failure with a serializing cache store and fails without the fix (Anne)
+      - [x] Root cause named in the fix commit; `heatmap-dashboard.md` documents the serialization constraint on the grid cache
+      - [x] No security regression; no schema change, so no factory/seeder change
+    status_history:
+      - { status: PLANNED, at: '2026-10-11T13:43:40+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-11T13:43:46+00:00' }
+      - { status: REVIEW, at: '2026-10-11T13:51:23+00:00' }
+      - { status: DONE, at: '2026-10-11T13:52:39+00:00' }
+    rework: false
+    merge_commit:
+      sha: 4fd303b17cddc315a59a4cd5d48c9e45afee4590
+      short_sha: 4fd303b
+      subject: 'chore(US-010): record the plan, backlog state and usage'
+      committed_at: '2026-10-11T15:51:27+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4fd303b17cddc315a59a4cd5d48c9e45afee4590'

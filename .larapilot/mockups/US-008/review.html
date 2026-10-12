@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Review Garmin import — Sport Heatmap</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="import.css">
+<script>if (location.hash === '#dark') document.documentElement.classList.add('dark');</script>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <a href="../heatmap-dashboard/index.html" class="brand">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="17" width="12" height="12" rx="3" fill="#86b6ef"/><rect x="17" y="17" width="12" height="12" rx="3" fill="#2a78d6"/><rect x="3" y="3" width="12" height="12" rx="3" fill="#3987e5"/><rect x="17" y="3" width="12" height="12" rx="3" fill="#104281"/></svg>
+      Heatmap
+    </a>
+    <button type="button" class="icon-btn" aria-pressed="false" onclick="document.documentElement.classList.toggle('dark'); this.setAttribute('aria-pressed', document.documentElement.classList.contains('dark'))">
+      <span class="sr-only">Toggle dark mode</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+  <div class="imp imp--wide">
+    <h1>Review import</h1>
+    <p class="lede">Nothing is saved until you confirm.</p>
+
+    <section class="card" style="margin-top:1rem; padding:1rem 1.25rem;" aria-labelledby="tally-h">
+      <h2 id="tally-h" class="sr-only">What the file contains</h2>
+      <dl class="tally">
+        <div><dt>New runs</dt><dd>35</dd></div>
+        <div><dt>Clashes to decide</dt><dd>2</dd></div>
+        <div><dt>Already imported</dt><dd>0</dd></div>
+        <div><dt>Not runs, ignored</dt><dd>3</dd></div>
+        <div><dt>Outside 16 weeks</dt><dd>0</dd></div>
+        <div><dt>Unreadable rows</dt><dd>0</dd></div>
+      </dl>
+    </section>
+
+    <form action="summary.html" method="get" style="margin-top:1rem;">
+      <section class="card" style="padding:1rem 1.25rem;" aria-labelledby="cmp-h">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; gap:0.75rem; align-items:end;">
+          <div>
+            <h2 id="cmp-h" class="section-title">Clashes</h2>
+            <p class="section-note">A stored run starts within 2 minutes of a run in the file. Skip keeps the stored one.</p>
+          </div>
+          <div class="shortcuts" data-resolve-shortcuts hidden>
+            <button type="button" class="btn btn--secondary" data-resolve-all="overwrite">Overwrite all</button>
+            <button type="button" class="btn btn--secondary" data-resolve-all="skip">Skip all</button>
+          </div>
+        </div>
+
+        <table class="cmp" style="margin-top:0.75rem;">
+          <caption class="sr-only">Stored run compared with the run in the file, and what to keep</caption>
+          <thead>
+            <tr>
+              <th scope="col">Run</th>
+              <th scope="col">Stored</th>
+              <th scope="col">Garmin file</th>
+              <th scope="col">Keep</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row"><span class="run-date">Sat 10 Oct 2026</span>Paese Corsa</th>
+              <td data-label="Stored" class="cmp-pair">
+                <dl class="side">
+                  <div><dt>Start</dt><dd>09:34:10</dd></div>
+                  <div><dt>Distance</dt><dd>8.2 km</dd></div>
+                  <div><dt>Moving</dt><dd>0:53:58</dd></div>
+                </dl>
+                <p class="side-source">Strava · <a href="https://www.strava.com/activities/1234567890">View on Strava</a></p>
+              </td>
+              <td data-label="Garmin file" class="cmp-pair">
+                <dl class="side">
+                  <div><dt>Start</dt><dd>09:33:27</dd></div>
+                  <div><dt>Distance</dt><dd>8.3 km</dd></div>
+                  <div><dt>Moving</dt><dd>0:54:23</dd></div>
+                </dl>
+              </td>
+              <td data-label="Keep">
+                <fieldset class="choice">
+                  <legend>Paese Corsa, 10 Oct 09:33</legend>
+                  <div class="seg">
+                    <input type="radio" id="r0-skip" name="resolutions[0]" value="skip" checked><label for="r0-skip">Skip</label>
+                    <input type="radio" id="r0-over" name="resolutions[0]" value="overwrite"><label for="r0-over">Overwrite</label>
+                  </div>
+                </fieldset>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row"><span class="run-date">Wed 30 Sep 2026</span>Paese Corsa</th>
+              <td data-label="Stored" class="cmp-pair">
+                <dl class="side">
+                  <div><dt>Start</dt><dd>06:41:30</dd></div>
+                  <div><dt>Distance</dt><dd>5.0 km</dd></div>
+                  <div><dt>Moving</dt><dd>0:31:40</dd></div>
+                </dl>
+                <p class="side-source">Garmin import</p>
+              </td>
+              <td data-label="Garmin file" class="cmp-pair">
+                <dl class="side">
+                  <div><dt>Start</dt><dd>06:40:07</dd></div>
+                  <div><dt>Distance</dt><dd>5.1 km</dd></div>
+                  <div><dt>Moving</dt><dd>0:32:05</dd></div>
+                </dl>
+              </td>
+              <td data-label="Keep">
+                <fieldset class="choice">
+                  <legend>Paese Corsa, 30 Sep 06:40</legend>
+                  <div class="seg">
+                    <input type="radio" id="r1-skip" name="resolutions[1]" value="skip" checked><label for="r1-skip">Skip</label>
+                    <input type="radio" id="r1-over" name="resolutions[1]" value="overwrite"><label for="r1-over">Overwrite</label>
+                  </div>
+                </fieldset>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card" style="margin-top:1rem; padding:1rem 1.25rem;" aria-labelledby="new-h">
+        <h2 id="new-h" class="section-title">New runs</h2>
+        <p class="section-note">No stored run clashes with these. They are added as they are.</p>
+        <table class="cmp" style="margin-top:0.75rem;">
+          <caption class="sr-only">Runs in the file that will be added</caption>
+          <thead>
+            <tr><th scope="col">Run</th><th scope="col">Start</th><th scope="col">Distance</th><th scope="col">Moving</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row"><span class="run-date">Thu 8 Oct 2026</span>Paese Corsa</th><td data-label="Start" class="num">06:53:22</td><td data-label="Distance" class="num">5.1 km</td><td data-label="Moving" class="num">0:32:40</td></tr>
+            <tr><th scope="row"><span class="run-date">Wed 7 Oct 2026</span>Paese Corsa</th><td data-label="Start" class="num">06:43:30</td><td data-label="Distance" class="num">5.1 km</td><td data-label="Moving" class="num">0:32:42</td></tr>
+            <tr><th scope="row"><span class="run-date">Wed 30 Sep 2026</span>Paese Corsa</th><td data-label="Start" class="num">08:51:10</td><td data-label="Distance" class="num">5.1 km</td><td data-label="Moving" class="num">0:32:01</td></tr>
+          </tbody>
+        </table>
+        <p class="mock-annot">Mockup shows 3 of 35. The real page lists every new run, newest first.</p>
+      </section>
+
+      <div class="btn-row">
+        <button type="submit" class="btn btn--primary">Confirm import</button>
+        <a href="../heatmap-dashboard/index.html" class="btn btn--secondary">Cancel</a>
+      </div>
+    </form>
+
+    <p class="mock-annot">
+      Stale review (another sync or import changed the stored runs between this page and Confirm): the page reloads with a warn
+      notice at the top — “Your stored activities changed since this review — check the conflicts again.” — and nothing is saved.
+      Cancel is a POST button in Blade (it clears the pending import); it is drawn as a link here only because a mockup has no server.
+    </p>
+  </div>
+</main>
+
+<footer><a href="https://www.strava.com">Powered by Strava</a> · runs only · distances in kilometres</footer>
+
+<script>
+  /* The data-resolve-all hook, as resources/js/app.js implements it: shortcuts
+     are hidden in the HTML and revealed only once JS runs, so a no-JS visitor
+     never sees buttons that do nothing — the per-row radios still work. */
+  document.querySelectorAll('[data-resolve-shortcuts]').forEach(function (el) { el.hidden = false; });
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('[data-resolve-all]');
+    if (!button) return;
+    var value = button.getAttribute('data-resolve-all');
+    button.form.querySelectorAll('input[type="radio"][name^="resolutions["][value="' + value + '"]').forEach(function (radio) { radio.checked = true; });
+  });
+</script>
+</body>
+</html>

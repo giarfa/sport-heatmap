@@ -37,6 +37,7 @@
     --lv-4: #104281;
     --lv-future-border: #cbd5e1;
     --cell-ring: rgba(15, 23, 42, 0.08);
+    --control-border: #94a3b8; /* slate-400: 3:1 non-text contrast on white */
 }
 
 /*
@@ -64,6 +65,7 @@ html.dark {
     --lv-4: #9ec5f4;
     --lv-future-border: #334155;
     --cell-ring: rgba(248, 250, 252, 0.1);
+    --control-border: #64748b; /* slate-500: 3.7:1 on slate-900 */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -86,6 +88,7 @@ html.dark {
         --lv-4: #9ec5f4;
         --lv-future-border: #334155;
         --cell-ring: rgba(248, 250, 252, 0.1);
+        --control-border: #64748b; /* slate-500 */
     }
 }
 
@@ -496,4 +499,364 @@ body {
             opacity: 0.55;
         }
     }
+}
+
+/* ---- Garmin import ------------------------------------------------------------
+   Upload, review and summary screens, ported from .larapilot/mockups/US-008/
+   import.css. No new colour: card surface, ink, accent (links + focus only),
+   the warn palette, and --control-border, the one token these screens add —
+   --hairline is decorative (~1.2:1) and fails WCAG 2.2 non-text contrast on a
+   form control. */
+.imp {
+    max-width: 40rem;
+}
+
+.imp--wide {
+    max-width: none;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    font-size: 0.875rem;
+    color: var(--accent);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Ink on card inverts with the theme, so the primary button needs no dark value. */
+.btn--primary {
+    background: var(--ink);
+    color: var(--surface-card);
+    border: 1px solid var(--ink);
+}
+
+.btn--secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--control-border);
+}
+
+.btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+
+.field-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.field-hint {
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+}
+
+.file-input {
+    display: block;
+    width: 100%;
+    margin-top: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem;
+    border: 1px solid var(--control-border);
+    border-radius: 0.5rem;
+    background: var(--surface-page);
+    color: var(--ink);
+    font-size: 0.875rem;
+}
+
+.file-input::file-selector-button {
+    min-height: 2rem;
+    margin-right: 0.75rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--control-border);
+    border-radius: 0.375rem;
+    background: var(--surface-card);
+    color: var(--ink);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.file-input[aria-invalid='true'] {
+    border-color: var(--warn-ink);
+}
+
+.field-error,
+.notice {
+    border: 1px solid var(--warn-border);
+    background: var(--warn-bg);
+    color: var(--warn-ink);
+    font-size: 0.875rem;
+}
+
+.field-error {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+}
+
+.notice {
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+}
+
+.tally {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 1rem;
+    font-size: 0.8125rem;
+}
+
+@media (min-width: 640px) {
+    .tally {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+.tally > div {
+    display: flex;
+    flex-direction: column-reverse;
+}
+
+.tally dt {
+    color: var(--ink-muted);
+}
+
+.tally dd {
+    font-size: 1.125rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.section-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.section-note {
+    margin-top: 0.125rem;
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+}
+
+/* Comparison table. From 640 px a real table; below, each <tr> is a stacked
+   card and every <td> prints its column name from data-label, so sighted users
+   read the same headers screen readers announce. Stored and Garmin stay side
+   by side at 49% each — on a phone the comparison is still a comparison. The
+   query stops at 639.98px so it never overlaps Tailwind's sm (640px). */
+.cmp {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.cmp th,
+.cmp td {
+    text-align: left;
+    vertical-align: top;
+    padding: 0.75rem 0.5rem;
+    border-top: 1px solid var(--hairline);
+}
+
+.cmp thead th {
+    padding-top: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    border-top: 0;
+}
+
+.cmp th[scope='row'] {
+    font-weight: 600;
+}
+
+.run-date {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.cmp .num {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.side {
+    display: grid;
+    gap: 0.125rem;
+}
+
+.side > div {
+    display: flex;
+    gap: 0.375rem;
+}
+
+.side dt {
+    min-width: 3.75rem;
+    color: var(--ink-muted);
+}
+
+.side dd {
+    font-variant-numeric: tabular-nums;
+}
+
+.side-source {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+}
+
+.side-source a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    color: var(--accent);
+}
+
+@media (max-width: 639.98px) {
+    .cmp thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+    }
+
+    .cmp tr {
+        display: block;
+        padding: 0.75rem 0;
+        border-top: 1px solid var(--hairline);
+    }
+
+    .cmp tbody tr:first-child {
+        border-top: 0;
+    }
+
+    .cmp th,
+    .cmp td {
+        display: block;
+        padding: 0.25rem 0;
+        border: 0;
+    }
+
+    .cmp td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--ink-muted);
+    }
+
+    .cmp .cmp-pair {
+        display: inline-block;
+        width: 49%;
+        vertical-align: top;
+    }
+}
+
+/* Overwrite / Skip as a segmented control. The radio stays in the tab order —
+   visually hidden, never display:none — so arrow keys still move within the
+   pair; the label is the 44px target and carries the focus ring. */
+.choice {
+    min-width: 0;
+}
+
+.choice legend {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+}
+
+.seg {
+    display: inline-flex;
+    margin-top: 0.25rem;
+    border: 1px solid var(--control-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.seg input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+}
+
+.seg label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    min-width: 5.5rem;
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--ink);
+}
+
+.seg label + input + label {
+    border-left: 1px solid var(--control-border);
+}
+
+.seg input:checked + label {
+    background: var(--ink);
+    color: var(--surface-card);
+    font-weight: 600;
+}
+
+.seg input:focus-visible + label {
+    outline: 2px solid var(--accent);
+    outline-offset: -4px;
+    border-radius: 0.375rem;
+}
+
+.shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.shortcuts[hidden] {
+    display: none;
+}
+
+.list-plain {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.list-plain li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--hairline);
+}
+
+.list-plain li:first-child {
+    border-top: 0;
+}
+
+.list-plain .muted {
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
 }

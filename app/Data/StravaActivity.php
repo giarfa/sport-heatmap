@@ -2,6 +2,7 @@
 
 namespace App\Data;
 
+use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use Carbon\CarbonImmutable;
 
@@ -85,6 +86,7 @@ final readonly class StravaActivity
      *     moving_time_seconds: int,
      *     start_date_local: CarbonImmutable,
      *     activity_date: CarbonImmutable,
+     *     source: ActivitySource,
      * }
      */
     public function toAttributes(): array
@@ -97,6 +99,7 @@ final readonly class StravaActivity
             'moving_time_seconds' => $this->movingTimeSeconds,
             'start_date_local' => $this->startDateLocal,
             'activity_date' => $this->activityDate,
+            'source' => ActivitySource::Strava,
         ];
     }
 

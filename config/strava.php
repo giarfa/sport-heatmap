@@ -109,6 +109,9 @@ $config = [
     | yields an empty array — never [''] — so a blank allowlist can never match
     | an athlete by accident.
     |
+    | The order matters: the first id that has connected is the athlete the
+    | public home page displays to signed-out visitors (US-007).
+    |
     */
 
     'allowed_athlete_ids' => $allowedAthleteIds,
