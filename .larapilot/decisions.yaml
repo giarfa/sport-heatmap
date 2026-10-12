@@ -454,4 +454,134 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-12T19:53:47+00:00'
+  -
+    id: ee28b17afa733157
+    ts: '2026-10-12T20:06:51+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'window navigation step'
+    label: 'window navigation step'
+    value: '16-week window moves 4 weeks per Previous/Next'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 9cf6a6a125f3481d
+    ts: '2026-10-12T20:06:51+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'window navigation history source'
+    label: 'window navigation history source'
+    value: 'navigation + Garmin import keeps runs of any past date; Strava sync stays on the current 112 days'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: ba9b56d5310c0997
+    ts: '2026-10-12T20:06:52+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'window navigation moscow'
+    label: 'window navigation MoSCoW'
+    value: 'Must (FR-019)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 3531ca1c374f05aa
+    ts: '2026-10-12T20:06:52+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'window navigation earliest bound'
+    label: 'window navigation earliest bound'
+    value: 'Previous disabled once the window holds the oldest stored run'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: b2172447d95c93f1
+    ts: '2026-10-12T20:06:52+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'us-013 release'
+    label: 'US-013 release'
+    value: 2.0.0
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 41bbdbad7fc857c3
+    ts: '2026-10-12T20:06:52+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'us-013 mockup'
+    label: 'US-013 mockup'
+    value: 'no mockup, plan directly'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 8774b104ce1fdd1d
+    ts: '2026-10-12T20:14:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'weekly mileage trend chart form'
+    label: 'weekly mileage trend chart form'
+    value: 'Weekly-total bars with a 4-week rolling average line'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-014
+    supersedes: null
+  -
+    id: 741ef117212fdc11
+    ts: '2026-10-12T20:14:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'weekly mileage trend period'
+    label: 'weekly mileage trend period'
+    value: 'Same 16-week window as the grid, follows Previous/Next'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-014
+    supersedes: null
+  -
+    id: 105915468214b9aa
+    ts: '2026-10-12T20:14:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'weekly mileage trend placement'
+    label: 'weekly mileage trend placement'
+    value: 'Beside the grid from lg up, stacked below on mobile'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-014
+    supersedes: null
+  -
+    id: d14b5d84132062dc
+    ts: '2026-10-12T20:14:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'weekly mileage trend moscow and release'
+    label: 'weekly mileage trend MoSCoW and release'
+    value: 'FR-020 Should, MEDIUM, release 2.0.0, blocked by US-013, mockup first'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-014
+    supersedes: null
+updated_at: '2026-10-12T20:14:42+00:00'

@@ -750,3 +750,89 @@ specs:
       - 🔎 Tom: confirm the exact English Garmin header texts (`Avg Pace`, `Total Ascent`, `Avg HR`) against a real English export in planning, not guessed; a pace may arrive as `m:ss` or `h:mm:ss`.
       - ✨ Joe: the app has no Alpine or Livewire — the detail is server-rendered with the cached grid and opened with native elements or a small vanilla script; no new JS dependency.
       - The developer domain docs for the sync, Garmin import, and heatmap domains are updated in this spec.
+  -
+    code: US-013
+    title: 'Previous / Next window navigation, with older Garmin runs kept'
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: HIGH
+    points: 8
+    status: TODO
+    body: |
+      #### US-013: Previous / Next window navigation, with older Garmin runs kept
+
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** TODO
+      **Blocked by:** -
+      **Type:** Feature
+      **Release:** 2.0.0
+      **Supersedes:** US-004 criterion "the window always ends on the current week" · US-008 criterion "rows outside the 112-day window are skipped and counted as outside-window"
+      **Traces to:** FR-019 (MoSCoW: Must — new) · FR-004 (changed) · FR-018 (changed) · FR-006 · FR-009 · FR-017 — no journey (the PRD has no `## User Journeys`)
+      **Prior art:** built-in — `HeatmapWindow` already accepts any date and the daily query and grid cache are keyed on the window start; plain Blade links, no package, no new JavaScript
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want Previous and Next buttons that move the 16-week heatmap 4 weeks at a time, and my older Garmin runs kept when I import them,
+      so that I can look back at earlier training blocks, not only the last 16 weeks.
+
+      **Demonstrates**
+      After implementing this spec, importing a full Garmin Connect export and pressing Previous shows the 16-week window ending 4 weeks earlier, with that period's runs, weekly totals, legend, and date range, down to the window holding the oldest stored run; Next walks forward again and stops on the current window.
+
+      **Acceptance Criteria**
+      - [ ] The home page opens on the current window, ending on the current week (unchanged)
+      - [ ] Previous shows the 16-week window ending 4 weeks earlier; Next moves 4 weeks forward and never past the current window
+      - [ ] Next is disabled on the current window; Previous is disabled once the shown window holds the athlete's oldest stored run, or when no run is stored
+      - [ ] The shown period is always stated above the grid as a date range (e.g. "18 May – 6 Sep 2026")
+      - [ ] Each window has its own URL on the home page, so a reload or a shared link keeps it; a future, malformed, or unparseable window renders the current window without an error, and a mid-week date is read as that week
+      - [ ] A past window renders no out-of-range future cells and no partial week total
+      - [ ] The legend and intensity scale are computed from the shown window only (FR-006)
+      - [ ] The sync status is the same on every window
+      - [ ] Garmin CSV import: running rows dated today or earlier are kept at any age; only future-dated rows are skipped, and the summary counts them as "future-dated" instead of "outside-window"
+      - [ ] Older runs go through the same conflict review, Overwrite / Skip, and re-import rules as runs in the current window
+      - [ ] After a confirmed Garmin import or a Strava sync, every window of that athlete shows the new data; no cached window grid survives the write
+      - [ ] The Strava sync still fetches and reconciles only the current 112 days and never deletes an activity outside them
+      - [ ] A signed-out visitor navigates the same way; navigating writes no row, calls no Strava endpoint, and triggers no token refresh (FR-017)
+      - [ ] Both controls are keyboard-reachable links named "Previous 4 weeks" and "Next 4 weeks"; a disabled control is announced as disabled and is not a link
+      - [ ] At 375 px the controls and grid cause no horizontal page scroll; both themes meet WCAG 2.2 AA contrast for the controls (FR-009)
+  -
+    code: US-014
+    title: 'Weekly mileage trend beside the heatmap'
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: MEDIUM
+    points: 5
+    status: TODO
+    body: |
+      #### US-014: Weekly mileage trend beside the heatmap
+
+      **Epic:** EP-003 | **Priority:** MEDIUM | **Points:** 5 | **Status:** TODO
+      **Blocked by:** US-013
+      **Release:** 2.0.0
+      **Type:** Feature
+      **Traces to:** FR-020 (MoSCoW: Should) · FR-005 · FR-009 · FR-017 · FR-019 — no journey (the PRD has no User Journeys section)
+      **Prior art:** custom — server-rendered inline SVG in a Blade component; a JavaScript charting library (Chart.js, ApexCharts) would be a new frontend dependency, which the Technical Architecture rules out
+      **Mockup:** required before planning — `/larapilot-design US-014`
+
+      **User Story**
+      As The Committed Amateur Runner,
+      I want a chart of my total kilometres week by week, with a rolling average, next to the heatmap,
+      so that I can see at a glance whether my running volume is building, holding, or dropping.
+
+      **Demonstrates**
+      After implementing this spec, opening the dashboard shows 16 weekly-total bars with a 4-week rolling average line beside the grid (stacked below it on a phone); choosing Previous or Next redraws the chart for the shown window, and every bar matches the weekly total of its row.
+
+      **Acceptance Criteria**
+      - [ ] The dashboard shows a trend chart with one bar per week of the shown 16-week window, oldest on the left, current week on the right; each bar's value equals the FR-005 weekly total of the same row, to 0.1 km
+      - [ ] A 4-week rolling average line is drawn over the bars: each point is the mean of that week and the three weeks before it, including stored weeks before the shown window; on the current window the line stops at the last completed week
+      - [ ] The y-axis starts at 0 km and labels at least 0 and the top gridline in km
+      - [ ] The in-progress week's bar is marked partial with the FR-005 convention, and its accessible name says "partial"
+      - [ ] Previous / Next (FR-019) re-render the chart for the shown window; a past window has no partial bar and the line spans all 16 weeks
+      - [ ] A 0 km week renders a zero-height bar with a visible baseline marker, never a gap
+      - [ ] A shown window with no stored run shows an empty-state message in place of the chart; the connect screen (no athlete) shows no chart
+      - [ ] No line point is drawn for a week with fewer than three weeks of history since the week of the oldest stored run — unknown weeks are never averaged as 0 km
+      - [ ] After a sync or a confirmed Garmin import the chart shows the new data; no cached chart survives the write
+      - [ ] A signed-out visitor sees the same chart; rendering it writes no row and calls no Strava endpoint (FR-017)
+      - [ ] From `lg` up the chart sits beside the grid; below `lg` it stacks under the grid and legend; no horizontal page scroll at 375 px (FR-009)
+      - [ ] The chart has an accessible name and a text alternative listing each week's date range, total km, and rolling average; partial and average are never conveyed by colour alone; WCAG 2.2 AA contrast in light and dark themes (FR-009)
+      - [ ] The chart is server-rendered SVG with no new frontend dependency, and adds at most one database query to the dashboard request

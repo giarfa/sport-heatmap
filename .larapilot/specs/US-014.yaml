@@ -1,0 +1,41 @@
+code: US-014
+title: 'Weekly mileage trend beside the heatmap'
+epic:
+  code: EP-003
+  title: 'Heatmap dashboard'
+priority: MEDIUM
+points: 5
+status: TODO
+body: |
+  #### US-014: Weekly mileage trend beside the heatmap
+
+  **Epic:** EP-003 | **Priority:** MEDIUM | **Points:** 5 | **Status:** TODO
+  **Blocked by:** US-013
+  **Release:** 2.0.0
+  **Type:** Feature
+  **Traces to:** FR-020 (MoSCoW: Should) · FR-005 · FR-009 · FR-017 · FR-019 — no journey (the PRD has no User Journeys section)
+  **Prior art:** custom — server-rendered inline SVG in a Blade component; a JavaScript charting library (Chart.js, ApexCharts) would be a new frontend dependency, which the Technical Architecture rules out
+  **Mockup:** required before planning — `/larapilot-design US-014`
+
+  **User Story**
+  As The Committed Amateur Runner,
+  I want a chart of my total kilometres week by week, with a rolling average, next to the heatmap,
+  so that I can see at a glance whether my running volume is building, holding, or dropping.
+
+  **Demonstrates**
+  After implementing this spec, opening the dashboard shows 16 weekly-total bars with a 4-week rolling average line beside the grid (stacked below it on a phone); choosing Previous or Next redraws the chart for the shown window, and every bar matches the weekly total of its row.
+
+  **Acceptance Criteria**
+  - [ ] The dashboard shows a trend chart with one bar per week of the shown 16-week window, oldest on the left, current week on the right; each bar's value equals the FR-005 weekly total of the same row, to 0.1 km
+  - [ ] A 4-week rolling average line is drawn over the bars: each point is the mean of that week and the three weeks before it, including stored weeks before the shown window; on the current window the line stops at the last completed week
+  - [ ] The y-axis starts at 0 km and labels at least 0 and the top gridline in km
+  - [ ] The in-progress week's bar is marked partial with the FR-005 convention, and its accessible name says "partial"
+  - [ ] Previous / Next (FR-019) re-render the chart for the shown window; a past window has no partial bar and the line spans all 16 weeks
+  - [ ] A 0 km week renders a zero-height bar with a visible baseline marker, never a gap
+  - [ ] A shown window with no stored run shows an empty-state message in place of the chart; the connect screen (no athlete) shows no chart
+  - [ ] No line point is drawn for a week with fewer than three weeks of history since the week of the oldest stored run — unknown weeks are never averaged as 0 km
+  - [ ] After a sync or a confirmed Garmin import the chart shows the new data; no cached chart survives the write
+  - [ ] A signed-out visitor sees the same chart; rendering it writes no row and calls no Strava endpoint (FR-017)
+  - [ ] From `lg` up the chart sits beside the grid; below `lg` it stacks under the grid and legend; no horizontal page scroll at 375 px (FR-009)
+  - [ ] The chart has an accessible name and a text alternative listing each week's date range, total km, and rolling average; partial and average are never conveyed by colour alone; WCAG 2.2 AA contrast in light and dark themes (FR-009)
+  - [ ] The chart is server-rendered SVG with no new frontend dependency, and adds at most one database query to the dashboard request
