@@ -236,6 +236,7 @@ class HeatmapGridCacheTest extends TestCase
 
     public function test_forgetting_one_athlete_leaves_another_athletes_cached_window_untouched(): void
     {
+        $this->useTheDatabaseCacheStore();
         $first = $this->allowlistedAthlete();
         $second = $this->allowlistedAthlete();
         $pastWindow = HeatmapWindow::current()->previous();
@@ -255,6 +256,7 @@ class HeatmapGridCacheTest extends TestCase
 
     public function test_forgetting_an_athlete_twice_keeps_retiring_the_windows_cached_in_between(): void
     {
+        $this->useTheDatabaseCacheStore();
         $athlete = $this->allowlistedAthlete();
         $pastWindow = HeatmapWindow::current()->previous();
         $cache = $this->app->make(HeatmapGridCache::class);

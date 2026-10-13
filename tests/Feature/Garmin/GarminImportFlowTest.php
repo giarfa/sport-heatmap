@@ -707,7 +707,7 @@ class GarminImportFlowTest extends TestCase
 
         $review = $this->review();
         $review->assertSee('<div><dt>New runs</dt><dd>1</dd></div>', escape: false);
-        $review->assertSee('<div><dt>Future-dated</dt><dd>2</dd></div>', escape: false);
+        $review->assertSee('<div><dt>Future-dated</dt><dd>0</dd></div>', escape: false);
 
         $this->confirm($review)->assertRedirect(route('garmin.import.summary'));
         $this->assertSame(1, Activity::count());

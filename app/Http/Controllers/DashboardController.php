@@ -63,12 +63,20 @@ class DashboardController extends Controller
          * runs are part of the same cached grid, so a sync or an import that forgets
          * the grid forgets the detail with it — they cannot disagree.
          */
-        $grid = $gridCache->remember(
-            $athlete,
-            $window,
-            $today,
-            fn () => $buildGrid($window, $dailyDistance($athlete, $window), $today, $dailyRuns($athlete, $window)),
-        );
+        $oldestRun = $oldestRunDate($athlete);
+        $build = fn () => $buildGrid($window, $dailyDistance($athlete, $window), $today, $dailyRuns($athlete, $window));
+
+        /*
+         * Only windows that can hold a run are cached, plus the current one. `to` accepts any
+         * past date, and every distinct week is a distinct cache key: without this a guest
+         * could fill the cache table with one empty grid per week back to year 0. A window
+         * that ends before the oldest run is empty by construction, costs two small queries,
+         * and is never linked to by Previous.
+         */
+        $canHoldRuns = $window->isCurrent($today)
+            || ($oldestRun !== null && $window->endsOn->greaterThanOrEqualTo($oldestRun));
+
+        $grid = $canHoldRuns ? $gridCache->remember($athlete, $window, $today, $build) : $build();
 
         /*
          * Resolved outside the grid cache, deliberately: a cached grid is
@@ -83,7 +91,7 @@ class DashboardController extends Controller
          */
         $status = $resolveSyncStatus($athlete, HeatmapWindow::current($today), $today);
 
-        $navigation = WindowNavigation::for($window, $today, $oldestRunDate($athlete));
+        $navigation = WindowNavigation::for($window, $today, $oldestRun);
 
         return view('dashboard', ['grid' => $grid, 'status' => $status, 'navigation' => $navigation]);
     }

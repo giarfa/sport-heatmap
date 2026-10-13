@@ -52,17 +52,16 @@ final readonly class ParsedGarminCsv
     public static function fromSessionArray(array $parsed): self
     {
         /*
-         * A pending upload stored in a session before US-013 carries `outside_window`, the
-         * count of rows the old importer dropped for being outside the 112 days. It must
-         * still open, so the legacy key is read when the new one is absent. Those rows were
-         * dropped under the old rule and are not in the import: the number is carried over
-         * so the review does not silently forget them, even though the label is now the
-         * new one. The session lives for one visit, so this branch dies out by itself.
+         * A pending upload or summary stored in a session before US-013 carries
+         * `outside_window`, the count of rows the old importer dropped for being outside the
+         * 112 days. It must still open, so the missing `future_dated` reads as 0: the old
+         * number counted a different thing, and showing it under "Future-dated" would be false.
+         * The session lives for one visit, so this branch dies out by itself.
          */
         return new self(
             rows: array_values(array_map(GarminCsvRow::fromSessionArray(...), $parsed['rows'])),
             ignoredByType: $parsed['ignored_by_type'],
-            futureDated: $parsed['future_dated'] ?? $parsed['outside_window'] ?? 0,
+            futureDated: $parsed['future_dated'] ?? 0,
             invalid: $parsed['invalid'],
         );
     }

@@ -279,7 +279,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | Header sets | `app/Support/Garmin/GarminCsvColumns.php` | Language detection, column lookup by name |
 | Type map | `app/Support/Garmin/GarminRunningTypes.php` | Garmin type name → `SportType` |
 | Row DTO | `app/Data/Garmin/GarminCsvRow.php` | `toAttributes()` (always `source = garmin_csv`), `toSessionArray()` / `fromSessionArray()`, `isIdenticalTo(Activity)` |
-| Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, future-dated count, invalid list; session round-trip (`fromSessionArray()` also reads the pre-`US-013` `outside_window` key, so an upload or summary in flight across the deploy still opens) |
+| Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, future-dated count, invalid list; session round-trip (`fromSessionArray()` tolerates the pre-`US-013` `outside_window` key and reads the missing `future_dated` as 0, so an upload or summary in flight across the deploy still opens) |
 | Rejection | `app/Exceptions/Garmin/GarminCsvRejectedException.php` | Owner-facing messages; no file content beyond a column name |
 | Target | `app/Support/Garmin/ResolveGarminImportTarget.php` | Signed-in owner, else displayed athlete, else null |
 | Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query, claiming; all new with no target |

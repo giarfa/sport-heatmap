@@ -597,24 +597,24 @@ tasks:
       4. Prepare the manual test handoff notes (plan Test Strategy) in the local PR body
 
       ## Completion Criteria
-      - [ ] CHANGELOG updated under Unreleased
-      - [ ] Domain docs and index current
-      - [ ] `larapilot:quality` passes; full test suite green
-      - [ ] Manual test handoff notes in the PR body
+      - [x] CHANGELOG updated under Unreleased
+      - [x] Domain docs and index current
+      - [x] `larapilot:quality` passes; full test suite green
+      - [x] Manual test handoff notes in the PR body
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/README.md` index rows for heatmap-dashboard, garmin-csv-import, activity-sync name US-013
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/README.md` index rows for heatmap-dashboard, garmin-csv-import, activity-sync name US-013
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `chore(US-013): TASK-11 changelog, domain docs, and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 2
     dependencies:
@@ -623,4 +623,10 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T20:06:53+00:00'
+    commit:
+      sha: 0558857cc98dfbcf6bac6f528429e9e838de325c
+      short_sha: '0558857'
+      subject: 'chore(US-013): TASK-11 changelog, domain docs, and quality gate'
+      committed_at: '2026-10-13T22:07:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0558857cc98dfbcf6bac6f528429e9e838de325c'
+updated_at: '2026-10-13T20:07:24+00:00'

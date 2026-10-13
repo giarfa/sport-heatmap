@@ -5,8 +5,10 @@ namespace Tests\Feature\Dashboard;
 use App\Models\Activity;
 use App\Models\SyncRun;
 use App\Models\User;
+use App\Support\Heatmap\HeatmapWindow;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
@@ -179,6 +181,22 @@ class WindowNavigationTest extends TestCase
 
         $current->assertSee('12.0 km');
         $current->assertDontSee('Tuesday 12 May 2026');
+    }
+
+    public function test_only_windows_that_can_hold_a_run_are_cached(): void
+    {
+        $athlete = $this->allowlistedAthlete();
+        $this->runOn($athlete, '2026-07-02', 10_000);
+        $keyOf = fn (string $to): string => "heatmap:grid:v3:{$athlete->id}:g0:"
+            .HeatmapWindow::fromRequestedEnd($to, now())->startsOn->toDateString().':2026-09-05';
+
+        $this->actingAs($athlete)->get('/?to=2026-08-09')->assertOk();
+        $this->actingAs($athlete)->get('/?to=2020-01-05')->assertOk()->assertSee('No runs stored in these 16 weeks.');
+        $this->actingAs($athlete)->get('/?to=0001-01-07')->assertOk();
+
+        $this->assertTrue(Cache::has($keyOf('2026-08-09')));
+        $this->assertFalse(Cache::has($keyOf('2020-01-05')), 'A window before the oldest run is built, not cached.');
+        $this->assertFalse(Cache::has($keyOf('0001-01-07')));
     }
 
     /**

@@ -66,8 +66,8 @@ working, the map freezes at the last good sync and the dashboard warns about it.
       fetched — **`source = strava` rows only**. Skipped and linked rows count
       as neither upserted nor deleted.
 5. On success the row becomes `succeeded` with the summed `activities_upserted`
-   / `activities_deleted`, and every synced athlete's cached grids — every
-   window, not only the current one — are retired (`HeatmapGridCache::forgetAthlete()`,
+   / `activities_deleted`, and each synced athlete's cached grids — every
+   window, not only the current one — are retired as that athlete is reconciled (`HeatmapGridCache::forgetAthlete()`,
    see `heatmap-dashboard.md`).
 6. On `StravaApiException` or `StravaReconnectRequiredException` the row becomes
    `failed` with zero counts and the exception message in `error_message`; a

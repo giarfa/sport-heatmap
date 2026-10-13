@@ -79,8 +79,22 @@ final readonly class HeatmapGridCache
     {
         $generationKey = $this->generationKey($athlete);
 
-        if ($this->cache->increment($generationKey) === false) {
-            $this->cache->forever($generationKey, 1);
+        /*
+         * The counter is created before it is bumped: on a missing key the database
+         * store's increment() answers false, and writing 1 in that branch would let two
+         * overlapping writes (an import during the nightly sync) both land on 1, so a grid
+         * built between them would survive the second write. add() is a no-op once the key
+         * exists, and increment() is atomic.
+         *
+         * A store that fails here is reported, not thrown: the write it follows is already
+         * committed, and a 500 for an import that was saved is worse than a grid that is
+         * served until grid_cache_ttl.
+         */
+        try {
+            $this->cache->add($generationKey, 0);
+            $this->cache->increment($generationKey);
+        } catch (Throwable $exception) {
+            report($exception);
         }
     }
 

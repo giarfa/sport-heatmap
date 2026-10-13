@@ -65,8 +65,11 @@ final readonly class GarminImportSummary
     public static function fromSessionArray(array $summary): self
     {
         /*
-         * A summary flashed before US-013 carries `outside_window`; it is read when
-         * `future_dated` is absent so a summary in flight across the deploy still renders.
+         * A pending upload or summary stored in a session before US-013 carries
+         * `outside_window`, the count of rows the old importer dropped for being outside the
+         * 112 days. It must still open, so the missing `future_dated` reads as 0: the old
+         * number counted a different thing, and showing it under "Future-dated" would be false.
+         * The session lives for one visit, so this branch dies out by itself.
          */
         return new self(
             imported: $summary['imported'],
@@ -74,7 +77,7 @@ final readonly class GarminImportSummary
             skipped: $summary['skipped'],
             alreadyImported: $summary['already_imported'],
             ignoredByType: $summary['ignored_by_type'],
-            futureDated: $summary['future_dated'] ?? $summary['outside_window'] ?? 0,
+            futureDated: $summary['future_dated'] ?? 0,
             invalid: $summary['invalid'],
         );
     }
