@@ -305,31 +305,37 @@ tasks:
       7. `php artisan test --compact tests/Feature/Dashboard`
 
       ## Completion Criteria
-      - [ ] `/` renders the current window exactly as before (existing dashboard tests green)
-      - [ ] `/?to=<past Sunday>` renders that window's grid, weekly totals, legend, and date range; no future cells and no partial total
-      - [ ] Previous / Next availability follows the oldest-run and current-window rules
-      - [ ] Sync status identical on every window; empty note follows the shown window
-      - [ ] At most one extra query per request (the `MIN`)
+      - [x] `/` renders the current window exactly as before (existing dashboard tests green)
+      - [x] `/?to=<past Sunday>` renders that window's grid, weekly totals, legend, and date range; no future cells and no partial total
+      - [x] Previous / Next availability follows the oldest-run and current-window rules
+      - [x] Sync status identical on every window; empty note follows the shown window
+      - [x] At most one extra query per request (the `MIN`)
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — request flow with `?to=`, `OldestRunDate`, `WindowNavigation` rules, why sync status always reads the current window, query shape
-      - [ ] Folder `README.md` index row updated (last spec: US-013)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — request flow with `?to=`, `OldestRunDate`, `WindowNavigation` rules, why sync status always reads the current window, query shape
+      - [x] Folder `README.md` index row updated (last spec: US-013)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-05 serve any window on the dashboard`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-01
       - TASK-03
+    commit:
+      sha: e4701e6a5b25f64b4886d9fcce9dbb366ab73b51
+      short_sha: e4701e6
+      subject: 'feat(US-013): TASK-05 serve any window on the dashboard'
+      committed_at: '2026-10-13T22:00:28+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e4701e6a5b25f64b4886d9fcce9dbb366ab73b51'
   -
     id: TASK-06
     title: 'Previous / Next controls: <x-window-nav> component and styles (mobile first, light + dark)'
@@ -587,4 +593,4 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T19:59:21+00:00'
+updated_at: '2026-10-13T20:00:28+00:00'

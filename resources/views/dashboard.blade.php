@@ -14,6 +14,8 @@
     <h1 class="text-lg font-semibold tracking-tight sm:text-xl">{{ $navigation->heading() }}</h1>
     <p class="mt-0.5 text-sm" style="color: var(--ink-muted);">{{ $grid->label() }} · running distance per day</p>
 
+    <x-window-nav :navigation="$navigation" />
+
     @if ($status->needsWarning())
         <div class="mt-4">
             <x-sync-warning :status="$status" />

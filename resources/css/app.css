@@ -625,6 +625,34 @@ html.dark {
     }
 }
 
+/* ---- Window navigation --------------------------------------------------------
+   Previous / Next above the grid (US-013, mirrors the US-014 mockup). Two 44 px
+   controls that fit 320 px side by side. The unavailable one is a disabled
+   <button>: dashed border and muted ink are a shape cue on top of the colour,
+   and the browser announces it as disabled. Tokens only. */
+.win-nav {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.win-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 2.75rem;
+    padding: 0 0.875rem;
+    border: 1px solid var(--control-border);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.win-btn--off {
+    border-style: dashed;
+    color: var(--ink-muted);
+}
+
 /* ---- Sync status ------------------------------------------------------------
    The header chip, the amber warning banner and the rail's sync detail card,
    plus the skeleton the grid card shows while a first sync is in flight. */

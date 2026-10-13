@@ -67,6 +67,25 @@ share stops working.
       sync detail card. An empty current window keeps the sync-specific note; an
       empty earlier window says "No runs stored in these 16 weeks." (`$grid->hasRuns()`).
 
+### Window navigation (`US-013`, FR-019)
+
+`<x-window-nav>` sits between the heading's range line and the grid: a
+`<nav aria-label="Window">` with two 44 px controls, "Previous 4 weeks" and "Next 4
+weeks" (the visible word is "Previous" / "Next"; "4 weeks" is `sr-only`, so the visible
+label is contained in the accessible name and the arrows are `aria-hidden`). An
+available control is a plain `<a>` to `WindowNavigation::$previousUrl` / `$nextUrl`;
+an unavailable one is a `<button type="button" disabled>` with a dashed border and
+muted ink — a disabled button is announced as disabled and is not a link, which a
+span or an `<a>` with no `href` is not. Navigation is full page loads: no script, no
+live region, and a signed-out visitor triggers no write and no Strava call (FR-017).
+The component does no arithmetic; every URL and availability rule is in
+`WindowNavigation`. Styles are `.win-nav` / `.win-btn` / `.win-btn--off` in
+`resources/css/app.css`, tokens only (`--control-border`, `--ink`, `--ink-muted`).
+
+The row mirrors `.larapilot/mockups/US-014/` (`past-window.html`, which drew it for
+context). The one agreed deviation is the disabled `<button>` in place of the drawn
+`<span>` (decision `46f30df8a6f0ac7a`, recorded in that README's Deviations).
+
 ### Day cell detail (`US-012`, FR-011)
 
 A day with at least one run (`DayCell::hasDetail()`) renders its cell as
@@ -178,7 +197,7 @@ calibrated bands, upper-inclusive.
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
 | Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v3:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
-| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `day-detail`, `run-metric`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
+| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Config | `config/heatmap.php` | Literals `window_weeks` (16), `navigation_step_weeks` (4) and `grid_cache_ttl` (86 400) |
 | Tests | `tests/Feature/Dashboard/*`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
@@ -203,6 +222,7 @@ three small indexed queries for the sync status and one `MIN()` for the oldest r
 | The URL names the window's **end** week, as a `Y-m-d` query value (`/?to=2026-09-06`, `US-013`) | A path segment; the window's start date in the URL; a page number | A query value keeps `/` the one route and the one cache key shape; the end is what the reader navigates by and survives a change of `window_weeks`, where a start date would shift every shared link; a page number says nothing in a shared link |
 | A bad `to` renders the current window silently (`US-013`) | 404; 422; a redirect to `/` | The spec asks for a bad or future link to render "without an error"; an old bookmark is better served by today's map than by an error page, and the guest path stays free of any new response |
 | `previous()` is not clamped to the oldest run; `next()` is clamped to the current window | Clamp both inside `HeatmapWindow` | The window is a value object that never sees the data, so how far back Previous may go is the controller's question (it disables the control); a window past the current one would hold only future cells |
+| The unavailable Previous / Next control is a disabled `<button>` (US-013) | The mockup's `<span>`; an `<a>` without `href`; `aria-disabled` on a link | A span is announced as text and an `<a>` with no `href` is neither focusable nor announced as a control; `aria-disabled` on a link still looks and tabs like one. A native disabled button is announced as disabled, is not a link, and is skipped by Tab — the acceptance criterion exactly. The look is the mockup's |
 | Previous is disabled from the athlete's oldest stored run, not from a fixed horizon (US-013) | A fixed number of windows; clamping inside `HeatmapWindow`; never disabling it | The reader should never page into a run of empty windows, and the value object cannot know the data. The cost is one `MIN()` per request, which the `(user_id, activity_date)` index serves, read outside the cache because the oldest run belongs to the athlete, not to any cached window |
 | The sync status always reads the current window (US-013) | Read the shown window | The status describes the sync, not the period on screen; a past window would otherwise show a different "Runs in window", a different empty note, and could flip the skeleton |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
