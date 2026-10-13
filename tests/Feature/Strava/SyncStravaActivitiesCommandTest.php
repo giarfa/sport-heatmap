@@ -8,6 +8,8 @@ use App\Models\Activity;
 use App\Models\SyncRun;
 use App\Models\User;
 use App\Services\Strava\StravaClient;
+use App\Support\Heatmap\HeatmapWindow;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -155,6 +157,28 @@ class SyncStravaActivitiesCommandTest extends TestCase
         $this->assertSame(SyncRunStatus::Succeeded, $syncRun->status);
         $this->assertSame(1, $syncRun->activities_upserted);
         $this->assertSame(0, $syncRun->activities_deleted);
+    }
+
+    public function test_the_sync_fetches_only_the_current_window_and_never_deletes_older_activities(): void
+    {
+        $this->travelTo('2026-09-05 09:00:00');
+        $athlete = $this->allowlistedAthlete();
+
+        $olderStravaRun = Activity::factory()->for($athlete)->onDate(CarbonImmutable::parse('2026-03-02'))->create(['strava_activity_id' => 777]);
+        $olderGarminRun = Activity::factory()->for($athlete)->garminImported()->onDate(CarbonImmutable::parse('2026-02-10'))->create();
+
+        Http::fake([
+            'www.strava.com/api/v3/athlete/activities*' => Http::response([$this->stravaActivityPayload(['id' => 1])]),
+        ]);
+
+        $this->artisan('strava:sync')->assertExitCode(Command::SUCCESS);
+
+        Http::assertSent(fn (Request $request): bool => (int) $request['after'] === HeatmapWindow::current()->afterTimestamp());
+        $this->assertSame(CarbonImmutable::parse('2026-05-18')->getTimestamp(), HeatmapWindow::current()->afterTimestamp());
+        $this->assertTrue(Activity::whereKey($olderStravaRun->id)->exists());
+        $this->assertTrue(Activity::whereKey($olderGarminRun->id)->exists());
+        $this->assertSame(3, Activity::count());
+        $this->assertSame(0, SyncRun::sole()->activities_deleted);
     }
 
     public function test_running_it_twice_against_the_same_response_reports_zero_zero_the_second_time(): void

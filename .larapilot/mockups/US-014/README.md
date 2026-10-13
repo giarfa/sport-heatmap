@@ -198,3 +198,12 @@ already public on the dashboard (FR-017): **no new personal data, no heart rate*
 - The final design of Previous / Next (US-013)
 
 If any of these appear in the implementation, the spec changed and this mockup is stale.
+
+---
+
+## Deviations
+
+| Date | Screen | What | Why | Decision |
+| --- | --- | --- | --- | --- |
+| 2026-10-13 | `index.html`, `past-window.html`, `dark.html`, `breakpoints.html` (Previous / Next row) | The unavailable control is a native `<button type="button" class="win-btn win-btn--off" disabled>`, not the drawn `<span class="win-btn win-btn--off">`; its name is the visible word plus "4 weeks" (no ", unavailable" text), the arrows are `aria-hidden`. Look unchanged. **US-013 owns the nav row**; this mockup only draws it for context | A disabled button is announced as disabled and is not a link, as US-013's acceptance criterion requires; a span is announced as plain text | `46f30df8a6f0ac7a` |
+

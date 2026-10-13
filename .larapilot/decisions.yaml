@@ -649,4 +649,30 @@ decisions:
     source: askquestion
     spec: US-013
     supersedes: null
-updated_at: '2026-10-13T19:44:57+00:00'
+  -
+    id: 2480c87b9210e0c2
+    ts: '2026-10-13T19:56:11+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-implement
+    topic: 'us-012 merge before us-013'
+    label: 'US-012 merge before US-013'
+    value: 'Merge US-012 into release/2.0.0 locally, then branch US-013 from the release'
+    question: null
+    rationale: "US-013 builds on US-012's cache key, DailyRuns, and DayRun; TASK-00 precondition"
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 54bb5d4247c100f0
+    ts: '2026-10-13T20:16:46+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-review
+    topic: 'us-013 review verdict'
+    label: 'US-013 review verdict'
+    value: 'Approve; PlanGarminImport quadratic Medium left open as follow-up'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+updated_at: '2026-10-13T20:16:46+00:00'

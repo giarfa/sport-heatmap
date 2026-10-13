@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-003` |
-| **Last updated by** | `US-012` — 2026-10-13 |
+| **Last updated by** | `US-013` — 2026-10-13 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
@@ -66,8 +66,9 @@ working, the map freezes at the last good sync and the dashboard warns about it.
       fetched — **`source = strava` rows only**. Skipped and linked rows count
       as neither upserted nor deleted.
 5. On success the row becomes `succeeded` with the summed `activities_upserted`
-   / `activities_deleted`, and every synced athlete's cached grid for today is
-   forgotten (`HeatmapGridCache::forget()`).
+   / `activities_deleted`, and each synced athlete's cached grids — every
+   window, not only the current one — are retired as that athlete is reconciled (`HeatmapGridCache::forgetAthlete()`,
+   see `heatmap-dashboard.md`).
 6. On `StravaApiException` or `StravaReconnectRequiredException` the row becomes
    `failed` with zero counts and the exception message in `error_message`; a
    warning is logged with the last attempted athlete id; exit code is failure.
@@ -167,7 +168,9 @@ so `down()` deletes them first.
 - **Invariant — `error_message` is safe to render.** It carries HTTP status and
   rate-limit usage only; it is shown on the dashboard (HTML-escaped).
 - **Invariant — the grid cache is forgotten on success only.** A failed run must
-  leave the last good grid in place.
+  leave the last good grid in place. The sync still fetches and reconciles only the
+  current 112 days (`US-013`): older windows are never touched by it, but their cached
+  grids are retired with the rest because the athlete's data changed.
 - **Invariant — an athlete removed from the allowlist stops being synced**, the
   same rule the web guard enforces.
 - **Invariant — skipping a CSV-only athlete is not a failure.** No warning or
@@ -192,7 +195,7 @@ so `down()` deletes them first.
 
 ## Related
 
-- Specs: `US-003`, `US-006`, `US-008`, `US-011`
-- Plans: `.larapilot/plans/US-003-plan.yaml`, `.larapilot/plans/US-008-plan.yaml`
+- Specs: `US-003`, `US-006`, `US-008`, `US-011`, `US-012`, `US-013`
+- Plans: `.larapilot/plans/US-003-plan.yaml`, `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-013-plan.yaml`
 - Review: `.larapilot/docs/review/US-003.md`
 - Other domains: `strava-connection.md`, `heatmap-dashboard.md`, `garmin-csv-import.md`

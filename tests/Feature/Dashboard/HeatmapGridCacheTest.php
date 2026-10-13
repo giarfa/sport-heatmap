@@ -7,6 +7,8 @@ use App\Data\Heatmap\DayRun;
 use App\Data\Heatmap\HeatmapGrid;
 use App\Models\Activity;
 use App\Models\User;
+use App\Support\Heatmap\HeatmapBuilder;
+use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -124,7 +126,7 @@ class HeatmapGridCacheTest extends TestCase
         $this->useTheDatabaseCacheStore();
         $athlete = $this->athleteWithOneRun();
         $window = HeatmapWindow::current();
-        $key = "heatmap:grid:v2:{$athlete->id}:{$window->startsOn->toDateString()}:".now()->toDateString();
+        $key = "heatmap:grid:v3:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString();
 
         Cache::put($key, new stdClass, 3_600);
         $this->assertInstanceOf(__PHP_Incomplete_Class::class, Cache::get($key));
@@ -167,7 +169,7 @@ class HeatmapGridCacheTest extends TestCase
 
         $this->getDashboard()->assertOk();
 
-        $cached = Cache::get("heatmap:grid:v2:{$athlete->id}:{$window->startsOn->toDateString()}:".now()->toDateString());
+        $cached = Cache::get("heatmap:grid:v3:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString());
         $this->assertInstanceOf(HeatmapGrid::class, $cached);
 
         $ranCells = collect($cached->weeks)->flatMap(fn ($week) => $week->days)->filter(fn ($cell) => $cell->hasDetail());
@@ -189,8 +191,83 @@ class HeatmapGridCacheTest extends TestCase
 
         $this->getDashboard()->assertOk()->assertSee('9.0 km');
 
-        $this->assertTrue(Cache::has("heatmap:grid:v2:{$athlete->id}:{$window->startsOn->toDateString()}:".now()->toDateString()));
+        $this->assertTrue(Cache::has("heatmap:grid:v3:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString()));
         $this->assertInstanceOf(__PHP_Incomplete_Class::class, Cache::get($oldKey), 'The old entry is left to expire, untouched.');
+    }
+
+    public function test_a_successful_sync_retires_a_cached_past_window_as_well_as_the_current_one(): void
+    {
+        $athlete = $this->allowlistedAthlete();
+        $current = HeatmapWindow::current();
+        $pastWindow = $current->previous()->previous();
+        $builds = 0;
+
+        $this->rememberWindow($athlete, $current, $builds);
+        $this->rememberWindow($athlete, $pastWindow, $builds);
+        $this->rememberWindow($athlete, $pastWindow, $builds);
+        $this->assertSame(2, $builds, 'The second read of the past window is a hit.');
+
+        Http::fake([
+            'www.strava.com/api/v3/athlete/activities*' => Http::response([$this->syncedActivityPayload()]),
+        ]);
+        $this->artisan('strava:sync')->assertExitCode(Command::SUCCESS);
+
+        $this->rememberWindow($athlete, $current, $builds);
+        $this->rememberWindow($athlete, $pastWindow, $builds);
+
+        $this->assertSame(4, $builds, 'Both windows are rebuilt after the sync.');
+    }
+
+    public function test_a_failed_sync_leaves_a_cached_past_window_in_place(): void
+    {
+        $athlete = $this->allowlistedAthlete();
+        $pastWindow = HeatmapWindow::current()->previous();
+        $builds = 0;
+
+        $this->rememberWindow($athlete, $pastWindow, $builds);
+
+        Http::fake(['www.strava.com/api/v3/athlete/activities*' => Http::response(['message' => 'Server Error'], 500)]);
+        $this->artisan('strava:sync')->assertExitCode(Command::FAILURE);
+
+        $this->rememberWindow($athlete, $pastWindow, $builds);
+
+        $this->assertSame(1, $builds);
+    }
+
+    public function test_forgetting_one_athlete_leaves_another_athletes_cached_window_untouched(): void
+    {
+        $this->useTheDatabaseCacheStore();
+        $first = $this->allowlistedAthlete();
+        $second = $this->allowlistedAthlete();
+        $pastWindow = HeatmapWindow::current()->previous();
+        $builds = 0;
+
+        $this->rememberWindow($first, $pastWindow, $builds);
+        $this->rememberWindow($second, $pastWindow, $builds);
+
+        $this->app->make(HeatmapGridCache::class)->forgetAthlete($first);
+
+        $this->rememberWindow($second, $pastWindow, $builds);
+        $this->assertSame(2, $builds, 'The other athlete still hits the cache.');
+
+        $this->rememberWindow($first, $pastWindow, $builds);
+        $this->assertSame(3, $builds, 'The forgotten athlete is rebuilt.');
+    }
+
+    public function test_forgetting_an_athlete_twice_keeps_retiring_the_windows_cached_in_between(): void
+    {
+        $this->useTheDatabaseCacheStore();
+        $athlete = $this->allowlistedAthlete();
+        $pastWindow = HeatmapWindow::current()->previous();
+        $cache = $this->app->make(HeatmapGridCache::class);
+        $builds = 0;
+
+        $cache->forgetAthlete($athlete);
+        $this->rememberWindow($athlete, $pastWindow, $builds);
+        $cache->forgetAthlete($athlete);
+        $this->rememberWindow($athlete, $pastWindow, $builds);
+
+        $this->assertSame(2, $builds);
     }
 
     public function test_the_cache_restores_no_class_outside_the_allowlist(): void
@@ -229,6 +306,24 @@ class HeatmapGridCacheTest extends TestCase
         Activity::factory()->for($athlete)->onDate(HeatmapWindow::current()->endsOn->subDays(2))->create([
             'distance_meters' => 7_300,
         ]);
+    }
+
+    /**
+     * Read a window through the grid cache the way the dashboard does, counting how
+     * often the grid had to be built — a hit leaves the count alone.
+     */
+    private function rememberWindow(User $athlete, HeatmapWindow $window, int &$builds): HeatmapGrid
+    {
+        return $this->app->make(HeatmapGridCache::class)->remember(
+            $athlete,
+            $window,
+            now(),
+            function () use ($window, &$builds): HeatmapGrid {
+                $builds++;
+
+                return $this->app->make(HeatmapBuilder::class)($window, [], now());
+            },
+        );
     }
 
     private function getDashboard(): TestResponse

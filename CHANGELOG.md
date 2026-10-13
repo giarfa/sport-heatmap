@@ -20,8 +20,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stored run and the file side by side; Overwrite keeps a stored value where the file has "--",
   and a run that was already imported gains only the metrics it lacked. Signed-out visitors see
   the same detail, heart rate included (US-012).
+- **Previous / Next navigation** on the heatmap. "Previous 4 weeks" moves the 16-week window four
+  weeks back, "Next 4 weeks" moves it forward and stops on the current window. The period is
+  always stated above the grid ("18 May – 6 Sep 2026"), and each window has its own address
+  (`/?to=2026-08-09`, the Sunday of its last week), so a reload or a shared link keeps it. A
+  malformed, impossible, or future date opens the current window instead of an error. Previous is
+  disabled once the window holds your oldest stored run. Each window computes its own legend, the
+  sync status is the same on every window, and a signed-out visitor navigates the same way
+  (US-013).
 
 ### Changed
+
+- The **Garmin CSV import keeps runs of any age**. Until now it skipped every run outside the last
+  16 weeks; now only rows dated after today are skipped, and the review and summary count them as
+  "Future-dated" in place of "Outside 16 weeks". Older runs go through the same conflict review,
+  Overwrite / Skip, and re-import rules, and the limit per import rises from 1,000 to 5,000 runs.
+  After a confirmed import or a Strava sync, every window shows the new data. The Strava sync is
+  unchanged: it fetches only the last 16 weeks and never deletes an older run (US-013).
 
 - The **Garmin CSV import is open to signed-out visitors**: every visitor sees "Import Garmin CSV"
   on the home page, and the connect screen offers it beside "Connect with Strava". A signed-out

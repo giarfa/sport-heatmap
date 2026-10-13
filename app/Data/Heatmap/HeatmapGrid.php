@@ -2,6 +2,7 @@
 
 namespace App\Data\Heatmap;
 
+use App\Enums\DayCellState;
 use Carbon\CarbonImmutable;
 
 /**
@@ -26,6 +27,22 @@ final readonly class HeatmapGrid
     public function label(): string
     {
         return $this->startsOn->format('j M').' – '.$this->endsOn->format('j M Y');
+    }
+
+    /**
+     * Whether any day of the window has a run — what tells an empty window from a quiet one.
+     */
+    public function hasRuns(): bool
+    {
+        foreach ($this->weeks as $week) {
+            foreach ($week->days as $day) {
+                if ($day->state === DayCellState::Ran) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

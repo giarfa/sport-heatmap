@@ -88,18 +88,24 @@ tasks:
       5. Draft internal PR title/body toward `base` (`release/2.0.0`)
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] PR title/body drafted toward `release/2.0.0` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/2.0.0` (not `develop`)
 
       ## Git Deliverables
       - Commit: `chore(US-013): TASK-00 bootstrap feature branch for release/2.0.0` (only if the command did not already leave a commit — an empty commit is optional)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally toward `release/2.0.0` — open remote only if user requests
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 1
     dependencies: {}
+    commit:
+      sha: f7740be383dcb82ebec9297bc66440a5214fb8c2
+      short_sha: f7740be
+      subject: 'chore(US-013): TASK-00 bootstrap feature branch for release/2.0.0'
+      committed_at: '2026-10-13T21:56:07+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/f7740be383dcb82ebec9297bc66440a5214fb8c2'
   -
     id: TASK-01
     title: 'Navigable HeatmapWindow: window from a URL date, previous, next, current'
@@ -119,29 +125,35 @@ tasks:
       5. `php artisan test --compact tests/Unit/Support/Heatmap` (existing tests stay green)
 
       ## Completion Criteria
-      - [ ] Any `Y-m-d` maps to the window ending in its ISO week; malformed / unparseable / future values give the current window, no exception
-      - [ ] `previous()` moves 4 weeks back; `next()` moves 4 weeks forward and never past the current window
-      - [ ] `current()` behaviour unchanged (existing tests green)
-      - [ ] Pint + Larastan clean for the touched files
+      - [x] Any `Y-m-d` maps to the window ending in its ISO week; malformed / unparseable / future values give the current window, no exception
+      - [x] `previous()` moves 4 weeks back; `next()` moves 4 weeks forward and never past the current window
+      - [x] `current()` behaviour unchanged (existing tests green)
+      - [x] Pint + Larastan clean for the touched files
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the window is navigable: URL date → window, 4-week step, Next clamp, strict parsing and its silent fallback; rejected alternatives (path segment, window start in the URL, 404 on bad input)
-      - [ ] Folder `README.md` index row updated (last spec: US-013)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the window is navigable: URL date → window, 4-week step, Next clamp, strict parsing and its silent fallback; rejected alternatives (path segment, window start in the URL, 404 on bad input)
+      - [x] Folder `README.md` index row updated (last spec: US-013)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-01 navigable heatmap window`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-00
+    commit:
+      sha: ff47e82b77fb67b2c05349c5657f5cdde1e6c982
+      short_sha: ff47e82
+      subject: 'feat(US-013): TASK-01 navigable heatmap window'
+      committed_at: '2026-10-13T21:56:53+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ff47e82b77fb67b2c05349c5657f5cdde1e6c982'
   -
     id: TASK-02
     title: 'Unit tests: HeatmapWindow navigation and parsing'
@@ -160,20 +172,26 @@ tasks:
       5. Do **not** add Dusk, Playwright, or browser suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every parsing and clamping rule of TASK-01 has one case
-      - [ ] Coverage matches the `NORMAL` bar
+      - [x] Tests pass locally
+      - [x] Every parsing and clamping rule of TASK-01 has one case
+      - [x] Coverage matches the `NORMAL` bar
 
       ## Git Deliverables
       - Commit: `test(US-013): TASK-02 cover heatmap window navigation`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
       - TASK-01
+    commit:
+      sha: 88630df9778343b62dafbf030ce10bcb838216ed
+      short_sha: 88630df
+      subject: 'test(US-013): TASK-02 cover heatmap window navigation'
+      committed_at: '2026-10-13T21:57:24+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/88630df9778343b62dafbf030ce10bcb838216ed'
   -
     id: TASK-03
     title: 'Invalidate every cached window of an athlete on sync and import'
@@ -195,29 +213,35 @@ tasks:
       5. `php artisan test --compact tests/Feature/Dashboard tests/Feature/Garmin tests/Feature/Console`
 
       ## Completion Criteria
-      - [ ] One `forgetAthlete()` call changes the key of every window of that athlete, and only that athlete
-      - [ ] Sync and confirmed import call `forgetAthlete()`; no caller passes a window any more
-      - [ ] Existing cache, sync, and import tests green
+      - [x] One `forgetAthlete()` call changes the key of every window of that athlete, and only that athlete
+      - [x] Sync and confirmed import call `forgetAthlete()`; no caller passes a window any more
+      - [x] Existing cache, sync, and import tests green
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — cache key format v3, the generation counter, why not tags / why not a per-window forget loop
-      - [ ] `.larapilot/docs/devs/activity-sync.md` and `.larapilot/docs/devs/garmin-csv-import.md` — the write now invalidates every window of the athlete
-      - [ ] Folder `README.md` index rows updated
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — cache key format v3, the generation counter, why not tags / why not a per-window forget loop
+      - [x] `.larapilot/docs/devs/activity-sync.md` and `.larapilot/docs/devs/garmin-csv-import.md` — the write now invalidates every window of the athlete
+      - [x] Folder `README.md` index rows updated
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-03 invalidate every cached window on write`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: cfd993d5f7b525019f4f41787bacef37622528e0
+      short_sha: cfd993d
+      subject: 'feat(US-013): TASK-03 invalidate every cached window on write'
+      committed_at: '2026-10-13T21:58:38+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cfd993d5f7b525019f4f41787bacef37622528e0'
   -
     id: TASK-04
     title: 'Feature tests: past windows are invalidated by import and sync'
@@ -236,20 +260,26 @@ tasks:
       5. `php artisan test --compact --filter=HeatmapGridCacheTest`
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] A cached past window never survives a confirmed import or a sync
-      - [ ] Coverage matches the `NORMAL` bar
+      - [x] Tests pass locally
+      - [x] A cached past window never survives a confirmed import or a sync
+      - [x] Coverage matches the `NORMAL` bar
 
       ## Git Deliverables
       - Commit: `test(US-013): TASK-04 cover cache invalidation of past windows`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
       - TASK-03
+    commit:
+      sha: 9939091f3122482cf7548cd4d854b58034d21fa7
+      short_sha: '9939091'
+      subject: 'test(US-013): TASK-04 cover cache invalidation of past windows'
+      committed_at: '2026-10-13T21:59:21+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9939091f3122482cf7548cd4d854b58034d21fa7'
   -
     id: TASK-05
     title: 'Dashboard serves any window: ?to=, oldest run, navigation state, steady sync status'
@@ -275,31 +305,37 @@ tasks:
       7. `php artisan test --compact tests/Feature/Dashboard`
 
       ## Completion Criteria
-      - [ ] `/` renders the current window exactly as before (existing dashboard tests green)
-      - [ ] `/?to=<past Sunday>` renders that window's grid, weekly totals, legend, and date range; no future cells and no partial total
-      - [ ] Previous / Next availability follows the oldest-run and current-window rules
-      - [ ] Sync status identical on every window; empty note follows the shown window
-      - [ ] At most one extra query per request (the `MIN`)
+      - [x] `/` renders the current window exactly as before (existing dashboard tests green)
+      - [x] `/?to=<past Sunday>` renders that window's grid, weekly totals, legend, and date range; no future cells and no partial total
+      - [x] Previous / Next availability follows the oldest-run and current-window rules
+      - [x] Sync status identical on every window; empty note follows the shown window
+      - [x] At most one extra query per request (the `MIN`)
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — request flow with `?to=`, `OldestRunDate`, `WindowNavigation` rules, why sync status always reads the current window, query shape
-      - [ ] Folder `README.md` index row updated (last spec: US-013)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — request flow with `?to=`, `OldestRunDate`, `WindowNavigation` rules, why sync status always reads the current window, query shape
+      - [x] Folder `README.md` index row updated (last spec: US-013)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-05 serve any window on the dashboard`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-01
       - TASK-03
+    commit:
+      sha: e4701e6a5b25f64b4886d9fcce9dbb366ab73b51
+      short_sha: e4701e6
+      subject: 'feat(US-013): TASK-05 serve any window on the dashboard'
+      committed_at: '2026-10-13T22:00:28+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e4701e6a5b25f64b4886d9fcce9dbb366ab73b51'
   -
     id: TASK-06
     title: 'Previous / Next controls: <x-window-nav> component and styles (mobile first, light + dark)'
@@ -325,30 +361,36 @@ tasks:
       5. `npm run build`; `php artisan test --compact tests/Feature/Dashboard`
 
       ## Completion Criteria
-      - [ ] Both controls present on every dashboard window; links named "Previous 4 weeks" / "Next 4 weeks"
-      - [ ] A disabled control is a disabled `<button>`, never an `<a>`
-      - [ ] No horizontal page scroll at 320/375 px; both themes meet AA for the controls
-      - [ ] Deviation recorded in the US-014 mockup README
-      - [ ] UI usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
+      - [x] Both controls present on every dashboard window; links named "Previous 4 weeks" / "Next 4 weeks"
+      - [x] A disabled control is a disabled `<button>`, never an `<a>`
+      - [x] No horizontal page scroll at 320/375 px; both themes meet AA for the controls
+      - [x] Deviation recorded in the US-014 mockup README
+      - [x] UI usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the nav component, its accessibility contract, and the disabled-button deviation
-      - [ ] Folder `README.md` index row updated (last spec: US-013)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the nav component, its accessibility contract, and the disabled-button deviation
+      - [x] Folder `README.md` index row updated (last spec: US-013)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-06 previous and next window controls`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 3
     dependencies:
       - TASK-05
+    commit:
+      sha: 1979b870e122b982509c9cb4ff0c3761a8a8893d
+      short_sha: 1979b87
+      subject: 'feat(US-013): TASK-06 previous and next window controls'
+      committed_at: '2026-10-13T22:01:18+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1979b870e122b982509c9cb4ff0c3761a8a8893d'
   -
     id: TASK-07
     title: 'Feature tests: dashboard window navigation, signed in and signed out'
@@ -372,21 +414,27 @@ tasks:
       10. `php artisan test --compact --filter=WindowNavigationTest` — no Dusk/Playwright/browser suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every FR-019 "Done means" bullet that HTTP can observe has a case
-      - [ ] Coverage matches the `NORMAL` bar
+      - [x] Tests pass locally
+      - [x] Every FR-019 "Done means" bullet that HTTP can observe has a case
+      - [x] Coverage matches the `NORMAL` bar
 
       ## Git Deliverables
       - Commit: `test(US-013): TASK-07 cover dashboard window navigation`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-05
       - TASK-06
+    commit:
+      sha: 6cb917601a21c55d08be289b88a635023e20ea3e
+      short_sha: 6cb9176
+      subject: 'test(US-013): TASK-07 cover dashboard window navigation'
+      committed_at: '2026-10-13T22:02:38+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6cb917601a21c55d08be289b88a635023e20ea3e'
   -
     id: TASK-08
     title: 'Garmin import keeps runs of any age; only future-dated rows are skipped'
@@ -410,30 +458,36 @@ tasks:
       5. `php artisan test --compact tests/Feature/Garmin tests/Unit/Support/Garmin`
 
       ## Completion Criteria
-      - [ ] A running row dated before the current window is planned and imported like any other
-      - [ ] A row after today is skipped and counted as future-dated; the review and summary say "Future-dated"
-      - [ ] A pending upload stored under the old key still opens the review
-      - [ ] An import of up to 5,000 runs is accepted; 5,001 is rejected with the existing message
-      - [ ] Existing Garmin tests green after updating the renamed counter
+      - [x] A running row dated before the current window is planned and imported like any other
+      - [x] A row after today is skipped and counted as future-dated; the review and summary say "Future-dated"
+      - [x] A pending upload stored under the old key still opens the review
+      - [x] An import of up to 5,000 runs is accepted; 5,001 is rejected with the existing message
+      - [x] Existing Garmin tests green after updating the renamed counter
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — runs of any age kept, future-dated rule, the counter rename and legacy key, the 5,000 cap and why
-      - [ ] Folder `README.md` index row updated
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — runs of any age kept, future-dated rule, the counter rename and legacy key, the 5,000 cap and why
+      - [x] Folder `README.md` index row updated
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-08 keep older Garmin runs and count future-dated rows`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-03
+    commit:
+      sha: 6723d9c334e185691133b549d85ef1bbc278e2cf
+      short_sha: 6723d9c
+      subject: 'feat(US-013): TASK-08 keep older Garmin runs and count future-dated rows'
+      committed_at: '2026-10-13T22:04:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6723d9c334e185691133b549d85ef1bbc278e2cf'
   -
     id: TASK-09
     title: 'Feature tests: older Garmin runs, future-dated rows, Strava sync bounds'
@@ -457,20 +511,26 @@ tasks:
       7. `php artisan test --compact tests/Feature/Garmin tests/Feature/Strava` — no browser suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every changed FR-018 bullet and the FR-002 bound have a case
-      - [ ] Coverage matches the `NORMAL` bar
+      - [x] Tests pass locally
+      - [x] Every changed FR-018 bullet and the FR-002 bound have a case
+      - [x] Coverage matches the `NORMAL` bar
 
       ## Git Deliverables
       - Commit: `test(US-013): TASK-09 cover older Garmin runs and sync bounds`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-08
+    commit:
+      sha: 74176fc9fbce1cf041a4b96545341ab09651b366
+      short_sha: 74176fc
+      subject: 'test(US-013): TASK-09 cover older Garmin runs and sync bounds'
+      committed_at: '2026-10-13T22:05:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/74176fc9fbce1cf041a4b96545341ab09651b366'
   -
     id: TASK-10
     title: 'Seed 7 weeks of Garmin history before the training block'
@@ -490,28 +550,34 @@ tasks:
       4. `php artisan migrate:fresh --seed`; `php artisan test --compact --filter=TrainingBlockSeederTest`
 
       ## Completion Criteria
-      - [ ] `migrate:fresh --seed` succeeds and the dashboard has an earlier window with runs
-      - [ ] The current window's seeded data and legend are unchanged
-      - [ ] Seeder test updated and green
+      - [x] `migrate:fresh --seed` succeeds and the dashboard has an earlier window with runs
+      - [x] The current window's seeded data and legend are unchanged
+      - [x] Seeder test updated and green
 
       ## Test Data
-      - [ ] `TrainingBlockSeeder` creates the 7 history weeks through `Activity::factory()` with Garmin source
-      - [ ] `ActivityFactory` updated in this same task only if a state is added
+      - [x] `TrainingBlockSeeder` creates the 7 history weeks through `Activity::factory()` with Garmin source
+      - [x] `ActivityFactory` updated in this same task only if a state is added
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — demo dataset section: the history weeks and why they mirror the US-014 mockup
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — demo dataset section: the history weeks and why they mirror the US-014 mockup
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-10 seed Garmin history before the training block`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: 33676b28a46218cd94d1497f29fa6b888e97fe37
+      short_sha: 33676b2
+      subject: 'feat(US-013): TASK-10 seed Garmin history before the training block'
+      committed_at: '2026-10-13T22:06:53+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/33676b28a46218cd94d1497f29fa6b888e97fe37'
   -
     id: TASK-11
     title: 'CHANGELOG, domain doc index, and quality gate'
@@ -531,24 +597,24 @@ tasks:
       4. Prepare the manual test handoff notes (plan Test Strategy) in the local PR body
 
       ## Completion Criteria
-      - [ ] CHANGELOG updated under Unreleased
-      - [ ] Domain docs and index current
-      - [ ] `larapilot:quality` passes; full test suite green
-      - [ ] Manual test handoff notes in the PR body
+      - [x] CHANGELOG updated under Unreleased
+      - [x] Domain docs and index current
+      - [x] `larapilot:quality` passes; full test suite green
+      - [x] Manual test handoff notes in the PR body
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/README.md` index rows for heatmap-dashboard, garmin-csv-import, activity-sync name US-013
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/README.md` index rows for heatmap-dashboard, garmin-csv-import, activity-sync name US-013
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `chore(US-013): TASK-11 changelog, domain docs, and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 2
     dependencies:
@@ -557,4 +623,10 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T19:48:10+00:00'
+    commit:
+      sha: 0558857cc98dfbcf6bac6f528429e9e838de325c
+      short_sha: '0558857'
+      subject: 'chore(US-013): TASK-11 changelog, domain docs, and quality gate'
+      committed_at: '2026-10-13T22:07:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0558857cc98dfbcf6bac6f528429e9e838de325c'
+updated_at: '2026-10-13T20:07:24+00:00'

@@ -46,7 +46,7 @@ class GuestGarminImportTest extends TestCase
     {
         return [
             'italian headers' => ['activities-it.csv', 37],
-            'english headers' => ['activities-en.csv', 6],
+            'english headers' => ['activities-en.csv', 7],
         ];
     }
 
@@ -201,7 +201,7 @@ class GuestGarminImportTest extends TestCase
         $this->flushSession();
         $this->upload($this->fixture('activities-en.csv'));
         $reviewB = $this->review();
-        $reviewB->assertSee('<div><dt>New runs</dt><dd>6</dd></div>', escape: false);
+        $reviewB->assertSee('<div><dt>New runs</dt><dd>7</dd></div>', escape: false);
         $reviewB->assertDontSee('Paese Corsa');
 
         $this->confirm($reviewA)->assertRedirect(route('garmin.import.review'));
@@ -213,6 +213,18 @@ class GuestGarminImportTest extends TestCase
 
         $this->assertSame(37, Activity::count());
         $this->assertSame(0, Activity::where('name', 'Ridge Trail')->count());
+    }
+
+    public function test_a_guest_import_keeps_a_run_older_than_the_current_window(): void
+    {
+        $displayed = $this->allowlistedAthlete();
+
+        $this->upload($this->csv(['Corsa,2026-03-15 09:00:00,false,"Thirty weeks ago","8.00","00:45:00","00:45:00"']));
+        $this->confirm($this->review())->assertRedirect(route('garmin.import.summary'));
+
+        $this->assertSame('2026-03-15', $displayed->activities()->sole()->activity_date->toDateString());
+        $this->assertGuest();
+        Http::assertNothingSent();
     }
 
     public function test_an_athlete_connecting_mid_review_sends_the_guest_back_to_the_review(): void

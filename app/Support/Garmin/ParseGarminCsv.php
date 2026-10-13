@@ -5,15 +5,14 @@ namespace App\Support\Garmin;
 use App\Data\Garmin\GarminCsvRow;
 use App\Data\Garmin\ParsedGarminCsv;
 use App\Exceptions\Garmin\GarminCsvRejectedException;
-use App\Support\Heatmap\HeatmapWindow;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use SplFileObject;
 use Throwable;
 
 /**
- * Reads a Garmin Connect "Activities" export into running rows inside the
- * heatmap window, counting and explaining every row it does not keep.
+ * Reads a Garmin Connect "Activities" export into running rows dated today or
+ * earlier, at any age, counting and explaining every row it does not keep.
  *
  * Writes nothing: the result is planned and reviewed before any row is stored.
  * A file that cannot be read as an export at all is rejected whole; a single
@@ -25,11 +24,13 @@ final readonly class ParseGarminCsv
 
     /*
      * Bounds on what one upload can put in the session and in front of the
-     * planner. 5 MB of minimal rows is ~100k rows; a real 16-week export holds
-     * a few hundred runs at most, and a real export with hundreds of unreadable
-     * rows is not one this importer can help with.
+     * planner. 5 MB of minimal rows is ~100k rows. Older runs are kept (US-013), so
+     * a full export of several years of training is the normal case: 5,000 runs is
+     * about 13 years at one a day, and the 5 MB limit still bounds the file itself.
+     * A real export with hundreds of unreadable rows is not one this importer can
+     * help with.
      */
-    private const MAX_RUNS = 1_000;
+    private const MAX_RUNS = 5_000;
 
     /*
      * Plausibility bounds on the run metrics: the file is attacker-supplied for a
@@ -51,7 +52,7 @@ final readonly class ParseGarminCsv
     /**
      * @throws GarminCsvRejectedException
      */
-    public function __invoke(string $path, HeatmapWindow $window, CarbonInterface $today): ParsedGarminCsv
+    public function __invoke(string $path, CarbonInterface $today): ParsedGarminCsv
     {
         $this->assertLooksLikeText($path);
 
@@ -62,7 +63,7 @@ final readonly class ParseGarminCsv
         $columns = null;
         $rows = [];
         $ignoredByType = [];
-        $outsideWindow = 0;
+        $futureDated = 0;
         $invalid = [];
         $dataRows = 0;
         $todayDate = $today->format('Y-m-d');
@@ -106,8 +107,13 @@ final readonly class ParseGarminCsv
                 continue;
             }
 
-            if ($startDateLocal->format('Y-m-d') > $todayDate || ! $window->contains($startDateLocal)) {
-                $outsideWindow++;
+            /*
+             * Only a run that has not happened yet is skipped. A run of any age is kept:
+             * the heatmap can be navigated back to it (US-013), and which window it falls
+             * in is the dashboard's business, not the importer's.
+             */
+            if ($startDateLocal->format('Y-m-d') > $todayDate) {
+                $futureDated++;
 
                 continue;
             }
@@ -160,7 +166,7 @@ final readonly class ParseGarminCsv
             throw GarminCsvRejectedException::empty();
         }
 
-        return new ParsedGarminCsv(array_values($rows), $ignoredByType, $outsideWindow, $invalid);
+        return new ParsedGarminCsv(array_values($rows), $ignoredByType, $futureDated, $invalid);
     }
 
     /**

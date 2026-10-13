@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Data\Heatmap\WindowNavigation;
 use App\Models\User;
 use App\Support\Heatmap\DailyRunningDistance;
 use App\Support\Heatmap\DailyRuns;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
+use App\Support\Heatmap\OldestRunDate;
 use App\Support\Strava\ResolveDisplayedAthlete;
 use App\Support\Sync\ResolveSyncStatus;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -26,10 +29,12 @@ class DashboardController extends Controller
      * loop is the failure mode this route exists to avoid.
      */
     public function __invoke(
+        Request $request,
         DailyRunningDistance $dailyDistance,
         DailyRuns $dailyRuns,
         HeatmapBuilder $buildGrid,
         HeatmapGridCache $gridCache,
+        OldestRunDate $oldestRunDate,
         ResolveSyncStatus $resolveSyncStatus,
         ResolveDisplayedAthlete $resolveDisplayedAthlete,
     ): View {
@@ -48,8 +53,8 @@ class DashboardController extends Controller
             return view('strava.connect');
         }
 
-        $window = HeatmapWindow::current();
         $today = now();
+        $window = HeatmapWindow::fromRequestedEnd($this->requestedEnd($request), $today);
 
         /*
          * The cache key is per athlete, not per viewer, so guests and the
@@ -58,21 +63,48 @@ class DashboardController extends Controller
          * runs are part of the same cached grid, so a sync or an import that forgets
          * the grid forgets the detail with it — they cannot disagree.
          */
-        $grid = $gridCache->remember(
-            $athlete,
-            $window,
-            $today,
-            fn () => $buildGrid($window, $dailyDistance($athlete, $window), $today, $dailyRuns($athlete, $window)),
-        );
+        $oldestRun = $oldestRunDate($athlete);
+        $build = fn () => $buildGrid($window, $dailyDistance($athlete, $window), $today, $dailyRuns($athlete, $window));
+
+        /*
+         * Only windows that can hold a run are cached, plus the current one. `to` accepts any
+         * past date, and every distinct week is a distinct cache key: without this a guest
+         * could fill the cache table with one empty grid per week back to year 0. A window
+         * that ends before the oldest run is empty by construction, costs two small queries,
+         * and is never linked to by Previous.
+         */
+        $canHoldRuns = $window->isCurrent($today)
+            || ($oldestRun !== null && $window->endsOn->greaterThanOrEqualTo($oldestRun));
+
+        $grid = $canHoldRuns ? $gridCache->remember($athlete, $window, $today, $build) : $build();
 
         /*
          * Resolved outside the grid cache, deliberately: a cached grid is
          * legitimate (US-004), but a cached "synced 6 hours ago" is the
          * failure mode FR-007 exists to prevent — the sync status has to be
          * read fresh on every request regardless of whether the grid was.
+         *
+         * It always reads the CURRENT window, never the one shown: the status
+         * describes the sync, not the period on screen, so the chip, the warning,
+         * the sync card and the first-sync skeleton must be the same whichever
+         * window the reader has navigated to.
          */
-        $status = $resolveSyncStatus($athlete, $window, $today);
+        $status = $resolveSyncStatus($athlete, HeatmapWindow::current($today), $today);
 
-        return view('dashboard', ['grid' => $grid, 'status' => $status]);
+        $navigation = WindowNavigation::for($window, $today, $oldestRun);
+
+        return view('dashboard', ['grid' => $grid, 'status' => $status, 'navigation' => $navigation]);
+    }
+
+    /**
+     * The `to` query value as a string, or '' for anything else: `?to[]=x` arrives as an
+     * array, and a plain (string) cast of it is a 500. HeatmapWindow decides what a string
+     * is worth.
+     */
+    private function requestedEnd(Request $request): string
+    {
+        $requested = $request->query('to');
+
+        return is_string($requested) ? $requested : '';
     }
 }
