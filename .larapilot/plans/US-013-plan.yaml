@@ -88,18 +88,24 @@ tasks:
       5. Draft internal PR title/body toward `base` (`release/2.0.0`)
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] PR title/body drafted toward `release/2.0.0` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/2.0.0` (not `develop`)
 
       ## Git Deliverables
       - Commit: `chore(US-013): TASK-00 bootstrap feature branch for release/2.0.0` (only if the command did not already leave a commit — an empty commit is optional)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally toward `release/2.0.0` — open remote only if user requests
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 1
     dependencies: {}
+    commit:
+      sha: f7740be383dcb82ebec9297bc66440a5214fb8c2
+      short_sha: f7740be
+      subject: 'chore(US-013): TASK-00 bootstrap feature branch for release/2.0.0'
+      committed_at: '2026-10-13T21:56:07+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/f7740be383dcb82ebec9297bc66440a5214fb8c2'
   -
     id: TASK-01
     title: 'Navigable HeatmapWindow: window from a URL date, previous, next, current'
@@ -119,29 +125,35 @@ tasks:
       5. `php artisan test --compact tests/Unit/Support/Heatmap` (existing tests stay green)
 
       ## Completion Criteria
-      - [ ] Any `Y-m-d` maps to the window ending in its ISO week; malformed / unparseable / future values give the current window, no exception
-      - [ ] `previous()` moves 4 weeks back; `next()` moves 4 weeks forward and never past the current window
-      - [ ] `current()` behaviour unchanged (existing tests green)
-      - [ ] Pint + Larastan clean for the touched files
+      - [x] Any `Y-m-d` maps to the window ending in its ISO week; malformed / unparseable / future values give the current window, no exception
+      - [x] `previous()` moves 4 weeks back; `next()` moves 4 weeks forward and never past the current window
+      - [x] `current()` behaviour unchanged (existing tests green)
+      - [x] Pint + Larastan clean for the touched files
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the window is navigable: URL date → window, 4-week step, Next clamp, strict parsing and its silent fallback; rejected alternatives (path segment, window start in the URL, 404 on bad input)
-      - [ ] Folder `README.md` index row updated (last spec: US-013)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the window is navigable: URL date → window, 4-week step, Next clamp, strict parsing and its silent fallback; rejected alternatives (path segment, window start in the URL, 404 on bad input)
+      - [x] Folder `README.md` index row updated (last spec: US-013)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-01 navigable heatmap window`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-00
+    commit:
+      sha: ff47e82b77fb67b2c05349c5657f5cdde1e6c982
+      short_sha: ff47e82
+      subject: 'feat(US-013): TASK-01 navigable heatmap window'
+      committed_at: '2026-10-13T21:56:53+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ff47e82b77fb67b2c05349c5657f5cdde1e6c982'
   -
     id: TASK-02
     title: 'Unit tests: HeatmapWindow navigation and parsing'
@@ -557,4 +569,4 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T19:48:10+00:00'
+updated_at: '2026-10-13T19:56:54+00:00'
