@@ -502,28 +502,34 @@ tasks:
       7. `php artisan test --compact tests/Unit/Data/Heatmap tests/Unit/Support/Heatmap tests/Feature/Dashboard`
 
       ## Completion Criteria
-      - [ ] One query for the runs per cache miss; no N+1
-      - [ ] Runs live inside the cached grid; sync and import invalidation cover the detail with no new call site
-      - [ ] Old cache entries cannot break the dashboard after deploy
-      - [ ] Tests pass
+      - [x] One query for the runs per cache miss; no N+1
+      - [x] Runs live inside the cached grid; sync and import invalidation cover the detail with no new call site
+      - [x] Old cache entries cannot break the dashboard after deploy
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md`: technical design (DayRun, DailyRuns, runs inside the cached grid), architectural choice (in-grid vs JSON-on-open, rejected), cache key version invariant
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md`: technical design (DayRun, DailyRuns, runs inside the cached grid), architectural choice (in-grid vs JSON-on-open, rejected), cache key version invariant
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-012): TASK-08 carry each day's runs in the heatmap grid`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 3
     dependencies:
       - TASK-02
+    commit:
+      sha: c71213963aaa6206fc4a34304e4cdb9d85d6ad83
+      short_sha: c712139
+      subject: "feat(US-012): TASK-08 carry each day's runs in the heatmap grid"
+      committed_at: '2026-10-13T21:00:55+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c71213963aaa6206fc4a34304e4cdb9d85d6ad83'
   -
     id: TASK-09
     title: 'Day cell detail: tappable ran days and the native dialog'
@@ -657,4 +663,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T18:58:39+00:00'
+updated_at: '2026-10-13T19:00:55+00:00'

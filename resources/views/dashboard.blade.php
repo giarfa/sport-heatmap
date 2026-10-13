@@ -33,6 +33,7 @@
                 @endif
                 <x-heatmap-grid :grid="$grid" />
             </section>
+            <x-day-detail :grid="$grid" />
         @endif
         <aside class="rail" aria-label="Legend and sync detail">
             <div class="card p-4">

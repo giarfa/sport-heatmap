@@ -37,9 +37,10 @@ share stops working.
    2. `HeatmapGridCache::remember()` returns the cached `HeatmapGrid`, or builds
       it — an entry that cannot be restored as a `HeatmapGrid` (incomplete
       class, or `unserialize` throwing on a nested class, enum case, or date)
-      is reported, counts as a miss, and is overwritten: `DailyRunningDistance` (one grouped `SUM` query) →
+      is reported, counts as a miss, and is overwritten: `DailyRunningDistance` (one grouped `SUM` query) and
+      `DailyRuns` (one query for the window's runs, `US-012`) →
       `HeatmapBuilder` (rest / ran / future cells, weekly totals, partial current
-      week) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
+      week, each Ran day's runs) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
    3. `ResolveSyncStatus` reads `sync_runs` and the window's activity count
       **outside** the cache and returns a `SyncStatus`. For a **CSV-only
       athlete** (`User::isCsvOnly()`, no Strava id — US-011) it reads no
@@ -47,7 +48,39 @@ share stops working.
       the athlete's `garmin_csv` activities, and the status is
       `SyncStatus::forCsvOnly()`.
    4. `dashboard.blade.php` renders the chip, an optional warning, the grid (or
-      the skeleton during a first sync), the legend, and the sync detail card.
+      the skeleton during a first sync), `<x-day-detail>`, the legend, and the
+      sync detail card.
+
+### Day cell detail (`US-012`, FR-011)
+
+A day with at least one run (`DayCell::hasDetail()`) renders its cell as
+`<button class="hm-hit" data-day="Y-m-d" aria-haspopup="dialog">` inside the
+`<td class="hm-td hm-td--ran">`; rest and future days stay plain cells. The
+page carries **one** native `<dialog id="day-dialog">` and, per ran day, an
+inert `<template id="day-{date}">` holding that day's heading, "N runs · X km"
+sub-line and a list of runs — name, source line, and a `<dl>` of Distance,
+Moving time, Avg pace, Ascent, Heart rate (`<x-run-metric>` prints a missing
+metric as an em dash read aloud as "not recorded", never `0`). A Strava-sourced
+run adds "View on Strava" (`DayRun::$stravaUrl`, i.e. `Activity::stravaUrl()`,
+the FR-008 rule: a Garmin-sourced run never links, even when it keeps its Strava
+id); a Garmin run shows "Garmin import".
+
+`resources/js/app.js` does the rest, with no dependency: a delegated click on
+`[data-day]` clones the day's template into the dialog and calls `showModal()`
+(Enter and Space click a `<button>`); the close button, Esc, and a click on the
+backdrop close it; on `close` the opening cell gets `is-open` removed and focus
+back. Opening reads only the page, so it writes no row and calls no endpoint for
+a signed-out visitor too (FR-017). Without JS the cells are buttons that do
+nothing; their screen-reader text still names the day, distance and run count.
+
+Layout follows `.larapilot/mockups/US-012/`: a bottom sheet below 640 px
+(`max-height: 85dvh`), a centred dialog from `sm`, slide/fade only under
+`prefers-reduced-motion: no-preference`, light and dark from the existing tokens
+plus one `--backdrop`. Tailwind's preflight zeroes `margin`, which the browser
+uses to centre a modal, so `.day-dlg` restores `margin: auto` from `sm`. The
+button fills the whole `<td>` (padding 2 / 3 / 4 px by breakpoint, the gap the
+`<td>` had) so the target is the full column width — 25.8 px at 320 px — while
+the visible square, the `<colgroup>` widths and the ramp are untouched.
 
 The guest branch is **read-only by structure**: the middleware is a no-op for
 guests, nothing on the path calls `EnsureFreshAccessToken` or `StravaClient`, and
@@ -128,7 +161,7 @@ calibrated bands, upper-inclusive.
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
 | Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v2:{user id}:{window start}:{today}`, TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
-| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
+| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `day-detail`, `run-metric`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Config | `config/heatmap.php` | Literal `window_weeks` (16) and `grid_cache_ttl` (86 400) |
 | Tests | `tests/Feature/Dashboard/*`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
@@ -155,6 +188,8 @@ three small indexed queries for the sync status.
 | All copy and arithmetic in DTOs / `SyncStatus` | Logic in Blade | Testable without rendering; components stay markup-only |
 | `@yield('header-status')` in the layout | View composer / shared variable | The connect and rejected screens extend the same layout and must render no chip |
 | Public read-only home page for guests (FR-017) | Keep it sign-in only | The owner checks it on any device and shares the link; the owner accepted the Strava API Agreement risk (decisions `f71daaa7e976c188`, `88f04507cbc7e573`) |
+| One shared `<dialog>` filled from a `<template>` per day (US-012) | One `<dialog>` per ran day; a bottom-sheet library; `<details>` | Same markup weight as the per-day dialogs but a single focus-return path; native `showModal()` gives the trap, Esc and inert page for free, where a library is a new dependency the app, which has no Alpine or Livewire, does not carry. `<details>` cannot be a modal sheet |
+| The Strava link in the detail opens in the same tab | `target="_blank" rel="noopener"` | The approved mockup and the US-008 review link do the same; the visible behaviour is the mockup's |
 | Guests and owner share the per-athlete grid cache | A separate guest cache | Same data, same key; a separate cache would double the rebuilds and could disagree with the owner's view |
 | Guests see the same sync warning, reason included | A reduced guest warning | Decision `f75e292def892fad`; the reason is already non-secret and HTML-escaped |
 | "Import Garmin CSV" for every visitor as a text line under the map (US-011) | A header button; a menu; owner-only | The same reasoning as the guest line: discreet, no header budget at 375 px, one screen with no nav. Open to guests by the owner's choice so the map works with CSV imports only |

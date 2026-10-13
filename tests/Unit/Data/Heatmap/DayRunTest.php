@@ -35,7 +35,7 @@ class DayRunTest extends TestCase
 
     public function test_a_strava_run_links_to_strava_and_names_its_source(): void
     {
-        $run = DayRun::fromActivity(Activity::factory()->make(['strava_activity_id' => 4_242]));
+        $run = DayRun::fromActivity(Activity::factory()->make(['user_id' => 1, 'strava_activity_id' => 4_242]));
 
         $this->assertSame('https://www.strava.com/activities/4242', $run->stravaUrl);
         $this->assertSame('Strava', $run->sourceLabel());
@@ -43,8 +43,8 @@ class DayRunTest extends TestCase
 
     public function test_a_garmin_run_has_no_link_even_when_it_keeps_a_strava_id(): void
     {
-        $imported = DayRun::fromActivity(Activity::factory()->garminImported()->make());
-        $twin = DayRun::fromActivity(Activity::factory()->garminOverwritten()->make(['strava_activity_id' => 4_242]));
+        $imported = DayRun::fromActivity(Activity::factory()->garminImported()->make(['user_id' => 1]));
+        $twin = DayRun::fromActivity(Activity::factory()->garminOverwritten()->make(['user_id' => 1, 'strava_activity_id' => 4_242]));
 
         $this->assertNull($imported->stravaUrl);
         $this->assertNull($twin->stravaUrl);
@@ -55,6 +55,7 @@ class DayRunTest extends TestCase
     public function test_it_carries_the_activitys_values_and_no_model(): void
     {
         $run = DayRun::fromActivity(Activity::factory()->withoutHeartRate()->make([
+            'user_id' => 1,
             'name' => 'Paese Corsa',
             'distance_meters' => 8_290,
             'moving_time_seconds' => 3_263,

@@ -27,4 +27,25 @@ final readonly class HeatmapGrid
     {
         return $this->startsOn->format('j M').' – '.$this->endsOn->format('j M Y');
     }
+
+    /**
+     * Every day that opens a detail, oldest first — what the day-detail component
+     * renders one template for.
+     *
+     * @return array<int, DayCell>
+     */
+    public function daysWithDetail(): array
+    {
+        $days = [];
+
+        foreach ($this->weeks as $week) {
+            foreach ($week->days as $day) {
+                if ($day->hasDetail()) {
+                    $days[] = $day;
+                }
+            }
+        }
+
+        return $days;
+    }
 }
