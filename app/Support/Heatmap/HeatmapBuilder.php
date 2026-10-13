@@ -19,13 +19,16 @@ final readonly class HeatmapBuilder
 {
     public function __construct(
         private CalibrateIntensityScale $calibrate,
+        private BuildWeeklyTrend $buildTrend,
     ) {}
 
     /**
      * @param  array<string, int>  $dailyMeters  keyed by "Y-m-d" => summed distance in metres
      * @param  array<string, array<int, DayRun>>  $dailyRuns  keyed by "Y-m-d" => that day's runs in start order
+     * @param  array<int, int>  $leadInWeekMeters  the three weeks before the window in metres, oldest first
+     * @param  CarbonInterface|null  $oldestRun  the athlete's oldest stored run, which bounds how far back the 4-week average reaches
      */
-    public function __invoke(HeatmapWindow $window, array $dailyMeters, CarbonInterface $today, array $dailyRuns = []): HeatmapGrid
+    public function __invoke(HeatmapWindow $window, array $dailyMeters, CarbonInterface $today, array $dailyRuns = [], array $leadInWeekMeters = [0, 0, 0], ?CarbonInterface $oldestRun = null): HeatmapGrid
     {
         $today = CarbonImmutable::instance($today)->startOfDay();
 
@@ -44,7 +47,13 @@ final readonly class HeatmapBuilder
             $weekStart = $weekStart->addWeek();
         }
 
-        return new HeatmapGrid($weeks, $window->startsOn, $window->endsOn, $scale);
+        /*
+         * The trend is built from the WeekRows just assembled, never from a second read of
+         * the data, so a bar cannot disagree with the total printed on its row.
+         */
+        $trend = ($this->buildTrend)($weeks, $leadInWeekMeters, $oldestRun, HeatmapGrid::labelFor($window->startsOn, $window->endsOn));
+
+        return new HeatmapGrid($weeks, $window->startsOn, $window->endsOn, $scale, $trend);
     }
 
     /**

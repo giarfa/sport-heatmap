@@ -43,10 +43,13 @@ share stops working.
    2. `HeatmapGridCache::remember()` returns the cached `HeatmapGrid`, or builds
       it — an entry that cannot be restored as a `HeatmapGrid` (incomplete
       class, or `unserialize` throwing on a nested class, enum case, or date)
-      is reported, counts as a miss, and is overwritten: `DailyRunningDistance` (one grouped `SUM` query) and
-      `DailyRuns` (one query for the window's runs, `US-012`) →
+      is reported, counts as a miss, and is overwritten: `DailyRunningDistance` (one grouped `SUM` query),
+      `DailyRuns` (one query for the window's runs, `US-012`) and `LeadInDistance`
+      (one grouped query for the three weeks before the window, `US-014`) →
       `HeatmapBuilder` (rest / ran / future cells, weekly totals, partial current
-      week, each Ran day's runs) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
+      week, each Ran day's runs) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7) and
+      `BuildWeeklyTrend` (the weekly-mileage chart, from the same `WeekRow`s) — all of it
+      cached as the one `HeatmapGrid`, so the chart has no cache of its own.
    3. `ResolveSyncStatus` reads `sync_runs` and the activity count of the
       **current** window — never the shown one — **outside** the cache and
       returns a `SyncStatus`, so the chip, warning, sync card and skeleton are the
@@ -197,14 +200,14 @@ calibrated bands, upper-inclusive.
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
-| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v3:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
+| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v4:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
 | Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Config | `config/heatmap.php` | Literals `window_weeks` (16), `navigation_step_weeks` (4) and `grid_cache_ttl` (86 400) |
 | Tests | `tests/Feature/Dashboard/*`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
 
-A dashboard request costs one grouped query and one run query on a cache miss, zero on a hit, plus
+A dashboard request costs one grouped query, one run query and one lead-in query on a cache miss, zero on a hit, plus
 three small indexed queries for the sync status and one `MIN()` for the oldest run (`US-013`).
 
 ### Weekly trend (`US-014`, FR-020)
@@ -239,7 +242,7 @@ the grid's date-range label, and returns a `WeeklyTrend` of numbers and strings 
 | The day's runs live inside the cached grid (`DayCell::$runs`, US-012) | A JSON endpoint fetched when a day is opened; a second cache entry for the detail | The detail then shares the grid's one key and its one invalidation — the sync's and the import's `forgetAthlete()` covers it with no new call site, and the two can never disagree. Opening a day costs no request, so a signed-out visitor still triggers no write and no Strava call (FR-017). The price is ~19 runs' worth of scalars per week in the entry, a few tens of KB for a 112-day window |
 | A per-athlete generation counter in the cache key; one `forgetAthlete()` bumps it (US-013) | Cache tags; forgetting each window's key in a loop; one entry holding every window | Navigation means an athlete has one cached grid per window they opened, and `cache.default` is `database`, which has no tags. A loop would have to guess which windows were cached; a single entry would rebuild every window on any miss. A counter makes one write retire every window at once; the orphans expire through `grid_cache_ttl`. The counter is created with `add()` then `increment()`d, because a bare `increment()` on a missing key answers `false` on the database store and a `forever(…, 1)` fallback lets two overlapping writes both land on 1. If the counter cannot be read the request builds the grid and leaves the cache alone, so a grid is never served or stored under a guessed generation; a failed bump is reported, not thrown, since the write it follows is already committed |
 | Only windows that can hold a run are cached (US-013) | Cache every requested window; clamp `to` to the oldest run; throttle `/` | `to` takes any past date and each week is a key, so a guest could fill the cache table with empty grids back to year 0. A window that ends before the oldest run is built uncached (two small queries); the current window is always cached. Clamping would change what a shared link shows, and a throttle would hit the owner too |
-| A `v2` segment in the cache key (US-012; `v3` since US-013, when the key gained the generation) | Reuse the key and rely on the unserialize `Throwable` catch | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read |
+| A `v2` segment in the cache key (US-012; `v3` since US-013, when the key gained the generation; `v4` since US-014, when the grid gained its `trend`) | Reuse the key and rely on the unserialize `Throwable` catch | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read |
 | Run formatting reuses `GarminImportFormat` | A second formatter in the heatmap layer | Pace, ascent, heart rate, distance and duration print the same on the review and in the day detail; one copy cannot drift |
 | The URL names the window's **end** week, as a `Y-m-d` query value (`/?to=2026-09-06`, `US-013`) | A path segment; the window's start date in the URL; a page number | A query value keeps `/` the one route and the one cache key shape; the end is what the reader navigates by and survives a change of `window_weeks`, where a start date would shift every shared link; a page number says nothing in a shared link |
 | A bad `to` renders the current window silently (`US-013`) | 404; 422; a redirect to `/` | The spec asks for a bad or future link to render "without an error"; an old bookmark is better served by today's map than by an error page, and the guest path stays free of any new response |
@@ -292,8 +295,9 @@ the grid's date-range label, and returns a `WeeklyTrend` of numbers and strings 
   `cache.serializable_classes`.** _Breaks if:_ a DTO, enum, or value object is
   nested into the grid without joining the list — the grid then fails to
   restore and is rebuilt (and reported) on every request, with no cache
-  benefit. `LegendRow` is not listed: `IntensityScale` holds scalars and derives
-  legend rows on render. The list never becomes `true`.
+  benefit. `WeeklyTrend`, `TrendBar` and `TrendTick` are listed (`US-014`).
+  `LegendRow` is not: `IntensityScale` holds scalars and derives legend rows on
+  render. The list never becomes `true`.
 - **Invariant — every write that changes an athlete's runs calls
   `HeatmapGridCache::forgetAthlete()`.** _Breaks if:_ a new write path (a sync, an
   import, an edit) skips it — every window already cached keeps the old data until
@@ -303,7 +307,8 @@ the grid's date-range label, and returns a `WeeklyTrend` of numbers and strings 
 - **Invariant — the key's shape version changes whenever a cached class gains a
   property.** `DayCell` gained `runs` in `US-012`, so the key went from
   `heatmap:grid:{…}` to `heatmap:grid:v2:{…}`; `US-013` made it `v3` when the
-  generation joined the key. _Breaks if:_ a property is added
+  generation joined the key, and `US-014` made it `v4` when `HeatmapGrid` gained
+  `trend`. _Breaks if:_ a property is added
   without bumping it — an entry from the previous deploy then restores with an
   uninitialized readonly property and every request fails until midnight.
 - **Invariant — runs ride only on Ran cells.** `HeatmapBuilder` attaches a day's
@@ -311,6 +316,11 @@ the grid's date-range label, and returns a `WeeklyTrend` of numbers and strings 
   Future cell never opens a detail and the detail never lists a run the colour
   does not account for. `DailyRuns` and `DailyRunningDistance` read the same
   window of the same rows.
+- **Invariant — the weekly trend lives inside the cached grid, never in a cache of
+  its own.** _Breaks if:_ the chart is cached or built outside `HeatmapGridCache::remember()`
+  — a sync or an import that calls `forgetAthlete()` would then retire the grid but leave
+  a chart that disagrees with its rows. Its lead-in query runs inside the build closure, so
+  a cache hit costs the chart no query.
 - **Invariant — the scale is calibrated once per grid build**, so cells and legend
   cannot disagree.
 - **Invariant — the failure reason is escaped** (`{{ }}`), never `{!! !!}`: it can

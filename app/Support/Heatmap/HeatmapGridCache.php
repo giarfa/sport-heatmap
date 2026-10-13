@@ -129,17 +129,18 @@ final readonly class HeatmapGridCache
         $today = CarbonImmutable::instance($today)->toDateString();
 
         /*
-         * The "v3" segment is the format of the key and the shape of the cached object.
-         * A grid cached before the day detail existed has DayCell objects with no `runs`
-         * property, and unserialize() restores a readonly property it never saw as
-         * uninitialized — the entry reads back as a HeatmapGrid and then fails on first
-         * access, which the instanceof check in remember() cannot catch. Bump this
-         * segment whenever a cached class gains a property or the key changes; old
-         * entries are simply never read again and expire on their own.
+         * The "v4" segment is the format of the key and the shape of the cached object.
+         * A grid cached before the weekly trend existed has no `trend` property (and one
+         * cached before the day detail had DayCell objects with no `runs`), and
+         * unserialize() restores a readonly property it never saw as uninitialized — the
+         * entry reads back as a HeatmapGrid and then fails on first access, which the
+         * instanceof check in remember() cannot catch. Bump this segment whenever a
+         * cached class gains a property or the key changes; old entries are simply never
+         * read again and expire on their own.
          *
          * The "g" segment is the athlete's generation: one write bumps it and every
          * window of that athlete gets a new key, on a store that cannot delete by prefix.
          */
-        return "heatmap:grid:v3:{$athlete->id}:g{$generation}:{$window->startsOn->toDateString()}:{$today}";
+        return "heatmap:grid:v4:{$athlete->id}:g{$generation}:{$window->startsOn->toDateString()}:{$today}";
     }
 }
