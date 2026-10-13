@@ -32,7 +32,8 @@ class LeadInDistanceTest extends TestCase
         $this->runOn($athlete, '2026-04-26', 9_000); // the Sunday before the lead-in: out
         $this->runOn($athlete, '2026-04-27', 12_000); // first day of the lead-in: in, week 1
         $this->runOn($athlete, '2026-05-03', 10_000); // week 1
-        $this->runOn($athlete, '2026-05-11', 18_600); // week 3
+        $this->runOn($athlete, '2026-05-11', 10_000); // week 3, two runs on one day are summed
+        $this->runOn($athlete, '2026-05-11', 8_600);
         $this->runOn($athlete, '2026-05-17', 1_000); // last day of the lead-in: week 3
         $this->runOn($athlete, '2026-05-18', 30_000); // the window's own first day: out
 
