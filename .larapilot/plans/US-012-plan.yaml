@@ -197,33 +197,39 @@ tasks:
       6. `php artisan test --compact tests/Feature/Database tests/Unit/Models/ActivityTest.php`
 
       ## Completion Criteria
-      - [ ] Migration reversible; columns nullable; no default `0`
-      - [ ] `Activity` fillable, casts, and docblock in sync with the migration
-      - [ ] `ActivityFactory` produces realistic metrics; `withoutMetrics()` / `withoutHeartRate()` states exist
-      - [ ] Seeder demo covers every detail state (all metrics, no HR, no metrics, Strava + Garmin on one day)
-      - [ ] `migrate:fresh --seed` succeeds
-      - [ ] Tests pass
+      - [x] Migration reversible; columns nullable; no default `0`
+      - [x] `Activity` fillable, casts, and docblock in sync with the migration
+      - [x] `ActivityFactory` produces realistic metrics; `withoutMetrics()` / `withoutHeartRate()` states exist
+      - [x] Seeder demo covers every detail state (all metrics, no HR, no metrics, Strava + Garmin on one day)
+      - [x] `migrate:fresh --seed` succeeds
+      - [x] Tests pass
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` updated with metrics and the two new states
-      - [ ] `TrainingBlockSeeder` composes them into the demo block
-      - [ ] Factory and seeder updated in **this same task** as the migration
+      - [x] `database/factories/ActivityFactory.php` updated with metrics and the two new states
+      - [x] `TrainingBlockSeeder` composes them into the demo block
+      - [x] Factory and seeder updated in **this same task** as the migration
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/activity-sync.md` → `### Data model`: the three columns, units, null = not recorded, why no index
-      - [ ] Folder `README.md` index row updated (`US-012`)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/activity-sync.md` → `### Data model`: the three columns, units, null = not recorded, why no index
+      - [x] Folder `README.md` index row updated (`US-012`)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-012): TASK-02 add run metric columns with factory and seeder`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: ce4ee783ff3f1ee33d00576392294402efa94580
+      short_sha: ce4ee78
+      subject: 'feat(US-012): TASK-02 add run metric columns with factory and seeder'
+      committed_at: '2026-10-13T20:53:21+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ce4ee783ff3f1ee33d00576392294402efa94580'
   -
     id: TASK-03
     title: 'Store pace, ascent and heart rate from the Strava sync'
@@ -621,4 +627,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T18:51:30+00:00'
+updated_at: '2026-10-13T18:53:21+00:00'

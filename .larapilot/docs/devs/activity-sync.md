@@ -34,7 +34,14 @@ working, the map freezes at the last good sync and the dashboard warns about it.
       until a short page, capped at `max_activity_pages` (10). Hitting the cap
       logs a warning but is not a failure.
    2. Each item becomes a `StravaActivity` DTO; non-running sports and dates
-      outside the window are dropped.
+      outside the window are dropped. The DTO also maps the run metrics Strava's
+      summary already returns under `activity:read_all` (no scope change):
+      `average_speed` (m/s) → `average_pace_seconds_per_km` = `round(1000 / speed)`,
+      or NULL when the speed is absent, non-numeric or `<= 0`;
+      `total_elevation_gain` → `total_ascent_meters`, rounded, NULL when absent or
+      negative (a flat run's `0` is kept); `average_heartrate` →
+      `average_heart_rate`, rounded, NULL when absent or `0` (sensor off).
+      A metric that is missing stays NULL — never `0`.
    3. `ReconcileStravaWindow` applies the complete fetch in one transaction.
       It first loads, in **one** query, every stored row it may touch (the
       window, plus any row already carrying a fetched id), then decides each
@@ -47,7 +54,11 @@ working, the map freezes at the last good sync and the dashboard warns about it.
          values stay, nothing is created, and the row is claimed so a second
          Strava activity cannot link to it.
       3. **Upsert** — otherwise, `updateOrCreate` on `strava_activity_id` with
-         `source = strava`.
+         `source = strava`, metrics included. A Strava run stored before `US-012`
+         gains its metrics on the next sync through this same call, and that first
+         post-deploy sync counts those backfilled rows as upserted (they changed).
+         A metric Strava no longer reports is written back as NULL: for a Strava
+         row Strava is the source of truth.
 
       Then delete-on-absence removes rows in the window whose id was not
       fetched — **`source = strava` rows only**. Skipped and linked rows count
@@ -71,7 +82,7 @@ fails the run.
 | Command | `php artisan strava:sync` — `app/Console/Commands/SyncStravaActivities.php` | Orchestrates one run |
 | Schedule | `routes/console.php` | Daily, timezone-aware, `withoutOverlapping()` |
 | HTTP client | `app/Services/Strava/StravaClient.php` | Token, pagination, retry/backoff, mid-sync 401 |
-| Activity DTO | `app/Data/StravaActivity.php` | `fromApiPayload()`; running sports only (`app/Enums/SportType.php`) |
+| Activity DTO | `app/Data/StravaActivity.php` | `fromApiPayload()`; running sports only (`app/Enums/SportType.php`); casts pace, ascent and heart rate to whole numbers or NULL |
 | Reconcile action | `app/Actions/Strava/ReconcileStravaWindow.php` | Skip / link / upsert, then Strava-only delete-on-absence, in one transaction |
 | Start-time matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest start, ties to the lowest id — shared with the Garmin import |
 | Outcome DTO | `app/Data/SyncOutcome.php` | Upserted / deleted counts, summed across athletes |
@@ -130,6 +141,7 @@ so `down()` deletes them first.
 | Skip a Garmin-won twin outright | Upsert it and let Garmin's values be re-applied | An upsert writes Strava's values and `source = strava` back; there is no later step that could restore Garmin's, so the owner's Overwrite would last until the next night |
 | Link a late Strava twin to a Garmin-new row (decision `7baf70c6656a936f`) | Create it as a separate Strava row; replace the Garmin row with Strava's | A separate row counts the same run twice on the map; replacing would silently undo the import the owner confirmed |
 | Delete-on-absence scoped to `source = strava` (FR-002) | Delete every row in the window not returned | A Garmin-new run was never on Strava and would be deleted the first night after its import |
+| A zero or absent Strava speed stores NULL pace | Store `0`, or a capped "very slow" pace | A watch that recorded no movement did not measure an infinitely slow run; `0` would render as a real value and a division by it errors. NULL renders as an em dash |
 | Synchronous Artisan command on the scheduler | Queued jobs | One athlete, one nightly run; a queue adds a worker to operate for no gain |
 | Literal `api_base_url` | `env()` | Pointing it elsewhere would send a live bearer token to another host |
 | Window anchored to the ISO week | Rolling "today − 112 days" | The bottom row must always be the current week, independent of the sync weekday |
@@ -141,6 +153,11 @@ so `down()` deletes them first.
 - **Invariant — Garmin wins permanently.** Once a row is `garmin_csv` the sync
   never reverts it, never re-adds its Strava twin, and never deletes it —
   including on a night Strava still returns the twin.
+- **Invariant — the sync never writes metrics on a Garmin-owned row.** The
+  Garmin-won twin is skipped before any write, and a late-linked Garmin-new row
+  receives only its `strava_activity_id`: neither copies pace, ascent or heart
+  rate from Strava, so the owner's CSV values (or its empty metrics) are never
+  replaced overnight.
 - **Invariant — one definition of "the same run".** Same local date, starts
   within ±2 minutes **inclusive** (120 s matches, 121 s does not), closest wins.
   The sync and the Garmin import both call `StartTimeMatcher`; never inline a

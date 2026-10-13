@@ -20,6 +20,9 @@ final readonly class StravaActivity
         public int $movingTimeSeconds,
         public CarbonImmutable $startDateLocal,
         public CarbonImmutable $activityDate,
+        public ?int $averagePaceSecondsPerKm,
+        public ?int $totalAscentMeters,
+        public ?int $averageHeartRate,
     ) {}
 
     /**
@@ -74,6 +77,9 @@ final readonly class StravaActivity
             movingTimeSeconds: $movingTimeSeconds,
             startDateLocal: $startDateLocal,
             activityDate: $activityDate->startOfDay(),
+            averagePaceSecondsPerKm: self::paceSecondsPerKm($payload['average_speed'] ?? null),
+            totalAscentMeters: self::wholeNumber($payload['total_elevation_gain'] ?? null, allowZero: true),
+            averageHeartRate: self::wholeNumber($payload['average_heartrate'] ?? null, allowZero: false),
         );
     }
 
@@ -87,6 +93,9 @@ final readonly class StravaActivity
      *     start_date_local: CarbonImmutable,
      *     activity_date: CarbonImmutable,
      *     source: ActivitySource,
+     *     average_pace_seconds_per_km: int|null,
+     *     total_ascent_meters: int|null,
+     *     average_heart_rate: int|null,
      * }
      */
     public function toAttributes(): array
@@ -100,7 +109,49 @@ final readonly class StravaActivity
             'start_date_local' => $this->startDateLocal,
             'activity_date' => $this->activityDate,
             'source' => ActivitySource::Strava,
+            'average_pace_seconds_per_km' => $this->averagePaceSecondsPerKm,
+            'total_ascent_meters' => $this->totalAscentMeters,
+            'average_heart_rate' => $this->averageHeartRate,
         ];
+    }
+
+    /**
+     * Whole seconds per kilometre from Strava's average speed in metres per second,
+     * or null when no usable speed was reported.
+     */
+    private static function paceSecondsPerKm(mixed $averageSpeed): ?int
+    {
+        /*
+         * A zero speed is Strava's "no movement recorded" (a stopped watch, a treadmill
+         * session without a footpod), not an infinitely slow run. Dividing by it would
+         * error, and storing any pace for it would put a number on the screen that was
+         * never measured; null is shown as "not recorded".
+         */
+        if (! is_numeric($averageSpeed) || (float) $averageSpeed <= 0) {
+            return null;
+        }
+
+        return (int) round(1_000 / (float) $averageSpeed);
+    }
+
+    /**
+     * A whole-number metric from a Strava field, or null when the field is absent or
+     * not a number. Zero is only kept where it is a real reading (ascent on a flat run);
+     * a zero heart rate means the sensor was off.
+     */
+    private static function wholeNumber(mixed $value, bool $allowZero): ?int
+    {
+        if (! is_numeric($value)) {
+            return null;
+        }
+
+        $whole = (int) round((float) $value);
+
+        if ($whole < 0 || ($whole === 0 && ! $allowZero)) {
+            return null;
+        }
+
+        return $whole;
     }
 
     /**

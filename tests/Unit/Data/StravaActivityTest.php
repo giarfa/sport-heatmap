@@ -31,6 +31,84 @@ class StravaActivityTest extends TestCase
         $this->assertSame(ActivitySource::Strava, $activity?->toAttributes()['source']);
     }
 
+    public function test_the_run_metrics_are_carried_as_whole_numbers(): void
+    {
+        $activity = StravaActivity::fromApiPayload($this->stravaActivityPayload([
+            'average_speed' => 2.86,
+            'total_elevation_gain' => 45.6,
+            'average_heartrate' => 151.7,
+        ]));
+
+        $this->assertSame(350, $activity?->averagePaceSecondsPerKm);
+        $this->assertSame(46, $activity->totalAscentMeters);
+        $this->assertSame(152, $activity->averageHeartRate);
+    }
+
+    public function test_the_run_metrics_reach_the_attributes_the_sync_writes(): void
+    {
+        $attributes = StravaActivity::fromApiPayload($this->stravaActivityPayload([
+            'average_speed' => 3.0,
+            'total_elevation_gain' => 12.0,
+            'average_heartrate' => 140.0,
+        ]))?->toAttributes();
+
+        $this->assertSame(333, $attributes['average_pace_seconds_per_km'] ?? null);
+        $this->assertSame(12, $attributes['total_ascent_meters'] ?? null);
+        $this->assertSame(140, $attributes['average_heart_rate'] ?? null);
+    }
+
+    public function test_a_run_without_a_heart_rate_keeps_its_other_metrics(): void
+    {
+        $activity = StravaActivity::fromApiPayload($this->stravaActivityPayload([
+            'average_speed' => 2.5,
+            'total_elevation_gain' => 30,
+        ]));
+
+        $this->assertSame(400, $activity?->averagePaceSecondsPerKm);
+        $this->assertSame(30, $activity->totalAscentMeters);
+        $this->assertNull($activity->averageHeartRate);
+    }
+
+    public function test_a_zero_or_absent_speed_is_not_recorded_rather_than_a_pace(): void
+    {
+        $zero = StravaActivity::fromApiPayload($this->stravaActivityPayload(['average_speed' => 0]));
+        $absent = StravaActivity::fromApiPayload($this->stravaActivityPayload());
+
+        $this->assertNull($zero?->averagePaceSecondsPerKm);
+        $this->assertNull($absent?->averagePaceSecondsPerKm);
+    }
+
+    public function test_non_numeric_metric_values_are_not_recorded(): void
+    {
+        $activity = StravaActivity::fromApiPayload($this->stravaActivityPayload([
+            'average_speed' => 'fast',
+            'total_elevation_gain' => null,
+            'average_heartrate' => [152],
+        ]));
+
+        $this->assertNull($activity?->averagePaceSecondsPerKm);
+        $this->assertNull($activity->totalAscentMeters);
+        $this->assertNull($activity->averageHeartRate);
+    }
+
+    public function test_a_flat_run_records_zero_ascent_but_a_zero_heart_rate_is_not_recorded(): void
+    {
+        $activity = StravaActivity::fromApiPayload($this->stravaActivityPayload([
+            'total_elevation_gain' => 0,
+            'average_heartrate' => 0,
+        ]));
+
+        $this->assertSame(0, $activity?->totalAscentMeters);
+        $this->assertNull($activity->averageHeartRate);
+    }
+
+    public function test_a_negative_ascent_is_not_recorded(): void
+    {
+        $activity = StravaActivity::fromApiPayload($this->stravaActivityPayload(['total_elevation_gain' => -3.0]));
+
+        $this->assertNull($activity?->totalAscentMeters);
+    }
+
     public function test_a_non_running_sport_type_is_discarded(): void
     {
         $activity = StravaActivity::fromApiPayload($this->stravaActivityPayload(['sport_type' => 'Ride']));
