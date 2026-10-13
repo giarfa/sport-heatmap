@@ -160,6 +160,64 @@ class TrainingBlockSeederTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $daysWithTwoRuns->count());
     }
 
+    public function test_the_demo_covers_every_run_metric_state(): void
+    {
+        $activities = $this->activities();
+
+        $this->assertTrue(
+            $activities->contains(fn (Activity $activity): bool => $activity->average_pace_seconds_per_km !== null
+                && $activity->total_ascent_meters !== null
+                && $activity->average_heart_rate !== null),
+            'No run carries all three metrics.',
+        );
+        $this->assertTrue(
+            $activities->contains(fn (Activity $activity): bool => $activity->average_pace_seconds_per_km !== null
+                && $activity->average_heart_rate === null),
+            'No run lacks only a heart rate.',
+        );
+        $this->assertTrue(
+            $activities->contains(fn (Activity $activity): bool => $activity->average_pace_seconds_per_km === null
+                && $activity->total_ascent_meters === null
+                && $activity->average_heart_rate === null),
+            'No run lacks every metric.',
+        );
+    }
+
+    public function test_the_garmin_imported_runs_have_no_metrics(): void
+    {
+        $garminImported = Activity::where('source', ActivitySource::GarminCsv)->whereNull('strava_activity_id')->get();
+
+        $this->assertCount(2, $garminImported);
+        $garminImported->each(function (Activity $activity): void {
+            $this->assertNull($activity->average_pace_seconds_per_km);
+            $this->assertNull($activity->total_ascent_meters);
+            $this->assertNull($activity->average_heart_rate);
+        });
+    }
+
+    public function test_one_day_lists_a_strava_run_and_a_garmin_run(): void
+    {
+        $mixedDays = $this->activities()
+            ->groupBy(fn (Activity $activity): string => $activity->activity_date->toDateString())
+            ->filter(fn (Collection $activities): bool => $activities->contains('source', ActivitySource::Strava)
+                && $activities->contains('source', ActivitySource::GarminCsv));
+
+        $this->assertGreaterThanOrEqual(1, $mixedDays->count());
+    }
+
+    public function test_the_stored_pace_is_the_pace_of_the_moving_time(): void
+    {
+        $this->activities()
+            ->filter(fn (Activity $activity): bool => $activity->average_pace_seconds_per_km !== null)
+            ->each(function (Activity $activity): void {
+                $this->assertEqualsWithDelta(
+                    $activity->moving_time_seconds / ($activity->distance_meters / 1000),
+                    $activity->average_pace_seconds_per_km,
+                    1.0,
+                );
+            });
+    }
+
     public function test_the_most_recent_sync_run_succeeded(): void
     {
         $this->assertGreaterThanOrEqual(1, SyncRun::count());

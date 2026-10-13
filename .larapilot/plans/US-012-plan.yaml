@@ -145,10 +145,10 @@ tasks:
       6. Present the screens to the user; record approval (and any deviation) in the README
 
       ## Completion Criteria
-      - [ ] Day detail drawn at 375 px (primary) and desktop, light and dark
-      - [ ] Review page metric rows drawn
-      - [ ] README documents breakpoints, a11y contract, and the `Mirrors:` targets for TASK-06 / TASK-09
-      - [ ] User approved the screens
+      - [x] Day detail drawn at 375 px (primary) and desktop, light and dark
+      - [x] Review page metric rows drawn
+      - [x] README documents breakpoints, a11y contract, and the `Mirrors:` targets for TASK-06 / TASK-09
+      - [x] User approved the screens
 
       ## Test Data
       - N/A — static mockups
@@ -161,11 +161,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Elise
     estimate_hours: 3
     dependencies:
       - TASK-00
+    commit:
+      sha: 6582569a380d6298da6bce1f23b17e20c2714941
+      short_sha: '6582569'
+      subject: 'chore(US-012): TASK-01 add the day cell detail mockups'
+      committed_at: '2026-10-13T20:51:30+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6582569a380d6298da6bce1f23b17e20c2714941'
   -
     id: TASK-02
     title: 'Add the three metric columns to activities, with factory and seeder'
@@ -615,4 +621,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T18:46:35+00:00'
+updated_at: '2026-10-13T18:51:30+00:00'

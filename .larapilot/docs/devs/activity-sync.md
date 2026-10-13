@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-003` |
-| **Last updated by** | `US-011` — 2026-10-12 |
+| **Last updated by** | `US-012` — 2026-10-13 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
@@ -81,7 +81,7 @@ fails the run.
 | Window | `app/Support/Heatmap/HeatmapWindow.php` | The shared 112-day window |
 | Config | `config/strava.php` | `sync_hour`, `sync_timezone`, literal `api_base_url`, `activities_per_page`, `max_activity_pages`, `retry_attempts`, `retry_backoff_ms` |
 | Env vars | `.env` | `STRAVA_SYNC_HOUR`, `STRAVA_SYNC_TIMEZONE` |
-| Factories / seeders | `database/factories/ActivityFactory.php` (`garminImported()`, `garminOverwritten()` states), `SyncRunFactory.php`, `database/seeders/TrainingBlockSeeder.php` | Local/testing demo block for athlete `10000001`, with two Garmin-new runs and one Garmin-won twin outside the current week |
+| Factories / seeders | `database/factories/ActivityFactory.php` (`garminImported()`, `garminOverwritten()`, `withoutMetrics()`, `withoutHeartRate()` states; the default definition stores a pace equal to the run's own moving-time pace), `SyncRunFactory.php`, `database/seeders/TrainingBlockSeeder.php` | Local/testing demo block for athlete `10000001`, with two Garmin-new runs (no metrics, one of them the second run of a Strava day) and one Garmin-won twin outside the current week; a few Strava runs have no heart rate |
 | Tests | `tests/Feature/Strava/SyncStravaActivitiesCommandTest.php`, `StravaClientTest.php`, `ReconcileStravaWindowTest.php`, `tests/Feature/Console/ScheduleTest.php`, `tests/Unit/Data/StravaActivityTest.php` | |
 
 ### Data model
@@ -100,6 +100,16 @@ Together they give three kinds of row:
 | Strava | `strava` | set | The sync: upserted, and deleted on absence |
 | Garmin-new | `garmin_csv` | NULL | The Garmin import; the sync never deletes it |
 | Garmin-won twin | `garmin_csv` | set | The Garmin import; the id is kept only so the sync recognises the twin and leaves it alone |
+
+Since `US-012`, three more nullable integer columns hold the per-run metrics:
+`average_pace_seconds_per_km` (whole seconds per km), `total_ascent_meters` (whole
+metres) and `average_heart_rate` (whole bpm). **NULL means "not recorded"** and is
+shown as an em dash; a stored `0` would read as a measurement, so there is no
+column default and no writer may store `0` for a missing value. They are plain
+`#[Fillable]` values (not identity), cast to `integer`, and are read only with the
+run's own row, so they carry **no index**: every query still filters on
+`(user_id, activity_date)` first. The migration is fully reversible
+(`down()` drops the three columns, nothing else depends on them).
 
 `Activity::stravaUrl()` returns a deep-link only for `source = strava` (FR-008):
 a Garmin-won twin's Strava page shows values that are no longer the stored ones.

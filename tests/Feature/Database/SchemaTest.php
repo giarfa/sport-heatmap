@@ -98,6 +98,23 @@ class SchemaTest extends TestCase
         $this->assertTrue($this->hasIndexOn('activities', ['strava_activity_id'], unique: true));
     }
 
+    /**
+     * NULL means "not recorded" and renders as an em dash; a default of 0 would read as
+     * a measurement, so the three run metrics must be nullable with no default.
+     */
+    public function test_activities_run_metrics_are_nullable_integers_with_no_default(): void
+    {
+        foreach ([
+            'average_pace_seconds_per_km',
+            'total_ascent_meters',
+            'average_heart_rate',
+        ] as $column) {
+            $this->assertSame('integer', $this->columnTypeName('activities', $column), "activities.{$column} has the wrong type.");
+            $this->assertTrue($this->columnIsNullable('activities', $column), "activities.{$column} must be nullable.");
+            $this->assertNull($this->columnDefault('activities', $column), "activities.{$column} must have no default.");
+        }
+    }
+
     public function test_sync_runs_table_has_every_required_column(): void
     {
         foreach ([
