@@ -109,6 +109,10 @@ Matched trimmed and case-insensitively (`GarminRunningTypes`):
 | Total ascent | metres, `,` thousands, optional decimal rounded; up to six integer digits; a flat run's `0` stays `0` | `"1,234"` → 1234 · `"45.6"` → 46 |
 | Average heart rate | up to three digits, optional decimal rounded; `0` is not recorded | `"152"` → 152 · `"148.6"` → 149 |
 
+Implausible values are not recorded either (pace above 36 000 s/km, ascent above
+20 000 m, heart rate above 250 bpm): the file is attacker-supplied for a
+signed-out visitor and the values are shown on the public map.
+
 `--`, empty, an absent column, or anything that does not match is a **null
 metric, never `0`**: a stored `0` would read on the dashboard as a measurement.
 The metrics are **not part of a run's identity** (`GarminCsvRow::isIdenticalTo()`

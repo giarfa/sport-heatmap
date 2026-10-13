@@ -12,6 +12,17 @@ use Carbon\CarbonImmutable;
  */
 final readonly class StravaActivity
 {
+    /*
+     * Plausibility bounds on the optional run metrics: a value outside them is a
+     * broken reading, shown as "not recorded" rather than published or allowed to
+     * overflow the column.
+     */
+    private const MAX_PACE_SECONDS_PER_KM = 36_000;
+
+    private const MAX_ASCENT_METERS = 20_000;
+
+    private const MAX_HEART_RATE = 250;
+
     public function __construct(
         public int $stravaActivityId,
         public SportType $sportType,
@@ -78,8 +89,8 @@ final readonly class StravaActivity
             startDateLocal: $startDateLocal,
             activityDate: $activityDate->startOfDay(),
             averagePaceSecondsPerKm: self::paceSecondsPerKm($payload['average_speed'] ?? null),
-            totalAscentMeters: self::wholeNumber($payload['total_elevation_gain'] ?? null, allowZero: true),
-            averageHeartRate: self::wholeNumber($payload['average_heartrate'] ?? null, allowZero: false),
+            totalAscentMeters: self::wholeNumber($payload['total_elevation_gain'] ?? null, allowZero: true, max: self::MAX_ASCENT_METERS),
+            averageHeartRate: self::wholeNumber($payload['average_heartrate'] ?? null, allowZero: false, max: self::MAX_HEART_RATE),
         );
     }
 
@@ -131,7 +142,14 @@ final readonly class StravaActivity
             return null;
         }
 
-        return (int) round(1_000 / (float) $averageSpeed);
+        $pace = round(1_000 / (float) $averageSpeed);
+
+        /*
+         * A speed near zero divides into a pace beyond the column's range, and a bound
+         * keeps one odd activity from throwing in the upsert and aborting the whole
+         * nightly reconcile. Ten hours per kilometre is not a run's pace.
+         */
+        return $pace > self::MAX_PACE_SECONDS_PER_KM ? null : (int) $pace;
     }
 
     /**
@@ -139,19 +157,19 @@ final readonly class StravaActivity
      * not a number. Zero is only kept where it is a real reading (ascent on a flat run);
      * a zero heart rate means the sensor was off.
      */
-    private static function wholeNumber(mixed $value, bool $allowZero): ?int
+    private static function wholeNumber(mixed $value, bool $allowZero, int $max): ?int
     {
         if (! is_numeric($value)) {
             return null;
         }
 
-        $whole = (int) round((float) $value);
+        $rounded = round((float) $value);
 
-        if ($whole < 0 || ($whole === 0 && ! $allowZero)) {
+        if ($rounded < 0 || $rounded > $max || ($rounded === 0.0 && ! $allowZero)) {
             return null;
         }
 
-        return $whole;
+        return (int) $rounded;
     }
 
     /**

@@ -654,25 +654,31 @@ tasks:
       4. `php artisan test --compact`
 
       ## Completion Criteria
-      - [ ] CHANGELOG Unreleased updated
-      - [ ] Domain docs and index describe the final behaviour
-      - [ ] Quality gate and full test suite green
+      - [x] CHANGELOG Unreleased updated
+      - [x] Domain docs and index describe the final behaviour
+      - [x] Quality gate and full test suite green
 
       ## Test Data
       - N/A — no model/schema change
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/README.md` index rows for the three domains name `US-012`
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/README.md` index rows for the three domains name `US-012`
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `chore(US-012): TASK-11 changelog, domain docs, and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T19:04:46+00:00'
+    commit:
+      sha: c1cec207d6e2d76c109a69ab11b1153ee99ca48c
+      short_sha: c1cec20
+      subject: 'chore(US-012): TASK-11 changelog, domain docs, and quality gate'
+      committed_at: '2026-10-13T21:05:28+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c1cec207d6e2d76c109a69ab11b1153ee99ca48c'
+updated_at: '2026-10-13T19:05:28+00:00'

@@ -102,6 +102,19 @@ class StravaActivityTest extends TestCase
         $this->assertNull($activity->averageHeartRate);
     }
 
+    public function test_implausible_metrics_are_not_recorded(): void
+    {
+        $activity = StravaActivity::fromApiPayload($this->stravaActivityPayload([
+            'average_speed' => 0.0000001,
+            'total_elevation_gain' => 1e30,
+            'average_heartrate' => 999,
+        ]));
+
+        $this->assertNull($activity?->averagePaceSecondsPerKm);
+        $this->assertNull($activity->totalAscentMeters);
+        $this->assertNull($activity->averageHeartRate);
+    }
+
     public function test_a_negative_ascent_is_not_recorded(): void
     {
         $activity = StravaActivity::fromApiPayload($this->stravaActivityPayload(['total_elevation_gain' => -3.0]));

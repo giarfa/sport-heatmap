@@ -31,6 +31,17 @@ final readonly class ParseGarminCsv
      */
     private const MAX_RUNS = 1_000;
 
+    /*
+     * Plausibility bounds on the run metrics: the file is attacker-supplied for a
+     * signed-out visitor and the values are shown on the public map, so a reading no
+     * run can have counts as "not recorded".
+     */
+    private const MAX_PACE_SECONDS_PER_KM = 36_000;
+
+    private const MAX_ASCENT_METERS = 20_000;
+
+    private const MAX_HEART_RATE = 250;
+
     private const MAX_INVALID_ROWS = 100;
 
     private const MAX_IGNORED_TYPES = 50;
@@ -265,7 +276,7 @@ final readonly class ParseGarminCsv
     {
         $seconds = $this->durationSeconds($raw);
 
-        return $seconds === null || $seconds === 0 ? null : $seconds;
+        return $seconds === null || $seconds === 0 || $seconds > self::MAX_PACE_SECONDS_PER_KM ? null : $seconds;
     }
 
     /**
@@ -280,7 +291,9 @@ final readonly class ParseGarminCsv
             return null;
         }
 
-        return (int) round((float) $metres);
+        $ascent = (int) round((float) $metres);
+
+        return $ascent > self::MAX_ASCENT_METERS ? null : $ascent;
     }
 
     /**
@@ -295,7 +308,7 @@ final readonly class ParseGarminCsv
 
         $bpm = (int) round((float) $raw);
 
-        return $bpm === 0 ? null : $bpm;
+        return $bpm === 0 || $bpm > self::MAX_HEART_RATE ? null : $bpm;
     }
 
     private function name(string $raw): string

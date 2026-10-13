@@ -41,7 +41,9 @@ working, the map freezes at the last good sync and the dashboard warns about it.
       `total_elevation_gain` → `total_ascent_meters`, rounded, NULL when absent or
       negative (a flat run's `0` is kept); `average_heartrate` →
       `average_heart_rate`, rounded, NULL when absent or `0` (sensor off).
-      A metric that is missing stays NULL — never `0`.
+      A metric that is missing stays NULL — never `0` — and so does an implausible one
+      (pace above 36 000 s/km, ascent above 20 000 m, heart rate above 250 bpm), which
+      would otherwise overflow the column and abort the reconcile.
    3. `ReconcileStravaWindow` applies the complete fetch in one transaction.
       It first loads, in **one** query, every stored row it may touch (the
       window, plus any row already carrying a fetched id), then decides each

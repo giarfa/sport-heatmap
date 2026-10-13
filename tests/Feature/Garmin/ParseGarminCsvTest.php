@@ -350,6 +350,17 @@ class ParseGarminCsvTest extends TestCase
         $this->assertSame([], $parsed->invalid);
     }
 
+    public function test_a_metric_no_run_can_have_is_not_recorded(): void
+    {
+        $parsed = $this->parse($this->csv(self::IT_HEADER.',Passo medio,Ascesa totale,FC Media', [
+            'Corsa,2026-10-10 09:33:27,false,"Paese Corsa","8.29","00:54:24","00:54:23","20:00:00","25,000","999"',
+        ]));
+
+        $this->assertNull($parsed->rows[0]->averagePaceSecondsPerKm);
+        $this->assertNull($parsed->rows[0]->totalAscentMeters);
+        $this->assertNull($parsed->rows[0]->averageHeartRate);
+    }
+
     public function test_the_metrics_are_not_part_of_a_runs_identity(): void
     {
         $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-metrics.csv'));
