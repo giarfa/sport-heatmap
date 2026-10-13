@@ -450,8 +450,8 @@ tasks:
       4. Do **not** add Playwright, Dusk, browser, or viewport suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every Garmin acceptance criterion of US-012 has a test
+      - [x] Tests pass locally
+      - [x] Every Garmin acceptance criterion of US-012 has a test
 
       ## Test Data
       - N/A — uses existing factories and fixtures
@@ -464,11 +464,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-06
+    commit:
+      sha: a76adccb6421dc7f1c21bb8aef360c28fc98082a
+      short_sha: a76adcc
+      subject: 'test(US-012): TASK-07 cover run metrics in the Garmin import'
+      committed_at: '2026-10-13T20:58:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/a76adccb6421dc7f1c21bb8aef360c28fc98082a'
   -
     id: TASK-08
     title: "Carry each day's runs inside the cached heatmap grid"
@@ -651,4 +657,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T18:57:57+00:00'
+updated_at: '2026-10-13T18:58:39+00:00'

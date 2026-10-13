@@ -460,7 +460,7 @@ class GarminImportFlowTest extends TestCase
             'distance_meters' => 8_290,
             'moving_time_seconds' => 3_263,
         ]);
-        $cacheKey = "heatmap:grid:{$this->owner->id}:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $cacheKey = "heatmap:grid:v2:{$this->owner->id}:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
 
         $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
         $this->assertTrue(Cache::has($cacheKey));
@@ -555,7 +555,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_confirming_forgets_the_cached_grid_for_today(): void
     {
-        $cacheKey = "heatmap:grid:{$this->owner->id}:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $cacheKey = "heatmap:grid:v2:{$this->owner->id}:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
 
         $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
         $this->assertTrue(Cache::has($cacheKey));

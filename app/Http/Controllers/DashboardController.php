@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Support\Heatmap\DailyRunningDistance;
+use App\Support\Heatmap\DailyRuns;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
@@ -26,6 +27,7 @@ class DashboardController extends Controller
      */
     public function __invoke(
         DailyRunningDistance $dailyDistance,
+        DailyRuns $dailyRuns,
         HeatmapBuilder $buildGrid,
         HeatmapGridCache $gridCache,
         ResolveSyncStatus $resolveSyncStatus,
@@ -52,13 +54,15 @@ class DashboardController extends Controller
         /*
          * The cache key is per athlete, not per viewer, so guests and the
          * signed-in owner share one cached grid — a guest visit never costs a
-         * rebuild the owner has already paid for, and vice versa.
+         * rebuild the owner has already paid for, and vice versa. The day detail's
+         * runs are part of the same cached grid, so a sync or an import that forgets
+         * the grid forgets the detail with it — they cannot disagree.
          */
         $grid = $gridCache->remember(
             $athlete,
             $window,
             $today,
-            fn () => $buildGrid($window, $dailyDistance($athlete, $window), $today),
+            fn () => $buildGrid($window, $dailyDistance($athlete, $window), $today, $dailyRuns($athlete, $window)),
         );
 
         /*

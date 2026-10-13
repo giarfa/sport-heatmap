@@ -3,6 +3,7 @@
 namespace Tests\Unit\Data\Heatmap;
 
 use App\Data\Heatmap\DayCell;
+use App\Data\Heatmap\DayRun;
 use App\Enums\DayCellState;
 use Carbon\CarbonImmutable;
 use Tests\TestCase;
@@ -93,5 +94,40 @@ class DayCellTest extends TestCase
         $cell = new DayCell(CarbonImmutable::parse('2026-09-06'), 0, DayCellState::Future, 4);
 
         $this->assertSame('future', $cell->modifier());
+    }
+
+    public function test_a_ran_day_with_runs_opens_a_detail_and_every_other_day_does_not(): void
+    {
+        $date = CarbonImmutable::parse('2026-10-03');
+
+        $this->assertTrue((new DayCell($date, 13_600, DayCellState::Ran, 3, [$this->dayRun()]))->hasDetail());
+        $this->assertFalse((new DayCell($date, 13_600, DayCellState::Ran, 3))->hasDetail());
+        $this->assertFalse((new DayCell($date, 0, DayCellState::Rest, 0))->hasDetail());
+        $this->assertFalse((new DayCell($date, 0, DayCellState::Future, 0, [$this->dayRun()]))->hasDetail());
+    }
+
+    public function test_the_detail_title_and_summary_count_the_runs(): void
+    {
+        $date = CarbonImmutable::parse('2026-10-03');
+
+        $one = new DayCell($date, 8_200, DayCellState::Ran, 2, [$this->dayRun()]);
+        $two = new DayCell($date, 13_600, DayCellState::Ran, 3, [$this->dayRun(), $this->dayRun()]);
+
+        $this->assertSame('Sat 3 Oct 2026', $one->detailTitle());
+        $this->assertSame('1 run · 8.2 km', $one->detailSummary());
+        $this->assertSame('2 runs · 13.6 km', $two->detailSummary());
+    }
+
+    public function test_the_button_name_extends_the_accessible_name_with_the_run_count_and_the_action(): void
+    {
+        $cell = new DayCell(CarbonImmutable::parse('2026-10-03'), 13_600, DayCellState::Ran, 3, [$this->dayRun(), $this->dayRun()]);
+
+        $this->assertSame('Saturday 3 Oct 2026: 13.6 km, 2 runs. Show details', $cell->detailButtonName());
+        $this->assertSame('Saturday 3 Oct 2026: 13.6 km', $cell->accessibleName(), 'The plain name is unchanged.');
+    }
+
+    private function dayRun(): DayRun
+    {
+        return new DayRun('Morning run', 8_200, 2_650, 323, 45, 152, null);
     }
 }
