@@ -556,33 +556,39 @@ tasks:
       7. `php artisan test --compact tests/Feature/Dashboard`; `npm run build`
 
       ## Completion Criteria
-      - [ ] Tap, click, Enter, Space open a ran day's detail; Esc closes and returns focus to the cell
-      - [ ] Rest and future days open nothing
-      - [ ] Every value labelled with its unit; missing metric reads `—`; no imperial unit
-      - [ ] Strava run links to its activity; Garmin run has no link
-      - [ ] Usable at 375 px without horizontal page scroll; light and dark meet WCAG 2.2 AA (manual smoke OK under NORMAL)
-      - [ ] Matches the approved mockups; deviations agreed and recorded
-      - [ ] Tests pass
+      - [x] Tap, click, Enter, Space open a ran day's detail; Esc closes and returns focus to the cell
+      - [x] Rest and future days open nothing
+      - [x] Every value labelled with its unit; missing metric reads `—`; no imperial unit
+      - [x] Strava run links to its activity; Garmin run has no link
+      - [x] Usable at 375 px without horizontal page scroll; light and dark meet WCAG 2.2 AA (manual smoke OK under NORMAL)
+      - [x] Matches the approved mockups; deviations agreed and recorded
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md`: functional flow of the detail (open/close/focus), why `<dialog>` + vanilla JS, why cells keep their size, FR-008 link rule source
-      - [ ] Folder `README.md` index row updated (`US-012`)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md`: functional flow of the detail (open/close/focus), why `<dialog>` + vanilla JS, why cells keep their size, FR-008 link rule source
+      - [x] Folder `README.md` index row updated (`US-012`)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-012): TASK-09 open a day cell detail from the heatmap`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
       - TASK-01
       - TASK-08
+    commit:
+      sha: 1e85f802892fdd629faab0872f8ef2f05ae6a4d0
+      short_sha: 1e85f80
+      subject: 'feat(US-012): TASK-09 open a day cell detail from the heatmap'
+      committed_at: '2026-10-13T21:03:41+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1e85f802892fdd629faab0872f8ef2f05ae6a4d0'
   -
     id: TASK-10
     title: 'Feature tests: day cell detail, signed-out view, cache agreement'
@@ -663,4 +669,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T19:00:55+00:00'
+updated_at: '2026-10-13T19:03:41+00:00'
