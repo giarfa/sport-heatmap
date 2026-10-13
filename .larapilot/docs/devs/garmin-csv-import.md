@@ -403,8 +403,8 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 
 ## Related
 
-- Specs: `US-008`, `US-011`
-- Plans: `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-011-plan.yaml`
+- Specs: `US-008`, `US-011`, `US-012`, `US-013`
+- Plans: `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-011-plan.yaml`, `.larapilot/plans/US-013-plan.yaml`
 - Mockups: `.larapilot/mockups/US-008/`
 - Decisions: `7baf70c6656a936f` (late Strava twin links to the Garmin row), `56c5683061907ab8` (running type names; unknowns surfaced)
 - Other domains: `activity-sync.md`, `heatmap-dashboard.md`

@@ -550,28 +550,34 @@ tasks:
       4. `php artisan migrate:fresh --seed`; `php artisan test --compact --filter=TrainingBlockSeederTest`
 
       ## Completion Criteria
-      - [ ] `migrate:fresh --seed` succeeds and the dashboard has an earlier window with runs
-      - [ ] The current window's seeded data and legend are unchanged
-      - [ ] Seeder test updated and green
+      - [x] `migrate:fresh --seed` succeeds and the dashboard has an earlier window with runs
+      - [x] The current window's seeded data and legend are unchanged
+      - [x] Seeder test updated and green
 
       ## Test Data
-      - [ ] `TrainingBlockSeeder` creates the 7 history weeks through `Activity::factory()` with Garmin source
-      - [ ] `ActivityFactory` updated in this same task only if a state is added
+      - [x] `TrainingBlockSeeder` creates the 7 history weeks through `Activity::factory()` with Garmin source
+      - [x] `ActivityFactory` updated in this same task only if a state is added
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — demo dataset section: the history weeks and why they mirror the US-014 mockup
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — demo dataset section: the history weeks and why they mirror the US-014 mockup
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-10 seed Garmin history before the training block`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: 33676b28a46218cd94d1497f29fa6b888e97fe37
+      short_sha: 33676b2
+      subject: 'feat(US-013): TASK-10 seed Garmin history before the training block'
+      committed_at: '2026-10-13T22:06:53+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/33676b28a46218cd94d1497f29fa6b888e97fe37'
   -
     id: TASK-11
     title: 'CHANGELOG, domain doc index, and quality gate'
@@ -617,4 +623,4 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T20:05:40+00:00'
+updated_at: '2026-10-13T20:06:53+00:00'

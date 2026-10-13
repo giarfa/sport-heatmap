@@ -195,7 +195,7 @@ so `down()` deletes them first.
 
 ## Related
 
-- Specs: `US-003`, `US-006`, `US-008`, `US-011`
-- Plans: `.larapilot/plans/US-003-plan.yaml`, `.larapilot/plans/US-008-plan.yaml`
+- Specs: `US-003`, `US-006`, `US-008`, `US-011`, `US-012`, `US-013`
+- Plans: `.larapilot/plans/US-003-plan.yaml`, `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-013-plan.yaml`
 - Review: `.larapilot/docs/review/US-003.md`
 - Other domains: `strava-connection.md`, `heatmap-dashboard.md`, `garmin-csv-import.md`
