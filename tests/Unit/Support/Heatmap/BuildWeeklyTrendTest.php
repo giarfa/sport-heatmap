@@ -321,4 +321,28 @@ class BuildWeeklyTrendTest extends TestCase
         $this->assertSame('41.2', $trend->bars[0]->kilometres);
         $this->assertSame('68.67', $trend->bars[0]->heightPercent); // 41.2 of a 60 km top, not 41.23
     }
+
+    public function test_a_partial_week_with_nothing_run_yet_is_a_named_stub_with_no_point(): void
+    {
+        $weeklyKm = self::CURRENT_WINDOW_KM;
+        $weeklyKm[15] = 0.0;
+
+        $bar = $this->currentTrend('2026-03-31', $weeklyKm)->bars[15];
+
+        $this->assertTrue($bar->isPartial);
+        $this->assertTrue($bar->isZero);
+        $this->assertNull($bar->averageKilometres);
+        $this->assertSame('31 Aug – 6 Sep 2026: 0.0 km so far, partial week', $bar->accessibleName);
+    }
+
+    public function test_a_lead_in_shorter_than_three_weeks_does_not_shift_the_averages(): void
+    {
+        $today = CarbonImmutable::parse(self::TODAY);
+        $window = HeatmapWindow::current($today);
+
+        $padded = $this->trendFor($window, $today, self::CURRENT_WINDOW_KM, [0, 0, 18_600], '2026-03-31');
+        $short = $this->trendFor($window, $today, self::CURRENT_WINDOW_KM, [18_600], '2026-03-31');
+
+        $this->assertEquals($padded, $short);
+    }
 }

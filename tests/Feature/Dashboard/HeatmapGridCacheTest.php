@@ -5,6 +5,8 @@ namespace Tests\Feature\Dashboard;
 use __PHP_Incomplete_Class;
 use App\Data\Heatmap\DayRun;
 use App\Data\Heatmap\HeatmapGrid;
+use App\Data\Heatmap\TrendBar;
+use App\Data\Heatmap\TrendTick;
 use App\Models\Activity;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapBuilder;
@@ -177,6 +179,8 @@ class HeatmapGridCacheTest extends TestCase
         $run = $ranCells->first()->runs[0];
         $this->assertInstanceOf(DayRun::class, $run);
         $this->assertSame('9.0 km', $run->kilometres());
+        $this->assertInstanceOf(TrendBar::class, $cached->trend->bars[0]);
+        $this->assertInstanceOf(TrendTick::class, $cached->trend->ticks[0]);
     }
 
     public function test_a_grid_cached_before_the_day_detail_existed_is_never_read(): void

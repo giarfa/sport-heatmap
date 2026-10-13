@@ -30,7 +30,7 @@
                         <line class="trend-baseline" x1="0" x2="160" y1="100" y2="100"/>
                     </g>
                     @foreach ($trend->bars as $bar)
-                        <g role="img">
+                        <g role="img" aria-label="{{ $bar->accessibleName }}">
                             <title>{{ $bar->accessibleName }}</title>
                             @if ($bar->isZero)
                                 <line class="trend-zero" x1="{{ $bar->x }}" x2="{{ $bar->xEnd }}" y1="100" y2="100"/>

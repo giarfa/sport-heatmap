@@ -64,7 +64,7 @@ class WeeklyTrendTest extends TestCase
 
         $card = $this->trendCard();
 
-        $this->assertSame(16, substr_count($card, '<g role="img">'));
+        $this->assertSame(16, substr_count($card, '<g role="img" aria-label='));
         $this->assertStringContainsString('<title>31 Aug – 6 Sep 2026: 12.3 km so far, partial week</title>', $card);
         $this->assertStringContainsString('<title>24 – 30 Aug 2026: 21.0 km; no 4-week average yet</title>', $card);
 

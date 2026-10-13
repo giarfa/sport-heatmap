@@ -112,11 +112,18 @@ final readonly class BuildWeeklyTrend
      */
     private function averageTenths(array $weeks, array $leadInWeekMeters, ?CarbonInterface $oldestRun): array
     {
+        $leadInCount = self::AVERAGE_WEEKS - 1;
+
+        /*
+         * Padded on the left to exactly three weeks: the slice below counts back from the
+         * window by that many, so a shorter list would shift every average onto the wrong
+         * weeks instead of failing. The history rule keeps a padded week out of any point
+         * that has not got real history behind it.
+         */
         $series = array_merge(
-            array_map(intval(...), array_values($leadInWeekMeters)),
+            array_pad(array_map(intval(...), array_values($leadInWeekMeters)), -$leadInCount, 0),
             array_map(fn (WeekRow $week): int => $week->totalMeters, array_values($weeks)),
         );
-        $leadInCount = count($leadInWeekMeters);
 
         /*
          * A week averages the three weeks before it only once those weeks exist in the

@@ -233,7 +233,7 @@ nothing to chart.", heading kept, no axis); the first-sync skeleton (`weekly-tre
 shown whenever the grid shows its own); and absent, because the connect screen renders no dashboard.
 
 Accessibility contract the markup must keep: the `<section>` is named by its `h3`; the SVG is a `role="group"` named by its
-`<title>`; each bar is a `<g role="img">` whose `<title>` is its accessible name (and the pointer tooltip); gridlines,
+`<title>`; each bar is a `<g role="img" aria-label="…">` carrying its accessible name, with the same text in a `<title>` for the pointer tooltip (a `<title>` alone is exposed inconsistently); gridlines,
 baseline and line are `aria-hidden`; the visible, collapsed-by-default `<details>` "Weekly figures" table is the text
 alternative. Partial is never colour alone (washed fill, dashed outline, a `partial` tag, "partial week" in the name),
 nor is the average (a line against bars), nor a 0 km week (a stub the key names).
