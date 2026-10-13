@@ -597,4 +597,17 @@ decisions:
     source: chat
     spec: US-012
     supersedes: null
-updated_at: '2026-10-13T18:33:21+00:00'
+  -
+    id: 98fe4bd16f3263d6
+    ts: '2026-10-13T18:40:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'us-012 english garmin metric headers'
+    label: 'US-012 English Garmin metric headers'
+    value: 'Avg Pace / Total Ascent / Avg HR, as in the existing English fixture; unconfirmed by a real English export'
+    question: null
+    rationale: 'No official Garmin header spec; the Italian sample is real and the English names follow the same family; a real export later is a one-line fix in GarminCsvColumns'
+    source: askquestion
+    spec: US-012
+    supersedes: null
+updated_at: '2026-10-13T18:40:40+00:00'
