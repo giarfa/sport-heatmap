@@ -347,28 +347,34 @@ tasks:
       6. `php artisan test --compact tests/Feature/Garmin/ParseGarminCsvTest.php`
 
       ## Completion Criteria
-      - [ ] Both languages parse the three metrics into whole seconds/metres/bpm
-      - [ ] Missing column, `--`, unreadable → that metric null, never `0`, row not counted invalid
-      - [ ] Pending session uploads without the new keys still rebuild
-      - [ ] Tests pass
+      - [x] Both languages parse the three metrics into whole seconds/metres/bpm
+      - [x] Missing column, `--`, unreadable → that metric null, never `0`, row not counted invalid
+      - [x] Pending session uploads without the new keys still rebuild
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema change; new CSV fixtures only
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`: header table gains the three optional columns (with the English-header assumption and decision id), parsing rules per metric, "metrics are not part of run identity"
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`: header table gains the three optional columns (with the English-header assumption and decision id), parsing rules per metric, "metrics are not part of run identity"
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-012): TASK-05 parse run metrics from Garmin CSV exports`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-02
+    commit:
+      sha: 5565a1c5bb6f8f755c340ad1251182cdfd9f0cbc
+      short_sha: 5565a1c
+      subject: 'feat(US-012): TASK-05 parse run metrics from Garmin CSV exports'
+      committed_at: '2026-10-13T20:56:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5565a1c5bb6f8f755c340ad1251182cdfd9f0cbc'
   -
     id: TASK-06
     title: 'Apply metrics on Overwrite and backfill, and show them on the conflict review'
@@ -639,4 +645,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T18:54:59+00:00'
+updated_at: '2026-10-13T18:56:39+00:00'

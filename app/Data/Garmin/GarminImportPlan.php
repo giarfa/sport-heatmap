@@ -2,6 +2,8 @@
 
 namespace App\Data\Garmin;
 
+use App\Models\Activity;
+
 /**
  * Every parsed row sorted against the stored activities, before anything is
  * written. Keys are the row's index in the parsed file, the only handle a
@@ -14,12 +16,14 @@ final readonly class GarminImportPlan
      * @param  array<int, GarminImportConflict>  $conflicts
      * @param  array<int, GarminCsvRow>  $alreadyImported
      * @param  int|null  $athleteId  The athlete planned against; null when none exists yet
+     * @param  array<int, Activity>  $alreadyImportedActivities  Row index => the stored run that row is already imported as
      */
     public function __construct(
         public array $newRows,
         public array $conflicts,
         public array $alreadyImported,
         public ?int $athleteId,
+        public array $alreadyImportedActivities = [],
     ) {}
 
     /**

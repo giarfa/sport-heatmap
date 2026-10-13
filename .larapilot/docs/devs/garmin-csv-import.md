@@ -151,8 +151,10 @@ new and no query runs.
 4. **New**: everything else.
 
 The result is a `GarminImportPlan` (`newRows`, `conflicts`, `alreadyImported`,
-all keyed by the row's index in the parsed file, plus the target's
-`athleteId`, null when there is none) with a `fingerprint()`: a SHA-256 of the
+all keyed by the row's index in the parsed file, `alreadyImportedActivities` —
+the stored run each already-imported row matched, so the apply step needs no
+second lookup — plus the target's `athleteId`, null when there is none) with a
+`fingerprint()`: a SHA-256 of the
 target id, the `rowIndex => storedActivityId` conflict pairs, and the
 already-imported row indexes — what the visitor was shown.
 
@@ -170,14 +172,26 @@ already-imported row indexes — what the visitor was shown.
 - **Overwrite** → the stored row takes the CSV's name, distance, moving time,
   start, `activity_date` and sport type, and `source` becomes `garmin_csv`.
   `strava_activity_id` is **kept**, so the nightly sync recognises the twin and
-  skips it (see `activity-sync.md`);
-- **Skip**, or no answer at all → nothing is written.
+  skips it (see `activity-sync.md`). The three run metrics are replaced by the
+  CSV's **except where the CSV recorded none**: `GarminCsvRow::toAttributes()`
+  omits an empty metric, so a `--` keeps the stored value. Blanking a pace the
+  owner already has because the new export lacks it would be data loss;
+- **Skip**, or no answer at all → nothing is written;
+- **Already imported** (same start, distance and moving time) → only the
+  metrics its stored run **lacks** are filled from the row
+  (`fillEmptyMetricsOfAlreadyImportedRuns()`); a metric already stored is never
+  touched and the row is saved only when something was filled. So a run
+  imported before `US-012` gains its pace, ascent and heart rate from a fresh
+  export, and re-importing the same file again changes nothing. These rows
+  still count as "already imported" in the summary — backfilling adds no new
+  count.
 
 The passed athlete is only read, never `save()`d — it may be the narrow
 displayed-athlete model. After the commit it forgets the cached grid for today
 of the athlete actually written to
 (`HeatmapGridCache::forget()`), so the dashboard shows the import on the next
-request. It returns a `GarminImportSummary`: imported, overwritten, skipped,
+request — also after a backfill-only import, whose metrics the cached day
+detail carries. It returns a `GarminImportSummary`: imported, overwritten, skipped,
 already imported, ignored by type, outside window, invalid. The action does not
 authorize (`.ai/rules/actions.md`); the caller has.
 
@@ -239,7 +253,15 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
   pre-checked; "Overwrite all" / "Skip all" rendered `hidden` and revealed by
   `resources/js/app.js` (`data-resolve-all`); "View on Strava" only where
   `Activity::stravaUrl()` is not null (FR-008). Formats come from
-  `GarminImportFormat` (km to one decimal, `H:MM:SS`, `HH:MM:SS` start).
+  `GarminImportFormat` (km to one decimal, `H:MM:SS`, `HH:MM:SS` start, and
+  `pace()` `5:23 /km`, `ascent()` `45 m`, `heartRate()` `152 bpm` — each null
+  when not recorded, which `<x-run-metric>` prints as an em dash read aloud as
+  "not recorded").
+- **Review metrics** (`US-012`, mockup `.larapilot/mockups/US-012/review-metrics.html`):
+  each conflict's Stored and Garmin-file sides gain `Avg pace`, `Ascent` and
+  `Heart rate` rows under `Moving`. A guest's Stored side still shows the start
+  only — no metrics, the same rule as name, distance, moving time and the Strava
+  link, so crafted rows cannot read stored runs through the review.
 
 ## Technical design
 
@@ -256,7 +278,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | CSV-only athlete | `app/Actions/Garmin/CreateCsvOnlyAthlete.php`, `User::isCsvOnly()`, `UserFactory::csvOnly()` | Placeholder identity (`NAME`, `EMAIL` constants), reused by `firstOrCreate` |
 | Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id — shared with the sync |
 | Plan DTOs | `app/Data/Garmin/GarminImportPlan.php`, `GarminImportConflict.php` | The plan and its `fingerprint()` |
-| Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction, CSV-only athlete created inside it; grid cache forgotten after commit |
+| Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction, CSV-only athlete created inside it; Overwrite and the already-imported metric backfill; grid cache forgotten after commit |
 | Answer | `app/Enums/ConflictResolution.php` | `overwrite`, `skip` |
 | Summary DTO | `app/Data/Garmin/GarminImportSummary.php` | The seven counts; session round-trip for the summary page |
 | Routes | `routes/web.php` (`garmin.import.*`, `strava.fresh` only), `garmin-import` limiter in `app/Providers/AppServiceProvider.php` | |

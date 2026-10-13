@@ -709,12 +709,16 @@ body {
 }
 
 .side dt {
-    min-width: 3.75rem;
+    min-width: 4.5rem; /* "Heart rate" is the longest label */
     color: var(--ink-muted);
 }
 
 .side dd {
     font-variant-numeric: tabular-nums;
+}
+
+.side dd.is-empty {
+    color: var(--ink-muted);
 }
 
 .side-source {
