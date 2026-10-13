@@ -213,29 +213,35 @@ tasks:
       5. `php artisan test --compact tests/Feature/Dashboard tests/Feature/Garmin tests/Feature/Console`
 
       ## Completion Criteria
-      - [ ] One `forgetAthlete()` call changes the key of every window of that athlete, and only that athlete
-      - [ ] Sync and confirmed import call `forgetAthlete()`; no caller passes a window any more
-      - [ ] Existing cache, sync, and import tests green
+      - [x] One `forgetAthlete()` call changes the key of every window of that athlete, and only that athlete
+      - [x] Sync and confirmed import call `forgetAthlete()`; no caller passes a window any more
+      - [x] Existing cache, sync, and import tests green
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — cache key format v3, the generation counter, why not tags / why not a per-window forget loop
-      - [ ] `.larapilot/docs/devs/activity-sync.md` and `.larapilot/docs/devs/garmin-csv-import.md` — the write now invalidates every window of the athlete
-      - [ ] Folder `README.md` index rows updated
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — cache key format v3, the generation counter, why not tags / why not a per-window forget loop
+      - [x] `.larapilot/docs/devs/activity-sync.md` and `.larapilot/docs/devs/garmin-csv-import.md` — the write now invalidates every window of the athlete
+      - [x] Folder `README.md` index rows updated
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-03 invalidate every cached window on write`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2
     dependencies:
       - TASK-00
+    commit:
+      sha: cfd993d5f7b525019f4f41787bacef37622528e0
+      short_sha: cfd993d
+      subject: 'feat(US-013): TASK-03 invalidate every cached window on write'
+      committed_at: '2026-10-13T21:58:38+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cfd993d5f7b525019f4f41787bacef37622528e0'
   -
     id: TASK-04
     title: 'Feature tests: past windows are invalidated by import and sync'
@@ -575,4 +581,4 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T19:57:25+00:00'
+updated_at: '2026-10-13T19:58:39+00:00'

@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\Garmin;
 
+use App\Data\Heatmap\HeatmapGrid;
 use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
+use App\Support\Heatmap\HeatmapBuilder;
+use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -568,6 +571,41 @@ class GarminImportFlowTest extends TestCase
         $this->assertSame(1, Cache::get($generationKey), 'The athlete\'s generation moves, so the cached grid is never read again.');
     }
 
+    public function test_confirming_retires_a_cached_past_window_as_well_as_the_current_one(): void
+    {
+        $current = HeatmapWindow::current();
+        $pastWindow = $current->previous()->previous();
+        $builds = 0;
+
+        $this->rememberWindow($current, $builds);
+        $this->rememberWindow($pastWindow, $builds);
+        $this->rememberWindow($pastWindow, $builds);
+        $this->assertSame(2, $builds, 'The second read of the past window is a hit.');
+
+        $this->upload($this->fixture('activities-it.csv'));
+        $this->confirm($this->review());
+
+        $this->rememberWindow($current, $builds);
+        $this->rememberWindow($pastWindow, $builds);
+
+        $this->assertSame(4, $builds, 'Both windows are rebuilt after the import.');
+    }
+
+    public function test_cancelling_leaves_a_cached_past_window_in_place(): void
+    {
+        $pastWindow = HeatmapWindow::current()->previous();
+        $builds = 0;
+
+        $this->rememberWindow($pastWindow, $builds);
+
+        $this->upload($this->fixture('activities-it.csv'));
+        $this->actingAs($this->owner)->post(route('garmin.import.cancel'))->assertRedirect();
+
+        $this->rememberWindow($pastWindow, $builds);
+
+        $this->assertSame(1, $builds);
+    }
+
     public function test_the_raw_upload_is_never_persisted(): void
     {
         Storage::fake('local');
@@ -627,6 +665,24 @@ class GarminImportFlowTest extends TestCase
         $review->assertSee('href="https://www.strava.com/activities/4242"', escape: false);
         $this->assertSame(1, substr_count($review->getContent(), 'https://www.strava.com/activities/'));
         $review->assertSee('Garmin import');
+    }
+
+    /**
+     * Read a window through the grid cache the way the dashboard does, counting how
+     * often the grid had to be built — a hit leaves the count alone.
+     */
+    private function rememberWindow(HeatmapWindow $window, int &$builds): HeatmapGrid
+    {
+        return $this->app->make(HeatmapGridCache::class)->remember(
+            $this->owner,
+            $window,
+            now(),
+            function () use ($window, &$builds): HeatmapGrid {
+                $builds++;
+
+                return $this->app->make(HeatmapBuilder::class)($window, [], now());
+            },
+        );
     }
 
     private function upload(UploadedFile $file): TestResponse
