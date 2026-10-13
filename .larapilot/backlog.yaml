@@ -703,11 +703,11 @@ specs:
       title: 'Heatmap dashboard'
     priority: HIGH
     points: 8
-    status: 'IN PROGRESS'
+    status: REVIEW
     body: |
       #### US-012: Average pace, total ascent and average heart rate per run, shown in the day cell detail
 
-      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** IN PROGRESS
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** REVIEW
       **Blocked by:** -
       **Type:** Feature
       **Traces to:** FR-011 (MoSCoW: Must — raised from Should) · FR-018 (extended) · FR-003 (extended) · FR-008 · FR-009 · FR-017 — no journey (the PRD has no `## User Journeys`)
@@ -753,6 +753,7 @@ specs:
     status_history:
       - { status: PLANNED, at: '2026-10-13T18:43:54+00:00' }
       - { status: 'IN PROGRESS', at: '2026-10-13T18:46:25+00:00' }
+      - { status: REVIEW, at: '2026-10-13T19:07:24+00:00' }
     rework: false
   -
     code: US-013
