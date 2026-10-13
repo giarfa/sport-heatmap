@@ -215,6 +215,18 @@ class GuestGarminImportTest extends TestCase
         $this->assertSame(0, Activity::where('name', 'Ridge Trail')->count());
     }
 
+    public function test_a_guest_import_keeps_a_run_older_than_the_current_window(): void
+    {
+        $displayed = $this->allowlistedAthlete();
+
+        $this->upload($this->csv(['Corsa,2026-03-15 09:00:00,false,"Thirty weeks ago","8.00","00:45:00","00:45:00"']));
+        $this->confirm($this->review())->assertRedirect(route('garmin.import.summary'));
+
+        $this->assertSame('2026-03-15', $displayed->activities()->sole()->activity_date->toDateString());
+        $this->assertGuest();
+        Http::assertNothingSent();
+    }
+
     public function test_an_athlete_connecting_mid_review_sends_the_guest_back_to_the_review(): void
     {
         $this->upload($this->fixture('activities-it.csv'));

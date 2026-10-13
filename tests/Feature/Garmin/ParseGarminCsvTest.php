@@ -160,6 +160,17 @@ class ParseGarminCsvTest extends TestCase
         );
     }
 
+    public function test_exactly_five_thousand_runs_are_accepted(): void
+    {
+        $lines = [];
+        $start = Carbon::parse('2026-10-10 00:00:00');
+        for ($second = 0; $second < 5_000; $second++) {
+            $lines[] = sprintf('Corsa,%s,false,"Run","5.00","00:30:00","00:30:00"', $start->copy()->addSeconds($second)->format('Y-m-d H:i:s'));
+        }
+
+        $this->assertCount(5_000, $this->parse($this->csv(self::IT_HEADER, $lines))->rows);
+    }
+
     public function test_more_than_a_hundred_unreadable_rows_is_rejected(): void
     {
         $this->assertRejected(

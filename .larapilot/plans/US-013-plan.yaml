@@ -458,30 +458,36 @@ tasks:
       5. `php artisan test --compact tests/Feature/Garmin tests/Unit/Support/Garmin`
 
       ## Completion Criteria
-      - [ ] A running row dated before the current window is planned and imported like any other
-      - [ ] A row after today is skipped and counted as future-dated; the review and summary say "Future-dated"
-      - [ ] A pending upload stored under the old key still opens the review
-      - [ ] An import of up to 5,000 runs is accepted; 5,001 is rejected with the existing message
-      - [ ] Existing Garmin tests green after updating the renamed counter
+      - [x] A running row dated before the current window is planned and imported like any other
+      - [x] A row after today is skipped and counted as future-dated; the review and summary say "Future-dated"
+      - [x] A pending upload stored under the old key still opens the review
+      - [x] An import of up to 5,000 runs is accepted; 5,001 is rejected with the existing message
+      - [x] Existing Garmin tests green after updating the renamed counter
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — runs of any age kept, future-dated rule, the counter rename and legacy key, the 5,000 cap and why
-      - [ ] Folder `README.md` index row updated
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — runs of any age kept, future-dated rule, the counter rename and legacy key, the 5,000 cap and why
+      - [x] Folder `README.md` index row updated
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-08 keep older Garmin runs and count future-dated rows`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-03
+    commit:
+      sha: 6723d9c334e185691133b549d85ef1bbc278e2cf
+      short_sha: 6723d9c
+      subject: 'feat(US-013): TASK-08 keep older Garmin runs and count future-dated rows'
+      committed_at: '2026-10-13T22:04:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6723d9c334e185691133b549d85ef1bbc278e2cf'
   -
     id: TASK-09
     title: 'Feature tests: older Garmin runs, future-dated rows, Strava sync bounds'
@@ -605,4 +611,4 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T20:02:38+00:00'
+updated_at: '2026-10-13T20:04:31+00:00'
