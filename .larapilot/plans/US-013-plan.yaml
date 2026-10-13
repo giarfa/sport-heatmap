@@ -361,30 +361,36 @@ tasks:
       5. `npm run build`; `php artisan test --compact tests/Feature/Dashboard`
 
       ## Completion Criteria
-      - [ ] Both controls present on every dashboard window; links named "Previous 4 weeks" / "Next 4 weeks"
-      - [ ] A disabled control is a disabled `<button>`, never an `<a>`
-      - [ ] No horizontal page scroll at 320/375 px; both themes meet AA for the controls
-      - [ ] Deviation recorded in the US-014 mockup README
-      - [ ] UI usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
+      - [x] Both controls present on every dashboard window; links named "Previous 4 weeks" / "Next 4 weeks"
+      - [x] A disabled control is a disabled `<button>`, never an `<a>`
+      - [x] No horizontal page scroll at 320/375 px; both themes meet AA for the controls
+      - [x] Deviation recorded in the US-014 mockup README
+      - [x] UI usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the nav component, its accessibility contract, and the disabled-button deviation
-      - [ ] Folder `README.md` index row updated (last spec: US-013)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the nav component, its accessibility contract, and the disabled-button deviation
+      - [x] Folder `README.md` index row updated (last spec: US-013)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-013): TASK-06 previous and next window controls`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 3
     dependencies:
       - TASK-05
+    commit:
+      sha: 1979b870e122b982509c9cb4ff0c3761a8a8893d
+      short_sha: 1979b87
+      subject: 'feat(US-013): TASK-06 previous and next window controls'
+      committed_at: '2026-10-13T22:01:18+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1979b870e122b982509c9cb4ff0c3761a8a8893d'
   -
     id: TASK-07
     title: 'Feature tests: dashboard window navigation, signed in and signed out'
@@ -593,4 +599,4 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T20:00:28+00:00'
+updated_at: '2026-10-13T20:01:18+00:00'
