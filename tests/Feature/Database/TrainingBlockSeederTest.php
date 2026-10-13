@@ -8,6 +8,7 @@ use App\Enums\SyncRunStatus;
 use App\Models\Activity;
 use App\Models\SyncRun;
 use App\Models\User;
+use App\Support\Heatmap\HeatmapWindow;
 use Database\Seeders\TrainingBlockSeeder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,8 +48,8 @@ class TrainingBlockSeederTest extends TestCase
      */
     public function test_it_seeds_enough_activities_to_exercise_the_dashboard(): void
     {
-        $this->assertGreaterThanOrEqual(50, Activity::count());
-        $this->assertLessThanOrEqual(95, Activity::count());
+        $this->assertGreaterThanOrEqual(50, $this->activities()->count());
+        $this->assertLessThanOrEqual(95, $this->activities()->count());
     }
 
     public function test_the_block_spans_sixteen_consecutive_iso_weeks_ending_with_the_current_one(): void
@@ -137,8 +138,8 @@ class TrainingBlockSeederTest extends TestCase
 
     public function test_the_block_seeds_two_garmin_imported_runs_and_one_garmin_overwritten_twin(): void
     {
-        $this->assertSame(2, Activity::where('source', ActivitySource::GarminCsv)->whereNull('strava_activity_id')->count());
-        $this->assertSame(1, Activity::where('source', ActivitySource::GarminCsv)->whereNotNull('strava_activity_id')->count());
+        $this->assertSame(2, $this->activities()->where('source', ActivitySource::GarminCsv)->whereNull('strava_activity_id')->count());
+        $this->assertSame(1, $this->activities()->where('source', ActivitySource::GarminCsv)->whereNotNull('strava_activity_id')->count());
     }
 
     public function test_no_garmin_sourced_run_sits_in_the_current_week(): void
@@ -185,7 +186,7 @@ class TrainingBlockSeederTest extends TestCase
 
     public function test_the_garmin_imported_runs_have_no_metrics(): void
     {
-        $garminImported = Activity::where('source', ActivitySource::GarminCsv)->whereNull('strava_activity_id')->get();
+        $garminImported = $this->activities()->where('source', ActivitySource::GarminCsv)->whereNull('strava_activity_id');
 
         $this->assertCount(2, $garminImported);
         $garminImported->each(function (Activity $activity): void {
@@ -233,11 +234,64 @@ class TrainingBlockSeederTest extends TestCase
     }
 
     /**
+     * Seven weeks of Garmin history sit before the block, Monday to Sunday, the 0 km week
+     * included, and every run in it is a Garmin import with no metrics.
+     */
+    public function test_seven_weeks_of_garmin_history_sit_before_the_block(): void
+    {
+        $history = $this->historyActivities();
+
+        $this->assertTrue($history->every(fn (Activity $activity): bool => $activity->source === ActivitySource::GarminCsv
+            && $activity->strava_activity_id === null
+            && $activity->average_pace_seconds_per_km === null
+            && $activity->total_ascent_meters === null
+            && $activity->average_heart_rate === null));
+
+        $firstWeek = $this->blockStart()->subWeeks(7);
+        $this->assertSame($firstWeek->toDateString(), $history->min('activity_date')->startOfWeek()->toDateString());
+
+        $totals = [];
+        foreach (range(0, 6) as $position) {
+            $weekStart = $firstWeek->copy()->addWeeks($position);
+            $totals[] = $history
+                ->filter(fn (Activity $activity): bool => $activity->activity_date->between($weekStart, $weekStart->copy()->endOfWeek()))
+                ->sum('distance_meters');
+        }
+
+        $this->assertSame([28_400, 31_000, 33_500, 36_200, 22_000, 0, 18_600], $totals);
+    }
+
+    public function test_previous_has_runs_to_show_from_the_current_window(): void
+    {
+        $oldest = Carbon::parse((string) Activity::min('activity_date'))->startOfDay();
+
+        $this->assertTrue($oldest->lessThan($this->blockStart()));
+        $this->assertTrue($oldest->lessThan(HeatmapWindow::current()->startsOn));
+    }
+
+    private function blockStart(): Carbon
+    {
+        return Carbon::today()->startOfWeek()->subWeeks(15);
+    }
+
+    /**
+     * The 16-week block: everything from its first week on.
+     *
      * @return Collection<int, Activity>
      */
     private function activities(): Collection
     {
-        return Activity::all();
+        return Activity::where('activity_date', '>=', $this->blockStart()->toDateString())->get();
+    }
+
+    /**
+     * The Garmin history before the block.
+     *
+     * @return Collection<int, Activity>
+     */
+    private function historyActivities(): Collection
+    {
+        return Activity::where('activity_date', '<', $this->blockStart()->toDateString())->get();
     }
 
     /**

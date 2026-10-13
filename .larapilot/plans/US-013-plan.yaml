@@ -511,20 +511,26 @@ tasks:
       7. `php artisan test --compact tests/Feature/Garmin tests/Feature/Strava` — no browser suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every changed FR-018 bullet and the FR-002 bound have a case
-      - [ ] Coverage matches the `NORMAL` bar
+      - [x] Tests pass locally
+      - [x] Every changed FR-018 bullet and the FR-002 bound have a case
+      - [x] Coverage matches the `NORMAL` bar
 
       ## Git Deliverables
       - Commit: `test(US-013): TASK-09 cover older Garmin runs and sync bounds`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-08
+    commit:
+      sha: 74176fc9fbce1cf041a4b96545341ab09651b366
+      short_sha: 74176fc
+      subject: 'test(US-013): TASK-09 cover older Garmin runs and sync bounds'
+      committed_at: '2026-10-13T22:05:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/74176fc9fbce1cf041a4b96545341ab09651b366'
   -
     id: TASK-10
     title: 'Seed 7 weeks of Garmin history before the training block'
@@ -611,4 +617,4 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T20:04:31+00:00'
+updated_at: '2026-10-13T20:05:40+00:00'

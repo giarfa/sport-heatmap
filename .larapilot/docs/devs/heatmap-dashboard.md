@@ -307,6 +307,15 @@ three small indexed queries for the sync status and one `MIN()` for the oldest r
   see the first connected one in allowlist order. With none connected, guests see
   the lowest-id stored athlete with activities — on a fresh
   `migrate:fresh --seed`, the seeded demo athlete.
+- **Demo dataset (`TrainingBlockSeeder`).** The 16-week block is computed from the
+  current week, so it always fills exactly the current window. Since `US-013` it is
+  preceded by seven weeks of Garmin-imported history (28.4, 31.0, 33.5, 36.2, 22.0,
+  **0.0**, 18.6 km, oldest first; `source = garmin_csv`, no metrics, each week summing to
+  its total in metres), so Previous is demonstrable after `migrate:fresh --seed`.
+  The totals are the ones the `US-014` mockup draws, so the two specs share one fixture and
+  the 0 km week gives the trend a rest week to show. The block itself is untouched and
+  the legend over the current window does not change. Do not run `migrate:fresh --seed` on a
+  database that holds real imports — point `DB_DATABASE` at a scratch file.
 - Strava orange (`#fc4c02`) is reserved for the connect button and never used as
   a data colour.
 
