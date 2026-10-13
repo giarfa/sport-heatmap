@@ -13,7 +13,8 @@ Lets the owner add runs that Strava is missing, or that Garmin recorded better,
 by uploading the "Activities" CSV exported from the Garmin Connect website
 (FR-018). Since US-011 any visitor can import, signed in or not: a guest
 imports into the displayed athlete, or — on a fresh install — creates a local
-CSV-only athlete, so the heatmap works with CSV imports only. The file is parsed into running rows inside the 112-day window, and
+CSV-only athlete, so the heatmap works with CSV imports only. The file is parsed into running rows of any age (dated today or earlier, so the
+heatmap can be navigated back to them — `US-013`), and
 every row that clashes with a stored run is reviewed before anything is
 written. If it stops working, Garmin-only runs never reach the heatmap; the
 Strava sync is unaffected.
@@ -22,7 +23,7 @@ Strava sync is unaffected.
 
 ### 1. Parsing (`ParseGarminCsv`)
 
-`ParseGarminCsv::__invoke($path, HeatmapWindow, $today)` reads the uploaded
+`ParseGarminCsv::__invoke($path, $today)` reads the uploaded
 file and returns a `ParsedGarminCsv`. It writes nothing.
 
 1. **Whole-file checks** — the import stops with `GarminCsvRejectedException`
@@ -36,18 +37,21 @@ file and returns a `ParsedGarminCsv`. It writes nothing.
      is not enough)
    - a required column of that language is missing → the message names it
    - there is a header but no data row → "The file has no activities."
-   - more than **1,000** runs survive into the window, or more than **100**
-     rows are unreadable → the message says so. These caps bound what one 5 MB
-     upload can put in the session and in front of the planner; a real
-     16-week export holds a few hundred runs at most.
+   - more than **5,000** runs, or more than **100** rows are unreadable → the
+     message says so ("The file has more than 5000 runs. Export a shorter period
+     from Garmin Connect."). These caps bound what one 5 MB upload can put in the
+     session and in front of the planner. The run cap was 1,000 while only the
+     last 16 weeks were kept; with older runs kept, a full export of several
+     years is the normal case, and 5,000 is about 13 years at a run a day.
 2. **Per row**, in this order — the first rule that applies decides the row:
    1. **Type** — not a running type → `ignoredByType[name] += 1` (names cut
       to 60 characters; beyond 50 distinct names the rest count as
       `(other types)`).
    2. **Date** — not `Y-m-d H:i:s` / `Y-m-d H:i` (or an overflowing date such
       as `2026-02-30`) → `invalid[] = {line, "unreadable date"}`.
-   3. **Window** — after today, or outside the heatmap window →
-      `outsideWindow += 1`.
+   3. **Future** — dated after today → `futureDated += 1` and the row is
+      skipped. A run of any age up to today is kept; which window it falls in is
+      the dashboard's business, not the importer's (`US-013`, FR-018).
    4. **Distance** — `"--"` or empty → `invalid[] = {line, "missing
       distance"}`; non-numeric or more than six integer digits →
       `"unreadable distance"` (an unbounded value would overflow the int cast
@@ -196,7 +200,7 @@ of the athlete actually written to
 (`HeatmapGridCache::forgetAthlete()`), so the dashboard shows the import on the next
 request, whichever window is opened — also after a backfill-only import, whose metrics the cached day
 detail carries. It returns a `GarminImportSummary`: imported, overwritten, skipped,
-already imported, ignored by type, outside window, invalid. The action does not
+already imported, ignored by type, future-dated, invalid. The action does not
 authorize (`.ai/rules/actions.md`); the caller has.
 
 ### 4. HTTP flow
@@ -275,7 +279,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | Header sets | `app/Support/Garmin/GarminCsvColumns.php` | Language detection, column lookup by name |
 | Type map | `app/Support/Garmin/GarminRunningTypes.php` | Garmin type name → `SportType` |
 | Row DTO | `app/Data/Garmin/GarminCsvRow.php` | `toAttributes()` (always `source = garmin_csv`), `toSessionArray()` / `fromSessionArray()`, `isIdenticalTo(Activity)` |
-| Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, outside-window count, invalid list; session round-trip |
+| Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, future-dated count, invalid list; session round-trip (`fromSessionArray()` also reads the pre-`US-013` `outside_window` key, so an upload or summary in flight across the deploy still opens) |
 | Rejection | `app/Exceptions/Garmin/GarminCsvRejectedException.php` | Owner-facing messages; no file content beyond a column name |
 | Target | `app/Support/Garmin/ResolveGarminImportTarget.php` | Signed-in owner, else displayed athlete, else null |
 | Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query, claiming; all new with no target |
@@ -298,6 +302,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 
 | Choice | Alternatives considered | Why this one |
 | --- | --- | --- |
+| Older runs are kept; only future-dated rows are skipped and counted as "Future-dated" (US-013, decision `17affbd2ffbcf2fe`) | Keep skipping what is outside the 112 days; import everything including future rows; a user-chosen cut-off | The heatmap is navigable back through history, so dropping an old run would make Previous show a hole the athlete's own export fills. A future-dated row is a clock or a typo, and on the dashboard it would be a cell that has not happened. The old count, "Outside 16 weeks", described a rule that no longer exists, so the counter, its session key and its label were renamed rather than reused with a new meaning |
 | `SplFileObject` CSV reader | `league/csv`, `maatwebsite/excel` | One flat file of ~100 rows; PHP's reader covers it and the project adds no dependency |
 | Parse inside the request | Queue a job | A whole export parses in milliseconds, and the owner is waiting on the review page anyway |
 | Locate columns by header name, per language | Fixed column positions | Garmin translates headers and changes column sets between exports; positions would silently read the wrong column |
@@ -378,9 +383,9 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 - **Adding a running type name:** one line in `GarminRunningTypes::TYPES`,
   lower-cased. The summary's "Ignored activity types" list is where a missing
   one shows up.
-- **Known gap — the window is fixed at upload.** A review confirmed after the
-  week rolls over still imports rows that were in the window when parsed.
-  They are older runs, and the heatmap simply does not show them.
+- **Known gap — "today" is fixed at upload.** A review confirmed after midnight
+  still imports the rows that were not future-dated when parsed; a row dated
+  tomorrow at upload time stays skipped even though tomorrow has come.
 - **Parsed rows live in the session store.** The raw file is never stored, but
   the parsed rows (names, starts, distances) sit in `sessions.payload` until
   confirm, cancel, the next upload, or session expiry. Set

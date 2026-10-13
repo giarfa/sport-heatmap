@@ -93,7 +93,7 @@ final readonly class ApplyGarminImport
             skipped: $skipped,
             alreadyImported: count($plan->alreadyImported),
             ignoredByType: $parsed->ignoredByType,
-            outsideWindow: $parsed->outsideWindow,
+            futureDated: $parsed->futureDated,
             invalid: $parsed->invalid,
         );
     }

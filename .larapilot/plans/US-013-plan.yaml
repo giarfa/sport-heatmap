@@ -414,21 +414,27 @@ tasks:
       10. `php artisan test --compact --filter=WindowNavigationTest` — no Dusk/Playwright/browser suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every FR-019 "Done means" bullet that HTTP can observe has a case
-      - [ ] Coverage matches the `NORMAL` bar
+      - [x] Tests pass locally
+      - [x] Every FR-019 "Done means" bullet that HTTP can observe has a case
+      - [x] Coverage matches the `NORMAL` bar
 
       ## Git Deliverables
       - Commit: `test(US-013): TASK-07 cover dashboard window navigation`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-05
       - TASK-06
+    commit:
+      sha: 6cb917601a21c55d08be289b88a635023e20ea3e
+      short_sha: 6cb9176
+      subject: 'test(US-013): TASK-07 cover dashboard window navigation'
+      committed_at: '2026-10-13T22:02:38+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6cb917601a21c55d08be289b88a635023e20ea3e'
   -
     id: TASK-08
     title: 'Garmin import keeps runs of any age; only future-dated rows are skipped'
@@ -599,4 +605,4 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T20:01:18+00:00'
+updated_at: '2026-10-13T20:02:38+00:00'

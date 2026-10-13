@@ -17,7 +17,7 @@ final readonly class GarminImportSummary
         public int $skipped,
         public int $alreadyImported,
         public array $ignoredByType,
-        public int $outsideWindow,
+        public int $futureDated,
         public array $invalid,
     ) {}
 
@@ -33,7 +33,7 @@ final readonly class GarminImportSummary
      *     skipped: int,
      *     already_imported: int,
      *     ignored_by_type: array<string, int>,
-     *     outside_window: int,
+     *     future_dated: int,
      *     invalid: array<int, array{line: int, reason: string}>,
      * }
      */
@@ -45,7 +45,7 @@ final readonly class GarminImportSummary
             'skipped' => $this->skipped,
             'already_imported' => $this->alreadyImported,
             'ignored_by_type' => $this->ignoredByType,
-            'outside_window' => $this->outsideWindow,
+            'future_dated' => $this->futureDated,
             'invalid' => $this->invalid,
         ];
     }
@@ -57,19 +57,24 @@ final readonly class GarminImportSummary
      *     skipped: int,
      *     already_imported: int,
      *     ignored_by_type: array<string, int>,
-     *     outside_window: int,
+     *     future_dated?: int,
+     *     outside_window?: int,
      *     invalid: array<int, array{line: int, reason: string}>,
      * }  $summary
      */
     public static function fromSessionArray(array $summary): self
     {
+        /*
+         * A summary flashed before US-013 carries `outside_window`; it is read when
+         * `future_dated` is absent so a summary in flight across the deploy still renders.
+         */
         return new self(
             imported: $summary['imported'],
             overwritten: $summary['overwritten'],
             skipped: $summary['skipped'],
             alreadyImported: $summary['already_imported'],
             ignoredByType: $summary['ignored_by_type'],
-            outsideWindow: $summary['outside_window'],
+            futureDated: $summary['future_dated'] ?? $summary['outside_window'] ?? 0,
             invalid: $summary['invalid'],
         );
     }

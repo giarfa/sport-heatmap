@@ -35,7 +35,7 @@ Keep the table below current — it is the entry point for a new developer.
 | Domain | What it covers | Last touched by |
 | --- | --- | --- |
 | [activity-sync](activity-sync.md) | Nightly `strava:sync`: fetch the 112-day window, reconcile `activities`, record `sync_runs`; activity sources; per-run metric columns; CSV-only athletes skipped | `US-013` |
-| [garmin-csv-import](garmin-csv-import.md) | Garmin Connect CSV upload: parsing, import target, CSV-only athlete, conflict review, Overwrite / Skip; optional pace / ascent / heart-rate columns | `US-013` |
+| [garmin-csv-import](garmin-csv-import.md) | Garmin Connect CSV upload: parsing, import target, CSV-only athlete, conflict review, Overwrite / Skip; optional pace / ascent / heart-rate columns; runs of any age kept, future-dated rows skipped | `US-013` |
 | [heatmap-dashboard](heatmap-dashboard.md) | The public `/` screen: 16-week grid, intensity scale, grid cache, fresh sync status (CSV-only import status), Garmin import entry points for every visitor; the day cell detail with each run's pace, ascent and heart rate; Previous / Next window navigation by a `to` date | `US-013` |
 | [strava-connection](strava-connection.md) | OAuth connect, athlete allowlist, encrypted tokens, refresh, the `strava.fresh` guard, the publicly displayed athlete (also the guest import target) and its stored-athlete fallback | `US-011` |
 

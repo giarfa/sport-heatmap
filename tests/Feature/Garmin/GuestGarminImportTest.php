@@ -46,7 +46,7 @@ class GuestGarminImportTest extends TestCase
     {
         return [
             'italian headers' => ['activities-it.csv', 37],
-            'english headers' => ['activities-en.csv', 6],
+            'english headers' => ['activities-en.csv', 7],
         ];
     }
 
@@ -201,7 +201,7 @@ class GuestGarminImportTest extends TestCase
         $this->flushSession();
         $this->upload($this->fixture('activities-en.csv'));
         $reviewB = $this->review();
-        $reviewB->assertSee('<div><dt>New runs</dt><dd>6</dd></div>', escape: false);
+        $reviewB->assertSee('<div><dt>New runs</dt><dd>7</dd></div>', escape: false);
         $reviewB->assertDontSee('Paese Corsa');
 
         $this->confirm($reviewA)->assertRedirect(route('garmin.import.review'));

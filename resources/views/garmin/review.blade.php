@@ -22,7 +22,7 @@
                 <div><dt>Clashes to decide</dt><dd>{{ count($plan->conflicts) }}</dd></div>
                 <div><dt>Already imported</dt><dd>{{ count($plan->alreadyImported) }}</dd></div>
                 <div><dt>Not runs, ignored</dt><dd>{{ $parsed->ignoredTotal() }}</dd></div>
-                <div><dt>Outside 16 weeks</dt><dd>{{ $parsed->outsideWindow }}</dd></div>
+                <div><dt>Future-dated</dt><dd>{{ $parsed->futureDated }}</dd></div>
                 <div><dt>Unreadable rows</dt><dd>{{ count($parsed->invalid) }}</dd></div>
             </dl>
         </section>

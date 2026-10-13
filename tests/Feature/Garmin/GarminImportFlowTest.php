@@ -76,17 +76,17 @@ class GarminImportFlowTest extends TestCase
         $summary->assertSee('Escursionismo');
     }
 
-    public function test_the_english_fixture_maps_types_and_lists_invalid_and_outside_window_rows(): void
+    public function test_the_english_fixture_maps_types_and_lists_invalid_and_future_dated_rows(): void
     {
         $this->upload($this->fixture('activities-en.csv'));
         $this->confirm($this->review());
 
-        $this->assertSame(6, Activity::count());
+        $this->assertSame(7, Activity::count());
         $this->assertSame(SportType::TrailRun, Activity::where('name', 'Ridge Trail')->sole()->sport_type);
         $this->assertSame(SportType::VirtualRun, Activity::where('name', 'Zwift Run')->sole()->sport_type);
 
         $summary = $this->actingAs($this->owner)->get(route('garmin.import.summary'));
-        $summary->assertSee('<div><dt>Outside 16 weeks</dt><dd>2</dd></div>', escape: false);
+        $summary->assertSee('<div><dt>Future-dated</dt><dd>1</dd></div>', escape: false);
         $summary->assertSee('<div><dt>Unreadable rows</dt><dd>2</dd></div>', escape: false);
         $summary->assertSee('Line 7');
         $summary->assertSee('missing distance');
