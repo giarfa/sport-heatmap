@@ -47,15 +47,25 @@ share stops working.
       `DailyRuns` (one query for the window's runs, `US-012`) →
       `HeatmapBuilder` (rest / ran / future cells, weekly totals, partial current
       week, each Ran day's runs) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
-   3. `ResolveSyncStatus` reads `sync_runs` and the window's activity count
-      **outside** the cache and returns a `SyncStatus`. For a **CSV-only
+   3. `ResolveSyncStatus` reads `sync_runs` and the activity count of the
+      **current** window — never the shown one — **outside** the cache and
+      returns a `SyncStatus`, so the chip, warning, sync card and skeleton are the
+      same on every window (`US-013`). For a **CSV-only
       athlete** (`User::isCsvOnly()`, no Strava id — US-011) it reads no
       `sync_runs` at all: the latest import is the newest `updated_at` among
       the athlete's `garmin_csv` activities, and the status is
       `SyncStatus::forCsvOnly()`.
-   4. `dashboard.blade.php` renders the chip, an optional warning, the grid (or
+   4. `OldestRunDate` (one `MIN(activity_date)`, read fresh) and the window feed
+      `WindowNavigation::for()`: the heading ("Last 16 weeks" on the current
+      window, "16 weeks to 6 Sep" on an earlier one), the page title, the empty
+      note, and the Previous and Next URLs. Previous is a link only while the
+      shown window starts after the oldest stored run (none stored → none);
+      Next is a link only on an earlier window, and points at plain `/` when it
+      reaches the current one, so the current window has one address.
+   5. `dashboard.blade.php` renders the chip, an optional warning, the grid (or
       the skeleton during a first sync), `<x-day-detail>`, the legend, and the
-      sync detail card.
+      sync detail card. An empty current window keeps the sync-specific note; an
+      empty earlier window says "No runs stored in these 16 weeks." (`$grid->hasRuns()`).
 
 ### Day cell detail (`US-012`, FR-011)
 
@@ -162,6 +172,7 @@ calibrated bands, upper-inclusive.
 | Window | `app/Support/Heatmap/HeatmapWindow.php` | ISO-week anchored 112-day window: `current()`, `endingInWeekOf()`, strict `fromRequestedEnd()`, `previous()`, `next()` (clamped to the current window), `isCurrent()` |
 | Daily totals | `app/Support/Heatmap/DailyRunningDistance.php` | One grouped aggregate query |
 | Day runs | `app/Support/Heatmap/DailyRuns.php`, `app/Data/Heatmap/DayRun.php` | One query per cache miss for the window's runs, grouped by day in start order; `DayRun` is a scalars-only run with its formatting (`kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()` — null when not recorded — and the Strava link from `Activity::stravaUrl()`) |
+| Navigation | `app/Support/Heatmap/OldestRunDate.php`, `app/Data/Heatmap/WindowNavigation.php` | The oldest stored run (one `MIN`, outside the cache) and the heading, title, empty note and Previous / Next URLs of the shown window |
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
@@ -172,8 +183,8 @@ calibrated bands, upper-inclusive.
 | Config | `config/heatmap.php` | Literals `window_weeks` (16), `navigation_step_weeks` (4) and `grid_cache_ttl` (86 400) |
 | Tests | `tests/Feature/Dashboard/*`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
 
-A dashboard request costs one grouped query on a cache miss, zero on a hit, plus
-three small indexed queries for the sync status.
+A dashboard request costs one grouped query and one run query on a cache miss, zero on a hit, plus
+three small indexed queries for the sync status and one `MIN()` for the oldest run (`US-013`).
 
 ## Architectural choices
 
@@ -192,6 +203,8 @@ three small indexed queries for the sync status.
 | The URL names the window's **end** week, as a `Y-m-d` query value (`/?to=2026-09-06`, `US-013`) | A path segment; the window's start date in the URL; a page number | A query value keeps `/` the one route and the one cache key shape; the end is what the reader navigates by and survives a change of `window_weeks`, where a start date would shift every shared link; a page number says nothing in a shared link |
 | A bad `to` renders the current window silently (`US-013`) | 404; 422; a redirect to `/` | The spec asks for a bad or future link to render "without an error"; an old bookmark is better served by today's map than by an error page, and the guest path stays free of any new response |
 | `previous()` is not clamped to the oldest run; `next()` is clamped to the current window | Clamp both inside `HeatmapWindow` | The window is a value object that never sees the data, so how far back Previous may go is the controller's question (it disables the control); a window past the current one would hold only future cells |
+| Previous is disabled from the athlete's oldest stored run, not from a fixed horizon (US-013) | A fixed number of windows; clamping inside `HeatmapWindow`; never disabling it | The reader should never page into a run of empty windows, and the value object cannot know the data. The cost is one `MIN()` per request, which the `(user_id, activity_date)` index serves, read outside the cache because the oldest run belongs to the athlete, not to any cached window |
+| The sync status always reads the current window (US-013) | Read the shown window | The status describes the sync, not the period on screen; a past window would otherwise show a different "Runs in window", a different empty note, and could flip the skeleton |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
 | CSV-only athlete: latest import = newest `updated_at` of its `garmin_csv` activities (US-011) | A `users.garmin_imported_at` column | No migration for one stamp; the cost is that a re-import that changes nothing does not move it |
 | CSV-only athlete ignores `sync_runs` | Show the instance-wide sync state | `sync_runs` describe the Strava sync, which never selects this athlete — a failed or stale sync of someone else would put a false warning over a map only imports change |
@@ -226,8 +239,10 @@ three small indexed queries for the sync status.
   keyed per athlete, so switching from the fallback to an allowlisted athlete
   never serves the fallback's cached grid.
 
-- **Invariant — the sync status is never cached.** _Breaks if:_ it moves into the
-  `remember()` closure.
+- **Invariant — the sync status is never cached, and never reads the shown window.**
+  _Breaks if:_ it moves into the `remember()` closure, or `ResolveSyncStatus` is
+  called with `$window` instead of `HeatmapWindow::current($today)` — the chip and
+  the sync card would then change as the reader navigates.
 - **Invariant — every class serialized inside a `HeatmapGrid` is listed in
   `cache.serializable_classes`.** _Breaks if:_ a DTO, enum, or value object is
   nested into the grid without joining the list — the grid then fails to

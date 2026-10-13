@@ -260,20 +260,26 @@ tasks:
       5. `php artisan test --compact --filter=HeatmapGridCacheTest`
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] A cached past window never survives a confirmed import or a sync
-      - [ ] Coverage matches the `NORMAL` bar
+      - [x] Tests pass locally
+      - [x] A cached past window never survives a confirmed import or a sync
+      - [x] Coverage matches the `NORMAL` bar
 
       ## Git Deliverables
       - Commit: `test(US-013): TASK-04 cover cache invalidation of past windows`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
       - TASK-03
+    commit:
+      sha: 9939091f3122482cf7548cd4d854b58034d21fa7
+      short_sha: '9939091'
+      subject: 'test(US-013): TASK-04 cover cache invalidation of past windows'
+      committed_at: '2026-10-13T21:59:21+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9939091f3122482cf7548cd4d854b58034d21fa7'
   -
     id: TASK-05
     title: 'Dashboard serves any window: ?to=, oldest run, navigation state, steady sync status'
@@ -581,4 +587,4 @@ tasks:
       - TASK-07
       - TASK-09
       - TASK-10
-updated_at: '2026-10-13T19:58:39+00:00'
+updated_at: '2026-10-13T19:59:21+00:00'
