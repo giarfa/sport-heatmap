@@ -610,4 +610,17 @@ decisions:
     source: askquestion
     spec: US-012
     supersedes: null
-updated_at: '2026-10-13T18:40:40+00:00'
+  -
+    id: c2e7680eedc81066
+    ts: '2026-10-13T18:51:30+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-implement
+    topic: 'us-012 mockups approval'
+    label: 'US-012 mockups approval'
+    value: 'Approved as drawn: bottom sheet / centred dialog, guest review shows stored start only'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-012
+    supersedes: null
+updated_at: '2026-10-13T18:51:30+00:00'

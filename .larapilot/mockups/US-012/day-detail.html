@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Day cell detail — Sport Heatmap</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="detail.css">
+<script>
+  /* URL hash drives the stamped states: #dark · #open=2026-10-03 · #dark&open=2026-10-03 */
+  var hashParams = new URLSearchParams(location.hash.slice(1));
+  if (hashParams.has('dark')) document.documentElement.classList.add('dark');
+</script>
+</head>
+<body>
+<a href="#main" class="sr-only">Skip to content</a>
+<header class="top">
+  <div class="top-in">
+    <a href="../heatmap-dashboard/index.html" class="brand">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="17" width="12" height="12" rx="3" fill="#86b6ef"/><rect x="17" y="17" width="12" height="12" rx="3" fill="#2a78d6"/><rect x="3" y="3" width="12" height="12" rx="3" fill="#3987e5"/><rect x="17" y="3" width="12" height="12" rx="3" fill="#104281"/></svg>
+      Heatmap
+    </a>
+    <button type="button" class="icon-btn" aria-pressed="false" onclick="document.documentElement.classList.toggle('dark'); this.setAttribute('aria-pressed', document.documentElement.classList.contains('dark'))">
+      <span class="sr-only">Toggle dark mode</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+  <h1>Last 16 weeks</h1>
+  <p class="lede">Mon 29 Jun – Sun 18 Oct 2026 · running distance per day · tap a day to see its runs</p>
+
+  <section class="card dash-grid" style="margin-top:1rem;" aria-labelledby="grid-heading">
+    <h2 id="grid-heading" class="sr-only">Daily running distance, 16 weeks by weekday</h2>
+    <table class="hm">
+      <caption class="sr-only">Sixteen rows, one per week, oldest first. Seven columns, Monday to Sunday, plus a weekly total column. Days with runs are buttons that show the runs of that day.</caption>
+      <colgroup><col class="hm-col-week"><col span="7" class="hm-col-day"><col class="hm-col-total"></colgroup>
+      <thead>
+        <tr>
+          <td class="hm-th-week"><span class="sr-only">Week starting</span></td>
+          <th scope="col" class="hm-th-day"><abbr title="Monday">Mo</abbr></th><th scope="col" class="hm-th-day"><abbr title="Tuesday">Tu</abbr></th><th scope="col" class="hm-th-day"><abbr title="Wednesday">We</abbr></th><th scope="col" class="hm-th-day"><abbr title="Thursday">Th</abbr></th><th scope="col" class="hm-th-day"><abbr title="Friday">Fr</abbr></th><th scope="col" class="hm-th-day"><abbr title="Saturday">Sa</abbr></th><th scope="col" class="hm-th-day"><abbr title="Sunday">Su</abbr></th>
+          <th scope="col" class="hm-th-total">Week</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="hm-row"><th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>14 Sep</th><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-14" aria-haspopup="dialog" title="Mon 14 Sep: 6.2 km"><span class="sr-only">Monday 14 Sep 2026: 6.2 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td"><span class="sr-only">Tuesday 15 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-16" aria-haspopup="dialog" title="Wed 16 Sep: 8.4 km"><span class="sr-only">Wednesday 16 Sep 2026: 8.4 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l2"></span></button></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-17" aria-haspopup="dialog" title="Thu 17 Sep: 5.1 km"><span class="sr-only">Thursday 17 Sep 2026: 5.1 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td"><span class="sr-only">Friday 18 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-19" aria-haspopup="dialog" title="Sat 19 Sep: 12.0 km"><span class="sr-only">Saturday 19 Sep 2026: 12.0 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l3"></span></button></td><td class="hm-td"><span class="sr-only">Sunday 20 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-total"><span class="hm-total-num">31.7</span><span class="hm-total-unit"> km</span></td></tr>
+        <tr class="hm-row"><th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>21 Sep</th><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-21" aria-haspopup="dialog" title="Mon 21 Sep: 5.0 km"><span class="sr-only">Monday 21 Sep 2026: 5.0 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-22" aria-haspopup="dialog" title="Tue 22 Sep: 7.1 km"><span class="sr-only">Tuesday 22 Sep 2026: 7.1 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td"><span class="sr-only">Wednesday 23 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-24" aria-haspopup="dialog" title="Thu 24 Sep: 8.0 km"><span class="sr-only">Thursday 24 Sep 2026: 8.0 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l2"></span></button></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-25" aria-haspopup="dialog" title="Fri 25 Sep: 5.2 km"><span class="sr-only">Friday 25 Sep 2026: 5.2 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-26" aria-haspopup="dialog" title="Sat 26 Sep: 14.8 km"><span class="sr-only">Saturday 26 Sep 2026: 14.8 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l4"></span></button></td><td class="hm-td"><span class="sr-only">Sunday 27 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-total"><span class="hm-total-num">40.1</span><span class="hm-total-unit"> km</span></td></tr>
+        <tr class="hm-row"><th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>28 Sep</th><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-28" aria-haspopup="dialog" title="Mon 28 Sep: 6.0 km"><span class="sr-only">Monday 28 Sep 2026: 6.0 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td"><span class="sr-only">Tuesday 29 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-09-30" aria-haspopup="dialog" title="Wed 30 Sep: 5.0 km"><span class="sr-only">Wednesday 30 Sep 2026: 5.0 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-10-01" aria-haspopup="dialog" title="Thu 01 Oct: 5.1 km"><span class="sr-only">Thursday 1 Oct 2026: 5.1 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td"><span class="sr-only">Friday 2 Oct 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-10-03" aria-haspopup="dialog" title="Sat 03 Oct: 13.6 km"><span class="sr-only">Saturday 3 Oct 2026: 13.6 km, 2 runs. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l3"></span></button></td><td class="hm-td"><span class="sr-only">Sunday 4 Oct 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-total"><span class="hm-total-num">29.7</span><span class="hm-total-unit"> km</span></td></tr>
+        <tr class="hm-row"><th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>5 Oct</th><td class="hm-td"><span class="sr-only">Monday 5 Oct 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-10-06" aria-haspopup="dialog" title="Tue 06 Oct: 7.0 km"><span class="sr-only">Tuesday 6 Oct 2026: 7.0 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-10-07" aria-haspopup="dialog" title="Wed 07 Oct: 5.1 km"><span class="sr-only">Wednesday 7 Oct 2026: 5.1 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-10-08" aria-haspopup="dialog" title="Thu 08 Oct: 5.1 km"><span class="sr-only">Thursday 8 Oct 2026: 5.1 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td"><span class="sr-only">Friday 9 Oct 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-10-10" aria-haspopup="dialog" title="Sat 10 Oct: 8.2 km"><span class="sr-only">Saturday 10 Oct 2026: 8.2 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l2"></span></button></td><td class="hm-td"><span class="sr-only">Sunday 11 Oct 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-total"><span class="hm-total-num">25.4</span><span class="hm-total-unit"> km</span></td></tr>
+        <tr class="hm-row hm-row-current"><th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>12 Oct</th><td class="hm-td hm-td--ran"><button type="button" class="hm-hit" data-day="2026-10-12" aria-haspopup="dialog" title="Mon 12 Oct: 6.0 km"><span class="sr-only">Monday 12 Oct 2026: 6.0 km, 1 run. Show details</span><span aria-hidden="true" class="hm-cell hm-cell--l1"></span></button></td><td class="hm-td"><span class="sr-only">Tuesday 13 Oct 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest"></span></td><td class="hm-td"><span class="sr-only">Wednesday 14 Oct 2026: not yet</span><span aria-hidden="true" class="hm-cell hm-cell--future"></span></td><td class="hm-td"><span class="sr-only">Thursday 15 Oct 2026: not yet</span><span aria-hidden="true" class="hm-cell hm-cell--future"></span></td><td class="hm-td"><span class="sr-only">Friday 16 Oct 2026: not yet</span><span aria-hidden="true" class="hm-cell hm-cell--future"></span></td><td class="hm-td"><span class="sr-only">Saturday 17 Oct 2026: not yet</span><span aria-hidden="true" class="hm-cell hm-cell--future"></span></td><td class="hm-td"><span class="sr-only">Sunday 18 Oct 2026: not yet</span><span aria-hidden="true" class="hm-cell hm-cell--future"></span></td><td class="hm-total"><span class="hm-total-num">6.0</span><span class="hm-total-unit"> km</span><span class="hm-partial">partial</span></td></tr>
+      </tbody>
+    </table>
+    <p class="mock-annot" style="margin-top:1rem;">
+      Mockup shows the last 5 of 16 rows. Tappable days: every day with a run. Try Sat 3 Oct (two runs, one without ascent or
+      heart rate), Wed 7 Oct (a Garmin run with no metrics at all), Sat 10 Oct (a Strava run with a link). Rest and future days are not controls.
+    </p>
+  </section>
+</main>
+
+<footer><a href="https://www.strava.com">Powered by Strava</a> · runs only · distances in kilometres</footer>
+
+<!-- One shared dialog; each ran day has a <template> with its content, so the cached grid carries
+     the data and opening a day makes no request (FR-017). -->
+<dialog class="day-dlg" id="day-dialog" aria-labelledby="dlg-title">
+  <div class="dlg-head">
+    <div data-dlg-title></div>
+    <button type="button" class="dlg-close" data-dlg-close>
+      <span class="sr-only">Close</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="dlg-body" data-dlg-body></div>
+</dialog>
+
+<template id="day-2026-09-14"><h2 id="dlg-title">Mon 14 Sep 2026</h2><p class="dlg-sub">1 run · 6.2 km</p><ol class="runs"><li class="run"><h3 class="run-name">Easy run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670001">View on Strava<span class="sr-only"> — Easy run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>6.2 km</dd></div><div><dt>Moving time</dt><dd>0:36:16</dd></div><div><dt>Avg pace</dt><dd>5:51 /km</dd></div><div><dt>Ascent</dt><dd>38 m</dd></div><div><dt>Heart rate</dt><dd>138 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-16"><h2 id="dlg-title">Wed 16 Sep 2026</h2><p class="dlg-sub">1 run · 8.4 km</p><ol class="runs"><li class="run"><h3 class="run-name">Tempo run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670002">View on Strava<span class="sr-only"> — Tempo run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>8.4 km</dd></div><div><dt>Moving time</dt><dd>0:44:31</dd></div><div><dt>Avg pace</dt><dd>5:18 /km</dd></div><div><dt>Ascent</dt><dd>52 m</dd></div><div><dt>Heart rate</dt><dd>156 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-17"><h2 id="dlg-title">Thu 17 Sep 2026</h2><p class="dlg-sub">1 run · 5.1 km</p><ol class="runs"><li class="run"><h3 class="run-name">Easy run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670003">View on Strava<span class="sr-only"> — Easy run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>5.1 km</dd></div><div><dt>Moving time</dt><dd>0:29:40</dd></div><div><dt>Avg pace</dt><dd>5:49 /km</dd></div><div><dt>Ascent</dt><dd>27 m</dd></div><div><dt>Heart rate</dt><dd>139 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-19"><h2 id="dlg-title">Sat 19 Sep 2026</h2><p class="dlg-sub">1 run · 12.0 km</p><ol class="runs"><li class="run"><h3 class="run-name">Long run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670004">View on Strava<span class="sr-only"> — Long run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>12.0 km</dd></div><div><dt>Moving time</dt><dd>1:07:12</dd></div><div><dt>Avg pace</dt><dd>5:36 /km</dd></div><div><dt>Ascent</dt><dd>96 m</dd></div><div><dt>Heart rate</dt><dd>147 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-21"><h2 id="dlg-title">Mon 21 Sep 2026</h2><p class="dlg-sub">1 run · 5.0 km</p><ol class="runs"><li class="run"><h3 class="run-name">Easy run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670005">View on Strava<span class="sr-only"> — Easy run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>5.0 km</dd></div><div><dt>Moving time</dt><dd>0:29:20</dd></div><div><dt>Avg pace</dt><dd>5:52 /km</dd></div><div><dt>Ascent</dt><dd>21 m</dd></div><div><dt>Heart rate</dt><dd>137 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-22"><h2 id="dlg-title">Tue 22 Sep 2026</h2><p class="dlg-sub">1 run · 7.1 km</p><ol class="runs"><li class="run"><h3 class="run-name">Easy run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670006">View on Strava<span class="sr-only"> — Easy run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>7.1 km</dd></div><div><dt>Moving time</dt><dd>0:40:42</dd></div><div><dt>Avg pace</dt><dd>5:44 /km</dd></div><div><dt>Ascent</dt><dd>44 m</dd></div><div><dt>Heart rate</dt><dd>141 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-24"><h2 id="dlg-title">Thu 24 Sep 2026</h2><p class="dlg-sub">1 run · 8.0 km</p><ol class="runs"><li class="run"><h3 class="run-name">Tempo run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670007">View on Strava<span class="sr-only"> — Tempo run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>8.0 km</dd></div><div><dt>Moving time</dt><dd>0:41:52</dd></div><div><dt>Avg pace</dt><dd>5:14 /km</dd></div><div><dt>Ascent</dt><dd>33 m</dd></div><div><dt>Heart rate</dt><dd>158 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-25"><h2 id="dlg-title">Fri 25 Sep 2026</h2><p class="dlg-sub">1 run · 5.2 km</p><ol class="runs"><li class="run"><h3 class="run-name">Easy run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670008">View on Strava<span class="sr-only"> — Easy run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>5.2 km</dd></div><div><dt>Moving time</dt><dd>0:30:20</dd></div><div><dt>Avg pace</dt><dd>5:50 /km</dd></div><div><dt>Ascent</dt><dd>24 m</dd></div><div><dt>Heart rate</dt><dd>138 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-26"><h2 id="dlg-title">Sat 26 Sep 2026</h2><p class="dlg-sub">1 run · 14.8 km</p><ol class="runs"><li class="run"><h3 class="run-name">Long run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670009">View on Strava<span class="sr-only"> — Long run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>14.8 km</dd></div><div><dt>Moving time</dt><dd>1:23:37</dd></div><div><dt>Avg pace</dt><dd>5:39 /km</dd></div><div><dt>Ascent</dt><dd>121 m</dd></div><div><dt>Heart rate</dt><dd>146 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-28"><h2 id="dlg-title">Mon 28 Sep 2026</h2><p class="dlg-sub">1 run · 6.0 km</p><ol class="runs"><li class="run"><h3 class="run-name">Easy run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670010">View on Strava<span class="sr-only"> — Easy run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>6.0 km</dd></div><div><dt>Moving time</dt><dd>0:34:42</dd></div><div><dt>Avg pace</dt><dd>5:47 /km</dd></div><div><dt>Ascent</dt><dd>31 m</dd></div><div><dt>Heart rate</dt><dd>140 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-09-30"><h2 id="dlg-title">Wed 30 Sep 2026</h2><p class="dlg-sub">1 run · 5.0 km</p><ol class="runs"><li class="run"><h3 class="run-name">Paese Corsa</h3><p class="run-src">Garmin import</p><dl class="run-stats"><div><dt>Distance</dt><dd>5.0 km</dd></div><div><dt>Moving time</dt><dd>0:28:45</dd></div><div><dt>Avg pace</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div><div><dt>Ascent</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div><div><dt>Heart rate</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div></dl></li></ol></template>
+<template id="day-2026-10-01"><h2 id="dlg-title">Thu 1 Oct 2026</h2><p class="dlg-sub">1 run · 5.1 km</p><ol class="runs"><li class="run"><h3 class="run-name">Easy run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670011">View on Strava<span class="sr-only"> — Easy run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>5.1 km</dd></div><div><dt>Moving time</dt><dd>0:29:35</dd></div><div><dt>Avg pace</dt><dd>5:48 /km</dd></div><div><dt>Ascent</dt><dd>29 m</dd></div><div><dt>Heart rate</dt><dd>139 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-10-03"><h2 id="dlg-title">Sat 3 Oct 2026</h2><p class="dlg-sub">2 runs · 13.6 km</p><ol class="runs"><li class="run"><h3 class="run-name">Morning run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670012">View on Strava<span class="sr-only"> — Morning run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>10.4 km</dd></div><div><dt>Moving time</dt><dd>0:55:59</dd></div><div><dt>Avg pace</dt><dd>5:23 /km</dd></div><div><dt>Ascent</dt><dd>45 m</dd></div><div><dt>Heart rate</dt><dd>152 bpm</dd></div></dl></li><li class="run"><h3 class="run-name">Evening shakeout</h3><p class="run-src">Garmin import</p><dl class="run-stats"><div><dt>Distance</dt><dd>3.2 km</dd></div><div><dt>Moving time</dt><dd>0:19:50</dd></div><div><dt>Avg pace</dt><dd>6:12 /km</dd></div><div><dt>Ascent</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div><div><dt>Heart rate</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div></dl></li></ol></template>
+<template id="day-2026-10-06"><h2 id="dlg-title">Tue 6 Oct 2026</h2><p class="dlg-sub">1 run · 7.0 km</p><ol class="runs"><li class="run"><h3 class="run-name">Easy run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670013">View on Strava<span class="sr-only"> — Easy run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>7.0 km</dd></div><div><dt>Moving time</dt><dd>0:40:15</dd></div><div><dt>Avg pace</dt><dd>5:45 /km</dd></div><div><dt>Ascent</dt><dd>40 m</dd></div><div><dt>Heart rate</dt><dd>140 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-10-07"><h2 id="dlg-title">Wed 7 Oct 2026</h2><p class="dlg-sub">1 run · 5.1 km</p><ol class="runs"><li class="run"><h3 class="run-name">Paese Corsa</h3><p class="run-src">Garmin import</p><dl class="run-stats"><div><dt>Distance</dt><dd>5.1 km</dd></div><div><dt>Moving time</dt><dd>0:29:19</dd></div><div><dt>Avg pace</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div><div><dt>Ascent</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div><div><dt>Heart rate</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div></dl></li></ol></template>
+<template id="day-2026-10-08"><h2 id="dlg-title">Thu 8 Oct 2026</h2><p class="dlg-sub">1 run · 5.1 km</p><ol class="runs"><li class="run"><h3 class="run-name">Paese Corsa</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670014">View on Strava<span class="sr-only"> — Paese Corsa</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>5.1 km</dd></div><div><dt>Moving time</dt><dd>0:30:31</dd></div><div><dt>Avg pace</dt><dd>5:59 /km</dd></div><div><dt>Ascent</dt><dd>18 m</dd></div><div><dt>Heart rate</dt><dd>143 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-10-10"><h2 id="dlg-title">Sat 10 Oct 2026</h2><p class="dlg-sub">1 run · 8.2 km</p><ol class="runs"><li class="run"><h3 class="run-name">Paese Corsa</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670015">View on Strava<span class="sr-only"> — Paese Corsa</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>8.2 km</dd></div><div><dt>Moving time</dt><dd>0:45:14</dd></div><div><dt>Avg pace</dt><dd>5:31 /km</dd></div><div><dt>Ascent</dt><dd>62 m</dd></div><div><dt>Heart rate</dt><dd>150 bpm</dd></div></dl></li></ol></template>
+<template id="day-2026-10-12"><h2 id="dlg-title">Mon 12 Oct 2026</h2><p class="dlg-sub">1 run · 6.0 km</p><ol class="runs"><li class="run"><h3 class="run-name">Easy run</h3><p class="run-src">Strava · <a href="https://www.strava.com/activities/12345670016">View on Strava<span class="sr-only"> — Easy run</span></a></p><dl class="run-stats"><div><dt>Distance</dt><dd>6.0 km</dd></div><div><dt>Moving time</dt><dd>0:34:54</dd></div><div><dt>Avg pace</dt><dd>5:49 /km</dd></div><div><dt>Ascent</dt><dd>30 m</dd></div><div><dt>Heart rate</dt><dd>139 bpm</dd></div></dl></li></ol></template>
+
+<script>
+  /* The vanilla script as resources/js/app.js implements it: delegated click, a native dialog,
+     focus back on the cell it came from, a click on the backdrop closes. No dependency. */
+  (function () {
+    var dialog = document.getElementById('day-dialog');
+    var titleSlot = dialog.querySelector('[data-dlg-title]');
+    var bodySlot = dialog.querySelector('[data-dlg-body]');
+    var opener = null;
+
+    function open(button) {
+      var tpl = document.getElementById('day-' + button.dataset.day);
+      if (!tpl) return;
+      var frag = tpl.content.cloneNode(true);
+      titleSlot.replaceChildren(frag.querySelector('h2'), frag.querySelector('.dlg-sub'));
+      bodySlot.replaceChildren(frag.querySelector('.runs'));
+      bodySlot.scrollTop = 0;
+      opener = button;
+      button.classList.add('is-open');
+      dialog.showModal();
+    }
+
+    document.addEventListener('click', function (event) {
+      var cell = event.target.closest('[data-day]');
+      if (cell) return open(cell);
+      if (event.target.closest('[data-dlg-close]') || event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener('close', function () {
+      if (!opener) return;
+      opener.classList.remove('is-open');
+      opener.focus();
+      opener = null;
+    });
+
+    var wanted = hashParams.get('open');
+    if (wanted) {
+      var cell = document.querySelector('[data-day="' + wanted + '"]');
+      if (cell) open(cell);
+    }
+  })();
+</script>
+</body>
+</html>

@@ -96,8 +96,8 @@ tasks:
       3. Draft internal PR title/body toward `base` (`release/2.0.0`)
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] PR title/body drafted toward `release/2.0.0` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/2.0.0` (not `develop`)
 
       ## Test Data
       - N/A — git only
@@ -111,10 +111,16 @@ tasks:
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
       - Commit only if the command did not already leave you on the new branch with a commit — an empty commit is optional
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
+    commit:
+      sha: 6bcc276ab46c7a0ce2d39cc42ac0f8c9c963943c
+      short_sha: 6bcc276
+      subject: 'chore(US-012): TASK-00 bootstrap feature branch for release/2.0.0'
+      committed_at: '2026-10-13T20:46:34+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6bcc276ab46c7a0ce2d39cc42ac0f8c9c963943c'
   -
     id: TASK-01
     title: 'Mockups: day cell detail and the metric rows of the import review (mobile first, light + dark)'
@@ -609,4 +615,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T18:43:54+00:00'
+updated_at: '2026-10-13T18:46:35+00:00'
