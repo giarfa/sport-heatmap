@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-008` |
-| **Last updated by** | `US-011` — 2026-10-12 |
+| **Last updated by** | `US-012` — 2026-10-13 |
 | **Owner persona** | 🔧 Alex |
 
 ## Purpose
@@ -55,6 +55,9 @@ file and returns a `ParsedGarminCsv`. It writes nothing.
    5. **Moving time** — `"--"` falls back to the `Tempo` / `Time` column; if
       that is also unreadable → `invalid[] = {line, "missing moving time"}`.
    6. **Title** — trimmed, `Run` when empty, cut to 255 characters.
+   7. **Run metrics** — pace, ascent and heart rate (below) are read last and
+      can never reject, invalidate or drop the row: an absent column, `--`, or
+      an unreadable value leaves **only that metric** null.
 3. Rows identical **within the file** (same start, distance and moving time)
    collapse into one.
 
@@ -71,9 +74,19 @@ rows still parse.
 | distance | `Distanza` | `Distance` | yes |
 | moving time | `Tempo in movimento` | `Moving Time` | yes |
 | time | `Tempo` | `Time` | no — fallback for a `"--"` moving time |
+| average pace | `Passo medio` | `Avg Pace` | no — `US-012` |
+| total ascent | `Ascesa totale` | `Total Ascent` | no — `US-012` |
+| average heart rate | `FC Media` | `Avg HR` | no — `US-012` |
 
 Columns are located **by name**, never by position. A UTF-8 BOM on the first
-cell is stripped.
+cell is stripped. Optional columns are skipped when absent and never count
+toward language detection, so a file without them parses exactly as before.
+
+**English metric headers are an assumption** (decision `98fe4bd16f3263d6`): the
+Italian names come from a real export; `Avg Pace` / `Total Ascent` / `Avg HR`
+follow the existing English fixture and are unconfirmed by a real English export.
+If a real one differs, the fix is one line in `GarminCsvColumns::HEADER_SETS`;
+until then an English file imports with empty metrics, which is safe.
 
 ### Running types
 
@@ -92,6 +105,20 @@ Matched trimmed and case-insensitively (`GarminRunningTypes`):
 | Distance | km, `.` decimal, `,` thousands → `round(km × 1000)` integer metres | `"8.29"` → 8290 · `"1,005.20"` → 1 005 200 |
 | Moving time | `HH:MM:SS`, `MM:SS`, optional fractional seconds → rounded seconds | `"00:54:23"` → 3263 · `"00:40:12.6"` → 2413 |
 | Date | wall-clock, **no timezone conversion**; `activity_date` is its date part | `2026-10-10 09:33:27` |
+| Average pace | `m:ss` or `h:mm:ss` (the moving-time grammar) → whole seconds per km; `0` is not recorded | `"5:23"` → 323 · `"1:05:10"` → 3910 |
+| Total ascent | metres, `,` thousands, optional decimal rounded; up to six integer digits; a flat run's `0` stays `0` | `"1,234"` → 1234 · `"45.6"` → 46 |
+| Average heart rate | up to three digits, optional decimal rounded; `0` is not recorded | `"152"` → 152 · `"148.6"` → 149 |
+
+`--`, empty, an absent column, or anything that does not match is a **null
+metric, never `0`**: a stored `0` would read on the dashboard as a measurement.
+The metrics are **not part of a run's identity** (`GarminCsvRow::isIdenticalTo()`
+and `identityKey()` compare start, distance and moving time only), so
+re-importing a file whose metrics changed still recognises its runs. In the
+session `GarminCsvRow::fromSessionArray()` reads the three keys with `?? null`,
+so an upload parked before `US-012` shipped can still be confirmed afterwards.
+`GarminCsvRow::toAttributes()` and `metricAttributes()` carry **only the metrics
+the file recorded** — an empty one is left out, not nulled, so writing the
+attributes onto a stored run can never blank a value it already holds.
 
 ### 2. Target and planning (`ResolveGarminImportTarget`, `PlanGarminImport`)
 

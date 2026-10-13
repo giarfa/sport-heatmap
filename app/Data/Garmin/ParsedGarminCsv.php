@@ -24,7 +24,7 @@ final readonly class ParsedGarminCsv
      * Scalars only, so the session never holds a serialized object.
      *
      * @return array{
-     *     rows: array<int, array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string}>,
+     *     rows: array<int, array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string, average_pace_seconds_per_km?: int|null, total_ascent_meters?: int|null, average_heart_rate?: int|null}>,
      *     ignored_by_type: array<string, int>,
      *     outside_window: int,
      *     invalid: array<int, array{line: int, reason: string}>,
@@ -42,7 +42,7 @@ final readonly class ParsedGarminCsv
 
     /**
      * @param  array{
-     *     rows: array<int, array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string}>,
+     *     rows: array<int, array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string, average_pace_seconds_per_km?: int|null, total_ascent_meters?: int|null, average_heart_rate?: int|null}>,
      *     ignored_by_type: array<string, int>,
      *     outside_window: int,
      *     invalid: array<int, array{line: int, reason: string}>,

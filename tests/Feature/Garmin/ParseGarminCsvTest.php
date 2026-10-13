@@ -243,6 +243,169 @@ class ParseGarminCsvTest extends TestCase
         $this->assertRejected('The file has no activities.', $this->file(''));
     }
 
+    public function test_the_italian_metric_columns_parse_to_whole_seconds_metres_and_bpm(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-metrics.csv'));
+
+        $this->assertCount(5, $parsed->rows);
+        $this->assertSame(['Escursionismo' => 1], $parsed->ignoredByType);
+
+        $first = $this->rowNamed($parsed, 'Paese Corsa');
+        $this->assertSame(323, $first->averagePaceSecondsPerKm);
+        $this->assertSame(45, $first->totalAscentMeters);
+        $this->assertSame(152, $first->averageHeartRate);
+
+        $hill = $this->rowNamed($parsed, 'Collina');
+        $this->assertSame(348, $hill->averagePaceSecondsPerKm);
+        $this->assertSame(1_234, $hill->totalAscentMeters, 'The thousands separator is not a decimal mark.');
+        $this->assertSame(149, $hill->averageHeartRate, 'A decimal heart rate rounds to whole bpm.');
+    }
+
+    public function test_the_english_metric_columns_parse_the_same_way(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-en-metrics.csv'));
+
+        $first = $this->rowNamed($parsed, 'Paese Run');
+        $this->assertSame(323, $first->averagePaceSecondsPerKm);
+        $this->assertSame(45, $first->totalAscentMeters);
+        $this->assertSame(152, $first->averageHeartRate);
+
+        $hill = $this->rowNamed($parsed, 'Hill run');
+        $this->assertSame(1_234, $hill->totalAscentMeters);
+        $this->assertSame(149, $hill->averageHeartRate);
+    }
+
+    public function test_a_pace_may_arrive_as_hours_minutes_seconds(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-metrics.csv'));
+
+        $this->assertSame(3_910, $this->rowNamed($parsed, 'Passeggiata di corsa')->averagePaceSecondsPerKm);
+    }
+
+    public function test_a_flat_run_keeps_a_zero_ascent_but_a_zero_heart_rate_is_not_recorded(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-metrics.csv'));
+
+        $row = $this->rowNamed($parsed, 'Passeggiata di corsa');
+        $this->assertSame(0, $row->totalAscentMeters);
+        $this->assertNull($row->averageHeartRate);
+    }
+
+    public function test_an_unreadable_metric_leaves_only_that_metric_empty_and_the_row_is_not_invalid(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-metrics.csv'));
+
+        $row = $this->rowNamed($parsed, 'Passo illeggibile');
+        $this->assertNull($row->averagePaceSecondsPerKm);
+        $this->assertSame(20, $row->totalAscentMeters);
+        $this->assertSame(140, $row->averageHeartRate);
+        $this->assertSame([], $parsed->invalid);
+        $this->assertSame(5_000, $row->distanceMeters);
+    }
+
+    public function test_double_dash_metrics_are_empty_never_zero(): void
+    {
+        $row = $this->rowNamed($this->parse(base_path('tests/Fixtures/Garmin/activities-it-metrics.csv')), 'Senza metriche');
+
+        $this->assertNull($row->averagePaceSecondsPerKm);
+        $this->assertNull($row->totalAscentMeters);
+        $this->assertNull($row->averageHeartRate);
+        $this->assertSame([], $row->metricAttributes());
+    }
+
+    public function test_every_run_of_the_verbatim_client_sample_has_empty_metrics(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it.csv'));
+
+        $this->assertCount(37, $parsed->rows);
+
+        foreach ($parsed->rows as $row) {
+            $this->assertNull($row->averagePaceSecondsPerKm);
+            $this->assertNull($row->totalAscentMeters);
+            $this->assertNull($row->averageHeartRate);
+        }
+    }
+
+    public function test_a_file_without_the_metric_columns_still_parses_with_empty_metrics(): void
+    {
+        $parsed = $this->parse($this->csv(self::IT_HEADER, [
+            'Corsa,2026-10-10 09:33:27,false,"Paese Corsa","8.29","00:54:24","00:54:23"',
+        ]));
+
+        $this->assertCount(1, $parsed->rows);
+        $this->assertNull($parsed->rows[0]->averagePaceSecondsPerKm);
+        $this->assertNull($parsed->rows[0]->totalAscentMeters);
+        $this->assertNull($parsed->rows[0]->averageHeartRate);
+    }
+
+    public function test_an_oversized_metric_value_is_not_recorded_instead_of_overflowing(): void
+    {
+        $parsed = $this->parse($this->csv(self::IT_HEADER.',Passo medio,Ascesa totale,FC Media', [
+            'Corsa,2026-10-10 09:33:27,false,"Paese Corsa","8.29","00:54:24","00:54:23","99999999:99:99","99999999999","99999"',
+        ]));
+
+        $this->assertNull($parsed->rows[0]->averagePaceSecondsPerKm);
+        $this->assertNull($parsed->rows[0]->totalAscentMeters);
+        $this->assertNull($parsed->rows[0]->averageHeartRate);
+        $this->assertSame([], $parsed->invalid);
+    }
+
+    public function test_the_metrics_are_not_part_of_a_runs_identity(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-metrics.csv'));
+        $row = $this->rowNamed($parsed, 'Paese Corsa');
+
+        $withoutMetrics = new GarminCsvRow(
+            $row->sportType,
+            $row->name,
+            $row->distanceMeters,
+            $row->movingTimeSeconds,
+            $row->startDateLocal,
+            $row->activityDate,
+        );
+
+        $this->assertSame($withoutMetrics->identityKey(), $row->identityKey());
+    }
+
+    public function test_the_metrics_survive_the_session_round_trip_and_an_older_pending_upload_still_rebuilds(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-metrics.csv'));
+        $rebuilt = ParsedGarminCsv::fromSessionArray($parsed->toSessionArray());
+
+        $this->assertEquals($parsed->rows, $rebuilt->rows);
+
+        $beforeTheDeploy = $parsed->toSessionArray();
+
+        foreach ($beforeTheDeploy['rows'] as $index => $row) {
+            unset(
+                $beforeTheDeploy['rows'][$index]['average_pace_seconds_per_km'],
+                $beforeTheDeploy['rows'][$index]['total_ascent_meters'],
+                $beforeTheDeploy['rows'][$index]['average_heart_rate'],
+            );
+        }
+
+        $old = ParsedGarminCsv::fromSessionArray($beforeTheDeploy);
+
+        $this->assertCount(5, $old->rows);
+        $this->assertNull($old->rows[0]->averagePaceSecondsPerKm);
+        $this->assertSame($parsed->rows[0]->identityKey(), $old->rows[0]->identityKey());
+    }
+
+    public function test_a_rows_attributes_carry_only_the_metrics_the_file_recorded(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-metrics.csv'));
+
+        $this->assertSame([
+            'average_pace_seconds_per_km' => 323,
+            'total_ascent_meters' => 45,
+            'average_heart_rate' => 152,
+        ], $this->rowNamed($parsed, 'Paese Corsa')->metricAttributes());
+
+        $partial = $this->rowNamed($parsed, 'Passo illeggibile')->toAttributes();
+        $this->assertArrayNotHasKey('average_pace_seconds_per_km', $partial);
+        $this->assertSame(20, $partial['total_ascent_meters']);
+    }
+
     private function parse(string $path): ParsedGarminCsv
     {
         return app(ParseGarminCsv::class)($path, HeatmapWindow::current(), now());

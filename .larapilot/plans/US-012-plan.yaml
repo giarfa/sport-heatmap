@@ -298,8 +298,8 @@ tasks:
       5. Do **not** add Playwright, Dusk, browser, or viewport suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Coverage matches the NORMAL bar (happy path, missing values, protection of Garmin-owned rows)
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar (happy path, missing values, protection of Garmin-owned rows)
 
       ## Test Data
       - N/A — uses existing factories
@@ -312,11 +312,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
       - TASK-03
+    commit:
+      sha: 3b4f45f64defd1f440e6dca9ea1c864a396928cb
+      short_sha: 3b4f45f
+      subject: 'test(US-012): TASK-04 cover run metrics in the Strava sync'
+      committed_at: '2026-10-13T20:54:59+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3b4f45f64defd1f440e6dca9ea1c864a396928cb'
   -
     id: TASK-05
     title: 'Parse pace, ascent and heart rate from Garmin CSV exports'
@@ -633,4 +639,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T18:54:15+00:00'
+updated_at: '2026-10-13T18:54:59+00:00'
