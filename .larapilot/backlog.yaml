@@ -703,11 +703,11 @@ specs:
       title: 'Heatmap dashboard'
     priority: HIGH
     points: 8
-    status: REVIEW
+    status: DONE
     body: |
       #### US-012: Average pace, total ascent and average heart rate per run, shown in the day cell detail
 
-      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** REVIEW
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** DONE
       **Blocked by:** -
       **Type:** Feature
       **Traces to:** FR-011 (MoSCoW: Must — raised from Should) · FR-018 (extended) · FR-003 (extended) · FR-008 · FR-009 · FR-017 — no journey (the PRD has no `## User Journeys`)
@@ -726,24 +726,24 @@ specs:
       **Acceptance Criteria**
 
       _Import and sync_
-      - [ ] A Garmin export with `Passo medio` / `Ascesa totale` / `FC Media` (Italian) or `Avg Pace` / `Total Ascent` / `Avg HR` (English) stores them per run: pace as seconds per km (`"5:23"` → 323), ascent as whole metres (thousands separators handled), heart rate as whole bpm
-      - [ ] The three columns are optional: a file without them, or with `--` in them (every row of `client-materials/Activities (1).csv`), still imports and the metrics stay empty — never `0`
-      - [ ] An unreadable metric value (e.g. pace `"abc"`) leaves only that metric empty; the row still imports and is not counted as invalid
-      - [ ] The nightly Strava sync stores the same metrics for Strava runs: pace from `average_speed` (rounded to whole s/km; empty when the speed is 0 or absent), ascent from `total_elevation_gain` (rounded), heart rate from `average_heartrate` when present; Strava runs already stored gain them on the next sync
-      - [ ] **Overwrite** replaces the three metrics with the CSV's; a `--` metric in the CSV keeps the stored value; the nightly sync never reverts a Garmin-won run's metrics (FR-002)
-      - [ ] A CSV row matching an already-imported Garmin run (counted "already imported") fills only that run's empty metrics from the CSV and changes nothing already set; re-importing the same file still changes nothing
-      - [ ] The conflict review page shows pace, ascent, and heart rate side by side for the stored run and the CSV row
+      - [x] A Garmin export with `Passo medio` / `Ascesa totale` / `FC Media` (Italian) or `Avg Pace` / `Total Ascent` / `Avg HR` (English) stores them per run: pace as seconds per km (`"5:23"` → 323), ascent as whole metres (thousands separators handled), heart rate as whole bpm
+      - [x] The three columns are optional: a file without them, or with `--` in them (every row of `client-materials/Activities (1).csv`), still imports and the metrics stay empty — never `0`
+      - [x] An unreadable metric value (e.g. pace `"abc"`) leaves only that metric empty; the row still imports and is not counted as invalid
+      - [x] The nightly Strava sync stores the same metrics for Strava runs: pace from `average_speed` (rounded to whole s/km; empty when the speed is 0 or absent), ascent from `total_elevation_gain` (rounded), heart rate from `average_heartrate` when present; Strava runs already stored gain them on the next sync
+      - [x] **Overwrite** replaces the three metrics with the CSV's; a `--` metric in the CSV keeps the stored value; the nightly sync never reverts a Garmin-won run's metrics (FR-002)
+      - [x] A CSV row matching an already-imported Garmin run (counted "already imported") fills only that run's empty metrics from the CSV and changes nothing already set; re-importing the same file still changes nothing
+      - [x] The conflict review page shows pace, ascent, and heart rate side by side for the stored run and the CSV row
 
       _Day cell detail (FR-011)_
-      - [ ] Tapping, clicking, or pressing Enter/Space on a day with runs opens its detail: for each run, the name, distance (km, one decimal), moving time, pace (`5:23 /km`), ascent (`45 m`), and heart rate (`152 bpm`); a missing metric reads `—`
-      - [ ] A Strava-sourced run links to its Strava activity; a Garmin-imported run has no link (FR-008)
-      - [ ] Days with no run and future days open no detail
-      - [ ] A signed-out visitor sees the same detail, heart rate included (accepted privacy risk, PRD Privacy & legal); opening it writes no row and calls no Strava endpoint (FR-017)
-      - [ ] FR-009: usable at 375 px without horizontal page scrolling; keyboard-operable (Esc closes and returns focus to the cell); every value labelled with its unit; light and dark themes meet WCAG 2.2 AA; no imperial unit anywhere
-      - [ ] After a sync or a confirmed import the detail agrees with the grid (same cache invalidation as the grid)
+      - [x] Tapping, clicking, or pressing Enter/Space on a day with runs opens its detail: for each run, the name, distance (km, one decimal), moving time, pace (`5:23 /km`), ascent (`45 m`), and heart rate (`152 bpm`); a missing metric reads `—`
+      - [x] A Strava-sourced run links to its Strava activity; a Garmin-imported run has no link (FR-008)
+      - [x] Days with no run and future days open no detail
+      - [x] A signed-out visitor sees the same detail, heart rate included (accepted privacy risk, PRD Privacy & legal); opening it writes no row and calls no Strava endpoint (FR-017)
+      - [x] FR-009: usable at 375 px without horizontal page scrolling; keyboard-operable (Esc closes and returns focus to the cell); every value labelled with its unit; light and dark themes meet WCAG 2.2 AA; no imperial unit anywhere
+      - [x] After a sync or a confirmed import the detail agrees with the grid (same cache invalidation as the grid)
 
       _Tests_
-      - [ ] Feature tests (Strava HTTP faked): new Italian and English fixtures with metric values; the sample's `--` rows import empty metrics; an unreadable metric; Strava runs with and without heart rate and with zero speed; Overwrite keeping a stored value on `--`; backfill of an already-imported run; the day detail for a Strava run (link) and a Garmin run (no link); a signed-out view writes nothing
+      - [x] Feature tests (Strava HTTP faked): new Italian and English fixtures with metric values; the sample's `--` rows import empty metrics; an unreadable metric; Strava runs with and without heart rate and with zero speed; Overwrite keeping a stored value on `--`; backfill of an already-imported run; the day detail for a Strava run (link) and a Garmin run (no link); a signed-out view writes nothing
 
       **Notes for planning**
       - 🗄️ Mike: one reversible migration adds nullable integers `average_pace_seconds_per_km`, `total_ascent_meters`, `average_heart_rate` to `activities`.
@@ -754,7 +754,14 @@ specs:
       - { status: PLANNED, at: '2026-10-13T18:43:54+00:00' }
       - { status: 'IN PROGRESS', at: '2026-10-13T18:46:25+00:00' }
       - { status: REVIEW, at: '2026-10-13T19:07:24+00:00' }
+      - { status: DONE, at: '2026-10-13T19:39:41+00:00' }
     rework: false
+    merge_commit:
+      sha: eb547ef78fae7363b1c83f1c303994aa32ca1eed
+      short_sha: eb547ef
+      subject: 'chore(US-012): log the implement session'
+      committed_at: '2026-10-13T21:07:29+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/eb547ef78fae7363b1c83f1c303994aa32ca1eed'
   -
     code: US-013
     title: 'Previous / Next window navigation, with older Garmin runs kept'
@@ -763,11 +770,11 @@ specs:
       title: 'Heatmap dashboard'
     priority: HIGH
     points: 8
-    status: TODO
+    status: PLANNED
     body: |
       #### US-013: Previous / Next window navigation, with older Garmin runs kept
 
-      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** TODO
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** PLANNED
       **Blocked by:** -
       **Type:** Feature
       **Release:** 2.0.0
@@ -799,6 +806,9 @@ specs:
       - [ ] A signed-out visitor navigates the same way; navigating writes no row, calls no Strava endpoint, and triggers no token refresh (FR-017)
       - [ ] Both controls are keyboard-reachable links named "Previous 4 weeks" and "Next 4 weeks"; a disabled control is announced as disabled and is not a link
       - [ ] At 375 px the controls and grid cause no horizontal page scroll; both themes meet WCAG 2.2 AA contrast for the controls (FR-009)
+    status_history:
+      - { status: PLANNED, at: '2026-10-13T19:48:10+00:00' }
+    rework: false
   -
     code: US-014
     title: 'Weekly mileage trend beside the heatmap'
