@@ -770,11 +770,11 @@ specs:
       title: 'Heatmap dashboard'
     priority: HIGH
     points: 8
-    status: REVIEW
+    status: DONE
     body: |
       #### US-013: Previous / Next window navigation, with older Garmin runs kept
 
-      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** REVIEW
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** DONE
       **Blocked by:** -
       **Type:** Feature
       **Release:** 2.0.0
@@ -791,26 +791,33 @@ specs:
       After implementing this spec, importing a full Garmin Connect export and pressing Previous shows the 16-week window ending 4 weeks earlier, with that period's runs, weekly totals, legend, and date range, down to the window holding the oldest stored run; Next walks forward again and stops on the current window.
 
       **Acceptance Criteria**
-      - [ ] The home page opens on the current window, ending on the current week (unchanged)
-      - [ ] Previous shows the 16-week window ending 4 weeks earlier; Next moves 4 weeks forward and never past the current window
-      - [ ] Next is disabled on the current window; Previous is disabled once the shown window holds the athlete's oldest stored run, or when no run is stored
-      - [ ] The shown period is always stated above the grid as a date range (e.g. "18 May – 6 Sep 2026")
-      - [ ] Each window has its own URL on the home page, so a reload or a shared link keeps it; a future, malformed, or unparseable window renders the current window without an error, and a mid-week date is read as that week
-      - [ ] A past window renders no out-of-range future cells and no partial week total
-      - [ ] The legend and intensity scale are computed from the shown window only (FR-006)
-      - [ ] The sync status is the same on every window
-      - [ ] Garmin CSV import: running rows dated today or earlier are kept at any age; only future-dated rows are skipped, and the summary counts them as "future-dated" instead of "outside-window"
-      - [ ] Older runs go through the same conflict review, Overwrite / Skip, and re-import rules as runs in the current window
-      - [ ] After a confirmed Garmin import or a Strava sync, every window of that athlete shows the new data; no cached window grid survives the write
-      - [ ] The Strava sync still fetches and reconciles only the current 112 days and never deletes an activity outside them
-      - [ ] A signed-out visitor navigates the same way; navigating writes no row, calls no Strava endpoint, and triggers no token refresh (FR-017)
-      - [ ] Both controls are keyboard-reachable links named "Previous 4 weeks" and "Next 4 weeks"; a disabled control is announced as disabled and is not a link
-      - [ ] At 375 px the controls and grid cause no horizontal page scroll; both themes meet WCAG 2.2 AA contrast for the controls (FR-009)
+      - [x] The home page opens on the current window, ending on the current week (unchanged)
+      - [x] Previous shows the 16-week window ending 4 weeks earlier; Next moves 4 weeks forward and never past the current window
+      - [x] Next is disabled on the current window; Previous is disabled once the shown window holds the athlete's oldest stored run, or when no run is stored
+      - [x] The shown period is always stated above the grid as a date range (e.g. "18 May – 6 Sep 2026")
+      - [x] Each window has its own URL on the home page, so a reload or a shared link keeps it; a future, malformed, or unparseable window renders the current window without an error, and a mid-week date is read as that week
+      - [x] A past window renders no out-of-range future cells and no partial week total
+      - [x] The legend and intensity scale are computed from the shown window only (FR-006)
+      - [x] The sync status is the same on every window
+      - [x] Garmin CSV import: running rows dated today or earlier are kept at any age; only future-dated rows are skipped, and the summary counts them as "future-dated" instead of "outside-window"
+      - [x] Older runs go through the same conflict review, Overwrite / Skip, and re-import rules as runs in the current window
+      - [x] After a confirmed Garmin import or a Strava sync, every window of that athlete shows the new data; no cached window grid survives the write
+      - [x] The Strava sync still fetches and reconciles only the current 112 days and never deletes an activity outside them
+      - [x] A signed-out visitor navigates the same way; navigating writes no row, calls no Strava endpoint, and triggers no token refresh (FR-017)
+      - [x] Both controls are keyboard-reachable links named "Previous 4 weeks" and "Next 4 weeks"; a disabled control is announced as disabled and is not a link
+      - [x] At 375 px the controls and grid cause no horizontal page scroll; both themes meet WCAG 2.2 AA contrast for the controls (FR-009)
     status_history:
       - { status: PLANNED, at: '2026-10-13T19:48:10+00:00' }
       - { status: 'IN PROGRESS', at: '2026-10-13T19:56:04+00:00' }
       - { status: REVIEW, at: '2026-10-13T20:09:33+00:00' }
+      - { status: DONE, at: '2026-10-13T20:16:43+00:00' }
     rework: false
+    merge_commit:
+      sha: d4f5881ef349d9afa0b4f95d027679dcdd6b79c3
+      short_sha: d4f5881
+      subject: 'chore(US-013): move to REVIEW and log the implement session'
+      committed_at: '2026-10-13T22:09:36+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d4f5881ef349d9afa0b4f95d027679dcdd6b79c3'
   -
     code: US-014
     title: 'Weekly mileage trend beside the heatmap'
