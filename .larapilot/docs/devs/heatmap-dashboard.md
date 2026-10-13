@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-013` — 2026-10-13 |
+| **Last updated by** | `US-014` — 2026-10-13 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -192,6 +192,8 @@ calibrated bands, upper-inclusive.
 | Daily totals | `app/Support/Heatmap/DailyRunningDistance.php` | One grouped aggregate query |
 | Day runs | `app/Support/Heatmap/DailyRuns.php`, `app/Data/Heatmap/DayRun.php` | One query per cache miss for the window's runs, grouped by day in start order; `DayRun` is a scalars-only run with its formatting (`kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()` — null when not recorded — and the Strava link from `Activity::stravaUrl()`) |
 | Navigation | `app/Support/Heatmap/OldestRunDate.php`, `app/Data/Heatmap/WindowNavigation.php` | The oldest stored run (one `MIN`, outside the cache) and the heading, title, empty note and Previous / Next URLs of the shown window |
+| Weekly trend | `app/Support/Heatmap/BuildWeeklyTrend.php`, `app/Data/Heatmap/WeeklyTrend.php`, `TrendBar.php`, `TrendTick.php` | `US-014`: turns the window's `WeekRow`s into the chart's bars, 4-week average, y axis and every string it prints (below) |
+| Lead-in | `app/Support/Heatmap/LeadInDistance.php` | `US-014`: the three weeks before the window in one grouped query, feeding the first averages |
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
@@ -204,6 +206,25 @@ calibrated bands, upper-inclusive.
 
 A dashboard request costs one grouped query and one run query on a cache miss, zero on a hit, plus
 three small indexed queries for the sync status and one `MIN()` for the oldest run (`US-013`).
+
+### Weekly trend (`US-014`, FR-020)
+
+`BuildWeeklyTrend` receives the 16 `WeekRow`s, the three lead-in weekly totals in metres, the athlete's oldest run and
+the grid's date-range label, and returns a `WeeklyTrend` of numbers and strings only; Blade does no arithmetic.
+
+- **Bars** are the grid's own totals: the bar's tenths of a kilometre are read back from `WeekRow::kilometres()`, and
+  geometry (`y = 100 − km / top × 100`, two decimals) is derived from that printed value, so a bar cannot disagree
+  with its row by a rounding step.
+- **Rolling average**: week *i* is the mean of weeks *i−3 … i*, summed in integer metres and divided by 4 with half-up
+  rounding to 0.1 km (`intdiv($metres + 200, 400)`); weeks 0–2 take their missing weeks from the lead-in.
+- **History rule**: no point for the in-progress week, with no stored run, or before the week of the oldest run plus three
+  weeks. An unknown week is never averaged as 0 km, so the line starts late rather than dipping to a figure never run.
+- **Y axis**: `max` covers the bars **and** the line points; `step` is the smallest of 5, 10, 20, 25, 30, 40, 50, 75, 100,
+  150, 200 km that is ≥ max ÷ 3 (200 when none); `top = step × ⌈max ÷ step⌉`; only the top label carries the unit.
+- **Line**: returned as polyline segments, one per unbroken run of points, a lone point becoming a 4-unit tick.
+- **Empty window**: no run → no bars, ticks, or line, and `isEmpty()` is true.
+- **Lead-in query**: `LeadInDistance` is one grouped query over the 21 days before the window, bounded `>= start` and
+  `< window start`.
 
 ## Architectural choices
 
@@ -226,6 +247,9 @@ three small indexed queries for the sync status and one `MIN()` for the oldest r
 | The unavailable Previous / Next control is a disabled `<button>` (US-013) | The mockup's `<span>`; an `<a>` without `href`; `aria-disabled` on a link | A span is announced as text and an `<a>` with no `href` is neither focusable nor announced as a control; `aria-disabled` on a link still looks and tabs like one. A native disabled button is announced as disabled, is not a link, and is skipped by Tab — the acceptance criterion exactly. The look is the mockup's |
 | Previous is disabled from the athlete's oldest stored run, not from a fixed horizon (US-013) | A fixed number of windows; clamping inside `HeatmapWindow`; never disabling it | The reader should never page into a run of empty windows, and the value object cannot know the data. The cost is one `MIN()` per request, which the `(user_id, activity_date)` index serves, read outside the cache because the oldest run belongs to the athlete, not to any cached window |
 | The sync status always reads the current window (US-013) | Read the shown window | The status describes the sync, not the period on screen; a past window would otherwise show a different "Runs in window", a different empty note, and could flip the skeleton |
+| The lead-in weeks come from their own query, `LeadInDistance` (US-014) | Widen `DailyRunningDistance` by 21 days | The intensity scale is calibrated over the shown window's daily totals only (FR-006); widening that query would let weeks the reader cannot see move the legend and every cell's level. One more grouped aggregate keeps the two concerns apart |
+| Rolling average in integer metres, half-up (US-014) | Float mean and `round()` | A float mean of exact half-way values depends on summation order: the US-014 mockup README prints 24.5, 33.0 and 39.0 for weeks whose exact means are 24.55, 33.05 and 39.05 km (its generator rounded `98.19999999999999 / 4` down). Integer math reads 24.6, 33.1 and 39.1 and cannot drift; `BuildWeeklyTrendTest` pins this |
+| The line is drawn as segments, not one polyline (US-014) | A single `points` string | The history and partial-week rules only cut the ends of the line today, but a single polyline would draw straight across any future gap; splitting at every missing point makes that impossible by construction |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
 | CSV-only athlete: latest import = newest `updated_at` of its `garmin_csv` activities (US-011) | A `users.garmin_imported_at` column | No migration for one stamp; the cost is that a re-import that changes nothing does not move it |
 | CSV-only athlete ignores `sync_runs` | Show the instance-wide sync state | `sync_runs` describe the Strava sync, which never selects this athlete — a failed or stale sync of someone else would put a false warning over a map only imports change |
