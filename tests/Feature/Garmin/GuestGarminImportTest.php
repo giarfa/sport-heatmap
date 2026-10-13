@@ -120,6 +120,24 @@ class GuestGarminImportTest extends TestCase
         $this->confirm($review)->assertRedirect(route('garmin.import.summary'));
     }
 
+    public function test_a_guest_review_hides_the_stored_runs_metrics_too(): void
+    {
+        $stored = $this->storedClashingRun($this->allowlistedAthlete());
+        $stored->update([
+            'average_pace_seconds_per_km' => 331,
+            'total_ascent_meters' => 62,
+            'average_heart_rate' => 150,
+        ]);
+
+        $this->upload($this->csv([self::SAMPLE_FIRST_ROW]));
+        $review = $this->review();
+
+        $review->assertDontSee('5:31 /km');
+        $review->assertDontSee('62 m');
+        $review->assertDontSee('150 bpm');
+        $this->assertSame(1, substr_count((string) $review->getContent(), 'Avg pace'), 'Only the file side carries the metric rows.');
+    }
+
     public function test_the_signed_in_owner_review_still_shows_every_stored_detail(): void
     {
         $owner = $this->allowlistedAthlete();

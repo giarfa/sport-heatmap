@@ -401,31 +401,37 @@ tasks:
       6. `php artisan test --compact tests/Feature/Garmin`
 
       ## Completion Criteria
-      - [ ] Overwrite: CSV metrics win; a `--` metric keeps the stored value
-      - [ ] Already imported: only empty metrics filled; nothing set changes; re-import of the same file changes nothing
-      - [ ] Summary counts unchanged; backfilled runs still count as "already imported"
-      - [ ] Grid cache forgotten after a backfill-only import
-      - [ ] Review page shows the three metrics side by side, `—` for missing, matches the mockup at 375 / 768 / 1280 px (manual smoke)
-      - [ ] Tests pass
+      - [x] Overwrite: CSV metrics win; a `--` metric keeps the stored value
+      - [x] Already imported: only empty metrics filled; nothing set changes; re-import of the same file changes nothing
+      - [x] Summary counts unchanged; backfilled runs still count as "already imported"
+      - [x] Grid cache forgotten after a backfill-only import
+      - [x] Review page shows the three metrics side by side, `—` for missing, matches the mockup at 375 / 768 / 1280 px (manual smoke)
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`: Overwrite and backfill rules for metrics, why `--` keeps the stored value, cache invalidation on backfill, review page columns
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`: Overwrite and backfill rules for metrics, why `--` keeps the stored value, cache invalidation on backfill, review page columns
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-012): TASK-06 apply run metrics on overwrite and backfill`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 4
     dependencies:
       - TASK-01
       - TASK-05
+    commit:
+      sha: 42ecacb1dcad5a7a6dceb71b1f7a4599a782b56f
+      short_sha: 42ecacb
+      subject: 'feat(US-012): TASK-06 apply run metrics on overwrite and backfill'
+      committed_at: '2026-10-13T20:57:57+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/42ecacb1dcad5a7a6dceb71b1f7a4599a782b56f'
   -
     id: TASK-07
     title: 'Feature tests: Garmin import metrics'
@@ -645,4 +651,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T18:56:39+00:00'
+updated_at: '2026-10-13T18:57:57+00:00'
