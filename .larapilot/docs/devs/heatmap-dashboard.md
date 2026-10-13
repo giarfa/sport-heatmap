@@ -66,8 +66,8 @@ share stops working.
       Next is a link only on an earlier window, and points at plain `/` when it
       reaches the current one, so the current window has one address.
    5. `dashboard.blade.php` renders the chip, an optional warning, the grid (or
-      the skeleton during a first sync), `<x-day-detail>`, the legend, and the
-      sync detail card. An empty current window keeps the sync-specific note; an
+      the skeleton during a first sync), `<x-day-detail>`, and the rail: legend →
+      weekly trend → sync detail card (`US-014`). An empty current window keeps the sync-specific note; an
       empty earlier window says "No runs stored in these 16 weeks." (`$grid->hasRuns()`).
 
 ### Window navigation (`US-013`, FR-019)
@@ -202,7 +202,7 @@ calibrated bands, upper-inclusive.
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
 | Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v4:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
-| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
+| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `weekly-trend`, `weekly-trend-skeleton`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Config | `config/heatmap.php` | Literals `window_weeks` (16), `navigation_step_weeks` (4) and `grid_cache_ttl` (86 400) |
 | Tests | `tests/Feature/Dashboard/*`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
@@ -226,6 +226,21 @@ the grid's date-range label, and returns a `WeeklyTrend` of numbers and strings 
   150, 200 km that is ≥ max ÷ 3 (200 when none); `top = step × ⌈max ÷ step⌉`; only the top label carries the unit.
 - **Line**: returned as polyline segments, one per unbroken run of points, a lone point becoming a 4-unit tick.
 - **Empty window**: no run → no bars, ticks, or line, and `isEmpty()` is true.
+
+The card (`components/weekly-trend.blade.php`, markup only) is the third rail card, beside the grid from `lg` and stacked
+under the legend below it. It has four states: the chart; the empty window ("No runs in this window, so there is
+nothing to chart.", heading kept, no axis); the first-sync skeleton (`weekly-trend-skeleton`, 16 `aria-hidden` bars,
+shown whenever the grid shows its own); and absent, because the connect screen renders no dashboard.
+
+Accessibility contract the markup must keep: the `<section>` is named by its `h3`; the SVG is a `role="group"` named by its
+`<title>`; each bar is a `<g role="img">` whose `<title>` is its accessible name (and the pointer tooltip); gridlines,
+baseline and line are `aria-hidden`; the visible, collapsed-by-default `<details>` "Weekly figures" table is the text
+alternative. Partial is never colour alone (washed fill, dashed outline, a `partial` tag, "partial week" in the name),
+nor is the average (a line against bars), nor a 0 km week (a stub the key names).
+
+The y labels, x labels and `partial` tag are HTML positioned in percent **outside** the SVG. The SVG is stretched with
+`preserveAspectRatio="none"` so one element fills a phone and a wide rail with no resize script; text or circles inside
+it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or lines smear on a wide rail.
 - **Lead-in query**: `LeadInDistance` is one grouped query over the 21 days before the window, bounded `>= start` and
   `< window start`.
 
@@ -252,6 +267,7 @@ the grid's date-range label, and returns a `WeeklyTrend` of numbers and strings 
 | The sync status always reads the current window (US-013) | Read the shown window | The status describes the sync, not the period on screen; a past window would otherwise show a different "Runs in window", a different empty note, and could flip the skeleton |
 | The lead-in weeks come from their own query, `LeadInDistance` (US-014) | Widen `DailyRunningDistance` by 21 days | The intensity scale is calibrated over the shown window's daily totals only (FR-006); widening that query would let weeks the reader cannot see move the legend and every cell's level. One more grouped aggregate keeps the two concerns apart |
 | Rolling average in integer metres, half-up (US-014) | Float mean and `round()` | A float mean of exact half-way values depends on summation order: the US-014 mockup README prints 24.5, 33.0 and 39.0 for weeks whose exact means are 24.55, 33.05 and 39.05 km (its generator rounded `98.19999999999999 / 4` down). Integer math reads 24.6, 33.1 and 39.1 and cannot drift; `BuildWeeklyTrendTest` pins this |
+| The chart is server-rendered inline SVG in a Blade component (US-014) | Chart.js / ApexCharts; a client-rendered canvas | A charting library is a new frontend dependency the Technical Architecture rules out, would need its own accessible text alternative, and would draw nothing for a guest with scripts off. One SVG of about 20 elements costs no script, no font, no service |
 | The line is drawn as segments, not one polyline (US-014) | A single `points` string | The history and partial-week rules only cut the ends of the line today, but a single polyline would draw straight across any future gap; splitting at every missing point makes that impossible by construction |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
 | CSV-only athlete: latest import = newest `updated_at` of its `garmin_csv` activities (US-011) | A `users.garmin_imported_at` column | No migration for one stamp; the cost is that a re-import that changes nothing does not move it |

@@ -37,10 +37,15 @@
             </section>
             <x-day-detail :grid="$grid" />
         @endif
-        <aside class="rail" aria-label="Legend and sync detail">
+        <aside class="rail" aria-label="Legend, weekly trend and sync detail">
             <div class="card p-4">
                 <x-heatmap-legend :scale="$grid->scale" />
             </div>
+            @if ($status->showsSkeleton())
+                <x-weekly-trend-skeleton />
+            @else
+                <x-weekly-trend :trend="$grid->trend" />
+            @endif
             <div class="card p-4">
                 <x-sync-detail :status="$status" />
             </div>

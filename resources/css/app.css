@@ -653,6 +653,271 @@ html.dark {
     color: var(--ink-muted);
 }
 
+/* ---- Weekly trend -----------------------------------------------------------
+   Server-rendered SVG, no chart library. The plot is a viewBox of 160 x 100
+   user units — 16 week slots of 10 units, bars 6 wide at x = slot*10 + 2,
+   y = 100 - km/top*100 — stretched to the card with preserveAspectRatio="none",
+   so the chart fills any width without a resize script. Two consequences
+   that are load-bearing:
+   1. Every stroke carries vector-effect: non-scaling-stroke, or lines would
+      smear horizontally on a wide rail and thin out on a phone.
+   2. No text and no circles live inside the SVG — both would distort. Axis
+      labels and the "partial" tag are HTML positioned in percent, which is
+      the same coordinate the SVG uses.
+   Colours: bars are --lv-2 (3.64:1 on the light card, 4.04:1 on the dark
+   card — clears the 3:1 non-text bar), the average line is --ink (4.9:1 over
+   a light bar, 4.2:1 over a dark one) with a card-coloured halo so it
+   separates from bars it crosses. No new token. */
+.trend-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.trend-note,
+.trend-empty {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+}
+
+.trend-note strong {
+    font-weight: 600;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.trend-chart {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+    grid-template-rows: 9rem auto;
+    margin-top: 0.75rem;
+}
+
+.trend-y {
+    position: relative;
+    font-size: 0.625rem;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.trend-y span {
+    position: absolute;
+    right: 0.375rem;
+    transform: translateY(50%);
+    white-space: nowrap;
+    line-height: 1;
+}
+
+.trend-plot {
+    position: relative;
+}
+
+.trend-plot svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.trend-plot svg * {
+    vector-effect: non-scaling-stroke;
+}
+
+.trend-gridline {
+    stroke: var(--hairline);
+    stroke-width: 1;
+}
+
+.trend-baseline {
+    stroke: var(--ink-muted);
+    stroke-width: 1;
+}
+
+.trend-bar {
+    fill: var(--lv-2);
+}
+
+/* Partial = the same bar, washed fill + dashed outline + the "partial" tag:
+   three cues, none of them hue. The outline carries the 3:1 contrast. */
+.trend-bar--partial {
+    fill: color-mix(in srgb, var(--lv-2) 30%, transparent);
+    stroke: var(--lv-2);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 2;
+}
+
+/* A 0 km week is a 3 px stub on the baseline in the bar colour — present,
+   flat, never a gap. */
+.trend-zero {
+    stroke: var(--lv-2);
+    stroke-width: 3;
+}
+
+.trend-line-halo,
+.trend-line {
+    fill: none;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.trend-line-halo {
+    stroke: var(--surface-card);
+    stroke-width: 5;
+}
+
+.trend-line {
+    stroke: var(--ink);
+    stroke-width: 2;
+}
+
+/* Same words and casing as the grid's .hm-partial (FR-005 convention). The
+   card-coloured plate masks the line if the two ever meet. */
+.trend-partial-tag {
+    position: absolute;
+    right: 0;
+    padding: 0 0.125rem;
+    border-radius: 0.125rem;
+    background: var(--surface-card);
+    font-size: 0.5625rem;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+}
+
+/* Four labels, one per 4-week step — the same step Previous / Next moves.
+   5% padding = the 2-unit bar offset inside a 40-unit group, so each label
+   starts flush with its bar. */
+.trend-x {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-top: 0.375rem;
+    font-size: 0.625rem;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.trend-x span {
+    padding-left: 5%;
+    white-space: nowrap;
+}
+
+.trend-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1rem;
+    margin-top: 0.75rem;
+    font-size: 0.6875rem;
+    color: var(--ink-muted);
+}
+
+.trend-key li {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.trend-key-swatch {
+    flex: none;
+    display: inline-block;
+}
+
+.trend-key-swatch--bar {
+    width: 0.5rem;
+    height: 0.75rem;
+    background: var(--lv-2);
+}
+
+.trend-key-swatch--line {
+    width: 1rem;
+    height: 2px;
+    background: var(--ink);
+}
+
+.trend-key-swatch--partial {
+    width: 0.5rem;
+    height: 0.75rem;
+    background: color-mix(in srgb, var(--lv-2) 30%, transparent);
+    border: 1.5px dashed var(--lv-2);
+}
+
+.trend-key-swatch--zero {
+    width: 0.5rem;
+    height: 3px;
+    background: var(--lv-2);
+}
+
+/* The text alternative is visible to everyone, collapsed by default: native
+   <details>, no script. The summary row is the 44 px target. */
+.trend-figures {
+    margin-top: 0.5rem;
+    border-top: 1px solid var(--hairline);
+}
+
+.trend-figures summary {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--accent);
+    cursor: pointer;
+}
+
+.trend-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.trend-table th,
+.trend-table td {
+    padding: 0.3125rem 0;
+    border-top: 1px solid var(--hairline);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.trend-table thead th {
+    border-top: 0;
+    font-weight: 600;
+    color: var(--ink-muted);
+}
+
+.trend-table th:first-child {
+    text-align: left;
+    font-weight: 500;
+}
+
+.trend-table-partial {
+    margin-left: 0.25rem;
+    font-size: 0.5625rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+}
+
+.trend-plot--skeleton {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.trend-plot--skeleton span {
+    display: block;
+    flex: 1;
+}
+
+@media (min-width: 1024px) {
+    .trend-chart {
+        grid-template-rows: 10rem auto;
+    }
+}
+
 /* ---- Sync status ------------------------------------------------------------
    The header chip, the amber warning banner and the rail's sync detail card,
    plus the skeleton the grid card shows while a first sync is in flight. */
