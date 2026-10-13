@@ -250,29 +250,35 @@ tasks:
       5. `php artisan test --compact tests/Unit/Data/StravaActivityTest.php`
 
       ## Completion Criteria
-      - [ ] Strava runs carry the three metrics after a sync; missing values stay null
-      - [ ] Already-stored Strava runs gain them through the existing `updateOrCreate`
-      - [ ] Garmin-won twins and late-linked Garmin runs keep their metrics
-      - [ ] No OAuth scope or config change
-      - [ ] Tests pass
+      - [x] Strava runs carry the three metrics after a sync; missing values stay null
+      - [x] Already-stored Strava runs gain them through the existing `updateOrCreate`
+      - [x] Garmin-won twins and late-linked Garmin runs keep their metrics
+      - [x] No OAuth scope or config change
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema change in this task (columns come from TASK-02)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/activity-sync.md`: functional flow (metrics mapping and rounding), invariant "the sync never writes metrics on a Garmin-owned row", note that the first post-deploy sync counts backfilled rows as upserted
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/activity-sync.md`: functional flow (metrics mapping and rounding), invariant "the sync never writes metrics on a Garmin-owned row", note that the first post-deploy sync counts backfilled rows as upserted
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-012): TASK-03 store run metrics from the Strava sync`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Matt
     estimate_hours: 2
     dependencies:
       - TASK-02
+    commit:
+      sha: 3c12255f2c9ab7486d5e6f31d494d64175c0f266
+      short_sha: 3c12255
+      subject: 'feat(US-012): TASK-03 store run metrics from the Strava sync'
+      committed_at: '2026-10-13T20:54:14+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3c12255f2c9ab7486d5e6f31d494d64175c0f266'
   -
     id: TASK-04
     title: 'Feature tests: Strava sync metrics'
@@ -627,4 +633,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T18:53:21+00:00'
+updated_at: '2026-10-13T18:54:15+00:00'
