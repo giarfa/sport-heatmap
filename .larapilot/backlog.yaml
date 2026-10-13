@@ -770,11 +770,11 @@ specs:
       title: 'Heatmap dashboard'
     priority: HIGH
     points: 8
-    status: PLANNED
+    status: 'IN PROGRESS'
     body: |
       #### US-013: Previous / Next window navigation, with older Garmin runs kept
 
-      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** PLANNED
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** IN PROGRESS
       **Blocked by:** -
       **Type:** Feature
       **Release:** 2.0.0
@@ -808,6 +808,7 @@ specs:
       - [ ] At 375 px the controls and grid cause no horizontal page scroll; both themes meet WCAG 2.2 AA contrast for the controls (FR-009)
     status_history:
       - { status: PLANNED, at: '2026-10-13T19:48:10+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-13T19:56:04+00:00' }
     rework: false
   -
     code: US-014
