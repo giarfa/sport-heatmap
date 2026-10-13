@@ -584,4 +584,17 @@ decisions:
     source: askquestion
     spec: US-014
     supersedes: null
-updated_at: '2026-10-12T20:14:42+00:00'
+  -
+    id: 117b78c0ccbc7128
+    ts: '2026-10-13T18:33:21+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release of us-012'
+    label: 'release of US-012'
+    value: 2.0.0
+    question: null
+    rationale: null
+    source: chat
+    spec: US-012
+    supersedes: null
+updated_at: '2026-10-13T18:33:21+00:00'
