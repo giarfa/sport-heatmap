@@ -154,11 +154,11 @@ The files are compiled for the project and hold only the rules its settings call
 
 - New product or PRD → `larapilot-inception` (client docs in `.larapilot/client-materials/`, legacy snapshots in `.larapilot/legacy/`)
 - Existing Laravel app with no PRD → `larapilot-adopt`
-- One new feature → `larapilot-feature`. A bug → `larapilot-bug`. A request that may be either → `larapilot-triage`, which classifies it and hands off. Security findings from Aikido → `larapilot-aikido`, errors in production from the tracker of the project (Boogle, Sentry, …) → `larapilot-error`, which asks which tracker when none is set: each downloads them, has the user confirm, and hands them to triage group by group
+- One new feature → `larapilot-feature`. A bug → `larapilot-bug`. A request that may be either → `larapilot-triage`, which classifies it and hands off. Security findings from the scanner the project associates (Aikido or Hackly) → `larapilot-security`, errors in production from the tracker of the project (Boogle, Sentry, …) → `larapilot-error`, which asks which tracker when none is set: each downloads them, has the user confirm, and hands them to triage group by group
 - A change to the PRD that is neither — sharpen, re-prioritize, re-scope, answer an open question, upgrade an older PRD → `larapilot-prd`. A PRD edited by hand → `larapilot-prd` to reconcile history, validation, and backlog
 - Backlog → `larapilot-spec`. Plan → `larapilot-plan`. Implement → `larapilot-implement`. Accept → `larapilot-review`
 - Mockups → `larapilot-design`. External frontend repo — a single app or a monorepo, its agent rules, a handoff to its team → `larapilot-frontend-companion`
-- Ship → `larapilot-ship`. Releases, when `release_mode` is YES → `larapilot-release`
+- Ship → `larapilot-ship`. Versions, when `release_mode` is YES — which story targets which version, where a version stands, its release notes, its release branch → `larapilot-release`; every other skill then works inside a version and names it (`.larapilot/runtime-versions.md`)
 - Upgrade Laravel → `larapilot-laravel-upgrade`, PHP → `larapilot-php-upgrade`, the database or its engine → `larapilot-db-upgrade`: each checks readiness first (`larapilot:upgrade-check`), reports the criticalities, and changes nothing until the user chooses. Vulnerable dependencies (CVE) and the SBOM → `larapilot-vendor-check`
 - Settings → `larapilot-settings`. Usage → `larapilot-usage`. Re-plan the order and the dates of delivery → `larapilot-schedule`. Quote → `larapilot-economics`
 - Tracker, Backstage, project handbook, custom skills → the matching `larapilot-*` skill
