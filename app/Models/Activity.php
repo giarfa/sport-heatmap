@@ -22,6 +22,9 @@ use Illuminate\Support\Carbon;
  * @property Carbon $start_date_local
  * @property Carbon $activity_date
  * @property ActivitySource $source
+ * @property int|null $average_pace_seconds_per_km
+ * @property int|null $total_ascent_meters
+ * @property int|null $average_heart_rate
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $user
@@ -40,6 +43,9 @@ use Illuminate\Support\Carbon;
     'start_date_local',
     'activity_date',
     'source',
+    'average_pace_seconds_per_km',
+    'total_ascent_meters',
+    'average_heart_rate',
 ])]
 class Activity extends Model
 {
@@ -108,6 +114,9 @@ class Activity extends Model
             'start_date_local' => 'datetime',
             'activity_date' => 'date',
             'source' => ActivitySource::class,
+            'average_pace_seconds_per_km' => 'integer',
+            'total_ascent_meters' => 'integer',
+            'average_heart_rate' => 'integer',
         ];
     }
 }

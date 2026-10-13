@@ -45,6 +45,55 @@ class ActivityTest extends TestCase
         $this->assertLessThanOrEqual(400, $secondsPerKilometre);
     }
 
+    public function test_the_factory_fills_realistic_run_metrics(): void
+    {
+        $activity = Activity::factory()->create()->refresh();
+
+        $this->assertEqualsWithDelta(
+            $activity->moving_time_seconds / ($activity->distance_meters / 1000),
+            $activity->average_pace_seconds_per_km,
+            1.0,
+            'The stored pace must be the pace of the moving time.',
+        );
+        $this->assertGreaterThanOrEqual(5, $activity->total_ascent_meters);
+        $this->assertLessThanOrEqual(180, $activity->total_ascent_meters);
+        $this->assertGreaterThanOrEqual(135, $activity->average_heart_rate);
+        $this->assertLessThanOrEqual(172, $activity->average_heart_rate);
+    }
+
+    public function test_the_without_metrics_state_leaves_all_three_empty_and_never_zero(): void
+    {
+        $activity = Activity::factory()->withoutMetrics()->create()->refresh();
+
+        $this->assertNull($activity->average_pace_seconds_per_km);
+        $this->assertNull($activity->total_ascent_meters);
+        $this->assertNull($activity->average_heart_rate);
+    }
+
+    public function test_the_without_heart_rate_state_keeps_pace_and_ascent(): void
+    {
+        $activity = Activity::factory()->withoutHeartRate()->create()->refresh();
+
+        $this->assertNotNull($activity->average_pace_seconds_per_km);
+        $this->assertNotNull($activity->total_ascent_meters);
+        $this->assertNull($activity->average_heart_rate);
+    }
+
+    public function test_the_run_metrics_are_mass_assignable_integers(): void
+    {
+        $activity = Activity::factory()->create();
+
+        $activity->update([
+            'average_pace_seconds_per_km' => '323',
+            'total_ascent_meters' => '45',
+            'average_heart_rate' => '152',
+        ]);
+
+        $this->assertSame(323, $activity->refresh()->average_pace_seconds_per_km);
+        $this->assertSame(45, $activity->total_ascent_meters);
+        $this->assertSame(152, $activity->average_heart_rate);
+    }
+
     public function test_it_belongs_to_a_user(): void
     {
         $user = User::factory()->create();

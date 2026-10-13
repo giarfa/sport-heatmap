@@ -597,4 +597,56 @@ decisions:
     source: chat
     spec: US-012
     supersedes: null
-updated_at: '2026-10-13T18:33:21+00:00'
+  -
+    id: 98fe4bd16f3263d6
+    ts: '2026-10-13T18:40:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'us-012 english garmin metric headers'
+    label: 'US-012 English Garmin metric headers'
+    value: 'Avg Pace / Total Ascent / Avg HR, as in the existing English fixture; unconfirmed by a real English export'
+    question: null
+    rationale: 'No official Garmin header spec; the Italian sample is real and the English names follow the same family; a real export later is a one-line fix in GarminCsvColumns'
+    source: askquestion
+    spec: US-012
+    supersedes: null
+  -
+    id: c2e7680eedc81066
+    ts: '2026-10-13T18:51:30+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-implement
+    topic: 'us-012 mockups approval'
+    label: 'US-012 mockups approval'
+    value: 'Approved as drawn: bottom sheet / centred dialog, guest review shows stored start only'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-012
+    supersedes: null
+  -
+    id: 46f30df8a6f0ac7a
+    ts: '2026-10-13T19:44:56+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'us-013 window navigation design'
+    label: 'US-013 window navigation design'
+    value: 'Adopt the US-014 mockup nav row (past-window.html, .win-nav/.win-btn) as the US-013 contract; the disabled control is a native disabled <button>, not a span'
+    question: null
+    rationale: 'US-013 has no mockup; the US-014 drawing already fits the tokens; a disabled button is announced as disabled and is not a link (AC)'
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 17affbd2ffbcf2fe
+    ts: '2026-10-13T19:44:57+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'garmin import run cap'
+    label: 'Garmin import run cap'
+    value: 'Raise ParseGarminCsv MAX_RUNS from 1000 to 5000 runs per import'
+    question: null
+    rationale: 'Older runs are now kept at any age; a full export can exceed 1000 runs; the 5 MB upload limit still bounds the file'
+    source: askquestion
+    spec: US-013
+    supersedes: null
+updated_at: '2026-10-13T19:44:57+00:00'

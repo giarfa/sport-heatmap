@@ -66,15 +66,24 @@ final readonly class ApplyGarminImport
                  * Every field the CSV carries wins, and source becomes garmin_csv,
                  * so the row really is Garmin's. strava_activity_id is not among
                  * them and stays: it is how the nightly sync recognises this twin
-                 * and leaves it alone.
+                 * and leaves it alone. The metrics follow the same rule except for
+                 * one: toAttributes() leaves out a metric the file recorded as "--",
+                 * so an empty cell keeps the stored value instead of blanking it.
                  */
                 $conflict->stored->fill($conflict->row->toAttributes())->save();
                 $overwritten++;
             }
 
+            $this->fillEmptyMetricsOfAlreadyImportedRuns($plan);
+
             return [$athlete, count($plan->newRows), $overwritten, $skipped];
         });
 
+        /*
+         * Forgotten for any import with a target, not only one that added or
+         * overwrote runs: a backfill-only import writes metrics the cached day
+         * detail carries, and the detail must agree with the grid after it.
+         */
         if ($writtenTo instanceof User) {
             $this->heatmapGridCache->forget($writtenTo, HeatmapWindow::current(), now());
         }
@@ -88,5 +97,29 @@ final readonly class ApplyGarminImport
             outsideWindow: $parsed->outsideWindow,
             invalid: $parsed->invalid,
         );
+    }
+
+    /**
+     * A file row that is already imported (same start, distance and moving time) fills
+     * only the metrics its stored run lacks.
+     *
+     * Re-importing the same export must stay a no-op, and a stored value — one the owner
+     * overwrote, or one Strava gave — is never replaced by a re-read of the file. The
+     * only thing a repeat import may add is a metric that was empty, which is how a run
+     * imported before the metrics existed gets them from a fresh export.
+     */
+    private function fillEmptyMetricsOfAlreadyImportedRuns(GarminImportPlan $plan): void
+    {
+        foreach ($plan->alreadyImportedActivities as $index => $stored) {
+            $emptyMetrics = array_filter(
+                $plan->alreadyImported[$index]->metricAttributes(),
+                static fn (int $value, string $column): bool => $stored->{$column} === null,
+                ARRAY_FILTER_USE_BOTH,
+            );
+
+            if ($emptyMetrics !== []) {
+                $stored->fill($emptyMetrics)->save();
+            }
+        }
     }
 }

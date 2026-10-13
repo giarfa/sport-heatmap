@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Pace, ascent and heart rate per run**, and a **day cell detail**. Tap, click, or press Enter or
+  Space on a day with runs on the heatmap to open its detail: each run's name, distance, moving
+  time, average pace (`5:23 /km`), total ascent (`45 m`) and average heart rate (`152 bpm`), with
+  "View on Strava" on runs that came from Strava. A bottom sheet on a phone, a centred dialog
+  from 640 px, Esc closes it. The nightly Strava sync stores the three metrics, runs already
+  stored gain them on the next sync, and the Garmin CSV import reads them from the optional
+  `Passo medio` / `Ascesa totale` / `FC Media` (or `Avg Pace` / `Total Ascent` / `Avg HR`)
+  columns. A metric that is not recorded reads "—", never 0. The review shows the metrics of the
+  stored run and the file side by side; Overwrite keeps a stored value where the file has "--",
+  and a run that was already imported gains only the metrics it lacked. Signed-out visitors see
+  the same detail, heart rate included (US-012).
+
 ### Changed
 
 - The **Garmin CSV import is open to signed-out visitors**: every visitor sees "Import Garmin CSV"

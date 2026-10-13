@@ -1,0 +1,684 @@
+code: US-012
+plan_body: |
+  **Release:** 2.0.0
+
+  ## Technical Solution
+
+  US-012 adds three per-run metrics — average pace, total ascent, average heart rate — to both import paths and surfaces them in a new day cell detail (FR-011). Delivery target is MVP: one thin vertical slice, no new package, no new JS dependency, no queue.
+
+  ### Data model (🗄️ Mike)
+  - One reversible migration on `activities`: nullable `unsignedInteger` columns `average_pace_seconds_per_km`, `total_ascent_meters`, `average_heart_rate`. `NULL` means "the source did not record it" — never `0`. No index: no query filters or sorts on them; every read still goes through `(user_id, activity_date)`.
+  - `down()` drops the three columns (SQLite drop column is supported by the installed Laravel); lossless for every other column.
+  - The existing integer PKs stay (existing schema; the UUID default applies to new models only — no new model here).
+
+  ### Strava path (🔗 Matt) — FR-003, FR-002
+  - `App\Data\StravaActivity` gains `?int $averagePaceSecondsPerKm`, `?int $totalAscentMeters`, `?int $averageHeartRate`, cast defensively in `fromApiPayload()`:
+    - pace = `round(1000 / average_speed)` when `average_speed` is numeric and `> 0`; otherwise null (zero/absent speed).
+    - ascent = `round(total_elevation_gain)` when numeric and `>= 0`; otherwise null.
+    - heart rate = `round(average_heartrate)` when numeric and `> 0`; Strava omits the key when no HR was recorded → null.
+  - `toAttributes()` carries the three keys, so `ReconcileStravaWindow`'s existing `updateOrCreate` backfills Strava runs stored before this spec on the next sync. Side effect, documented: the first sync after deploy reports those rows as upserted once (they really changed).
+  - Garmin-won twins are still skipped before any write (`$garminOwnedIds`), so the sync never reverts a Garmin-won run's metrics. A late-linked Garmin-new twin keeps writing only `strava_activity_id`: Garmin's metrics stay, empty ones included (invariant recorded in the domain doc).
+  - Scope `activity:read_all` already returns the three fields — no OAuth change, no `.env.example` change.
+
+  ### Garmin path (FR-018)
+  - `GarminCsvColumns` gains three **optional** keys per language — `avg_pace` (`Passo medio` / `Avg Pace`), `total_ascent` (`Ascesa totale` / `Total Ascent`), `avg_hr` (`FC Media` / `Avg HR`). They join `OPTIONAL_KEYS`, so they never take part in language detection and a file without them still imports. English names per decision `98fe4bd16f3263d6` (fixture headers, not yet confirmed by a real English export).
+  - `ParseGarminCsv` reads them per row with three private parsers that return `null` for missing column, `''`, `--`, or anything unreadable — never an `invalid` row:
+    - pace: `m:ss` or `h:mm:ss` (reuse the `durationSeconds()` grammar) → seconds per km; `0` → null.
+    - ascent: digits with `,` thousands separators and an optional decimal → rounded whole metres.
+    - heart rate: digits with an optional decimal → rounded whole bpm; `0` → null.
+  - `GarminCsvRow` gains the three nullable ints; `toAttributes()` includes them; `toSessionArray()` / `fromSessionArray()` carry them with `?? null` defaults so a pending upload serialized before the deploy still confirms. Identity (`isIdenticalTo`, `identityKey`) is unchanged: metrics are not part of what makes a run "the same run".
+  - `GarminCsvRow::metricAttributes()` returns only the metrics the CSV actually holds (non-null). It is what both rules below are built from.
+  - `GarminImportPlan` keeps, for each already-imported row, the stored `Activity` it matched (new `alreadyImportedActivities` map, row index => Activity). The fingerprint is unchanged (it already hashes the already-imported indexes).
+  - `ApplyGarminImport`, inside the existing transaction:
+    - **Overwrite**: `fill(toAttributes() minus the null metrics)` — a `--` metric keeps the stored value; everything else is Garmin's as today.
+    - **Already imported**: fill only the stored metrics that are null with the CSV's non-null ones; `save()` only when dirty. Nothing set is ever changed, so re-importing the same file changes nothing.
+    - The grid cache is forgotten whenever anything was written, backfill-only imports included.
+    - Summary counts are unchanged; a backfilled run still counts as "already imported" (no new counter — not in the spec).
+  - Review page: pace, ascent, heart rate side by side for the stored run and the CSV row, via new `GarminImportFormat::pace()`, `ascent()`, `heartRate()` that print `—` for null.
+
+  ### Day cell detail (✨ Joe, 🎨 Elise) — FR-011, FR-008, FR-009, FR-017
+  - New `App\Data\Heatmap\DayRun` (final readonly, scalars only): name, distance metres, moving seconds, the three metrics, `?string $stravaUrl` (from `Activity::stravaUrl()`, so the FR-008 rule stays in one place). Formatting lives on the DTO — `kilometres()` (`8.3 km`), `movingTime()`, `pace()` (`5:23 /km`), `ascent()` (`45 m`), `heartRate()` (`152 bpm`), each `—` when null — so Blade does no arithmetic, like `DayCell`.
+  - New `App\Support\Heatmap\DailyRuns`: **one** query per cache miss — `select` of the needed columns for the window, `orderBy('start_date_local')`, grouped in PHP by `activity_date` into `array<string, array<int, DayRun>>`. No relation is loaded, so no N+1. Expected volume: ≤ a few hundred rows per 112-day window.
+  - `DayCell` gains `array $runs` (`array<int, DayRun>`, empty for rest/future) and `hasDetail()` (true only for `Ran` with runs). `HeatmapBuilder` receives the runs map beside `$dailyMeters`; `DailyRunningDistance` stays the source of the distance totals (unchanged, tested aggregate).
+  - Cache: the runs are built **inside** the cached grid, so the detail and the grid share one entry and one invalidation (sync and import already call `HeatmapGridCache::forget`). `DayRun` joins `cache.serializable_classes`. The key gets a shape version (`heatmap:grid:v2:…`): an old cached `DayCell` unserialized without `$runs` would leave a readonly property uninitialized and fail in Blade until the 24 h TTL expires — the existing "incomplete class = miss" guard does not catch that case.
+  - Blade: a ran-day cell becomes a `<button type="button">` filling the `<td>` (the sr-only accessible name moves inside it; `aria-haspopup="dialog"`, `aria-controls`). Rest and future cells stay static. The detail is a native `<dialog>` per ran day, server-rendered after the table in a new `<x-day-detail>` component: heading with the date and the day total, one block per run (`<dl>` with unit-labelled values), "View on Strava" link for Strava runs only (`target="_blank" rel="noopener"`), close button 44 × 44 px.
+  - JS: a small delegated handler in `resources/js/app.js` (existing style) — click on `[data-day-detail]` → `showModal()`; the dialog's `close` event returns focus to the cell that opened it. Esc is native to `<dialog>`; Enter/Space are native to `<button>`. No Alpine, no Livewire, no package.
+  - Layout per the US-012 mockup: bottom sheet at 375 px (full width, no horizontal page scroll), centred dialog from `sm`; light and dark from the existing tokens; motion only under `prefers-reduced-motion: no-preference`. Cell size is unchanged: at 320 px cells are ≈ 26 px, above the WCAG 2.2 AA 24 × 24 px target minimum, so the grid is not shrunk (heatmap-dashboard README → "tap-through to a day drawer").
+  - Signed-out visitors get the same detail (accepted privacy risk, PRD Privacy & legal). The dashboard path stays read-only by structure: no new write, no Strava call — the detail is part of the page already rendered.
+
+  ### Personal data (⚖️ Violet)
+  Average heart rate is health data. The PRD records showing it to signed-out visitors as an accepted privacy risk on a single-owner, `noindex` instance; this spec adds no new processor, no export, no log of the values. No new legal page or consent surface.
+
+  ### Coordination with the other 2.0.0 specs
+  US-013 (window navigation) will touch `HeatmapWindow`, `ParseGarminCsv`'s window filter, and the cache key; US-014 adds the trend beside the grid. US-012 keeps its changes to those files minimal (new optional columns in the parser; a version segment in the cache key) so whichever lands second rebases with small, local conflicts — Sarah runs `release-sync` / rebases onto `release/2.0.0` before review.
+
+  ### Rejected alternatives
+  - Fetch the detail over a JSON route on open — a second cache, a second invalidation path, and a request per tap; rejected (spec: same invalidation as the grid).
+  - Alpine/Livewire for the drawer — the app has neither; rejected (Joe's note).
+  - Shrinking cells to 44 px targets — breaks the 320 px grid; rejected (mockup README).
+  - Storing pace as speed or as a float — the spec fixes whole seconds per km.
+
+  ## Git & Branching
+  - Mode: GITFLOW (no automatic push)
+  - Release: 2.0.0 — TASK-00 runs `php artisan larapilot:release-feature --semver=2.0.0 --spec=US-012 --slug=run-metrics-day-detail` (it opens `release/2.0.0`, still `planned`); branch `feature/US-012-run-metrics-day-detail` from `release/2.0.0`
+  - Per task: one Conventional Commit `type(US-012): TASK-NN …`; code, tests, and domain docs in the same commit
+  - PR toward `release/2.0.0`, prepared locally; push/remote PR only if the user asks
+  - Merge after `larapilot-review` approval; Sarah syncs with `release-sync` if `develop` or sibling 2.0.0 features moved
+
+  ## Test Data Strategy
+  - Alex/Mike update `ActivityFactory`: the definition fills realistic metrics derived from the run (pace = moving time / km, ascent 5–180 m, heart rate 135–172 bpm); new states `withoutMetrics()` (Garmin `--` sample behaviour) and `withoutHeartRate()` (Strava run with no HR strap); `garminImported()` keeps metrics unless combined with `withoutMetrics()`
+  - `TrainingBlockSeeder` (the 68-day demo block): most runs carry all three metrics; a handful have no heart rate; two Garmin-imported days with empty metrics; one day with two runs (one Strava with a link, one Garmin without) so the detail demo shows every state
+  - New fixtures: `tests/Fixtures/Garmin/activities-it-metrics.csv`, `activities-en-metrics.csv` (metric values, a thousands-separated ascent, an `h:mm:ss` pace, one unreadable pace); the verbatim client sample `activities-it.csv` stays the `--` case
+  - `php artisan migrate:fresh --seed` before the entity task's `task-done`
+
+  ## Test Strategy
+  - Bar: NORMAL — PHPUnit feature and unit tests (the project uses PHPUnit, not Pest); no Playwright, Dusk, browser, or viewport suites
+  - Strava: `Http::fake()` + `Http::preventStrayRequests()` in `setUp()`; runs with/without HR, zero/absent speed, backfill of a stored run, Garmin-won twin untouched
+  - Garmin: Italian and English metric fixtures, sample `--` rows → null (never 0), unreadable metric → row imported, not invalid; Overwrite keeps stored value on `--`; backfill of an already-imported run; second re-import changes nothing; review page shows the three metrics side by side
+  - Dashboard: ran-day cells are buttons, rest/future are not; detail content for a Strava run (link) and a Garmin run (no link); `—` for missing; signed-out view writes no row and makes no HTTP call; detail reflects a sync and a confirmed (backfill-only) import
+  - Unit: `StravaActivity::fromApiPayload` metric casting, `DayRun` formatting, `HeatmapBuilder` runs per cell, Garmin metric parsers
+  - Manual test handoff (Anne, in the review notes): 320/375/768/1280 px, keyboard (Tab to a cell, Enter/Space opens, Esc closes and focus returns), VoiceOver read-out, light and dark contrast
+  - Gate: `php artisan larapilot:quality` (Pint + Larastan level 5) green before review
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap the feature branch on release/2.0.0'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for this spec on release `2.0.0`: create `feature/US-012-run-metrics-day-detail` from `release/2.0.0` and prepare the internal PR description toward `release/2.0.0`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `php artisan larapilot:release-feature --semver=2.0.0 --spec=US-012 --slug=run-metrics-day-detail`
+      2. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`.
+      3. Draft internal PR title/body toward `base` (`release/2.0.0`)
+
+      ## Completion Criteria
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/2.0.0` (not `develop`)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — no behaviour change
+
+      ## Git Deliverables
+      - Commit: `chore(US-012): TASK-00 bootstrap feature branch for release/2.0.0`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+      - Commit only if the command did not already leave you on the new branch with a commit — an empty commit is optional
+    type: Impl
+    status: DONE
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+    commit:
+      sha: 6bcc276ab46c7a0ce2d39cc42ac0f8c9c963943c
+      short_sha: 6bcc276
+      subject: 'chore(US-012): TASK-00 bootstrap feature branch for release/2.0.0'
+      committed_at: '2026-10-13T20:46:34+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6bcc276ab46c7a0ce2d39cc42ac0f8c9c963943c'
+  -
+    id: TASK-01
+    title: 'Mockups: day cell detail and the metric rows of the import review (mobile first, light + dark)'
+    body: |-
+      ## Description
+      Elise draws the day cell detail (FR-011) and the three new metric rows of the Garmin conflict review as static HTML in the existing visual language of `.larapilot/mockups/heatmap-dashboard/` — the same Tailwind tokens, `card` surface, indigo focus/link accent, Inter with tabular numbers; no new design system. Joe annotates the implementable pattern (native `<dialog>`, bottom sheet ≤ 639 px, centred dialog from `sm`). The user approves the screens before TASK-06 and TASK-09 build from them.
+
+      ## Files Involved
+      - .larapilot/mockups/US-012/README.md (Fidelity contract, screen table, breakpoints, a11y notes, Deviations)
+      - .larapilot/mockups/US-012/day-detail.html (375 px primary: one run; two runs — Strava with "View on Strava", Garmin without; a run with `—` metrics)
+      - .larapilot/mockups/US-012/dark.html (same screen stamped dark)
+      - .larapilot/mockups/US-012/breakpoints.html (320 / 375 / 768 / 1280 iframes)
+      - .larapilot/mockups/US-012/review-metrics.html (US-008 review table with pace / ascent / heart rate rows, stored vs CSV, at 375 px and desktop)
+      - .larapilot/mockups/US-012/favicon.svg (copy of the dashboard asset, as sibling folders do)
+
+      ## Steps
+      1. Read `.larapilot/mockups/heatmap-dashboard/README.md` (ramp, grid geometry, a11y) and `.larapilot/mockups/US-008/README.md` (review table)
+      2. Draw the cell focus/hover state of a tappable ran day without changing cell size or the ramp; rest and future cells stay non-interactive
+      3. Detail: date heading + day total, per run name / distance (km, one decimal) / moving time / pace `5:23 /km` / ascent `45 m` / heart rate `152 bpm`, `—` for missing; close button 44 × 44 px; Strava link copy per the brand guidelines; Esc and focus-return annotated
+      4. Mobile first: 375 px bottom sheet, no horizontal page scroll; `sm`+ centred dialog; reduced-motion note
+      5. Light + dark, WCAG 2.2 AA contrast noted for text and the backdrop; no imperial unit anywhere
+      6. Present the screens to the user; record approval (and any deviation) in the README
+
+      ## Completion Criteria
+      - [x] Day detail drawn at 375 px (primary) and desktop, light and dark
+      - [x] Review page metric rows drawn
+      - [x] README documents breakpoints, a11y contract, and the `Mirrors:` targets for TASK-06 / TASK-09
+      - [x] User approved the screens
+
+      ## Test Data
+      - N/A — static mockups
+
+      ## Domain Docs
+      - N/A — mockups do not change domain behaviour
+
+      ## Git Deliverables
+      - Commit: `chore(US-012): TASK-01 add the day cell detail mockups`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Elise
+    estimate_hours: 3
+    dependencies:
+      - TASK-00
+    commit:
+      sha: 6582569a380d6298da6bce1f23b17e20c2714941
+      short_sha: '6582569'
+      subject: 'chore(US-012): TASK-01 add the day cell detail mockups'
+      committed_at: '2026-10-13T20:51:30+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6582569a380d6298da6bce1f23b17e20c2714941'
+  -
+    id: TASK-02
+    title: 'Add the three metric columns to activities, with factory and seeder'
+    body: |-
+      ## Description
+      Add nullable `average_pace_seconds_per_km`, `total_ascent_meters`, `average_heart_rate` to `activities`, expose them on `Activity`, and keep the demo dataset coherent.
+
+      ## Files Involved
+      - database/migrations/xxxx_add_run_metrics_to_activities_table.php (`php artisan make:migration add_run_metrics_to_activities_table --table=activities --no-interaction`)
+      - app/Models/Activity.php
+      - database/factories/ActivityFactory.php
+      - database/seeders/TrainingBlockSeeder.php
+      - tests/Feature/Database/SchemaTest.php
+      - tests/Feature/Database/TrainingBlockSeederTest.php
+      - tests/Unit/Models/ActivityTest.php
+
+      ## Steps
+      1. Migration: three `unsignedInteger(...)->nullable()` columns; `down()` drops them; block comment on why no index and why null ≠ 0
+      2. `Activity`: add to `#[Fillable]` (they are values, not identity), `'integer'` casts, `@property int|null` lines in the class docblock (Larastan's only type source)
+      3. Factory: definition fills realistic metrics derived from the generated run (pace = moving time / km, ascent 5–180 m, heart rate 135–172 bpm); states `withoutMetrics()` and `withoutHeartRate()`
+      4. `TrainingBlockSeeder`: metrics on most runs, a few without HR, two Garmin days with empty metrics, one day with a Strava run and a Garmin run
+      5. `php artisan migrate:fresh --seed`; `php artisan migrate:rollback --step=1 && php artisan migrate` to prove reversibility
+      6. `php artisan test --compact tests/Feature/Database tests/Unit/Models/ActivityTest.php`
+
+      ## Completion Criteria
+      - [x] Migration reversible; columns nullable; no default `0`
+      - [x] `Activity` fillable, casts, and docblock in sync with the migration
+      - [x] `ActivityFactory` produces realistic metrics; `withoutMetrics()` / `withoutHeartRate()` states exist
+      - [x] Seeder demo covers every detail state (all metrics, no HR, no metrics, Strava + Garmin on one day)
+      - [x] `migrate:fresh --seed` succeeds
+      - [x] Tests pass
+
+      ## Test Data
+      - [x] `database/factories/ActivityFactory.php` updated with metrics and the two new states
+      - [x] `TrainingBlockSeeder` composes them into the demo block
+      - [x] Factory and seeder updated in **this same task** as the migration
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/activity-sync.md` → `### Data model`: the three columns, units, null = not recorded, why no index
+      - [x] Folder `README.md` index row updated (`US-012`)
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-012): TASK-02 add run metric columns with factory and seeder`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Mike
+    estimate_hours: 2
+    dependencies:
+      - TASK-00
+    commit:
+      sha: ce4ee783ff3f1ee33d00576392294402efa94580
+      short_sha: ce4ee78
+      subject: 'feat(US-012): TASK-02 add run metric columns with factory and seeder'
+      committed_at: '2026-10-13T20:53:21+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ce4ee783ff3f1ee33d00576392294402efa94580'
+  -
+    id: TASK-03
+    title: 'Store pace, ascent and heart rate from the Strava sync'
+    body: |-
+      ## Description
+      Carry `average_speed`, `total_elevation_gain`, and `average_heartrate` across the Strava boundary as whole-number metrics, so the nightly sync stores them for new runs and backfills runs already stored (FR-003), without touching Garmin-won twins (FR-002).
+
+      ## Files Involved
+      - app/Data/StravaActivity.php
+      - app/Actions/Strava/ReconcileStravaWindow.php (comment only, unless a change proves necessary)
+      - tests/Unit/Data/StravaActivityTest.php
+
+      ## Steps
+      1. Add `?int $averagePaceSecondsPerKm`, `?int $totalAscentMeters`, `?int $averageHeartRate` to the constructor; cast in `fromApiPayload()` per the plan (pace `round(1000 / speed)` only when speed is numeric and `> 0`; ascent rounded when numeric and `>= 0`; HR rounded when numeric and `> 0`; otherwise null) with a block comment on why zero speed is "not recorded", not "infinitely slow"
+      2. Add the three keys to `toAttributes()` and its array-shape docblock
+      3. In `ReconcileStravaWindow`, add a block comment above the Garmin-won `continue` and the late-twin link stating that neither path writes metrics, and why
+      4. Unit tests: all three present; HR absent; speed `0` and absent; non-numeric values; rounding (`2.86 m/s` → 350 s/km, `45.6 m` → 46, `151.7` → 152)
+      5. `php artisan test --compact tests/Unit/Data/StravaActivityTest.php`
+
+      ## Completion Criteria
+      - [x] Strava runs carry the three metrics after a sync; missing values stay null
+      - [x] Already-stored Strava runs gain them through the existing `updateOrCreate`
+      - [x] Garmin-won twins and late-linked Garmin runs keep their metrics
+      - [x] No OAuth scope or config change
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema change in this task (columns come from TASK-02)
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/activity-sync.md`: functional flow (metrics mapping and rounding), invariant "the sync never writes metrics on a Garmin-owned row", note that the first post-deploy sync counts backfilled rows as upserted
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-012): TASK-03 store run metrics from the Strava sync`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Matt
+    estimate_hours: 2
+    dependencies:
+      - TASK-02
+    commit:
+      sha: 3c12255f2c9ab7486d5e6f31d494d64175c0f266
+      short_sha: 3c12255
+      subject: 'feat(US-012): TASK-03 store run metrics from the Strava sync'
+      committed_at: '2026-10-13T20:54:14+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3c12255f2c9ab7486d5e6f31d494d64175c0f266'
+  -
+    id: TASK-04
+    title: 'Feature tests: Strava sync metrics'
+    body: |-
+      ## Description
+      Add PHPUnit feature coverage for the sync storing, backfilling, and protecting run metrics, with Strava HTTP faked.
+
+      ## Files Involved
+      - tests/Feature/Strava/ReconcileStravaWindowTest.php
+      - tests/Feature/Strava/SyncStravaActivitiesCommandTest.php
+
+      ## Steps
+      1. Use existing factories (`ActivityFactory` states from TASK-02) — no new factory definitions here
+      2. `Http::fake()` + `Http::preventStrayRequests()` in `setUp()`; athletes via `allowlistedAthlete()` / `allowlistAthletes()`
+      3. Cover: a run with all three metrics; a run with no `average_heartrate`; `average_speed` `0`; a run stored before this spec (null metrics) gaining them on the next sync; a Garmin-won twin whose metrics (including null ones) are unchanged after a sync that returns different values; a late-linked Garmin-new twin keeping its metrics
+      4. `php artisan test --compact tests/Feature/Strava`
+      5. Do **not** add Playwright, Dusk, browser, or viewport suites
+
+      ## Completion Criteria
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar (happy path, missing values, protection of Garmin-owned rows)
+
+      ## Test Data
+      - N/A — uses existing factories
+
+      ## Domain Docs
+      - N/A — tests only
+
+      ## Git Deliverables
+      - Commit: `test(US-012): TASK-04 cover run metrics in the Strava sync`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 2
+    dependencies:
+      - TASK-03
+    commit:
+      sha: 3b4f45f64defd1f440e6dca9ea1c864a396928cb
+      short_sha: 3b4f45f
+      subject: 'test(US-012): TASK-04 cover run metrics in the Strava sync'
+      committed_at: '2026-10-13T20:54:59+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3b4f45f64defd1f440e6dca9ea1c864a396928cb'
+  -
+    id: TASK-05
+    title: 'Parse pace, ascent and heart rate from Garmin CSV exports'
+    body: |-
+      ## Description
+      Read the optional `Passo medio` / `Avg Pace`, `Ascesa totale` / `Total Ascent`, `FC Media` / `Avg HR` columns into each parsed run; a missing column, `--`, or an unreadable value leaves only that metric empty and never rejects the row (FR-018).
+
+      ## Files Involved
+      - app/Support/Garmin/GarminCsvColumns.php
+      - app/Support/Garmin/ParseGarminCsv.php
+      - app/Data/Garmin/GarminCsvRow.php
+      - tests/Fixtures/Garmin/activities-it-metrics.csv (new)
+      - tests/Fixtures/Garmin/activities-en-metrics.csv (new)
+      - tests/Feature/Garmin/ParseGarminCsvTest.php
+
+      ## Steps
+      1. `GarminCsvColumns`: add `avg_pace`, `total_ascent`, `avg_hr` to both header sets and to `OPTIONAL_KEYS`; check `headerSetFor()` still ignores optional keys for language detection; block comment citing decision `98fe4bd16f3263d6` (English names from the fixture, unconfirmed by a real export)
+      2. `ParseGarminCsv`: private `paceSecondsPerKm()`, `ascentMeters()`, `heartRate()` — `m:ss` / `h:mm:ss` pace (reuse the `durationSeconds()` grammar; `0` → null), ascent with `,` thousands separators and optional decimal rounded, HR digits with optional decimal rounded (`0` → null); `''` / `--` / unreadable → null; bounded digit counts so no int overflow
+      3. `GarminCsvRow`: three nullable ints in constructor, `toAttributes()`, `toSessionArray()`, `fromSessionArray()` (`?? null` so a pending upload serialized before the deploy still confirms — block comment); new `metricAttributes()` returning only the non-null metrics; identity methods unchanged
+      4. Fixtures: Italian and English exports with metric values, a `1,234` ascent, an `1:05:10` pace, one row with pace `abc`, one row with `--` metrics
+      5. Unit-level parser cases in `ParseGarminCsvTest`: `"5:23"` → 323; `"1,234"` → 1234; `"152"` → 152; `--` → null; `abc` → null and the row is still imported and not in `invalid`; a file without the three columns still parses; the verbatim client sample yields null metrics on every `Corsa` row
+      6. `php artisan test --compact tests/Feature/Garmin/ParseGarminCsvTest.php`
+
+      ## Completion Criteria
+      - [x] Both languages parse the three metrics into whole seconds/metres/bpm
+      - [x] Missing column, `--`, unreadable → that metric null, never `0`, row not counted invalid
+      - [x] Pending session uploads without the new keys still rebuild
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema change; new CSV fixtures only
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`: header table gains the three optional columns (with the English-header assumption and decision id), parsing rules per metric, "metrics are not part of run identity"
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-012): TASK-05 parse run metrics from Garmin CSV exports`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-02
+    commit:
+      sha: 5565a1c5bb6f8f755c340ad1251182cdfd9f0cbc
+      short_sha: 5565a1c
+      subject: 'feat(US-012): TASK-05 parse run metrics from Garmin CSV exports'
+      committed_at: '2026-10-13T20:56:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5565a1c5bb6f8f755c340ad1251182cdfd9f0cbc'
+  -
+    id: TASK-06
+    title: 'Apply metrics on Overwrite and backfill, and show them on the conflict review'
+    body: |-
+      ## Description
+      Overwrite replaces the stored metrics with the CSV's except where the CSV says `--`; an already-imported run gains only the metrics it lacks; the review page shows pace, ascent, and heart rate side by side.
+
+      Mirrors: `.larapilot/mockups/US-012/review-metrics.html` (on top of `.larapilot/mockups/US-008/review.html`)
+
+      ## Files Involved
+      - app/Data/Garmin/GarminImportPlan.php
+      - app/Support/Garmin/PlanGarminImport.php
+      - app/Actions/Garmin/ApplyGarminImport.php
+      - app/Support/Garmin/GarminImportFormat.php
+      - resources/views/garmin/review.blade.php
+      - resources/css/app.css (only if the review table needs a row style)
+
+      ## Steps
+      1. Read the US-012 and US-008 mockup READMEs and the review screens first; deviations are agreed with the user before coding (**Mockup fidelity**)
+      2. `GarminImportPlan`: add `array<int, Activity> $alreadyImportedActivities` (row index => matched stored run); `PlanGarminImport` fills it in the identity pass it already runs; fingerprint unchanged
+      3. `ApplyGarminImport` (same transaction): Overwrite fills `toAttributes()` without the null metrics; for each already-imported pair fill only stored-null metrics from `metricAttributes()` and `save()` only when dirty; forget the grid cache whenever any row was written, a backfill-only import included; block comments on both rules
+      4. `GarminImportFormat::pace()` (`5:23 /km`), `ascent()` (`45 m`), `heartRate()` (`152 bpm`), `—` for null
+      5. Review table: three rows/columns per the mockup, stored vs CSV; mobile first, usable at 375 px, light + dark
+      6. `php artisan test --compact tests/Feature/Garmin`
+
+      ## Completion Criteria
+      - [x] Overwrite: CSV metrics win; a `--` metric keeps the stored value
+      - [x] Already imported: only empty metrics filled; nothing set changes; re-import of the same file changes nothing
+      - [x] Summary counts unchanged; backfilled runs still count as "already imported"
+      - [x] Grid cache forgotten after a backfill-only import
+      - [x] Review page shows the three metrics side by side, `—` for missing, matches the mockup at 375 / 768 / 1280 px (manual smoke)
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema change in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`: Overwrite and backfill rules for metrics, why `--` keeps the stored value, cache invalidation on backfill, review page columns
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-012): TASK-06 apply run metrics on overwrite and backfill`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 4
+    dependencies:
+      - TASK-01
+      - TASK-05
+    commit:
+      sha: 42ecacb1dcad5a7a6dceb71b1f7a4599a782b56f
+      short_sha: 42ecacb
+      subject: 'feat(US-012): TASK-06 apply run metrics on overwrite and backfill'
+      committed_at: '2026-10-13T20:57:57+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/42ecacb1dcad5a7a6dceb71b1f7a4599a782b56f'
+  -
+    id: TASK-07
+    title: 'Feature tests: Garmin import metrics'
+    body: |-
+      ## Description
+      Add PHPUnit feature coverage for importing, overwriting, backfilling, and reviewing run metrics through the HTTP import flow.
+
+      ## Files Involved
+      - tests/Feature/Garmin/GarminImportFlowTest.php
+      - tests/Feature/Garmin/GuestGarminImportTest.php (one signed-out case)
+
+      ## Steps
+      1. Use existing factories and the TASK-05 fixtures — no new factory definitions
+      2. Cover: Italian and English metric fixtures store the expected values; the verbatim sample stores null metrics (assert `null`, not `0`); an unreadable pace imports the row, counts it imported, leaves pace null; Overwrite with a `--` metric keeps the stored value and takes the others; an already-imported run gains its missing metrics and keeps the set ones; importing the same file again changes nothing (`updated_at` and values unchanged); the review page shows stored and CSV pace/ascent/HR side by side
+      3. `php artisan test --compact tests/Feature/Garmin`
+      4. Do **not** add Playwright, Dusk, browser, or viewport suites
+
+      ## Completion Criteria
+      - [x] Tests pass locally
+      - [x] Every Garmin acceptance criterion of US-012 has a test
+
+      ## Test Data
+      - N/A — uses existing factories and fixtures
+
+      ## Domain Docs
+      - N/A — tests only
+
+      ## Git Deliverables
+      - Commit: `test(US-012): TASK-07 cover run metrics in the Garmin import`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-06
+    commit:
+      sha: a76adccb6421dc7f1c21bb8aef360c28fc98082a
+      short_sha: a76adcc
+      subject: 'test(US-012): TASK-07 cover run metrics in the Garmin import'
+      committed_at: '2026-10-13T20:58:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/a76adccb6421dc7f1c21bb8aef360c28fc98082a'
+  -
+    id: TASK-08
+    title: "Carry each day's runs inside the cached heatmap grid"
+    body: |-
+      ## Description
+      Build the per-run detail data with the grid, in one extra query per cache miss, so the detail and the grid share one cache entry and one invalidation.
+
+      ## Files Involved
+      - app/Data/Heatmap/DayRun.php (new — `php artisan make:class Data/Heatmap/DayRun --no-interaction`)
+      - app/Support/Heatmap/DailyRuns.php (new)
+      - app/Data/Heatmap/DayCell.php
+      - app/Support/Heatmap/HeatmapBuilder.php
+      - app/Support/Heatmap/HeatmapGridCache.php
+      - app/Http/Controllers/DashboardController.php
+      - config/cache.php (`serializable_classes`)
+      - tests/Unit/Data/Heatmap/DayRunTest.php (new), tests/Unit/Data/Heatmap/DayCellTest.php, tests/Unit/Support/Heatmap/HeatmapBuilderTest.php, tests/Feature/Dashboard/HeatmapGridCacheTest.php
+
+      ## Steps
+      1. `DayRun` (final readonly, scalars only, `fromActivity(Activity)` factory using `Activity::stravaUrl()`): formatting methods `kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()`, `accessibleSummary()`; `—` for null
+      2. `DailyRuns`: one query — `select` the needed columns, window bounds on `activity_date`, `orderBy('start_date_local')` — grouped by date; block comment on the query shape (no relation, no per-day query)
+      3. `DayCell`: `array<int, DayRun> $runs` + `hasDetail()`; `HeatmapBuilder` takes the runs map and attaches it only to `Ran` cells
+      4. `HeatmapGridCache`: add a shape-version segment to the key (`heatmap:grid:v2:`) with a block comment on the uninitialized-readonly failure mode; add `DayRun` to `cache.serializable_classes`
+      5. `DashboardController`: the cached build closure calls `DailyRuns` beside `DailyRunningDistance`
+      6. Unit tests: `DayRun` formatting (`5:23 /km`, `45 m`, `152 bpm`, `—`, `8.3 km`), builder attaches runs only to ran days and in start order, cache key changed, the cached grid round-trips through a serializing store
+      7. `php artisan test --compact tests/Unit/Data/Heatmap tests/Unit/Support/Heatmap tests/Feature/Dashboard`
+
+      ## Completion Criteria
+      - [x] One query for the runs per cache miss; no N+1
+      - [x] Runs live inside the cached grid; sync and import invalidation cover the detail with no new call site
+      - [x] Old cache entries cannot break the dashboard after deploy
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema change in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md`: technical design (DayRun, DailyRuns, runs inside the cached grid), architectural choice (in-grid vs JSON-on-open, rejected), cache key version invariant
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-012): TASK-08 carry each day's runs in the heatmap grid`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Joe
+    estimate_hours: 3
+    dependencies:
+      - TASK-02
+    commit:
+      sha: c71213963aaa6206fc4a34304e4cdb9d85d6ad83
+      short_sha: c712139
+      subject: "feat(US-012): TASK-08 carry each day's runs in the heatmap grid"
+      committed_at: '2026-10-13T21:00:55+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c71213963aaa6206fc4a34304e4cdb9d85d6ad83'
+  -
+    id: TASK-09
+    title: 'Day cell detail: tappable ran days and the native dialog'
+    body: |-
+      ## Description
+      Make ran-day cells open a server-rendered detail listing each run with distance, moving time, pace, ascent, and heart rate; Strava runs link to Strava, Garmin runs do not; keyboard-operable, usable at 375 px, light and dark (FR-011, FR-008, FR-009).
+
+      Mirrors: `.larapilot/mockups/US-012/day-detail.html`, `.larapilot/mockups/US-012/dark.html`, `.larapilot/mockups/US-012/breakpoints.html`
+
+      ## Files Involved
+      - resources/views/components/heatmap-grid.blade.php
+      - resources/views/components/day-detail.blade.php (new)
+      - resources/views/dashboard.blade.php
+      - resources/js/app.js
+      - resources/css/app.css
+
+      ## Steps
+      1. Read the US-012 mockup README (Fidelity contract, Deviations) and every screen above first; any visible deviation is agreed with the user in chat and logged (`decision-log --topic="mockup deviation"`) before coding
+      2. Grid: a `Ran` cell with `hasDetail()` renders a `<button type="button" data-day-detail="…" aria-haspopup="dialog" aria-controls="…">` filling the `<td>` with the sr-only name inside; rest/future cells unchanged; cell size, `<colgroup>` widths, and td padding untouched (heatmap-dashboard README → grid geometry)
+      3. `<x-day-detail>`: one `<dialog>` per ran day after the table — `aria-labelledby` heading (date + day total), per run `<dl>` with unit-labelled values, `—` for missing, "View on Strava" only when `stravaUrl` is set (`target="_blank" rel="noopener"`), 44 × 44 px close button (`<form method="dialog">`)
+      4. `app.js`: delegated click → `showModal()`; on `close` return focus to the opening cell; optional backdrop-click close per the mockup; no dependency
+      5. CSS: bottom sheet below `sm`, centred dialog from `sm`, tokens from the existing theme, light + dark, motion only under `prefers-reduced-motion: no-preference`; no horizontal page scroll at 320/375 px
+      6. Smoke-check at 375, 768, 1280 px, both themes, keyboard only
+      7. `php artisan test --compact tests/Feature/Dashboard`; `npm run build`
+
+      ## Completion Criteria
+      - [x] Tap, click, Enter, Space open a ran day's detail; Esc closes and returns focus to the cell
+      - [x] Rest and future days open nothing
+      - [x] Every value labelled with its unit; missing metric reads `—`; no imperial unit
+      - [x] Strava run links to its activity; Garmin run has no link
+      - [x] Usable at 375 px without horizontal page scroll; light and dark meet WCAG 2.2 AA (manual smoke OK under NORMAL)
+      - [x] Matches the approved mockups; deviations agreed and recorded
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema change in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md`: functional flow of the detail (open/close/focus), why `<dialog>` + vanilla JS, why cells keep their size, FR-008 link rule source
+      - [x] Folder `README.md` index row updated (`US-012`)
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-012): TASK-09 open a day cell detail from the heatmap`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 5
+    dependencies:
+      - TASK-01
+      - TASK-08
+    commit:
+      sha: 1e85f802892fdd629faab0872f8ef2f05ae6a4d0
+      short_sha: 1e85f80
+      subject: 'feat(US-012): TASK-09 open a day cell detail from the heatmap'
+      committed_at: '2026-10-13T21:03:41+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1e85f802892fdd629faab0872f8ef2f05ae6a4d0'
+  -
+    id: TASK-10
+    title: 'Feature tests: day cell detail, signed-out view, cache agreement'
+    body: |-
+      ## Description
+      Add PHPUnit feature coverage for the dashboard detail, the read-only guest view, and the detail agreeing with the grid after a sync and an import.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/DayDetailTest.php (new — `php artisan make:test --phpunit DayDetailTest --no-interaction`, then move under Dashboard like its siblings)
+      - tests/Feature/Dashboard/PublicDashboardTest.php
+
+      ## Steps
+      1. Use existing factories (`withoutMetrics()`, `withoutHeartRate()`, `garminImported()`)
+      2. Cover: ran-day cells render a button with `aria-controls`, rest/future cells do not; a Strava run's detail shows name, `x.x km`, moving time, `m:ss /km`, `N m`, `N bpm` and its `strava.com/activities/{id}` link; a Garmin run shows no link; missing metrics render `—` and never `0 bpm` / `0 m`; signed-out view shows the same detail (heart rate included), writes no row (`assertDatabaseCount` before/after) and makes no HTTP call (`Http::preventStrayRequests()`); after a sync (faked) and after a backfill-only confirmed import, a fresh dashboard request shows the new metrics
+      3. `php artisan test --compact tests/Feature/Dashboard`
+      4. Write the **manual test handoff** in the review notes: 320/375/768/1280 px, keyboard path, VoiceOver read-out, light/dark contrast
+      5. Do **not** add Playwright, Dusk, browser, or viewport suites
+
+      ## Completion Criteria
+      - [x] Tests pass locally
+      - [x] Every day-detail acceptance criterion with server-side behaviour has a test; the rest are in the manual handoff
+
+      ## Test Data
+      - N/A — uses existing factories
+
+      ## Domain Docs
+      - N/A — tests only
+
+      ## Git Deliverables
+      - Commit: `test(US-012): TASK-10 cover the day cell detail`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-04
+      - TASK-07
+      - TASK-09
+    commit:
+      sha: cf9cee0148abb6120f02eadea3a84e5cdd6dae3f
+      short_sha: cf9cee0
+      subject: 'test(US-012): TASK-10 cover the day cell detail'
+      committed_at: '2026-10-13T21:04:45+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cf9cee0148abb6120f02eadea3a84e5cdd6dae3f'
+  -
+    id: TASK-11
+    title: 'CHANGELOG, domain doc index, and quality gate'
+    body: |-
+      ## Description
+      Close the spec's documentation and quality loop: CHANGELOG Unreleased entry, domain doc index current, Pint + Larastan green.
+
+      ## Files Involved
+      - CHANGELOG.md
+      - .larapilot/docs/devs/README.md
+      - .larapilot/docs/devs/activity-sync.md, garmin-csv-import.md, heatmap-dashboard.md (consistency pass only)
+
+      ## Steps
+      1. `CHANGELOG.md` → Unreleased / Added: per-run pace, ascent, heart rate from Strava and Garmin; day cell detail
+      2. Re-read the three domain docs against the final code; fix anything a later task made stale; `Last updated by: US-012`
+      3. `php artisan larapilot:quality` (Pint + Larastan level 5); fix findings
+      4. `php artisan test --compact`
+
+      ## Completion Criteria
+      - [x] CHANGELOG Unreleased updated
+      - [x] Domain docs and index describe the final behaviour
+      - [x] Quality gate and full test suite green
+
+      ## Test Data
+      - N/A — no model/schema change
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/README.md` index rows for the three domains name `US-012`
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-012): TASK-11 changelog, domain docs, and quality gate`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Albert
+    estimate_hours: 1
+    dependencies:
+      - TASK-10
+    commit:
+      sha: c1cec207d6e2d76c109a69ab11b1153ee99ca48c
+      short_sha: c1cec20
+      subject: 'chore(US-012): TASK-11 changelog, domain docs, and quality gate'
+      committed_at: '2026-10-13T21:05:28+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c1cec207d6e2d76c109a69ab11b1153ee99ca48c'
+updated_at: '2026-10-13T19:05:28+00:00'

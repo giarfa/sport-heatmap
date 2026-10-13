@@ -4,14 +4,16 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-011` — 2026-10-12 |
+| **Last updated by** | `US-012` — 2026-10-13 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
 
 The single screen of the product, served at `/` and **public**: a 16-week × 7-day
 grid of daily running distance with weekly totals, a self-calibrating intensity
-legend, and a sync status (header chip, warning banner, detail card). Signed-out
+legend, a sync status (header chip, warning banner, detail card), and a day detail
+that lists each run of a tapped day with its pace, ascent and heart rate — public
+too, heart rate included (accepted privacy risk, PRD Privacy & legal). Signed-out
 visitors see the owner's last synced map read-only; signing in is only needed to
 connect Strava. It must never present stale data as current. If it stops
 working, the owner loses the only view of their training and the link they
@@ -37,9 +39,10 @@ share stops working.
    2. `HeatmapGridCache::remember()` returns the cached `HeatmapGrid`, or builds
       it — an entry that cannot be restored as a `HeatmapGrid` (incomplete
       class, or `unserialize` throwing on a nested class, enum case, or date)
-      is reported, counts as a miss, and is overwritten: `DailyRunningDistance` (one grouped `SUM` query) →
+      is reported, counts as a miss, and is overwritten: `DailyRunningDistance` (one grouped `SUM` query) and
+      `DailyRuns` (one query for the window's runs, `US-012`) →
       `HeatmapBuilder` (rest / ran / future cells, weekly totals, partial current
-      week) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
+      week, each Ran day's runs) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
    3. `ResolveSyncStatus` reads `sync_runs` and the window's activity count
       **outside** the cache and returns a `SyncStatus`. For a **CSV-only
       athlete** (`User::isCsvOnly()`, no Strava id — US-011) it reads no
@@ -47,7 +50,39 @@ share stops working.
       the athlete's `garmin_csv` activities, and the status is
       `SyncStatus::forCsvOnly()`.
    4. `dashboard.blade.php` renders the chip, an optional warning, the grid (or
-      the skeleton during a first sync), the legend, and the sync detail card.
+      the skeleton during a first sync), `<x-day-detail>`, the legend, and the
+      sync detail card.
+
+### Day cell detail (`US-012`, FR-011)
+
+A day with at least one run (`DayCell::hasDetail()`) renders its cell as
+`<button class="hm-hit" data-day="Y-m-d" aria-haspopup="dialog">` inside the
+`<td class="hm-td hm-td--ran">`; rest and future days stay plain cells. The
+page carries **one** native `<dialog id="day-dialog">` and, per ran day, an
+inert `<template id="day-{date}">` holding that day's heading, "N runs · X km"
+sub-line and a list of runs — name, source line, and a `<dl>` of Distance,
+Moving time, Avg pace, Ascent, Heart rate (`<x-run-metric>` prints a missing
+metric as an em dash read aloud as "not recorded", never `0`). A Strava-sourced
+run adds "View on Strava" (`DayRun::$stravaUrl`, i.e. `Activity::stravaUrl()`,
+the FR-008 rule: a Garmin-sourced run never links, even when it keeps its Strava
+id); a Garmin run shows "Garmin import".
+
+`resources/js/app.js` does the rest, with no dependency: a delegated click on
+`[data-day]` clones the day's template into the dialog and calls `showModal()`
+(Enter and Space click a `<button>`); the close button, Esc, and a click on the
+backdrop close it; on `close` the opening cell gets `is-open` removed and focus
+back. Opening reads only the page, so it writes no row and calls no endpoint for
+a signed-out visitor too (FR-017). Without JS the cells are buttons that do
+nothing; their screen-reader text still names the day, distance and run count.
+
+Layout follows `.larapilot/mockups/US-012/`: a bottom sheet below 640 px
+(`max-height: 85dvh`), a centred dialog from `sm`, slide/fade only under
+`prefers-reduced-motion: no-preference`, light and dark from the existing tokens
+plus one `--backdrop`. Tailwind's preflight zeroes `margin`, which the browser
+uses to centre a modal, so `.day-dlg` restores `margin: auto` from `sm`. The
+button fills the whole `<td>` (padding 2 / 3 / 4 px by breakpoint, the gap the
+`<td>` had) so the target is the full column width — 25.8 px at 320 px — while
+the visible square, the `<colgroup>` widths and the ramp are untouched.
 
 The guest branch is **read-only by structure**: the middleware is a no-op for
 guests, nothing on the path calls `EnsureFreshAccessToken` or `StravaClient`, and
@@ -122,12 +157,13 @@ calibrated bands, upper-inclusive.
 | Displayed athlete | `app/Support/Strava/ResolveDisplayedAthlete.php` | Guest path only; read-only, ≤ 2 queries; allowlist first, then the stored-athlete fallback |
 | Window | `app/Support/Heatmap/HeatmapWindow.php` | ISO-week anchored 112-day window |
 | Daily totals | `app/Support/Heatmap/DailyRunningDistance.php` | One grouped aggregate query |
-| Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals |
+| Day runs | `app/Support/Heatmap/DailyRuns.php`, `app/Data/Heatmap/DayRun.php` | One query per cache miss for the window's runs, grouped by day in start order; `DayRun` is a scalars-only run with its formatting (`kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()` — null when not recorded — and the Strava link from `Activity::stravaUrl()`) |
+| Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
-| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:{user id}:{window start}:{today}`, TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
+| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v2:{user id}:{window start}:{today}`, TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
-| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
+| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `day-detail`, `run-metric`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Config | `config/heatmap.php` | Literal `window_weeks` (16) and `grid_cache_ttl` (86 400) |
 | Tests | `tests/Feature/Dashboard/*`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
@@ -145,12 +181,17 @@ three small indexed queries for the sync status.
 | Sync status resolved outside the cache | Cache it with the grid | A cached "synced 6 hours ago" is exactly what FR-007 forbids |
 | Cache the grid DTOs, with `cache.serializable_classes` listing exactly the classes the grid is made of (US-010) | `serializable_classes => true`; caching a plain array through `toArray()` / `fromArray()` mappers | Laravel 13 defaults the list to `false`, so a serializing store (`database`, `file`, `redis`) restored the grid as `__PHP_Incomplete_Class` and every cache hit answered 500. `true` reopens the gadget-chain risk the default closes; mappers on five DTOs add code for no gain over the framework's allowlist |
 | A cached entry that cannot be restored is reported, rebuilt and overwritten (US-010) | Return it as is; `Cache::remember()`; `cache:clear` in the deploy notes | An entry written by an older shape of the grid — a class not yet allowlisted, a renamed `DayCellState` case, a changed property type — would otherwise fail every request until midnight. `unserialize` throws for nested failures, so the read catches `Throwable`, not only `__PHP_Incomplete_Class` |
+| The day's runs live inside the cached grid (`DayCell::$runs`, US-012) | A JSON endpoint fetched when a day is opened; a second cache entry for the detail | The detail then shares the grid's one key and its one invalidation — the sync's and the import's existing `forget()` covers it with no new call site, and the two can never disagree. Opening a day costs no request, so a signed-out visitor still triggers no write and no Strava call (FR-017). The price is ~19 runs' worth of scalars per week in the entry, a few tens of KB for a 112-day window |
+| A `v2` segment in the cache key (US-012) | Reuse the key and rely on the unserialize `Throwable` catch | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read |
+| Run formatting reuses `GarminImportFormat` | A second formatter in the heatmap layer | Pace, ascent, heart rate, distance and duration print the same on the review and in the day detail; one copy cannot drift |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
 | CSV-only athlete: latest import = newest `updated_at` of its `garmin_csv` activities (US-011) | A `users.garmin_imported_at` column | No migration for one stamp; the cost is that a re-import that changes nothing does not move it |
 | CSV-only athlete ignores `sync_runs` | Show the instance-wide sync state | `sync_runs` describe the Strava sync, which never selects this athlete — a failed or stale sync of someone else would put a false warning over a map only imports change |
 | All copy and arithmetic in DTOs / `SyncStatus` | Logic in Blade | Testable without rendering; components stay markup-only |
 | `@yield('header-status')` in the layout | View composer / shared variable | The connect and rejected screens extend the same layout and must render no chip |
 | Public read-only home page for guests (FR-017) | Keep it sign-in only | The owner checks it on any device and shares the link; the owner accepted the Strava API Agreement risk (decisions `f71daaa7e976c188`, `88f04507cbc7e573`) |
+| One shared `<dialog>` filled from a `<template>` per day (US-012) | One `<dialog>` per ran day; a bottom-sheet library; `<details>` | Same markup weight as the per-day dialogs but a single focus-return path; native `showModal()` gives the trap, Esc and inert page for free, where a library is a new dependency the app, which has no Alpine or Livewire, does not carry. `<details>` cannot be a modal sheet |
+| The Strava link in the detail opens in the same tab | `target="_blank" rel="noopener"` | The approved mockup and the US-008 review link do the same; the visible behaviour is the mockup's |
 | Guests and owner share the per-athlete grid cache | A separate guest cache | Same data, same key; a separate cache would double the rebuilds and could disagree with the owner's view |
 | Guests see the same sync warning, reason included | A reduced guest warning | Decision `f75e292def892fad`; the reason is already non-secret and HTML-escaped |
 | "Import Garmin CSV" for every visitor as a text line under the map (US-011) | A header button; a menu; owner-only | The same reasoning as the guest line: discreet, no header budget at 375 px, one screen with no nav. Open to guests by the owner's choice so the map works with CSV imports only |
@@ -187,6 +228,16 @@ three small indexed queries for the sync status.
   legend rows on render. The list never becomes `true`.
 - **Invariant — the grid cache key carries today's date.** _Breaks if:_ the key
   drops it; the cache then outlives midnight.
+- **Invariant — the key's shape version changes whenever a cached class gains a
+  property.** `DayCell` gained `runs` in `US-012`, so the key went from
+  `heatmap:grid:{…}` to `heatmap:grid:v2:{…}`. _Breaks if:_ a property is added
+  without bumping it — an entry from the previous deploy then restores with an
+  uninitialized readonly property and every request fails until midnight.
+- **Invariant — runs ride only on Ran cells.** `HeatmapBuilder` attaches a day's
+  runs only when the grid's own rule made it Ran (distance above 0), so a Rest or
+  Future cell never opens a detail and the detail never lists a run the colour
+  does not account for. `DailyRuns` and `DailyRunningDistance` read the same
+  window of the same rows.
 - **Invariant — the scale is calibrated once per grid build**, so cells and legend
   cannot disagree.
 - **Invariant — the failure reason is escaped** (`{{ }}`), never `{!! !!}`: it can

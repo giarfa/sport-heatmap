@@ -15,7 +15,7 @@
 {{-- Markup only: every number and every string comes from a HeatmapGrid/WeekRow/DayCell method — no arithmetic here. --}}
 <table class="hm">
     <caption class="sr-only">
-        Sixteen rows, one per week, oldest first. Seven columns, Monday to Sunday, plus a weekly total column.
+        Sixteen rows, one per week, oldest first. Seven columns, Monday to Sunday, plus a weekly total column. Days with runs are buttons that show the runs of that day.
     </caption>
     <colgroup>
         <col class="hm-col-week">
@@ -36,11 +36,21 @@
             <tr class="hm-row @if ($week->isCurrent) hm-row-current @endif">
                 <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>{{ $week->weekLabel() }}</th>
                 @foreach ($week->days as $day)
-                    <td class="hm-td">
-                        <span class="sr-only">{{ $day->accessibleName() }}</span>
-                        <span aria-hidden="true" class="hm-cell hm-cell--{{ $day->modifier() }}"
-                            @if ($day->pointerTitle() !== null) title="{{ $day->pointerTitle() }}" @endif></span>
-                    </td>
+                    @if ($day->hasDetail())
+                        {{-- A ran day is a button that fills the whole cell: the 2-4 px gap moves inside the target, the square and the grid geometry do not change. --}}
+                        <td class="hm-td hm-td--ran">
+                            <button type="button" class="hm-hit" data-day="{{ $day->date->toDateString() }}" aria-haspopup="dialog" title="{{ $day->pointerTitle() }}">
+                                <span class="sr-only">{{ $day->detailButtonName() }}</span>
+                                <span aria-hidden="true" class="hm-cell hm-cell--{{ $day->modifier() }}"></span>
+                            </button>
+                        </td>
+                    @else
+                        <td class="hm-td">
+                            <span class="sr-only">{{ $day->accessibleName() }}</span>
+                            <span aria-hidden="true" class="hm-cell hm-cell--{{ $day->modifier() }}"
+                                @if ($day->pointerTitle() !== null) title="{{ $day->pointerTitle() }}" @endif></span>
+                        </td>
+                    @endif
                 @endforeach
                 <td class="hm-total">
                     <span class="hm-total-num">{{ $week->kilometres() }}</span><span class="hm-total-unit"> km</span>

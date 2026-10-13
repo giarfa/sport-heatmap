@@ -31,6 +31,17 @@ class TrainingBlockSeeder extends Seeder
      */
     private const DOUBLE_RUN_WEEK_INDEXES = [2, 6, 10];
 
+    /**
+     * The double-run week whose second run is the Garmin import, so the demo has a day
+     * that lists a Strava run and a Garmin run side by side.
+     */
+    private const MIXED_SOURCE_WEEK_INDEX = 6;
+
+    /**
+     * How many runs were recorded without a heart-rate strap, as a percentage.
+     */
+    private const WITHOUT_HEART_RATE_PERCENT = 15;
+
     private const GARMIN_IMPORTED_RUNS = 2;
 
     private const GARMIN_OVERWRITTEN_RUNS = 1;
@@ -257,14 +268,18 @@ class TrainingBlockSeeder extends Seeder
     /**
      * Pick the runs that came from a Garmin Connect CSV import: GARMIN_IMPORTED_RUNS
      * imported new and GARMIN_OVERWRITTEN_RUNS overwriting a Strava twin, so the
-     * demo map exercises every activity source. Taken from completed weeks only, so
-     * the current week stays exactly what the last sync returned.
+     * demo map exercises every activity source. One imported run is always the second
+     * run of a double-run day whose first run is from Strava. Taken from completed
+     * weeks only, so the current week stays exactly what the last sync returned.
      *
      * @param  array<int, array<int, array{date: Carbon, distance_meters: int}>>  $block
      * @return array<string, string> "{weekIndex}.{runIndex}" => factory state name
      */
     private function garminRuns(array $block): array
     {
+        $mixedSourceRun = self::MIXED_SOURCE_WEEK_INDEX.'.'.array_key_last($block[self::MIXED_SOURCE_WEEK_INDEX]);
+        $mixedDayStravaRun = self::MIXED_SOURCE_WEEK_INDEX.'.0';
+
         $candidates = [];
 
         foreach ($block as $weekIndex => $runs) {
@@ -273,18 +288,23 @@ class TrainingBlockSeeder extends Seeder
             }
 
             foreach (array_keys($runs) as $runIndex) {
-                $candidates[] = "{$weekIndex}.{$runIndex}";
+                if (! in_array("{$weekIndex}.{$runIndex}", [$mixedSourceRun, $mixedDayStravaRun], true)) {
+                    $candidates[] = "{$weekIndex}.{$runIndex}";
+                }
             }
         }
 
         shuffle($candidates);
 
         $states = [
-            ...array_fill(0, self::GARMIN_IMPORTED_RUNS, 'garminImported'),
+            ...array_fill(0, self::GARMIN_IMPORTED_RUNS - 1, 'garminImported'),
             ...array_fill(0, self::GARMIN_OVERWRITTEN_RUNS, 'garminOverwritten'),
         ];
 
-        return array_combine(array_slice($candidates, 0, count($states)), $states);
+        return [
+            $mixedSourceRun => 'garminImported',
+            ...array_combine(array_slice($candidates, 0, count($states)), $states),
+        ];
     }
 
     private function createActivity(User $athlete, Carbon $date, int $distanceMeters, ?string $garminState = null): void
@@ -304,12 +324,30 @@ class TrainingBlockSeeder extends Seeder
             default => $factory,
         };
 
+        /*
+         * A Garmin import of the owner's real export carries `--` in the metric columns,
+         * so those runs have none; a Garmin-won twin keeps the metrics Strava gave it,
+         * because Overwrite never replaces a stored value with `--`. A few Strava runs
+         * lack a heart rate, as a run without a strap does.
+         */
+        $factory = match (true) {
+            $garminState === 'garminImported' => $factory->withoutMetrics(),
+            fake()->boolean(self::WITHOUT_HEART_RATE_PERCENT) => $factory->withoutHeartRate(),
+            default => $factory,
+        };
+
         $secondsPerKilometre = fake()->numberBetween(255, 375);
 
-        $factory->create([
+        $attributes = [
             'distance_meters' => $distanceMeters,
             'moving_time_seconds' => (int) round($distanceMeters / 1_000 * $secondsPerKilometre),
-        ]);
+        ];
+
+        if ($garminState !== 'garminImported') {
+            $attributes['average_pace_seconds_per_km'] = $secondsPerKilometre;
+        }
+
+        $factory->create($attributes);
     }
 
     /**

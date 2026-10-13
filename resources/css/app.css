@@ -352,6 +352,246 @@ body {
     }
 }
 
+/* ---- Day cell detail --------------------------------------------------------
+   Ported from .larapilot/mockups/US-012/detail.css (the approved mockup). A ran
+   day's cell is a button that fills the whole <td>, so the target is the full
+   column width — 25.8px at 320px, 31px at 375px, both at least WCAG 2.2's 24px —
+   and the 2-4px gap between squares moves inside it. The visible square, the
+   ramp and the grid geometry do not change. Rest and future days stay plain. */
+.hm-td.hm-td--ran {
+    padding: 0;
+}
+
+.hm-hit {
+    display: block;
+    width: 100%;
+    padding: 2px;
+    border: 0;
+    background: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+}
+
+@media (min-width: 480px) {
+    .hm-hit {
+        padding: 3px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .hm-hit {
+        padding: 4px; /* the same gap .hm-td has here */
+    }
+}
+
+.hm-hit:hover .hm-cell {
+    box-shadow: 0 0 0 2px var(--ink-muted);
+}
+
+.hm-hit:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 0;
+}
+
+.hm-hit.is-open .hm-cell {
+    box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* A native <dialog> opened with showModal(): focus trap, Esc, inert page and
+   focus return come from the browser. Below sm it is a bottom sheet; from sm a
+   centred dialog. --backdrop is the one token the dialog adds. */
+:root {
+    --backdrop: rgb(15 23 42 / 0.55);
+}
+
+html.dark {
+    --backdrop: rgb(0 0 0 / 0.65);
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.light) {
+        --backdrop: rgb(0 0 0 / 0.65);
+    }
+}
+
+.day-dlg {
+    padding: 0;
+    border: 1px solid var(--hairline);
+    background: var(--surface-card);
+    color: var(--ink);
+    max-width: none;
+    overflow: hidden;
+}
+
+.day-dlg::backdrop {
+    background: var(--backdrop);
+}
+
+.day-dlg[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 639.98px) {
+    .day-dlg {
+        position: fixed;
+        inset: auto 0 0 0;
+        margin: 0;
+        width: 100%;
+        max-height: 85dvh;
+        border-width: 1px 0 0;
+        border-radius: 1rem 1rem 0 0;
+    }
+
+    .dlg-head::before {
+        content: '';
+        position: absolute;
+        top: 0.5rem;
+        left: 50%;
+        width: 2.25rem;
+        height: 0.25rem;
+        margin-left: -1.125rem;
+        border-radius: 9999px;
+        background: var(--control-border);
+    }
+}
+
+@media (min-width: 640px) {
+    .day-dlg {
+        margin: auto; /* Tailwind's preflight zeroes the margin the UA stylesheet centres a modal with */
+        width: min(30rem, calc(100% - 2rem));
+        max-height: min(80dvh, 40rem);
+        border-radius: 0.75rem;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .day-dlg[open] {
+        animation: dlg-in 0.18s ease-out;
+    }
+
+    @keyframes dlg-in {
+        from {
+            opacity: 0;
+            transform: translateY(1rem);
+        }
+    }
+}
+
+.dlg-head {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 1.25rem 0.5rem 0.5rem 1.25rem;
+    border-bottom: 1px solid var(--hairline);
+}
+
+.dlg-head h2 {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+}
+
+.dlg-sub {
+    margin: 0.125rem 0 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.dlg-close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: none;
+    color: var(--ink-muted);
+    cursor: pointer;
+}
+
+.dlg-body {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 1.25rem 1.25rem;
+}
+
+.runs {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.run {
+    padding: 1rem 0;
+    border-top: 1px solid var(--hairline);
+}
+
+.run:first-child {
+    border-top: 0;
+}
+
+.run-name {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.run-src {
+    margin: 0.125rem 0 0;
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+}
+
+.run-src a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    margin-block: -0.5rem -0.75rem;
+    color: var(--accent);
+}
+
+.run-stats {
+    margin: 0.5rem 0 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem 0.5rem;
+}
+
+.run-stats > div {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+}
+
+.run-stats dt {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-muted);
+}
+
+.run-stats dd {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.run-stats dd.is-empty {
+    color: var(--ink-muted);
+    font-weight: 500;
+}
+
 /* ---- Dashboard layout --------------------------------------------------------
    The grid is capped at a readable cell density (~48px) instead of stretching
    to the container — desktop enhancement is a side rail, not bigger squares.
@@ -709,12 +949,16 @@ body {
 }
 
 .side dt {
-    min-width: 3.75rem;
+    min-width: 4.5rem; /* "Heart rate" is the longest label */
     color: var(--ink-muted);
 }
 
 .side dd {
     font-variant-numeric: tabular-nums;
+}
+
+.side dd.is-empty {
+    color: var(--ink-muted);
 }
 
 .side-source {

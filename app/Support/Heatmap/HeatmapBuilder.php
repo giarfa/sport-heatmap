@@ -3,6 +3,7 @@
 namespace App\Support\Heatmap;
 
 use App\Data\Heatmap\DayCell;
+use App\Data\Heatmap\DayRun;
 use App\Data\Heatmap\HeatmapGrid;
 use App\Data\Heatmap\IntensityScale;
 use App\Data\Heatmap\WeekRow;
@@ -22,8 +23,9 @@ final readonly class HeatmapBuilder
 
     /**
      * @param  array<string, int>  $dailyMeters  keyed by "Y-m-d" => summed distance in metres
+     * @param  array<string, array<int, DayRun>>  $dailyRuns  keyed by "Y-m-d" => that day's runs in start order
      */
-    public function __invoke(HeatmapWindow $window, array $dailyMeters, CarbonInterface $today): HeatmapGrid
+    public function __invoke(HeatmapWindow $window, array $dailyMeters, CarbonInterface $today, array $dailyRuns = []): HeatmapGrid
     {
         $today = CarbonImmutable::instance($today)->startOfDay();
 
@@ -38,14 +40,18 @@ final readonly class HeatmapBuilder
         $weekStart = $window->startsOn;
 
         while ($weekStart->lessThanOrEqualTo($window->endsOn)) {
-            $weeks[] = $this->buildWeek($weekStart, $dailyMeters, $today, $scale);
+            $weeks[] = $this->buildWeek($weekStart, $dailyMeters, $dailyRuns, $today, $scale);
             $weekStart = $weekStart->addWeek();
         }
 
         return new HeatmapGrid($weeks, $window->startsOn, $window->endsOn, $scale);
     }
 
-    private function buildWeek(CarbonImmutable $weekStart, array $dailyMeters, CarbonImmutable $today, IntensityScale $scale): WeekRow
+    /**
+     * @param  array<string, int>  $dailyMeters
+     * @param  array<string, array<int, DayRun>>  $dailyRuns
+     */
+    private function buildWeek(CarbonImmutable $weekStart, array $dailyMeters, array $dailyRuns, CarbonImmutable $today, IntensityScale $scale): WeekRow
     {
         $days = [];
         $totalMeters = 0;
@@ -69,7 +75,14 @@ final readonly class HeatmapBuilder
             $metres = $dailyMeters[$date->toDateString()] ?? 0;
             $state = $metres > 0 ? DayCellState::Ran : DayCellState::Rest;
 
-            $days[] = new DayCell($date, $metres, $state, $scale->levelFor($metres));
+            /*
+             * Runs ride only on a Ran cell, so the grid's own rule — a day with no
+             * distance is a rest day — decides which days open a detail, and the
+             * detail can never list a run the cell's colour does not account for.
+             */
+            $runs = $state === DayCellState::Ran ? ($dailyRuns[$date->toDateString()] ?? []) : [];
+
+            $days[] = new DayCell($date, $metres, $state, $scale->levelFor($metres), $runs);
             $totalMeters += $metres;
         }
 

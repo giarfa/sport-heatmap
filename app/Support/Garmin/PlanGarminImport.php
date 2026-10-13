@@ -46,6 +46,7 @@ final readonly class PlanGarminImport
             ->keyBy('id');
 
         $alreadyImported = [];
+        $alreadyImportedActivities = [];
 
         /*
          * Identity first, for the whole file, before any conflict is claimed.
@@ -60,6 +61,7 @@ final readonly class PlanGarminImport
 
             if ($identical !== null) {
                 $alreadyImported[$index] = $row;
+                $alreadyImportedActivities[$index] = $identical;
                 $stored->forget($identical->id);
             }
         }
@@ -107,6 +109,11 @@ final readonly class PlanGarminImport
 
         $newRows = array_diff_key($rows, $alreadyImported, $conflicts);
 
-        return new GarminImportPlan($newRows, $conflicts, $alreadyImported, $athlete->id);
+        /*
+         * The matched stored run rides along so the apply step can fill its empty
+         * metrics without a second lookup. The fingerprint still hashes only the row
+         * indexes: which runs are already imported is what the visitor was shown.
+         */
+        return new GarminImportPlan($newRows, $conflicts, $alreadyImported, $athlete->id, $alreadyImportedActivities);
     }
 }

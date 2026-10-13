@@ -31,6 +31,17 @@ final readonly class ParseGarminCsv
      */
     private const MAX_RUNS = 1_000;
 
+    /*
+     * Plausibility bounds on the run metrics: the file is attacker-supplied for a
+     * signed-out visitor and the values are shown on the public map, so a reading no
+     * run can have counts as "not recorded".
+     */
+    private const MAX_PACE_SECONDS_PER_KM = 36_000;
+
+    private const MAX_ASCENT_METERS = 20_000;
+
+    private const MAX_HEART_RATE = 250;
+
     private const MAX_INVALID_ROWS = 100;
 
     private const MAX_IGNORED_TYPES = 50;
@@ -128,6 +139,9 @@ final readonly class ParseGarminCsv
                 movingTimeSeconds: $movingTimeSeconds,
                 startDateLocal: $startDateLocal,
                 activityDate: $startDateLocal->startOfDay(),
+                averagePaceSecondsPerKm: $this->paceSecondsPerKm($this->cell($cells, $columns, 'avg_pace')),
+                totalAscentMeters: $this->ascentMeters($this->cell($cells, $columns, 'total_ascent')),
+                averageHeartRate: $this->heartRate($this->cell($cells, $columns, 'avg_hr')),
             );
 
             /*
@@ -238,6 +252,63 @@ final readonly class ParseGarminCsv
         }
 
         return (int) round((int) $parts[1] * 3_600 + (int) $parts[2] * 60 + (float) $parts[3]);
+    }
+
+    /**
+     * The raw text of an optional column, or '' when this file has no such column.
+     *
+     * @param  array<int, string|null>  $cells
+     * @param  array<string, int>  $columns
+     */
+    private function cell(array $cells, array $columns, string $key): string
+    {
+        return isset($columns[$key]) ? trim((string) ($cells[$columns[$key]] ?? '')) : '';
+    }
+
+    /**
+     * Average pace as whole seconds per kilometre: "5:23" → 323, "1:05:10" → 3910.
+     *
+     * Garmin writes "--" when it did not record one. A metric that is unreadable or
+     * zero is null, never 0 — a stored 0 would read on the dashboard as a real
+     * measurement — and it never makes the row invalid: the run itself is fine.
+     */
+    private function paceSecondsPerKm(string $raw): ?int
+    {
+        $seconds = $this->durationSeconds($raw);
+
+        return $seconds === null || $seconds === 0 || $seconds > self::MAX_PACE_SECONDS_PER_KM ? null : $seconds;
+    }
+
+    /**
+     * Total ascent as whole metres, "," thousands separators handled ("1,234" → 1234),
+     * with an optional decimal part rounded. A flat run's 0 is a real reading and stays 0.
+     */
+    private function ascentMeters(string $raw): ?int
+    {
+        $metres = str_replace(',', '', $raw);
+
+        if (! preg_match('/^\d{1,6}(\.\d+)?$/', $metres)) {
+            return null;
+        }
+
+        $ascent = (int) round((float) $metres);
+
+        return $ascent > self::MAX_ASCENT_METERS ? null : $ascent;
+    }
+
+    /**
+     * Average heart rate as whole bpm. Up to three digits keeps a malformed cell from
+     * becoming an absurd reading; 0 means the strap was off, so it is not recorded.
+     */
+    private function heartRate(string $raw): ?int
+    {
+        if (! preg_match('/^\d{1,3}(\.\d+)?$/', $raw)) {
+            return null;
+        }
+
+        $bpm = (int) round((float) $raw);
+
+        return $bpm === 0 || $bpm > self::MAX_HEART_RATE ? null : $bpm;
     }
 
     private function name(string $raw): string
