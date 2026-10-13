@@ -78,10 +78,8 @@ class SyncStravaActivities extends Command
                 $athletes->count(), $outcome->upserted, $outcome->deleted,
             ));
 
-            $today = now();
-
             foreach ($athletes as $athlete) {
-                $this->gridCache->forget($athlete, $window, $today);
+                $this->gridCache->forgetAthlete($athlete);
             }
 
             return self::SUCCESS;

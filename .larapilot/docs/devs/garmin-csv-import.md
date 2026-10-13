@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-008` |
-| **Last updated by** | `US-012` — 2026-10-13 |
+| **Last updated by** | `US-013` — 2026-10-13 |
 | **Owner persona** | 🔧 Alex |
 
 ## Purpose
@@ -191,10 +191,10 @@ already-imported row indexes — what the visitor was shown.
   count.
 
 The passed athlete is only read, never `save()`d — it may be the narrow
-displayed-athlete model. After the commit it forgets the cached grid for today
+displayed-athlete model. After the commit it retires every cached window grid
 of the athlete actually written to
-(`HeatmapGridCache::forget()`), so the dashboard shows the import on the next
-request — also after a backfill-only import, whose metrics the cached day
+(`HeatmapGridCache::forgetAthlete()`), so the dashboard shows the import on the next
+request, whichever window is opened — also after a backfill-only import, whose metrics the cached day
 detail carries. It returns a `GarminImportSummary`: imported, overwritten, skipped,
 already imported, ignored by type, outside window, invalid. The action does not
 authorize (`.ai/rules/actions.md`); the caller has.
@@ -282,7 +282,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | CSV-only athlete | `app/Actions/Garmin/CreateCsvOnlyAthlete.php`, `User::isCsvOnly()`, `UserFactory::csvOnly()` | Placeholder identity (`NAME`, `EMAIL` constants), reused by `firstOrCreate` |
 | Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id — shared with the sync |
 | Plan DTOs | `app/Data/Garmin/GarminImportPlan.php`, `GarminImportConflict.php` | The plan and its `fingerprint()` |
-| Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction, CSV-only athlete created inside it; Overwrite and the already-imported metric backfill; grid cache forgotten after commit |
+| Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction, CSV-only athlete created inside it; Overwrite and the already-imported metric backfill; every cached window grid of the athlete retired after commit (`forgetAthlete()`) |
 | Answer | `app/Enums/ConflictResolution.php` | `overwrite`, `skip` |
 | Summary DTO | `app/Data/Garmin/GarminImportSummary.php` | The seven counts; session round-trip for the summary page |
 | Routes | `routes/web.php` (`garmin.import.*`, `strava.fresh` only), `garmin-import` limiter in `app/Providers/AppServiceProvider.php` | |

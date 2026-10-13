@@ -8,7 +8,6 @@ use App\Data\Garmin\ParsedGarminCsv;
 use App\Enums\ConflictResolution;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapGridCache;
-use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -85,7 +84,7 @@ final readonly class ApplyGarminImport
          * detail carries, and the detail must agree with the grid after it.
          */
         if ($writtenTo instanceof User) {
-            $this->heatmapGridCache->forget($writtenTo, HeatmapWindow::current(), now());
+            $this->heatmapGridCache->forgetAthlete($writtenTo);
         }
 
         return new GarminImportSummary(

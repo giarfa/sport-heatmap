@@ -460,7 +460,8 @@ class GarminImportFlowTest extends TestCase
             'distance_meters' => 8_290,
             'moving_time_seconds' => 3_263,
         ]);
-        $cacheKey = "heatmap:grid:v2:{$this->owner->id}:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $cacheKey = "heatmap:grid:v3:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $generationKey = "heatmap:grid:generation:{$this->owner->id}";
 
         $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
         $this->assertTrue(Cache::has($cacheKey));
@@ -468,7 +469,7 @@ class GarminImportFlowTest extends TestCase
         $this->upload($this->csv(self::IT_METRICS_HEADER, [self::SAMPLE_FIRST_ROW.',"5:23","45","152"']));
         $this->confirm($this->review());
 
-        $this->assertFalse(Cache::has($cacheKey));
+        $this->assertSame(1, Cache::get($generationKey), 'The athlete\'s generation moves, so the cached grid is never read again.');
     }
 
     public function test_re_importing_a_metric_file_changes_nothing(): void
@@ -555,7 +556,8 @@ class GarminImportFlowTest extends TestCase
 
     public function test_confirming_forgets_the_cached_grid_for_today(): void
     {
-        $cacheKey = "heatmap:grid:v2:{$this->owner->id}:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $cacheKey = "heatmap:grid:v3:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $generationKey = "heatmap:grid:generation:{$this->owner->id}";
 
         $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
         $this->assertTrue(Cache::has($cacheKey));
@@ -563,7 +565,7 @@ class GarminImportFlowTest extends TestCase
         $this->upload($this->fixture('activities-it.csv'));
         $this->confirm($this->review());
 
-        $this->assertFalse(Cache::has($cacheKey));
+        $this->assertSame(1, Cache::get($generationKey), 'The athlete\'s generation moves, so the cached grid is never read again.');
     }
 
     public function test_the_raw_upload_is_never_persisted(): void

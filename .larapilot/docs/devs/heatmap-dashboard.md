@@ -127,8 +127,8 @@ of the import screens). Strava orange stays on the Strava button only. A
 guest's first confirmed import creates the CSV-only athlete, and the next
 visit to `/` shows that athlete's map instead of this screen.
 
-A confirmed import forgets the written athlete's cached grid for today (`HeatmapGridCache::forget()`), so the map shows the imported runs on
-the next request, and "Import cancelled. Nothing was written." arrives through
+A confirmed import retires every cached window grid of the written athlete (`HeatmapGridCache::forgetAthlete()`), so the map shows the imported runs on
+the next request in whichever window is opened, and "Import cancelled. Nothing was written." arrives through
 `<x-session-notices />`. Garmin-imported runs are ordinary rows to the grid:
 `DailyRunningDistance` sums every source alike.
 
@@ -165,7 +165,7 @@ calibrated bands, upper-inclusive.
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
-| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v2:{user id}:{window start}:{today}`, TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
+| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v3:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
 | Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `day-detail`, `run-metric`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
@@ -185,8 +185,9 @@ three small indexed queries for the sync status.
 | Sync status resolved outside the cache | Cache it with the grid | A cached "synced 6 hours ago" is exactly what FR-007 forbids |
 | Cache the grid DTOs, with `cache.serializable_classes` listing exactly the classes the grid is made of (US-010) | `serializable_classes => true`; caching a plain array through `toArray()` / `fromArray()` mappers | Laravel 13 defaults the list to `false`, so a serializing store (`database`, `file`, `redis`) restored the grid as `__PHP_Incomplete_Class` and every cache hit answered 500. `true` reopens the gadget-chain risk the default closes; mappers on five DTOs add code for no gain over the framework's allowlist |
 | A cached entry that cannot be restored is reported, rebuilt and overwritten (US-010) | Return it as is; `Cache::remember()`; `cache:clear` in the deploy notes | An entry written by an older shape of the grid — a class not yet allowlisted, a renamed `DayCellState` case, a changed property type — would otherwise fail every request until midnight. `unserialize` throws for nested failures, so the read catches `Throwable`, not only `__PHP_Incomplete_Class` |
-| The day's runs live inside the cached grid (`DayCell::$runs`, US-012) | A JSON endpoint fetched when a day is opened; a second cache entry for the detail | The detail then shares the grid's one key and its one invalidation — the sync's and the import's existing `forget()` covers it with no new call site, and the two can never disagree. Opening a day costs no request, so a signed-out visitor still triggers no write and no Strava call (FR-017). The price is ~19 runs' worth of scalars per week in the entry, a few tens of KB for a 112-day window |
-| A `v2` segment in the cache key (US-012) | Reuse the key and rely on the unserialize `Throwable` catch | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read |
+| The day's runs live inside the cached grid (`DayCell::$runs`, US-012) | A JSON endpoint fetched when a day is opened; a second cache entry for the detail | The detail then shares the grid's one key and its one invalidation — the sync's and the import's `forgetAthlete()` covers it with no new call site, and the two can never disagree. Opening a day costs no request, so a signed-out visitor still triggers no write and no Strava call (FR-017). The price is ~19 runs' worth of scalars per week in the entry, a few tens of KB for a 112-day window |
+| A per-athlete generation counter in the cache key; one `forgetAthlete()` bumps it (US-013) | Cache tags; forgetting each window's key in a loop; one entry holding every window | Navigation means an athlete has one cached grid per window they opened, and `cache.default` is `database`, which has no tags. A loop would have to guess which windows were cached; a single entry would rebuild every window on any miss. A counter makes one write retire every window at once; the orphans expire through `grid_cache_ttl`. If the counter cannot be read the request builds the grid and leaves the cache alone, so a grid is never served or stored under a guessed generation |
+| A `v2` segment in the cache key (US-012; `v3` since US-013, when the key gained the generation) | Reuse the key and rely on the unserialize `Throwable` catch | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read |
 | Run formatting reuses `GarminImportFormat` | A second formatter in the heatmap layer | Pace, ascent, heart rate, distance and duration print the same on the review and in the day detail; one copy cannot drift |
 | The URL names the window's **end** week, as a `Y-m-d` query value (`/?to=2026-09-06`, `US-013`) | A path segment; the window's start date in the URL; a page number | A query value keeps `/` the one route and the one cache key shape; the end is what the reader navigates by and survives a change of `window_weeks`, where a start date would shift every shared link; a page number says nothing in a shared link |
 | A bad `to` renders the current window silently (`US-013`) | 404; 422; a redirect to `/` | The spec asks for a bad or future link to render "without an error"; an old bookmark is better served by today's map than by an error page, and the guest path stays free of any new response |
@@ -233,11 +234,16 @@ three small indexed queries for the sync status.
   restore and is rebuilt (and reported) on every request, with no cache
   benefit. `LegendRow` is not listed: `IntensityScale` holds scalars and derives
   legend rows on render. The list never becomes `true`.
+- **Invariant — every write that changes an athlete's runs calls
+  `HeatmapGridCache::forgetAthlete()`.** _Breaks if:_ a new write path (a sync, an
+  import, an edit) skips it — every window already cached keeps the old data until
+  midnight or the TTL.
 - **Invariant — the grid cache key carries today's date.** _Breaks if:_ the key
   drops it; the cache then outlives midnight.
 - **Invariant — the key's shape version changes whenever a cached class gains a
   property.** `DayCell` gained `runs` in `US-012`, so the key went from
-  `heatmap:grid:{…}` to `heatmap:grid:v2:{…}`. _Breaks if:_ a property is added
+  `heatmap:grid:{…}` to `heatmap:grid:v2:{…}`; `US-013` made it `v3` when the
+  generation joined the key. _Breaks if:_ a property is added
   without bumping it — an entry from the previous deploy then restores with an
   uninitialized readonly property and every request fails until midnight.
 - **Invariant — runs ride only on Ran cells.** `HeatmapBuilder` attaches a day's
