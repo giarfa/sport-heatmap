@@ -608,8 +608,8 @@ tasks:
       5. Do **not** add Playwright, Dusk, browser, or viewport suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every day-detail acceptance criterion with server-side behaviour has a test; the rest are in the manual handoff
+      - [x] Tests pass locally
+      - [x] Every day-detail acceptance criterion with server-side behaviour has a test; the rest are in the manual handoff
 
       ## Test Data
       - N/A — uses existing factories
@@ -622,13 +622,19 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/2.0.0` — open/update remote only if the user asks
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-04
       - TASK-07
       - TASK-09
+    commit:
+      sha: cf9cee0148abb6120f02eadea3a84e5cdd6dae3f
+      short_sha: cf9cee0
+      subject: 'test(US-012): TASK-10 cover the day cell detail'
+      committed_at: '2026-10-13T21:04:45+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cf9cee0148abb6120f02eadea3a84e5cdd6dae3f'
   -
     id: TASK-11
     title: 'CHANGELOG, domain doc index, and quality gate'
@@ -669,4 +675,4 @@ tasks:
     estimate_hours: 1
     dependencies:
       - TASK-10
-updated_at: '2026-10-13T19:03:41+00:00'
+updated_at: '2026-10-13T19:04:46+00:00'

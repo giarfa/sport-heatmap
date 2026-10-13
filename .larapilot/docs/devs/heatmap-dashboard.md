@@ -11,7 +11,9 @@
 
 The single screen of the product, served at `/` and **public**: a 16-week × 7-day
 grid of daily running distance with weekly totals, a self-calibrating intensity
-legend, and a sync status (header chip, warning banner, detail card). Signed-out
+legend, a sync status (header chip, warning banner, detail card), and a day detail
+that lists each run of a tapped day with its pace, ascent and heart rate — public
+too, heart rate included (accepted privacy risk, PRD Privacy & legal). Signed-out
 visitors see the owner's last synced map read-only; signing in is only needed to
 connect Strava. It must never present stale data as current. If it stops
 working, the owner loses the only view of their training and the link they
