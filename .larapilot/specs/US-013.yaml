@@ -5,11 +5,11 @@ epic:
   title: 'Heatmap dashboard'
 priority: HIGH
 points: 8
-status: 'IN PROGRESS'
+status: REVIEW
 body: |
   #### US-013: Previous / Next window navigation, with older Garmin runs kept
 
-  **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** IN PROGRESS
+  **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** REVIEW
   **Blocked by:** -
   **Type:** Feature
   **Release:** 2.0.0
@@ -48,4 +48,7 @@ status_history:
   -
     status: 'IN PROGRESS'
     at: '2026-10-13T19:56:04+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-13T20:09:33+00:00'
 rework: false
