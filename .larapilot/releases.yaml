@@ -28,7 +28,7 @@ releases:
   -
     version: 2.0.0
     title: v2.0
-    status: in_progress
+    status: shipped
     branch: release/2.0.0
     specs:
       - US-011
@@ -37,5 +37,5 @@ releases:
       - US-012
       - US-015
     created_at: '2026-10-12T19:48:57+00:00'
-    shipped_at: null
-updated_at: '2026-10-17T06:44:40+00:00'
+    shipped_at: '2026-10-17T09:09:15+02:00'
+updated_at: '2026-10-17T07:09:26+00:00'
