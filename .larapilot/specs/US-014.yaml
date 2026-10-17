@@ -5,11 +5,11 @@ epic:
   title: 'Heatmap dashboard'
 priority: MEDIUM
 points: 5
-status: TODO
+status: DONE
 body: |
   #### US-014: Weekly mileage trend beside the heatmap
 
-  **Epic:** EP-003 | **Priority:** MEDIUM | **Points:** 5 | **Status:** TODO
+  **Epic:** EP-003 | **Priority:** MEDIUM | **Points:** 5 | **Status:** DONE
   **Blocked by:** US-013
   **Release:** 2.0.0
   **Type:** Feature
@@ -26,16 +26,36 @@ body: |
   After implementing this spec, opening the dashboard shows 16 weekly-total bars with a 4-week rolling average line beside the grid (stacked below it on a phone); choosing Previous or Next redraws the chart for the shown window, and every bar matches the weekly total of its row.
 
   **Acceptance Criteria**
-  - [ ] The dashboard shows a trend chart with one bar per week of the shown 16-week window, oldest on the left, current week on the right; each bar's value equals the FR-005 weekly total of the same row, to 0.1 km
-  - [ ] A 4-week rolling average line is drawn over the bars: each point is the mean of that week and the three weeks before it, including stored weeks before the shown window; on the current window the line stops at the last completed week
-  - [ ] The y-axis starts at 0 km and labels at least 0 and the top gridline in km
-  - [ ] The in-progress week's bar is marked partial with the FR-005 convention, and its accessible name says "partial"
-  - [ ] Previous / Next (FR-019) re-render the chart for the shown window; a past window has no partial bar and the line spans all 16 weeks
-  - [ ] A 0 km week renders a zero-height bar with a visible baseline marker, never a gap
-  - [ ] A shown window with no stored run shows an empty-state message in place of the chart; the connect screen (no athlete) shows no chart
-  - [ ] No line point is drawn for a week with fewer than three weeks of history since the week of the oldest stored run — unknown weeks are never averaged as 0 km
-  - [ ] After a sync or a confirmed Garmin import the chart shows the new data; no cached chart survives the write
-  - [ ] A signed-out visitor sees the same chart; rendering it writes no row and calls no Strava endpoint (FR-017)
-  - [ ] From `lg` up the chart sits beside the grid; below `lg` it stacks under the grid and legend; no horizontal page scroll at 375 px (FR-009)
-  - [ ] The chart has an accessible name and a text alternative listing each week's date range, total km, and rolling average; partial and average are never conveyed by colour alone; WCAG 2.2 AA contrast in light and dark themes (FR-009)
-  - [ ] The chart is server-rendered SVG with no new frontend dependency, and adds at most one database query to the dashboard request
+  - [x] The dashboard shows a trend chart with one bar per week of the shown 16-week window, oldest on the left, current week on the right; each bar's value equals the FR-005 weekly total of the same row, to 0.1 km
+  - [x] A 4-week rolling average line is drawn over the bars: each point is the mean of that week and the three weeks before it, including stored weeks before the shown window; on the current window the line stops at the last completed week
+  - [x] The y-axis starts at 0 km and labels at least 0 and the top gridline in km
+  - [x] The in-progress week's bar is marked partial with the FR-005 convention, and its accessible name says "partial"
+  - [x] Previous / Next (FR-019) re-render the chart for the shown window; a past window has no partial bar and the line spans all 16 weeks
+  - [x] A 0 km week renders a zero-height bar with a visible baseline marker, never a gap
+  - [x] A shown window with no stored run shows an empty-state message in place of the chart; the connect screen (no athlete) shows no chart
+  - [x] No line point is drawn for a week with fewer than three weeks of history since the week of the oldest stored run — unknown weeks are never averaged as 0 km
+  - [x] After a sync or a confirmed Garmin import the chart shows the new data; no cached chart survives the write
+  - [x] A signed-out visitor sees the same chart; rendering it writes no row and calls no Strava endpoint (FR-017)
+  - [x] From `lg` up the chart sits beside the grid; below `lg` it stacks under the grid and legend; no horizontal page scroll at 375 px (FR-009)
+  - [x] The chart has an accessible name and a text alternative listing each week's date range, total km, and rolling average; partial and average are never conveyed by colour alone; WCAG 2.2 AA contrast in light and dark themes (FR-009)
+  - [x] The chart is server-rendered SVG with no new frontend dependency, and adds at most one database query to the dashboard request
+status_history:
+  -
+    status: PLANNED
+    at: '2026-10-13T20:22:20+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-10-13T20:39:50+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-13T20:51:30+00:00'
+  -
+    status: DONE
+    at: '2026-10-17T06:40:34+00:00'
+rework: false
+merge_commit:
+  sha: 9f7889fc2e7742117bac0f9f48089a55f67d201d
+  short_sha: 9f7889f
+  subject: 'chore(US-014): record the review'
+  committed_at: '2026-10-13T22:51:29+02:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/9f7889fc2e7742117bac0f9f48089a55f67d201d'

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Weekly distance chart** beside the heatmap: one bar per week of the shown 16 weeks, oldest on
+  the left, with a 4-week average line over them. The average of a week includes the weeks before
+  the window, and starts only once three weeks of runs are stored behind it, so a missing week is
+  never counted as 0 km. The week in progress is marked "partial" and has no average, so the line
+  stops at the last completed week; a 0 km week is a flat marker on the baseline, never a gap. The
+  chart follows Previous / Next, sits beside the grid from 1024 px and under it on a phone, and
+  lists every week's dates, total and average under "Weekly figures". A window with no runs says
+  so instead of drawing an empty chart, and signed-out visitors see the same chart (US-014).
 - **Pace, ascent and heart rate per run**, and a **day cell detail**. Tap, click, or press Enter or
   Space on a day with runs on the heatmap to open its detail: each run's name, distance, moving
   time, average pace (`5:23 /km`), total ascent (`45 m`) and average heart rate (`152 bpm`), with

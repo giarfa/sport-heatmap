@@ -9,6 +9,7 @@ use App\Support\Heatmap\DailyRuns;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
+use App\Support\Heatmap\LeadInDistance;
 use App\Support\Heatmap\OldestRunDate;
 use App\Support\Strava\ResolveDisplayedAthlete;
 use App\Support\Sync\ResolveSyncStatus;
@@ -32,6 +33,7 @@ class DashboardController extends Controller
         Request $request,
         DailyRunningDistance $dailyDistance,
         DailyRuns $dailyRuns,
+        LeadInDistance $leadInDistance,
         HeatmapBuilder $buildGrid,
         HeatmapGridCache $gridCache,
         OldestRunDate $oldestRunDate,
@@ -64,7 +66,22 @@ class DashboardController extends Controller
          * the grid forgets the detail with it — they cannot disagree.
          */
         $oldestRun = $oldestRunDate($athlete);
-        $build = fn () => $buildGrid($window, $dailyDistance($athlete, $window), $today, $dailyRuns($athlete, $window));
+
+        /*
+         * The weekly trend is built with the grid and cached inside it, so its one extra
+         * query — the lead-in weeks the first 4-week averages reach back into — runs only
+         * on a cache miss, inside this closure. A hit costs the chart nothing, and a sync
+         * or import that forgets the grid forgets the chart with it: there is no second
+         * cache that could outlive a write.
+         */
+        $build = fn () => $buildGrid(
+            $window,
+            $dailyDistance($athlete, $window),
+            $today,
+            $dailyRuns($athlete, $window),
+            $leadInDistance($athlete, $window),
+            $oldestRun,
+        );
 
         /*
          * Only windows that can hold a run are cached, plus the current one. `to` accepts any

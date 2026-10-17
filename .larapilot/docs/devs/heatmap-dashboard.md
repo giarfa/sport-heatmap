@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-013` — 2026-10-13 |
+| **Last updated by** | `US-014` — 2026-10-13 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -43,10 +43,13 @@ share stops working.
    2. `HeatmapGridCache::remember()` returns the cached `HeatmapGrid`, or builds
       it — an entry that cannot be restored as a `HeatmapGrid` (incomplete
       class, or `unserialize` throwing on a nested class, enum case, or date)
-      is reported, counts as a miss, and is overwritten: `DailyRunningDistance` (one grouped `SUM` query) and
-      `DailyRuns` (one query for the window's runs, `US-012`) →
+      is reported, counts as a miss, and is overwritten: `DailyRunningDistance` (one grouped `SUM` query),
+      `DailyRuns` (one query for the window's runs, `US-012`) and `LeadInDistance`
+      (one grouped query for the three weeks before the window, `US-014`) →
       `HeatmapBuilder` (rest / ran / future cells, weekly totals, partial current
-      week, each Ran day's runs) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7).
+      week, each Ran day's runs) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7) and
+      `BuildWeeklyTrend` (the weekly-mileage chart, from the same `WeekRow`s) — all of it
+      cached as the one `HeatmapGrid`, so the chart has no cache of its own.
    3. `ResolveSyncStatus` reads `sync_runs` and the activity count of the
       **current** window — never the shown one — **outside** the cache and
       returns a `SyncStatus`, so the chip, warning, sync card and skeleton are the
@@ -63,8 +66,8 @@ share stops working.
       Next is a link only on an earlier window, and points at plain `/` when it
       reaches the current one, so the current window has one address.
    5. `dashboard.blade.php` renders the chip, an optional warning, the grid (or
-      the skeleton during a first sync), `<x-day-detail>`, the legend, and the
-      sync detail card. An empty current window keeps the sync-specific note; an
+      the skeleton during a first sync), `<x-day-detail>`, and the rail: legend →
+      weekly trend → sync detail card (`US-014`). An empty current window keeps the sync-specific note; an
       empty earlier window says "No runs stored in these 16 weeks." (`$grid->hasRuns()`).
 
 ### Window navigation (`US-013`, FR-019)
@@ -192,18 +195,54 @@ calibrated bands, upper-inclusive.
 | Daily totals | `app/Support/Heatmap/DailyRunningDistance.php` | One grouped aggregate query |
 | Day runs | `app/Support/Heatmap/DailyRuns.php`, `app/Data/Heatmap/DayRun.php` | One query per cache miss for the window's runs, grouped by day in start order; `DayRun` is a scalars-only run with its formatting (`kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()` — null when not recorded — and the Strava link from `Activity::stravaUrl()`) |
 | Navigation | `app/Support/Heatmap/OldestRunDate.php`, `app/Data/Heatmap/WindowNavigation.php` | The oldest stored run (one `MIN`, outside the cache) and the heading, title, empty note and Previous / Next URLs of the shown window |
+| Weekly trend | `app/Support/Heatmap/BuildWeeklyTrend.php`, `app/Data/Heatmap/WeeklyTrend.php`, `TrendBar.php`, `TrendTick.php` | `US-014`: turns the window's `WeekRow`s into the chart's bars, 4-week average, y axis and every string it prints (below) |
+| Lead-in | `app/Support/Heatmap/LeadInDistance.php` | `US-014`: the three weeks before the window in one grouped query, feeding the first averages |
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
-| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v3:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
+| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v4:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
-| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
+| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `weekly-trend`, `weekly-trend-skeleton`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Config | `config/heatmap.php` | Literals `window_weeks` (16), `navigation_step_weeks` (4) and `grid_cache_ttl` (86 400) |
 | Tests | `tests/Feature/Dashboard/*`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
 
-A dashboard request costs one grouped query and one run query on a cache miss, zero on a hit, plus
+A dashboard request costs one grouped query, one run query and one lead-in query on a cache miss, zero on a hit, plus
 three small indexed queries for the sync status and one `MIN()` for the oldest run (`US-013`).
+
+### Weekly trend (`US-014`, FR-020)
+
+`BuildWeeklyTrend` receives the 16 `WeekRow`s, the three lead-in weekly totals in metres, the athlete's oldest run and
+the grid's date-range label, and returns a `WeeklyTrend` of numbers and strings only; Blade does no arithmetic.
+
+- **Bars** are the grid's own totals: the bar's tenths of a kilometre are read back from `WeekRow::kilometres()`, and
+  geometry (`y = 100 − km / top × 100`, two decimals) is derived from that printed value, so a bar cannot disagree
+  with its row by a rounding step.
+- **Rolling average**: week *i* is the mean of weeks *i−3 … i*, summed in integer metres and divided by 4 with half-up
+  rounding to 0.1 km (`intdiv($metres + 200, 400)`); weeks 0–2 take their missing weeks from the lead-in.
+- **History rule**: no point for the in-progress week, with no stored run, or before the week of the oldest run plus three
+  weeks. An unknown week is never averaged as 0 km, so the line starts late rather than dipping to a figure never run.
+- **Y axis**: `max` covers the bars **and** the line points; `step` is the smallest of 5, 10, 20, 25, 30, 40, 50, 75, 100,
+  150, 200 km that is ≥ max ÷ 3 (200 when none); `top = step × ⌈max ÷ step⌉`; only the top label carries the unit.
+- **Line**: returned as polyline segments, one per unbroken run of points, a lone point becoming a 4-unit tick.
+- **Empty window**: no run → no bars, ticks, or line, and `isEmpty()` is true.
+
+The card (`components/weekly-trend.blade.php`, markup only) is the third rail card, beside the grid from `lg` and stacked
+under the legend below it. It has four states: the chart; the empty window ("No runs in this window, so there is
+nothing to chart.", heading kept, no axis); the first-sync skeleton (`weekly-trend-skeleton`, 16 `aria-hidden` bars,
+shown whenever the grid shows its own); and absent, because the connect screen renders no dashboard.
+
+Accessibility contract the markup must keep: the `<section>` is named by its `h3`; the SVG is a `role="group"` named by its
+`<title>`; each bar is a `<g role="img" aria-label="…">` carrying its accessible name, with the same text in a `<title>` for the pointer tooltip (a `<title>` alone is exposed inconsistently); gridlines,
+baseline and line are `aria-hidden`; the visible, collapsed-by-default `<details>` "Weekly figures" table is the text
+alternative. Partial is never colour alone (washed fill, dashed outline, a `partial` tag, "partial week" in the name),
+nor is the average (a line against bars), nor a 0 km week (a stub the key names).
+
+The y labels, x labels and `partial` tag are HTML positioned in percent **outside** the SVG. The SVG is stretched with
+`preserveAspectRatio="none"` so one element fills a phone and a wide rail with no resize script; text or circles inside
+it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or lines smear on a wide rail.
+- **Lead-in query**: `LeadInDistance` is one grouped query over the 21 days before the window, bounded `>= start` and
+  `< window start`.
 
 ## Architectural choices
 
@@ -218,7 +257,7 @@ three small indexed queries for the sync status and one `MIN()` for the oldest r
 | The day's runs live inside the cached grid (`DayCell::$runs`, US-012) | A JSON endpoint fetched when a day is opened; a second cache entry for the detail | The detail then shares the grid's one key and its one invalidation — the sync's and the import's `forgetAthlete()` covers it with no new call site, and the two can never disagree. Opening a day costs no request, so a signed-out visitor still triggers no write and no Strava call (FR-017). The price is ~19 runs' worth of scalars per week in the entry, a few tens of KB for a 112-day window |
 | A per-athlete generation counter in the cache key; one `forgetAthlete()` bumps it (US-013) | Cache tags; forgetting each window's key in a loop; one entry holding every window | Navigation means an athlete has one cached grid per window they opened, and `cache.default` is `database`, which has no tags. A loop would have to guess which windows were cached; a single entry would rebuild every window on any miss. A counter makes one write retire every window at once; the orphans expire through `grid_cache_ttl`. The counter is created with `add()` then `increment()`d, because a bare `increment()` on a missing key answers `false` on the database store and a `forever(…, 1)` fallback lets two overlapping writes both land on 1. If the counter cannot be read the request builds the grid and leaves the cache alone, so a grid is never served or stored under a guessed generation; a failed bump is reported, not thrown, since the write it follows is already committed |
 | Only windows that can hold a run are cached (US-013) | Cache every requested window; clamp `to` to the oldest run; throttle `/` | `to` takes any past date and each week is a key, so a guest could fill the cache table with empty grids back to year 0. A window that ends before the oldest run is built uncached (two small queries); the current window is always cached. Clamping would change what a shared link shows, and a throttle would hit the owner too |
-| A `v2` segment in the cache key (US-012; `v3` since US-013, when the key gained the generation) | Reuse the key and rely on the unserialize `Throwable` catch | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read |
+| A `v2` segment in the cache key (US-012; `v3` since US-013, when the key gained the generation; `v4` since US-014, when the grid gained its `trend`) | Reuse the key and rely on the unserialize `Throwable` catch | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read |
 | Run formatting reuses `GarminImportFormat` | A second formatter in the heatmap layer | Pace, ascent, heart rate, distance and duration print the same on the review and in the day detail; one copy cannot drift |
 | The URL names the window's **end** week, as a `Y-m-d` query value (`/?to=2026-09-06`, `US-013`) | A path segment; the window's start date in the URL; a page number | A query value keeps `/` the one route and the one cache key shape; the end is what the reader navigates by and survives a change of `window_weeks`, where a start date would shift every shared link; a page number says nothing in a shared link |
 | A bad `to` renders the current window silently (`US-013`) | 404; 422; a redirect to `/` | The spec asks for a bad or future link to render "without an error"; an old bookmark is better served by today's map than by an error page, and the guest path stays free of any new response |
@@ -226,6 +265,10 @@ three small indexed queries for the sync status and one `MIN()` for the oldest r
 | The unavailable Previous / Next control is a disabled `<button>` (US-013) | The mockup's `<span>`; an `<a>` without `href`; `aria-disabled` on a link | A span is announced as text and an `<a>` with no `href` is neither focusable nor announced as a control; `aria-disabled` on a link still looks and tabs like one. A native disabled button is announced as disabled, is not a link, and is skipped by Tab — the acceptance criterion exactly. The look is the mockup's |
 | Previous is disabled from the athlete's oldest stored run, not from a fixed horizon (US-013) | A fixed number of windows; clamping inside `HeatmapWindow`; never disabling it | The reader should never page into a run of empty windows, and the value object cannot know the data. The cost is one `MIN()` per request, which the `(user_id, activity_date)` index serves, read outside the cache because the oldest run belongs to the athlete, not to any cached window |
 | The sync status always reads the current window (US-013) | Read the shown window | The status describes the sync, not the period on screen; a past window would otherwise show a different "Runs in window", a different empty note, and could flip the skeleton |
+| The lead-in weeks come from their own query, `LeadInDistance` (US-014) | Widen `DailyRunningDistance` by 21 days | The intensity scale is calibrated over the shown window's daily totals only (FR-006); widening that query would let weeks the reader cannot see move the legend and every cell's level. One more grouped aggregate keeps the two concerns apart |
+| Rolling average in integer metres, half-up (US-014) | Float mean and `round()` | A float mean of exact half-way values depends on summation order: the US-014 mockup README prints 24.5, 33.0 and 39.0 for weeks whose exact means are 24.55, 33.05 and 39.05 km (its generator rounded `98.19999999999999 / 4` down). Integer math reads 24.6, 33.1 and 39.1 and cannot drift; `BuildWeeklyTrendTest` pins this |
+| The chart is server-rendered inline SVG in a Blade component (US-014) | Chart.js / ApexCharts; a client-rendered canvas | A charting library is a new frontend dependency the Technical Architecture rules out, would need its own accessible text alternative, and would draw nothing for a guest with scripts off. One SVG of about 20 elements costs no script, no font, no service |
+| The line is drawn as segments, not one polyline (US-014) | A single `points` string | The history and partial-week rules only cut the ends of the line today, but a single polyline would draw straight across any future gap; splitting at every missing point makes that impossible by construction |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
 | CSV-only athlete: latest import = newest `updated_at` of its `garmin_csv` activities (US-011) | A `users.garmin_imported_at` column | No migration for one stamp; the cost is that a re-import that changes nothing does not move it |
 | CSV-only athlete ignores `sync_runs` | Show the instance-wide sync state | `sync_runs` describe the Strava sync, which never selects this athlete — a failed or stale sync of someone else would put a false warning over a map only imports change |
@@ -268,8 +311,9 @@ three small indexed queries for the sync status and one `MIN()` for the oldest r
   `cache.serializable_classes`.** _Breaks if:_ a DTO, enum, or value object is
   nested into the grid without joining the list — the grid then fails to
   restore and is rebuilt (and reported) on every request, with no cache
-  benefit. `LegendRow` is not listed: `IntensityScale` holds scalars and derives
-  legend rows on render. The list never becomes `true`.
+  benefit. `WeeklyTrend`, `TrendBar` and `TrendTick` are listed (`US-014`).
+  `LegendRow` is not: `IntensityScale` holds scalars and derives legend rows on
+  render. The list never becomes `true`.
 - **Invariant — every write that changes an athlete's runs calls
   `HeatmapGridCache::forgetAthlete()`.** _Breaks if:_ a new write path (a sync, an
   import, an edit) skips it — every window already cached keeps the old data until
@@ -279,7 +323,8 @@ three small indexed queries for the sync status and one `MIN()` for the oldest r
 - **Invariant — the key's shape version changes whenever a cached class gains a
   property.** `DayCell` gained `runs` in `US-012`, so the key went from
   `heatmap:grid:{…}` to `heatmap:grid:v2:{…}`; `US-013` made it `v3` when the
-  generation joined the key. _Breaks if:_ a property is added
+  generation joined the key, and `US-014` made it `v4` when `HeatmapGrid` gained
+  `trend`. _Breaks if:_ a property is added
   without bumping it — an entry from the previous deploy then restores with an
   uninitialized readonly property and every request fails until midnight.
 - **Invariant — runs ride only on Ran cells.** `HeatmapBuilder` attaches a day's
@@ -287,6 +332,11 @@ three small indexed queries for the sync status and one `MIN()` for the oldest r
   Future cell never opens a detail and the detail never lists a run the colour
   does not account for. `DailyRuns` and `DailyRunningDistance` read the same
   window of the same rows.
+- **Invariant — the weekly trend lives inside the cached grid, never in a cache of
+  its own.** _Breaks if:_ the chart is cached or built outside `HeatmapGridCache::remember()`
+  — a sync or an import that calls `forgetAthlete()` would then retire the grid but leave
+  a chart that disagrees with its rows. Its lead-in query runs inside the build closure, so
+  a cache hit costs the chart no query.
 - **Invariant — the scale is calibrated once per grid build**, so cells and legend
   cannot disagree.
 - **Invariant — the failure reason is escaped** (`{{ }}`), never `{!! !!}`: it can

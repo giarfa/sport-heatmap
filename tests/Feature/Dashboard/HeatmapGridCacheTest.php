@@ -5,6 +5,8 @@ namespace Tests\Feature\Dashboard;
 use __PHP_Incomplete_Class;
 use App\Data\Heatmap\DayRun;
 use App\Data\Heatmap\HeatmapGrid;
+use App\Data\Heatmap\TrendBar;
+use App\Data\Heatmap\TrendTick;
 use App\Models\Activity;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapBuilder;
@@ -126,7 +128,7 @@ class HeatmapGridCacheTest extends TestCase
         $this->useTheDatabaseCacheStore();
         $athlete = $this->athleteWithOneRun();
         $window = HeatmapWindow::current();
-        $key = "heatmap:grid:v3:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString();
+        $key = "heatmap:grid:v4:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString();
 
         Cache::put($key, new stdClass, 3_600);
         $this->assertInstanceOf(__PHP_Incomplete_Class::class, Cache::get($key));
@@ -169,7 +171,7 @@ class HeatmapGridCacheTest extends TestCase
 
         $this->getDashboard()->assertOk();
 
-        $cached = Cache::get("heatmap:grid:v3:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString());
+        $cached = Cache::get("heatmap:grid:v4:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString());
         $this->assertInstanceOf(HeatmapGrid::class, $cached);
 
         $ranCells = collect($cached->weeks)->flatMap(fn ($week) => $week->days)->filter(fn ($cell) => $cell->hasDetail());
@@ -177,6 +179,8 @@ class HeatmapGridCacheTest extends TestCase
         $run = $ranCells->first()->runs[0];
         $this->assertInstanceOf(DayRun::class, $run);
         $this->assertSame('9.0 km', $run->kilometres());
+        $this->assertInstanceOf(TrendBar::class, $cached->trend->bars[0]);
+        $this->assertInstanceOf(TrendTick::class, $cached->trend->ticks[0]);
     }
 
     public function test_a_grid_cached_before_the_day_detail_existed_is_never_read(): void
@@ -191,7 +195,7 @@ class HeatmapGridCacheTest extends TestCase
 
         $this->getDashboard()->assertOk()->assertSee('9.0 km');
 
-        $this->assertTrue(Cache::has("heatmap:grid:v3:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString()));
+        $this->assertTrue(Cache::has("heatmap:grid:v4:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString()));
         $this->assertInstanceOf(__PHP_Incomplete_Class::class, Cache::get($oldKey), 'The old entry is left to expire, untouched.');
     }
 

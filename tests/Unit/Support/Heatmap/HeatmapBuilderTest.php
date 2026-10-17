@@ -4,6 +4,7 @@ namespace Tests\Unit\Support\Heatmap;
 
 use App\Data\Heatmap\DayRun;
 use App\Enums\DayCellState;
+use App\Support\Heatmap\BuildWeeklyTrend;
 use App\Support\Heatmap\CalibrateIntensityScale;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapWindow;
@@ -14,7 +15,7 @@ class HeatmapBuilderTest extends TestCase
 {
     private function builder(): HeatmapBuilder
     {
-        return new HeatmapBuilder(new CalibrateIntensityScale);
+        return new HeatmapBuilder(new CalibrateIntensityScale, new BuildWeeklyTrend);
     }
 
     public function test_the_grid_has_16_rows_of_7_cells_oldest_week_first(): void
