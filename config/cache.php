@@ -1,8 +1,12 @@
 <?php
 
 use App\Data\Heatmap\DayCell;
+use App\Data\Heatmap\DayRun;
 use App\Data\Heatmap\HeatmapGrid;
 use App\Data\Heatmap\IntensityScale;
+use App\Data\Heatmap\TrendBar;
+use App\Data\Heatmap\TrendTick;
+use App\Data\Heatmap\WeeklyTrend;
 use App\Data\Heatmap\WeekRow;
 use App\Enums\DayCellState;
 use Carbon\CarbonImmutable;
@@ -145,7 +149,11 @@ return [
         HeatmapGrid::class,
         WeekRow::class,
         DayCell::class,
+        DayRun::class,
         IntensityScale::class,
+        WeeklyTrend::class,
+        TrendBar::class,
+        TrendTick::class,
         DayCellState::class,
         CarbonImmutable::class,
     ],

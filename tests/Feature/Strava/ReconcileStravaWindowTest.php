@@ -73,6 +73,21 @@ class ReconcileStravaWindowTest extends TestCase
         $this->assertSame(0, Activity::count());
     }
 
+    public function test_a_strava_run_on_the_windows_last_day_that_strava_no_longer_returns_is_deleted_and_a_garmin_run_survives(): void
+    {
+        $user = $this->allowlistedAthlete();
+        $window = HeatmapWindow::current();
+
+        $stravaRun = Activity::factory()->for($user)->onDate($window->endsOn)->create();
+        $garminRun = Activity::factory()->for($user)->garminImported()->onDate($window->endsOn)->create();
+
+        $outcome = $this->reconcile($user, $window, []);
+
+        $this->assertSame(1, $outcome->deleted);
+        $this->assertFalse(Activity::whereKey($stravaRun->id)->exists());
+        $this->assertTrue(Activity::whereKey($garminRun->id)->exists());
+    }
+
     public function test_an_activity_outside_the_window_is_left_untouched(): void
     {
         $user = $this->allowlistedAthlete();
@@ -171,6 +186,191 @@ class ReconcileStravaWindowTest extends TestCase
         $this->assertSame(8_290, $stored->distance_meters);
         $this->assertSame(3_263, $stored->moving_time_seconds);
         $this->assertSame($start->format('Y-m-d H:i:s'), $stored->start_date_local->format('Y-m-d H:i:s'));
+    }
+
+    public function test_a_new_activity_stores_its_pace_ascent_and_heart_rate(): void
+    {
+        $user = $this->allowlistedAthlete();
+
+        $this->reconcile($user, HeatmapWindow::current(), [
+            $this->stravaActivity([
+                'id' => 1,
+                'average_speed' => 3.095,
+                'total_elevation_gain' => 44.6,
+                'average_heartrate' => 151.7,
+            ]),
+        ]);
+
+        $activity = Activity::sole();
+        $this->assertSame(323, $activity->average_pace_seconds_per_km);
+        $this->assertSame(45, $activity->total_ascent_meters);
+        $this->assertSame(152, $activity->average_heart_rate);
+    }
+
+    public function test_a_run_without_a_heart_rate_stores_the_other_metrics_and_an_empty_heart_rate(): void
+    {
+        $user = $this->allowlistedAthlete();
+
+        $this->reconcile($user, HeatmapWindow::current(), [
+            $this->stravaActivity(['id' => 1, 'average_speed' => 2.5, 'total_elevation_gain' => 30.0]),
+        ]);
+
+        $activity = Activity::sole();
+        $this->assertSame(400, $activity->average_pace_seconds_per_km);
+        $this->assertSame(30, $activity->total_ascent_meters);
+        $this->assertNull($activity->average_heart_rate);
+    }
+
+    public function test_a_zero_average_speed_stores_no_pace_rather_than_zero(): void
+    {
+        $user = $this->allowlistedAthlete();
+
+        $this->reconcile($user, HeatmapWindow::current(), [
+            $this->stravaActivity(['id' => 1, 'average_speed' => 0, 'total_elevation_gain' => 12.0, 'average_heartrate' => 140.0]),
+        ]);
+
+        $activity = Activity::sole();
+        $this->assertNull($activity->average_pace_seconds_per_km);
+        $this->assertSame(12, $activity->total_ascent_meters);
+        $this->assertSame(140, $activity->average_heart_rate);
+    }
+
+    public function test_a_strava_run_stored_before_the_metrics_existed_gains_them_on_the_next_sync(): void
+    {
+        $user = $this->allowlistedAthlete();
+        $window = HeatmapWindow::current();
+        $start = Carbon::today()->setTime(7, 15);
+
+        Activity::factory()->for($user)->withoutMetrics()->create([
+            'strava_activity_id' => 9,
+            'start_date_local' => $start,
+            'activity_date' => $start->toDateString(),
+        ]);
+
+        $payload = [
+            'id' => 9,
+            'start_date_local' => $start->format('Y-m-d\TH:i:s\Z'),
+            'average_speed' => 2.86,
+            'total_elevation_gain' => 45.6,
+            'average_heartrate' => 151.7,
+        ];
+
+        $first = $this->reconcile($user, $window, [$this->stravaActivity($payload)]);
+        $second = $this->reconcile($user, $window, [$this->stravaActivity($payload)]);
+
+        $activity = Activity::sole();
+        $this->assertSame(350, $activity->average_pace_seconds_per_km);
+        $this->assertSame(46, $activity->total_ascent_meters);
+        $this->assertSame(152, $activity->average_heart_rate);
+        $this->assertSame(1, $first->upserted, 'The backfill is a change, so it counts as upserted.');
+        $this->assertSame(0, $second->upserted, 'Once backfilled, the same fetch changes nothing.');
+    }
+
+    public function test_a_metric_strava_stops_reporting_is_cleared_on_a_strava_run(): void
+    {
+        $user = $this->allowlistedAthlete();
+        $start = Carbon::today()->setTime(7, 15);
+
+        Activity::factory()->for($user)->create([
+            'strava_activity_id' => 9,
+            'start_date_local' => $start,
+            'activity_date' => $start->toDateString(),
+            'average_heart_rate' => 150,
+        ]);
+
+        $this->reconcile($user, HeatmapWindow::current(), [
+            $this->stravaActivity(['id' => 9, 'start_date_local' => $start->format('Y-m-d\TH:i:s\Z'), 'average_speed' => 3.0]),
+        ]);
+
+        $this->assertNull(Activity::sole()->average_heart_rate);
+    }
+
+    public function test_a_garmin_won_twin_keeps_its_metrics_when_strava_returns_different_ones(): void
+    {
+        $user = $this->allowlistedAthlete();
+        $start = Carbon::today()->setTime(9, 33, 27);
+
+        $twin = Activity::factory()->for($user)->garminOverwritten()->create([
+            'strava_activity_id' => 42,
+            'start_date_local' => $start,
+            'activity_date' => $start->toDateString(),
+            'average_pace_seconds_per_km' => 327,
+            'total_ascent_meters' => 64,
+            'average_heart_rate' => 151,
+        ]);
+
+        $outcome = $this->reconcile($user, HeatmapWindow::current(), [
+            $this->stravaActivity([
+                'id' => 42,
+                'start_date_local' => $start->format('Y-m-d\TH:i:s\Z'),
+                'average_speed' => 2.0,
+                'total_elevation_gain' => 10.0,
+                'average_heartrate' => 120.0,
+            ]),
+        ]);
+
+        $stored = $twin->fresh();
+        $this->assertSame(0, $outcome->upserted);
+        $this->assertSame(327, $stored->average_pace_seconds_per_km);
+        $this->assertSame(64, $stored->total_ascent_meters);
+        $this->assertSame(151, $stored->average_heart_rate);
+    }
+
+    public function test_a_garmin_won_twin_without_metrics_stays_without_them(): void
+    {
+        $user = $this->allowlistedAthlete();
+        $start = Carbon::today()->setTime(9, 33, 27);
+
+        $twin = Activity::factory()->for($user)->garminOverwritten()->withoutMetrics()->create([
+            'strava_activity_id' => 42,
+            'start_date_local' => $start,
+            'activity_date' => $start->toDateString(),
+        ]);
+
+        $this->reconcile($user, HeatmapWindow::current(), [
+            $this->stravaActivity([
+                'id' => 42,
+                'start_date_local' => $start->format('Y-m-d\TH:i:s\Z'),
+                'average_speed' => 3.0,
+                'total_elevation_gain' => 20.0,
+                'average_heartrate' => 140.0,
+            ]),
+        ]);
+
+        $stored = $twin->fresh();
+        $this->assertNull($stored->average_pace_seconds_per_km);
+        $this->assertNull($stored->total_ascent_meters);
+        $this->assertNull($stored->average_heart_rate);
+    }
+
+    public function test_a_late_linked_garmin_run_keeps_its_metrics_and_its_empty_ones(): void
+    {
+        $user = $this->allowlistedAthlete();
+        $start = Carbon::today()->setTime(9, 33, 27);
+
+        $imported = Activity::factory()->for($user)->garminImported()->create([
+            'start_date_local' => $start,
+            'activity_date' => $start->toDateString(),
+            'average_pace_seconds_per_km' => 330,
+            'total_ascent_meters' => null,
+            'average_heart_rate' => null,
+        ]);
+
+        $this->reconcile($user, HeatmapWindow::current(), [
+            $this->stravaActivity([
+                'id' => 77,
+                'start_date_local' => $start->copy()->addSeconds(90)->format('Y-m-d\TH:i:s\Z'),
+                'average_speed' => 2.0,
+                'total_elevation_gain' => 80.0,
+                'average_heartrate' => 160.0,
+            ]),
+        ]);
+
+        $linked = $imported->fresh();
+        $this->assertSame(77, $linked->strava_activity_id);
+        $this->assertSame(330, $linked->average_pace_seconds_per_km);
+        $this->assertNull($linked->total_ascent_meters, 'A metric the CSV left empty is not filled from Strava.');
+        $this->assertNull($linked->average_heart_rate);
     }
 
     public function test_a_garmin_won_twin_that_strava_no_longer_returns_is_not_deleted(): void

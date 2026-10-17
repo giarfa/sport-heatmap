@@ -20,10 +20,7 @@ final readonly class DailyRunningDistance
     {
         $rows = $athlete->activities()
             ->selectRaw('activity_date, SUM(distance_meters) as meters')
-            ->whereBetween('activity_date', [
-                $window->startsOn->toDateString(),
-                $window->endsOn->toDateString(),
-            ])
+            ->onDaysBetween($window->startsOn, $window->endsOn)
             ->groupBy('activity_date')
             ->get();
 

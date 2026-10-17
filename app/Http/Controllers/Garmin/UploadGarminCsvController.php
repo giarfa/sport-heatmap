@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Garmin\UploadGarminCsvRequest;
 use App\Support\Garmin\ParseGarminCsv;
 use App\Support\Garmin\PendingGarminImport;
-use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
 
@@ -31,7 +30,7 @@ class UploadGarminCsvController extends Controller
          * cadence and locations included — is never persisted beyond the request.
          */
         try {
-            $parsed = $parseGarminCsv((string) $file->getRealPath(), HeatmapWindow::current(), now());
+            $parsed = $parseGarminCsv((string) $file->getRealPath(), now());
         } catch (GarminCsvRejectedException $exception) {
             return redirect()->route('garmin.import.create')->withErrors(['csv' => $exception->getMessage()]);
         }

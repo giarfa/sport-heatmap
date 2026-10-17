@@ -4,7 +4,6 @@ namespace Tests\Feature\Strava;
 
 use App\Models\Activity;
 use App\Models\User;
-use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +33,11 @@ class ReconnectStateTest extends TestCase
         Http::fake(['www.strava.com/oauth/token' => Http::response(['message' => 'Unauthorized'], 401)]);
 
         $user = $this->allowlistedAthlete(factoryState: 'stravaTokenExpired');
-        Activity::factory()->for($user)->onDate(HeatmapWindow::current()->endsOn->subDays(2))->create([
+        /*
+         * Yesterday, not a fixed offset from the window's end: that Sunday-based offset lands on a
+         * future day from Monday to Thursday, which the grid renders as not-yet and never sums.
+         */
+        Activity::factory()->for($user)->onDate(now()->subDay())->create([
             'distance_meters' => 12_345,
         ]);
 

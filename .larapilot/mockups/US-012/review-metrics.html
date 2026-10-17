@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Review Garmin import, with run metrics — Sport Heatmap</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="detail.css">
+<script>if (location.hash === '#dark') document.documentElement.classList.add('dark');</script>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <a href="../heatmap-dashboard/index.html" class="brand">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="17" width="12" height="12" rx="3" fill="#86b6ef"/><rect x="17" y="17" width="12" height="12" rx="3" fill="#2a78d6"/><rect x="3" y="3" width="12" height="12" rx="3" fill="#3987e5"/><rect x="17" y="3" width="12" height="12" rx="3" fill="#104281"/></svg>
+      Heatmap
+    </a>
+    <button type="button" class="icon-btn" aria-pressed="false" onclick="document.documentElement.classList.toggle('dark'); this.setAttribute('aria-pressed', document.documentElement.classList.contains('dark'))">
+      <span class="sr-only">Toggle dark mode</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+  <div class="imp imp--wide">
+    <h1>Review import</h1>
+    <p class="lede">Nothing is saved until you confirm.</p>
+
+    <section class="card" style="margin-top:1rem; padding:1rem 1.25rem;" aria-labelledby="tally-h">
+      <h2 id="tally-h" class="sr-only">What the file contains</h2>
+      <dl class="tally">
+        <div><dt>New runs</dt><dd>35</dd></div>
+        <div><dt>Clashes to decide</dt><dd>2</dd></div>
+        <div><dt>Already imported</dt><dd>4</dd></div>
+        <div><dt>Not runs, ignored</dt><dd>3</dd></div>
+        <div><dt>Outside 16 weeks</dt><dd>0</dd></div>
+        <div><dt>Unreadable rows</dt><dd>0</dd></div>
+      </dl>
+    </section>
+
+    <form action="summary.html" method="get" style="margin-top:1rem;">
+      <section class="card" style="padding:1rem 1.25rem;" aria-labelledby="cmp-h">
+        <div>
+          <h2 id="cmp-h" class="section-title">Clashes</h2>
+          <p class="section-note">A stored run starts within 2 minutes of a run in the file. Skip keeps the stored one. Overwrite replaces the run and its pace, ascent and heart rate; a “—” in the file keeps the stored value.</p>
+        </div>
+
+        <table class="cmp" style="margin-top:0.75rem;">
+          <caption class="sr-only">Stored run compared with the run in the file, and what to keep</caption>
+          <thead>
+            <tr>
+              <th scope="col">Run</th>
+              <th scope="col">Stored</th>
+              <th scope="col">Garmin file</th>
+              <th scope="col">Keep</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row"><span class="run-date">Sat 10 Oct 2026</span>Paese Corsa</th>
+              <td data-label="Stored" class="cmp-pair">
+                <dl class="side">
+                  <div><dt>Start</dt><dd>09:34:10</dd></div>
+                  <div><dt>Distance</dt><dd>8.2 km</dd></div>
+                  <div><dt>Moving</dt><dd>0:45:14</dd></div>
+                  <div><dt>Avg pace</dt><dd>5:31 /km</dd></div>
+                  <div><dt>Ascent</dt><dd>62 m</dd></div>
+                  <div><dt>Heart rate</dt><dd>150 bpm</dd></div>
+                </dl>
+                <p class="side-source">Strava · <a href="https://www.strava.com/activities/12345670015">View on Strava</a></p>
+              </td>
+              <td data-label="Garmin file" class="cmp-pair">
+                <dl class="side">
+                  <div><dt>Start</dt><dd>09:33:27</dd></div>
+                  <div><dt>Distance</dt><dd>8.3 km</dd></div>
+                  <div><dt>Moving</dt><dd>0:45:17</dd></div>
+                  <div><dt>Avg pace</dt><dd>5:27 /km</dd></div>
+                  <div><dt>Ascent</dt><dd>64 m</dd></div>
+                  <div><dt>Heart rate</dt><dd>151 bpm</dd></div>
+                </dl>
+              </td>
+              <td data-label="Keep">
+                <fieldset class="choice">
+                  <legend>Paese Corsa, 10 Oct 09:33</legend>
+                  <div class="seg">
+                    <input type="radio" id="r0-skip" name="resolutions[0]" value="skip" checked><label for="r0-skip">Skip</label>
+                    <input type="radio" id="r0-over" name="resolutions[0]" value="overwrite"><label for="r0-over">Overwrite</label>
+                  </div>
+                </fieldset>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row"><span class="run-date">Wed 30 Sep 2026</span>Paese Corsa</th>
+              <td data-label="Stored" class="cmp-pair">
+                <dl class="side">
+                  <div><dt>Start</dt><dd>06:41:30</dd></div>
+                  <div><dt>Distance</dt><dd>5.0 km</dd></div>
+                  <div><dt>Moving</dt><dd>0:31:40</dd></div>
+                  <div><dt>Avg pace</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div>
+                  <div><dt>Ascent</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div>
+                  <div><dt>Heart rate</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div>
+                </dl>
+                <p class="side-source">Garmin import</p>
+              </td>
+              <td data-label="Garmin file" class="cmp-pair">
+                <dl class="side">
+                  <div><dt>Start</dt><dd>06:40:07</dd></div>
+                  <div><dt>Distance</dt><dd>5.1 km</dd></div>
+                  <div><dt>Moving</dt><dd>0:32:05</dd></div>
+                  <div><dt>Avg pace</dt><dd>6:17 /km</dd></div>
+                  <div><dt>Ascent</dt><dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd></div>
+                  <div><dt>Heart rate</dt><dd>149 bpm</dd></div>
+                </dl>
+              </td>
+              <td data-label="Keep">
+                <fieldset class="choice">
+                  <legend>Paese Corsa, 30 Sep 06:40</legend>
+                  <div class="seg">
+                    <input type="radio" id="r1-skip" name="resolutions[1]" value="skip" checked><label for="r1-skip">Skip</label>
+                    <input type="radio" id="r1-over" name="resolutions[1]" value="overwrite"><label for="r1-over">Overwrite</label>
+                  </div>
+                </fieldset>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <div class="btn-row">
+        <button type="submit" class="btn btn--primary">Confirm import</button>
+        <a href="../heatmap-dashboard/index.html" class="btn btn--secondary">Cancel</a>
+      </div>
+    </form>
+
+    <p class="mock-annot">
+      Changed against US-008: three rows (Avg pace, Ascent, Heart rate) under Moving, on both sides. A value the file or the stored run
+      does not have reads “—”. The “New runs” table, the tally and the shortcuts are unchanged: new runs are added as they are, and
+      “Already imported” runs fill only their empty metrics without asking. A signed-out visitor’s stored side keeps showing the start only —
+      no pace, ascent or heart rate (same rule as name, distance and moving time).
+    </p>
+  </div>
+</main>
+
+<footer><a href="https://www.strava.com">Powered by Strava</a> · runs only · distances in kilometres</footer>
+</body>
+</html>

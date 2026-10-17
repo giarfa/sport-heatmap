@@ -42,4 +42,29 @@ final class GarminImportFormat
     {
         return $date->format('D j M Y');
     }
+
+    /**
+     * Average pace as minutes and seconds per kilometre: 323 → "5:23 /km". Null when
+     * the pace was not recorded; the view prints that as an em dash.
+     */
+    public static function pace(?int $secondsPerKm): ?string
+    {
+        return $secondsPerKm === null ? null : sprintf('%d:%02d /km', intdiv($secondsPerKm, 60), $secondsPerKm % 60);
+    }
+
+    /**
+     * Total ascent in whole metres: 45 → "45 m".
+     */
+    public static function ascent(?int $meters): ?string
+    {
+        return $meters === null ? null : "{$meters} m";
+    }
+
+    /**
+     * Average heart rate in whole beats per minute: 152 → "152 bpm".
+     */
+    public static function heartRate(?int $bpm): ?string
+    {
+        return $bpm === null ? null : "{$bpm} bpm";
+    }
 }

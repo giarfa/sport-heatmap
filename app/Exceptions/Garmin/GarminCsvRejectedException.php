@@ -35,7 +35,7 @@ class GarminCsvRejectedException extends RuntimeException
 
     public static function tooManyRuns(int $limit): self
     {
-        return new self("The file has more than {$limit} runs in the last 16 weeks. Export a shorter period from Garmin Connect.");
+        return new self("The file has more than {$limit} runs. Export a shorter period from Garmin Connect.");
     }
 
     public static function tooManyInvalidRows(int $limit): self

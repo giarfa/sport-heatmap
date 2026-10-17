@@ -2,7 +2,9 @@
 
 namespace Tests\Unit\Support\Heatmap;
 
+use App\Data\Heatmap\DayRun;
 use App\Enums\DayCellState;
+use App\Support\Heatmap\BuildWeeklyTrend;
 use App\Support\Heatmap\CalibrateIntensityScale;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapWindow;
@@ -13,7 +15,7 @@ class HeatmapBuilderTest extends TestCase
 {
     private function builder(): HeatmapBuilder
     {
-        return new HeatmapBuilder(new CalibrateIntensityScale);
+        return new HeatmapBuilder(new CalibrateIntensityScale, new BuildWeeklyTrend);
     }
 
     public function test_the_grid_has_16_rows_of_7_cells_oldest_week_first(): void
@@ -193,5 +195,44 @@ class HeatmapBuilderTest extends TestCase
         }
 
         $this->assertSame(112, $cellCount);
+    }
+
+    public function test_runs_are_attached_only_to_ran_days_in_the_order_given(): void
+    {
+        $today = CarbonImmutable::parse('2026-09-05'); // Saturday
+        $window = HeatmapWindow::current($today);
+        $ranDay = $today->subDays(2)->toDateString();
+        $first = new DayRun('Morning run', 5_000, 1_650, 330, 20, 140, null);
+        $second = new DayRun('Evening run', 3_000, 1_100, 366, null, null, null);
+
+        $grid = $this->builder()(
+            $window,
+            [$ranDay => 8_000],
+            $today,
+            [
+                $ranDay => [$first, $second],
+                $today->subDays(3)->toDateString() => [$first], // a run the grid counted as 0 m: a rest day
+                $today->addDay()->toDateString() => [$first],   // a future day
+            ],
+        );
+
+        $cells = collect($grid->weeks)->flatMap(fn ($week) => $week->days);
+
+        $this->assertSame([$first, $second], $cells->first(fn ($cell) => $cell->date->toDateString() === $ranDay)->runs);
+        $this->assertSame(
+            1,
+            $cells->filter(fn ($cell) => $cell->runs !== [])->count(),
+            'Only the ran day carries runs.',
+        );
+        $this->assertTrue($cells->first(fn ($cell) => $cell->date->toDateString() === $ranDay)->hasDetail());
+    }
+
+    public function test_a_grid_built_without_runs_has_no_detail_anywhere(): void
+    {
+        $today = CarbonImmutable::parse('2026-09-05');
+
+        $grid = $this->builder()(HeatmapWindow::current($today), [$today->subDay()->toDateString() => 8_000], $today);
+
+        $this->assertFalse(collect($grid->weeks)->flatMap(fn ($week) => $week->days)->contains(fn ($cell) => $cell->hasDetail()));
     }
 }

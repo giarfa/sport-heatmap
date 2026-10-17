@@ -22,7 +22,7 @@
                 <div><dt>Clashes to decide</dt><dd>{{ count($plan->conflicts) }}</dd></div>
                 <div><dt>Already imported</dt><dd>{{ count($plan->alreadyImported) }}</dd></div>
                 <div><dt>Not runs, ignored</dt><dd>{{ $parsed->ignoredTotal() }}</dd></div>
-                <div><dt>Outside 16 weeks</dt><dd>{{ $parsed->outsideWindow }}</dd></div>
+                <div><dt>Future-dated</dt><dd>{{ $parsed->futureDated }}</dd></div>
                 <div><dt>Unreadable rows</dt><dd>{{ count($parsed->invalid) }}</dd></div>
             </dl>
         </section>
@@ -37,7 +37,7 @@
                     <div class="flex flex-wrap items-end justify-between gap-3">
                         <div>
                             <h2 id="clashes-heading" class="section-title">Clashes</h2>
-                            <p class="section-note">A stored run starts within 2 minutes of a run in the file. Skip keeps the stored one.</p>
+                            <p class="section-note">A stored run starts within 2 minutes of a run in the file. Skip keeps the stored one. Overwrite replaces the run and its pace, ascent and heart rate; a “—” in the file keeps the stored value.</p>
                         </div>
                         {{-- Revealed by resources/js/app.js; without JS they never appear and the radios still work. --}}
                         <div class="shortcuts" data-resolve-shortcuts hidden>
@@ -68,6 +68,9 @@
                                                 <div><dt>Start</dt><dd>{{ GarminImportFormat::start($conflict->stored->start_date_local) }}</dd></div>
                                                 <div><dt>Distance</dt><dd>{{ GarminImportFormat::distance($conflict->stored->distance_meters) }}</dd></div>
                                                 <div><dt>Moving</dt><dd>{{ GarminImportFormat::duration($conflict->stored->moving_time_seconds) }}</dd></div>
+                                                <div><dt>Avg pace</dt><x-run-metric :value="GarminImportFormat::pace($conflict->stored->average_pace_seconds_per_km)" /></div>
+                                                <div><dt>Ascent</dt><x-run-metric :value="GarminImportFormat::ascent($conflict->stored->total_ascent_meters)" /></div>
+                                                <div><dt>Heart rate</dt><x-run-metric :value="GarminImportFormat::heartRate($conflict->stored->average_heart_rate)" /></div>
                                             </dl>
                                             <p class="side-source">
                                                 {{ $conflict->stored->name }} ·
@@ -78,6 +81,7 @@
                                                 @endif
                                             </p>
                                         @else
+                                            {{-- A guest sees the start only: no pace, ascent or heart rate either (same rule as name, distance and time). --}}
                                             <dl class="side">
                                                 <div><dt>Start</dt><dd>{{ GarminImportFormat::start($conflict->stored->start_date_local) }}</dd></div>
                                             </dl>
@@ -89,6 +93,9 @@
                                             <div><dt>Start</dt><dd>{{ GarminImportFormat::start($conflict->row->startDateLocal) }}</dd></div>
                                             <div><dt>Distance</dt><dd>{{ GarminImportFormat::distance($conflict->row->distanceMeters) }}</dd></div>
                                             <div><dt>Moving</dt><dd>{{ GarminImportFormat::duration($conflict->row->movingTimeSeconds) }}</dd></div>
+                                            <div><dt>Avg pace</dt><x-run-metric :value="GarminImportFormat::pace($conflict->row->averagePaceSecondsPerKm)" /></div>
+                                            <div><dt>Ascent</dt><x-run-metric :value="GarminImportFormat::ascent($conflict->row->totalAscentMeters)" /></div>
+                                            <div><dt>Heart rate</dt><x-run-metric :value="GarminImportFormat::heartRate($conflict->row->averageHeartRate)" /></div>
                                         </dl>
                                     </td>
                                     <td data-label="Keep">

@@ -8,6 +8,8 @@ use App\Models\Activity;
 use App\Models\SyncRun;
 use App\Models\User;
 use App\Services\Strava\StravaClient;
+use App\Support\Heatmap\HeatmapWindow;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -59,6 +61,70 @@ class SyncStravaActivitiesCommandTest extends TestCase
         $this->assertNull($syncRun->error_message);
     }
 
+    public function test_the_nightly_sync_stores_the_run_metrics_and_backfills_runs_stored_without_them(): void
+    {
+        $athlete = $this->allowlistedAthlete();
+
+        $start = now()->subDays(2)->setTime(7, 15);
+        Activity::factory()->for($athlete)->withoutMetrics()->create([
+            'strava_activity_id' => 1,
+            'start_date_local' => $start,
+            'activity_date' => $start->toDateString(),
+        ]);
+
+        Http::fake([
+            'www.strava.com/api/v3/athlete/activities*' => Http::response([
+                $this->stravaActivityPayload([
+                    'id' => 1,
+                    'start_date_local' => $start->format('Y-m-d\TH:i:s\Z'),
+                    'average_speed' => 3.095,
+                    'total_elevation_gain' => 45.0,
+                    'average_heartrate' => 152.0,
+                ]),
+                $this->stravaActivityPayload(['id' => 2, 'average_speed' => 0, 'total_elevation_gain' => 8.0]),
+            ]),
+        ]);
+
+        $this->artisan('strava:sync')->assertExitCode(Command::SUCCESS);
+
+        $backfilled = Activity::where('strava_activity_id', 1)->sole();
+        $this->assertSame(323, $backfilled->average_pace_seconds_per_km);
+        $this->assertSame(45, $backfilled->total_ascent_meters);
+        $this->assertSame(152, $backfilled->average_heart_rate);
+
+        $stopped = Activity::where('strava_activity_id', 2)->sole();
+        $this->assertNull($stopped->average_pace_seconds_per_km);
+        $this->assertSame(8, $stopped->total_ascent_meters);
+        $this->assertNull($stopped->average_heart_rate);
+
+        $this->assertSame(2, SyncRun::sole()->activities_upserted);
+    }
+
+    public function test_a_garmin_won_twin_keeps_its_metrics_through_the_nightly_sync(): void
+    {
+        $athlete = $this->allowlistedAthlete();
+
+        $twin = Activity::factory()->for($athlete)->garminOverwritten()->onDate(now())->create([
+            'strava_activity_id' => 42,
+            'average_pace_seconds_per_km' => 327,
+            'total_ascent_meters' => 64,
+            'average_heart_rate' => 151,
+        ]);
+
+        Http::fake([
+            'www.strava.com/api/v3/athlete/activities*' => Http::response([
+                $this->stravaActivityPayload(['id' => 42, 'average_speed' => 2.0, 'total_elevation_gain' => 10.0, 'average_heartrate' => 120.0]),
+            ]),
+        ]);
+
+        $this->artisan('strava:sync')->assertExitCode(Command::SUCCESS);
+
+        $stored = $twin->fresh();
+        $this->assertSame(327, $stored->average_pace_seconds_per_km);
+        $this->assertSame(64, $stored->total_ascent_meters);
+        $this->assertSame(151, $stored->average_heart_rate);
+    }
+
     public function test_a_garmin_won_activity_survives_the_sync_and_is_excluded_from_the_run_counts(): void
     {
         $athlete = $this->allowlistedAthlete();
@@ -91,6 +157,28 @@ class SyncStravaActivitiesCommandTest extends TestCase
         $this->assertSame(SyncRunStatus::Succeeded, $syncRun->status);
         $this->assertSame(1, $syncRun->activities_upserted);
         $this->assertSame(0, $syncRun->activities_deleted);
+    }
+
+    public function test_the_sync_fetches_only_the_current_window_and_never_deletes_older_activities(): void
+    {
+        $this->travelTo('2026-09-05 09:00:00');
+        $athlete = $this->allowlistedAthlete();
+
+        $olderStravaRun = Activity::factory()->for($athlete)->onDate(CarbonImmutable::parse('2026-03-02'))->create(['strava_activity_id' => 777]);
+        $olderGarminRun = Activity::factory()->for($athlete)->garminImported()->onDate(CarbonImmutable::parse('2026-02-10'))->create();
+
+        Http::fake([
+            'www.strava.com/api/v3/athlete/activities*' => Http::response([$this->stravaActivityPayload(['id' => 1])]),
+        ]);
+
+        $this->artisan('strava:sync')->assertExitCode(Command::SUCCESS);
+
+        Http::assertSent(fn (Request $request): bool => (int) $request['after'] === HeatmapWindow::current()->afterTimestamp());
+        $this->assertSame(CarbonImmutable::parse('2026-05-18')->getTimestamp(), HeatmapWindow::current()->afterTimestamp());
+        $this->assertTrue(Activity::whereKey($olderStravaRun->id)->exists());
+        $this->assertTrue(Activity::whereKey($olderGarminRun->id)->exists());
+        $this->assertSame(3, Activity::count());
+        $this->assertSame(0, SyncRun::sole()->activities_deleted);
     }
 
     public function test_running_it_twice_against_the_same_response_reports_zero_zero_the_second_time(): void

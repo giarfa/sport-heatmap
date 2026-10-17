@@ -28,6 +28,9 @@ final class GarminCsvColumns
             'distance' => 'Distanza',
             'moving_time' => 'Tempo in movimento',
             'time' => 'Tempo',
+            'avg_pace' => 'Passo medio',
+            'total_ascent' => 'Ascesa totale',
+            'avg_hr' => 'FC Media',
         ],
         'en' => [
             'type' => 'Activity Type',
@@ -36,15 +39,27 @@ final class GarminCsvColumns
             'distance' => 'Distance',
             'moving_time' => 'Moving Time',
             'time' => 'Time',
+            'avg_pace' => 'Avg Pace',
+            'total_ascent' => 'Total Ascent',
+            'avg_hr' => 'Avg HR',
         ],
     ];
 
+    /*
+     * The three run-metric headers (decision 98fe4bd16f3263d6). The Italian ones are
+     * read off a real export; the English ones follow the existing English fixture
+     * and are unconfirmed by a real English export — if a real one differs, the fix
+     * is one line here, and until then an English file simply imports without metrics.
+     */
+
     /**
-     * Read when moving time is "--"; a file without it is still accepted.
+     * Columns a file may lack and still be accepted: "time" is read when moving time
+     * is "--", and the three run metrics are read when present. A missing optional
+     * column is never a rejection and never counts toward language detection.
      *
      * @var array<int, string>
      */
-    private const OPTIONAL_KEYS = ['time'];
+    private const OPTIONAL_KEYS = ['time', 'avg_pace', 'total_ascent', 'avg_hr'];
 
     /**
      * Map each canonical key to its column index in this file's header row.

@@ -1,0 +1,105 @@
+/* ---- US-012 mockups — shared stylesheet ------------------------------------
+   Builds on ../US-008/import.css, which already carries the tokens copied from
+   resources/css/app.css, the page shell, the card, the buttons and the stacked
+   comparison table. Nothing here is a new colour or a new design system: the
+   additions are the intensity ramp (data colours, from heatmap-dashboard/README.md),
+   the heatmap grid with its cells turned into controls, and the day-detail
+   dialog. The component rules below are the ones Alex ports into
+   resources/css/app.css under "Day cell detail". */
+@import url('../US-008/import.css');
+
+:root {
+  --lv-0: #e2e8f0; --lv-1: #86b6ef; --lv-2: #3987e5; --lv-3: #256abf; --lv-4: #104281;
+  --lv-future-border: #cbd5e1;
+  --cell-ring: rgba(15, 23, 42, 0.08);
+  --backdrop: rgb(15 23 42 / 0.55);
+}
+html.dark {
+  --lv-0: #1e293b; --lv-1: #184f95; --lv-2: #2a78d6; --lv-3: #5598e7; --lv-4: #9ec5f4;
+  --lv-future-border: #334155;
+  --cell-ring: rgba(248, 250, 252, 0.10);
+  --backdrop: rgb(0 0 0 / 0.65);
+}
+
+/* ---- Heatmap grid (unchanged geometry — see heatmap-dashboard/README.md) --- */
+.dash-grid { max-width: 34rem; padding: 0.75rem; }
+@media (min-width: 640px) { .dash-grid { padding: 1.25rem; } }
+.hm { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+.hm-col-week { width: 13%; } .hm-col-day { width: 9.5%; } .hm-col-total { width: 20.5%; }
+.hm-th-week { padding: 0 0.375rem 0 0; text-align: right; font-size: 0.625rem; font-weight: 500; color: var(--ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; vertical-align: middle; }
+.hm-th-day { padding: 0 0 0.375rem; font-size: 0.625rem; font-weight: 600; color: var(--ink-muted); text-align: center; }
+.hm-th-day abbr { text-decoration: none; }
+.hm-th-total { padding: 0 0 0.375rem 0.375rem; font-size: 0.625rem; font-weight: 600; color: var(--ink-muted); text-align: right; }
+.hm-td { padding: 2px; }
+.hm-cell { display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 0.1875rem; box-shadow: inset 0 0 0 1px var(--cell-ring); }
+.hm-cell--rest { background: var(--lv-0); }
+.hm-cell--l1 { background: var(--lv-1); } .hm-cell--l2 { background: var(--lv-2); }
+.hm-cell--l3 { background: var(--lv-3); } .hm-cell--l4 { background: var(--lv-4); }
+.hm-cell--future { background: transparent; box-shadow: none; border: 1px dashed var(--lv-future-border); }
+.hm-total { text-align: right; font-size: 0.6875rem; vertical-align: middle; font-variant-numeric: tabular-nums; white-space: nowrap; padding: 0 0 0 0.375rem; }
+.hm-total-num { font-weight: 600; } .hm-total-unit { color: var(--ink-muted); }
+.hm-partial { display: block; font-size: 0.5625rem; font-weight: 500; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.1; }
+.hm-row-current .hm-th-week { color: var(--ink); font-weight: 600; }
+@media (min-width: 480px) {
+  .hm-th-week, .hm-th-day, .hm-th-total { font-size: 0.6875rem; }
+  .hm-total { font-size: 0.8125rem; }
+  .hm-td { padding: 3px; }
+  .hm-cell { border-radius: 0.25rem; }
+}
+
+/* ---- NEW: a ran day is a control -------------------------------------------
+   The button fills the whole <td> and the 2–3 px gap moves inside it, so the
+   target is the full column width: 25.8 px at 320 px, 31 px at 375 px, both
+   ≥ 24 px (WCAG 2.2 SC 2.5.8). The visible square, the ramp and the grid
+   geometry do not change. Rest and future days stay plain, non-interactive cells. */
+.hm-td--ran { padding: 0; }
+.hm-hit { display: block; width: 100%; padding: 2px; border: 0; background: none; border-radius: 0.25rem; cursor: pointer; font: inherit; color: inherit; }
+@media (min-width: 480px) { .hm-hit { padding: 3px; } }
+.hm-hit:hover .hm-cell { box-shadow: 0 0 0 2px var(--ink-muted); }
+.hm-hit:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+.hm-hit.is-open .hm-cell { box-shadow: 0 0 0 2px var(--ink); }
+
+/* ---- NEW: the day detail dialog ---------------------------------------------
+   A native <dialog> opened with showModal(): focus trap, Esc, inert page and
+   focus return come from the browser. ≤ 639.98 px it is a bottom sheet; from
+   `sm` a centred dialog. */
+.day-dlg { padding: 0; border: 1px solid var(--hairline); background: var(--surface-card); color: var(--ink); max-width: none; overflow: hidden; }
+.day-dlg::backdrop { background: var(--backdrop); }
+.day-dlg[open] { display: flex; flex-direction: column; }
+@media (max-width: 639.98px) {
+  .day-dlg { position: fixed; inset: auto 0 0 0; margin: 0; width: 100%; max-height: 85dvh; border-width: 1px 0 0; border-radius: 1rem 1rem 0 0; }
+  .dlg-head::before { content: ''; position: absolute; top: 0.5rem; left: 50%; width: 2.25rem; height: 0.25rem; margin-left: -1.125rem; border-radius: 9999px; background: var(--control-border); }
+}
+@media (min-width: 640px) {
+  .day-dlg { width: min(30rem, calc(100% - 2rem)); max-height: min(80dvh, 40rem); border-radius: 0.75rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .day-dlg[open] { animation: dlg-in 0.18s ease-out; }
+  @keyframes dlg-in { from { opacity: 0; transform: translateY(1rem); } }
+}
+.dlg-head { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; padding: 1.25rem 0.5rem 0.5rem 1.25rem; border-bottom: 1px solid var(--hairline); }
+.dlg-head h2 { margin: 0; font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.dlg-sub { margin: 0.125rem 0 0.5rem; font-size: 0.8125rem; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.dlg-close { flex: none; display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 0; border-radius: 0.5rem; background: none; color: var(--ink-muted); cursor: pointer; }
+.dlg-body { overflow-y: auto; overscroll-behavior: contain; padding: 0 1.25rem 1.25rem; }
+
+.runs { margin: 0; padding: 0; list-style: none; }
+.run { padding: 1rem 0; border-top: 1px solid var(--hairline); }
+.run:first-child { border-top: 0; }
+.run-name { margin: 0; font-size: 0.9375rem; font-weight: 600; }
+.run-src { margin: 0.125rem 0 0; font-size: 0.75rem; color: var(--ink-muted); }
+.run-src a { display: inline-flex; align-items: center; min-height: 2.75rem; margin-block: -0.5rem -0.75rem; }
+.run-stats { margin: 0.5rem 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem 0.5rem; }
+.run-stats div { display: flex; flex-direction: column-reverse; justify-content: flex-end; }
+.run-stats dt { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
+.run-stats dd { margin: 0; font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.run-stats dd.is-empty { color: var(--ink-muted); font-weight: 500; }
+
+/* ---- NEW: three more rows in the review's stored / file sides --------------- */
+.side dt { min-width: 4.5rem; }
+.side dd.is-empty { color: var(--ink-muted); }
+
+.frames { display: flex; flex-wrap: wrap; gap: 1.5rem; padding: 1.5rem; align-items: flex-start; }
+.frames figure { margin: 0; }
+.frames figcaption { font-size: 0.75rem; color: var(--ink-muted); margin-bottom: 0.375rem; }
+.frames iframe { border: 1px solid var(--hairline); border-radius: 0.5rem; background: #fff; height: 900px; }

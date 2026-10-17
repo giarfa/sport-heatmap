@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\Garmin;
 
+use App\Data\Heatmap\HeatmapGrid;
 use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
+use App\Support\Heatmap\HeatmapBuilder;
+use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,6 +31,8 @@ class GarminImportFlowTest extends TestCase
     use RefreshDatabase;
 
     private const IT_HEADER = 'Tipo di attività,Data,Preferita,Titolo,Distanza,Tempo,Tempo in movimento';
+
+    private const IT_METRICS_HEADER = self::IT_HEADER.',Passo medio,Ascesa totale,FC Media';
 
     private const SAMPLE_FIRST_ROW = 'Corsa,2026-10-10 09:33:27,false,"Paese Corsa","8.29","00:54:24","00:54:23"';
 
@@ -71,17 +76,17 @@ class GarminImportFlowTest extends TestCase
         $summary->assertSee('Escursionismo');
     }
 
-    public function test_the_english_fixture_maps_types_and_lists_invalid_and_outside_window_rows(): void
+    public function test_the_english_fixture_maps_types_and_lists_invalid_and_future_dated_rows(): void
     {
         $this->upload($this->fixture('activities-en.csv'));
         $this->confirm($this->review());
 
-        $this->assertSame(6, Activity::count());
+        $this->assertSame(7, Activity::count());
         $this->assertSame(SportType::TrailRun, Activity::where('name', 'Ridge Trail')->sole()->sport_type);
         $this->assertSame(SportType::VirtualRun, Activity::where('name', 'Zwift Run')->sole()->sport_type);
 
         $summary = $this->actingAs($this->owner)->get(route('garmin.import.summary'));
-        $summary->assertSee('<div><dt>Outside 16 weeks</dt><dd>2</dd></div>', escape: false);
+        $summary->assertSee('<div><dt>Future-dated</dt><dd>1</dd></div>', escape: false);
         $summary->assertSee('<div><dt>Unreadable rows</dt><dd>2</dd></div>', escape: false);
         $summary->assertSee('Line 7');
         $summary->assertSee('missing distance');
@@ -326,6 +331,198 @@ class GarminImportFlowTest extends TestCase
         $this->assertSame(0, Activity::count());
     }
 
+    public function test_the_italian_metric_fixture_stores_pace_ascent_and_heart_rate_per_run(): void
+    {
+        $this->upload($this->fixture('activities-it-metrics.csv'));
+        $this->confirm($this->review());
+
+        $first = Activity::where('start_date_local', '2026-10-10 09:33:27')->sole();
+        $this->assertSame(323, $first->average_pace_seconds_per_km);
+        $this->assertSame(45, $first->total_ascent_meters);
+        $this->assertSame(152, $first->average_heart_rate);
+
+        $hill = Activity::where('start_date_local', '2026-10-08 06:53:22')->sole();
+        $this->assertSame(348, $hill->average_pace_seconds_per_km);
+        $this->assertSame(1_234, $hill->total_ascent_meters);
+        $this->assertSame(149, $hill->average_heart_rate);
+
+        $this->assertSame(3_910, Activity::where('name', 'Passeggiata di corsa')->sole()->average_pace_seconds_per_km);
+    }
+
+    public function test_the_english_metric_fixture_stores_the_same_values(): void
+    {
+        $this->upload($this->fixture('activities-en-metrics.csv'));
+        $this->confirm($this->review());
+
+        $first = Activity::where('name', 'Paese Run')->sole();
+        $this->assertSame(323, $first->average_pace_seconds_per_km);
+        $this->assertSame(45, $first->total_ascent_meters);
+        $this->assertSame(152, $first->average_heart_rate);
+        $this->assertSame(1_234, Activity::where('name', 'Hill run')->sole()->total_ascent_meters);
+    }
+
+    public function test_the_verbatim_sample_stores_empty_metrics_never_zero(): void
+    {
+        $this->upload($this->fixture('activities-it.csv'));
+        $this->confirm($this->review());
+
+        $this->assertSame(37, Activity::count());
+        $this->assertSame(37, Activity::whereNull('average_pace_seconds_per_km')
+            ->whereNull('total_ascent_meters')
+            ->whereNull('average_heart_rate')
+            ->count());
+    }
+
+    public function test_an_unreadable_pace_imports_the_row_and_leaves_only_the_pace_empty(): void
+    {
+        $this->upload($this->fixture('activities-it-metrics.csv'));
+        $review = $this->review();
+        $review->assertSee('<div><dt>Unreadable rows</dt><dd>0</dd></div>', escape: false);
+        $this->confirm($review);
+
+        $row = Activity::where('name', 'Passo illeggibile')->sole();
+        $this->assertNull($row->average_pace_seconds_per_km);
+        $this->assertSame(20, $row->total_ascent_meters);
+        $this->assertSame(140, $row->average_heart_rate);
+        $this->assertSame(5, Activity::count());
+
+        $this->actingAs($this->owner)
+            ->get(route('garmin.import.summary'))
+            ->assertSee('5 runs added, 0 overwritten.')
+            ->assertSee('<div><dt>Unreadable rows</dt><dd>0</dd></div>', escape: false);
+    }
+
+    public function test_overwrite_takes_the_csv_metrics_and_keeps_a_stored_value_where_the_csv_has_none(): void
+    {
+        $stored = $this->storedStravaRun('2026-10-10 09:34:10', [
+            'average_pace_seconds_per_km' => 331,
+            'total_ascent_meters' => 62,
+            'average_heart_rate' => 150,
+        ]);
+
+        $this->upload($this->csv(self::IT_METRICS_HEADER, [self::SAMPLE_FIRST_ROW.',"5:27","--","151"']));
+        $this->confirm($this->review(), [0 => 'overwrite']);
+
+        $overwritten = $stored->fresh();
+        $this->assertSame(327, $overwritten->average_pace_seconds_per_km, 'The CSV pace wins.');
+        $this->assertSame(62, $overwritten->total_ascent_meters, 'A -- in the CSV keeps the stored ascent.');
+        $this->assertSame(151, $overwritten->average_heart_rate, 'The CSV heart rate wins.');
+        $this->assertSame(ActivitySource::GarminCsv, $overwritten->source);
+    }
+
+    public function test_overwrite_with_no_metric_columns_keeps_every_stored_metric(): void
+    {
+        $stored = $this->storedStravaRun('2026-10-10 09:34:10', [
+            'average_pace_seconds_per_km' => 331,
+            'total_ascent_meters' => 62,
+            'average_heart_rate' => 150,
+        ]);
+
+        $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
+        $this->confirm($this->review(), [0 => 'overwrite']);
+
+        $overwritten = $stored->fresh();
+        $this->assertSame(331, $overwritten->average_pace_seconds_per_km);
+        $this->assertSame(62, $overwritten->total_ascent_meters);
+        $this->assertSame(150, $overwritten->average_heart_rate);
+    }
+
+    public function test_an_already_imported_run_gains_its_missing_metrics_and_keeps_the_ones_it_has(): void
+    {
+        $imported = Activity::factory()->for($this->owner)->garminImported()->withoutMetrics()->create([
+            'name' => 'Paese Corsa',
+            'start_date_local' => '2026-10-10 09:33:27',
+            'activity_date' => '2026-10-10',
+            'distance_meters' => 8_290,
+            'moving_time_seconds' => 3_263,
+            'average_heart_rate' => 140,
+        ]);
+
+        $this->upload($this->csv(self::IT_METRICS_HEADER, [self::SAMPLE_FIRST_ROW.',"5:23","45","152"']));
+        $review = $this->review();
+        $review->assertSee('<div><dt>Already imported</dt><dd>1</dd></div>', escape: false);
+        $this->confirm($review);
+
+        $backfilled = $imported->fresh();
+        $this->assertSame(323, $backfilled->average_pace_seconds_per_km);
+        $this->assertSame(45, $backfilled->total_ascent_meters);
+        $this->assertSame(140, $backfilled->average_heart_rate, 'A heart rate already stored is never replaced by a re-import.');
+        $this->assertSame(1, Activity::count());
+
+        $this->actingAs($this->owner)
+            ->get(route('garmin.import.summary'))
+            ->assertSee('<div><dt>Already imported</dt><dd>1</dd></div>', escape: false);
+    }
+
+    public function test_a_backfill_only_import_forgets_the_cached_grid(): void
+    {
+        Activity::factory()->for($this->owner)->garminImported()->withoutMetrics()->create([
+            'name' => 'Paese Corsa',
+            'start_date_local' => '2026-10-10 09:33:27',
+            'activity_date' => '2026-10-10',
+            'distance_meters' => 8_290,
+            'moving_time_seconds' => 3_263,
+        ]);
+        $cacheKey = "heatmap:grid:v5:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $generationKey = "heatmap:grid:generation:{$this->owner->id}";
+
+        $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
+        $this->assertTrue(Cache::has($cacheKey));
+
+        $this->upload($this->csv(self::IT_METRICS_HEADER, [self::SAMPLE_FIRST_ROW.',"5:23","45","152"']));
+        $this->confirm($this->review());
+
+        $this->assertSame(1, Cache::get($generationKey), 'The athlete\'s generation moves, so the cached grid is never read again.');
+    }
+
+    public function test_re_importing_a_metric_file_changes_nothing(): void
+    {
+        $this->upload($this->fixture('activities-it-metrics.csv'));
+        $this->confirm($this->review());
+
+        $snapshot = DB::table('activities')->orderBy('id')->get();
+        Carbon::setTestNow('2026-10-11 12:30:00');
+
+        $this->upload($this->fixture('activities-it-metrics.csv'));
+        $review = $this->review();
+        $review->assertSee('<div><dt>Already imported</dt><dd>5</dd></div>', escape: false);
+        $this->confirm($review);
+
+        $this->assertEquals($snapshot, DB::table('activities')->orderBy('id')->get(), 'Values and updated_at are untouched.');
+    }
+
+    public function test_the_review_shows_the_stored_and_the_csv_metrics_side_by_side(): void
+    {
+        $this->storedStravaRun('2026-10-10 09:34:10', [
+            'average_pace_seconds_per_km' => 331,
+            'total_ascent_meters' => 62,
+            'average_heart_rate' => 150,
+        ]);
+
+        $this->upload($this->csv(self::IT_METRICS_HEADER, [self::SAMPLE_FIRST_ROW.',"5:27","64","--"']));
+        $review = $this->review();
+
+        $review->assertSeeInOrder(['Avg pace', '5:31 /km', 'Ascent', '62 m', 'Heart rate', '150 bpm']);
+        $review->assertSeeInOrder(['Avg pace', '5:27 /km', 'Ascent', '64 m', 'Heart rate']);
+        $review->assertSee('<dd class="is-empty"><span aria-hidden="true">—</span><span class="sr-only">not recorded</span></dd>', escape: false);
+    }
+
+    public function test_the_review_prints_an_empty_stored_metric_as_a_dash_not_a_zero(): void
+    {
+        $this->storedStravaRun('2026-10-10 09:34:10', [
+            'average_pace_seconds_per_km' => null,
+            'total_ascent_meters' => null,
+            'average_heart_rate' => null,
+        ]);
+
+        $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
+        $review = $this->review();
+
+        $this->assertSame(6, substr_count((string) $review->getContent(), 'class="is-empty"'));
+        $review->assertDontSee('0 bpm');
+        $review->assertDontSee('0 m');
+    }
+
     public function test_re_importing_the_same_file_changes_nothing(): void
     {
         $this->upload($this->fixture('activities-it.csv'));
@@ -362,7 +559,8 @@ class GarminImportFlowTest extends TestCase
 
     public function test_confirming_forgets_the_cached_grid_for_today(): void
     {
-        $cacheKey = "heatmap:grid:{$this->owner->id}:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $cacheKey = "heatmap:grid:v5:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $generationKey = "heatmap:grid:generation:{$this->owner->id}";
 
         $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
         $this->assertTrue(Cache::has($cacheKey));
@@ -370,7 +568,149 @@ class GarminImportFlowTest extends TestCase
         $this->upload($this->fixture('activities-it.csv'));
         $this->confirm($this->review());
 
-        $this->assertFalse(Cache::has($cacheKey));
+        $this->assertSame(1, Cache::get($generationKey), 'The athlete\'s generation moves, so the cached grid is never read again.');
+    }
+
+    public function test_confirming_retires_a_cached_past_window_as_well_as_the_current_one(): void
+    {
+        $current = HeatmapWindow::current();
+        $pastWindow = $current->previous()->previous();
+        $builds = 0;
+
+        $this->rememberWindow($current, $builds);
+        $this->rememberWindow($pastWindow, $builds);
+        $this->rememberWindow($pastWindow, $builds);
+        $this->assertSame(2, $builds, 'The second read of the past window is a hit.');
+
+        $this->upload($this->fixture('activities-it.csv'));
+        $this->confirm($this->review());
+
+        $this->rememberWindow($current, $builds);
+        $this->rememberWindow($pastWindow, $builds);
+
+        $this->assertSame(4, $builds, 'Both windows are rebuilt after the import.');
+    }
+
+    public function test_cancelling_leaves_a_cached_past_window_in_place(): void
+    {
+        $pastWindow = HeatmapWindow::current()->previous();
+        $builds = 0;
+
+        $this->rememberWindow($pastWindow, $builds);
+
+        $this->upload($this->fixture('activities-it.csv'));
+        $this->actingAs($this->owner)->post(route('garmin.import.cancel'))->assertRedirect();
+
+        $this->rememberWindow($pastWindow, $builds);
+
+        $this->assertSame(1, $builds);
+    }
+
+    public function test_runs_of_any_age_are_kept_and_only_future_dated_rows_are_skipped(): void
+    {
+        $this->upload($this->csv(self::IT_HEADER, [
+            'Corsa,2026-03-15 09:00:00,false,"Thirty weeks ago","8.00","00:45:00","00:45:00"',
+            self::SAMPLE_FIRST_ROW,
+            'Corsa,2026-10-12 07:00:00,false,"Tomorrow","5.00","00:30:00","00:30:00"',
+        ]));
+
+        $review = $this->review();
+        $review->assertSee('<div><dt>New runs</dt><dd>2</dd></div>', escape: false);
+        $review->assertSee('<div><dt>Future-dated</dt><dd>1</dd></div>', escape: false);
+
+        $this->confirm($review);
+
+        $this->assertSame(['2026-03-15', '2026-10-10'], Activity::orderBy('activity_date')->get()->map(fn (Activity $run): string => $run->activity_date->toDateString())->all());
+        $this->actingAs($this->owner)->get(route('garmin.import.summary'))
+            ->assertSee('<div><dt>Future-dated</dt><dd>1</dd></div>', escape: false)
+            ->assertDontSee('Outside 16 weeks');
+    }
+
+    public function test_an_older_clash_goes_through_the_same_review_and_overwrite_replaces_it(): void
+    {
+        $stored = $this->storedStravaRun('2026-03-15 09:01:00', ['name' => 'Morning Run', 'distance_meters' => 7_900]);
+        $untouched = $this->storedStravaRun('2026-03-20 09:00:00', ['name' => 'Another day']);
+
+        $this->upload($this->csv(self::IT_HEADER, ['Corsa,2026-03-15 09:00:00,false,"Thirty weeks ago","8.00","00:45:00","00:45:00"']));
+        $review = $this->review();
+        $review->assertSee('<div><dt>Clashes to decide</dt><dd>1</dd></div>', escape: false);
+        $review->assertSee('<div><dt>New runs</dt><dd>0</dd></div>', escape: false);
+
+        $this->confirm($review, [0 => 'overwrite']);
+
+        $this->assertSame('Thirty weeks ago', $stored->fresh()->name);
+        $this->assertSame(8_000, $stored->fresh()->distance_meters);
+        $this->assertSame('Another day', $untouched->fresh()->name);
+        $this->assertSame(2, Activity::count());
+    }
+
+    public function test_skip_leaves_an_older_clash_byte_identical(): void
+    {
+        $stored = $this->storedStravaRun('2026-03-15 09:01:00');
+        $before = DB::table('activities')->where('id', $stored->id)->first();
+
+        $this->upload($this->csv(self::IT_HEADER, ['Corsa,2026-03-15 09:00:00,false,"Thirty weeks ago","8.00","00:45:00","00:45:00"']));
+        $this->confirm($this->review(), [0 => 'skip']);
+
+        $this->assertEquals($before, DB::table('activities')->where('id', $stored->id)->first());
+        $this->assertSame(1, Activity::count());
+    }
+
+    public function test_re_importing_an_older_run_adds_nothing_and_only_fills_its_missing_metrics(): void
+    {
+        $row = 'Corsa,2026-03-15 09:00:00,false,"Thirty weeks ago","8.00","00:45:00","00:45:00"';
+
+        $this->upload($this->csv(self::IT_HEADER, [$row]));
+        $this->confirm($this->review());
+        $this->assertNull(Activity::sole()->average_heart_rate);
+
+        $this->upload($this->csv(self::IT_METRICS_HEADER, [$row.',"5:23","45","152"']));
+        $review = $this->review();
+        $review->assertSee('<div><dt>Already imported</dt><dd>1</dd></div>', escape: false);
+        $this->confirm($review);
+
+        $filled = Activity::sole();
+        $this->assertSame(323, $filled->average_pace_seconds_per_km);
+        $this->assertSame(152, $filled->average_heart_rate);
+
+        $snapshot = DB::table('activities')->get();
+        $this->upload($this->csv(self::IT_METRICS_HEADER, [$row.',"5:23","45","152"']));
+        $this->confirm($this->review());
+
+        $this->assertEquals($snapshot, DB::table('activities')->get());
+    }
+
+    public function test_the_italian_sample_imports_in_full_however_old_it_is(): void
+    {
+        Carbon::setTestNow('2027-06-01 12:00:00');
+        $this->owner->forceFill(['strava_token_expires_at' => now()->addHours(6)])->save();
+
+        $this->upload($this->fixture('activities-it.csv'));
+        $review = $this->review();
+        $review->assertSee('<div><dt>New runs</dt><dd>37</dd></div>', escape: false);
+        $review->assertSee('<div><dt>Future-dated</dt><dd>0</dd></div>', escape: false);
+        $this->confirm($review);
+
+        $this->assertSame(37, Activity::count());
+        $this->actingAs($this->owner)->get(route('garmin.import.summary'))->assertSee('Escursionismo');
+    }
+
+    public function test_a_pending_upload_stored_before_the_rename_still_opens_and_confirms(): void
+    {
+        $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
+        $pending = session('garmin_import.pending');
+        $this->assertIsArray($pending);
+
+        unset($pending['parsed']['future_dated']);
+        $pending['parsed']['outside_window'] = 2;
+        $this->withSession(['garmin_import.pending' => $pending]);
+
+        $review = $this->review();
+        $review->assertSee('<div><dt>New runs</dt><dd>1</dd></div>', escape: false);
+        $review->assertSee('<div><dt>Future-dated</dt><dd>0</dd></div>', escape: false);
+
+        $this->confirm($review)->assertRedirect(route('garmin.import.summary'));
+        $this->assertSame(1, Activity::count());
     }
 
     public function test_the_raw_upload_is_never_persisted(): void
@@ -432,6 +772,24 @@ class GarminImportFlowTest extends TestCase
         $review->assertSee('href="https://www.strava.com/activities/4242"', escape: false);
         $this->assertSame(1, substr_count($review->getContent(), 'https://www.strava.com/activities/'));
         $review->assertSee('Garmin import');
+    }
+
+    /**
+     * Read a window through the grid cache the way the dashboard does, counting how
+     * often the grid had to be built — a hit leaves the count alone.
+     */
+    private function rememberWindow(HeatmapWindow $window, int &$builds): HeatmapGrid
+    {
+        return $this->app->make(HeatmapGridCache::class)->remember(
+            $this->owner,
+            $window,
+            now(),
+            function () use ($window, &$builds): HeatmapGrid {
+                $builds++;
+
+                return $this->app->make(HeatmapBuilder::class)($window, [], now());
+            },
+        );
     }
 
     private function upload(UploadedFile $file): TestResponse

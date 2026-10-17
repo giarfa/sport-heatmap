@@ -24,6 +24,9 @@ final readonly class GarminCsvRow
         public int $movingTimeSeconds,
         public CarbonImmutable $startDateLocal,
         public CarbonImmutable $activityDate,
+        public ?int $averagePaceSecondsPerKm = null,
+        public ?int $totalAscentMeters = null,
+        public ?int $averageHeartRate = null,
     ) {}
 
     /**
@@ -35,6 +38,9 @@ final readonly class GarminCsvRow
      *     start_date_local: CarbonImmutable,
      *     activity_date: CarbonImmutable,
      *     source: ActivitySource,
+     *     average_pace_seconds_per_km?: int,
+     *     total_ascent_meters?: int,
+     *     average_heart_rate?: int,
      * }
      */
     public function toAttributes(): array
@@ -47,13 +53,34 @@ final readonly class GarminCsvRow
             'start_date_local' => $this->startDateLocal,
             'activity_date' => $this->activityDate,
             'source' => ActivitySource::GarminCsv,
+            ...$this->metricAttributes(),
         ];
+    }
+
+    /**
+     * Only the metrics the file actually recorded, keyed by column.
+     *
+     * An empty metric is left out rather than carried as null: the attributes are
+     * written onto a stored run on Overwrite, and a "--" in the file must keep what
+     * is already stored, never blank it. They are also not part of the run's
+     * identity (isIdenticalTo() / identityKey()), so re-importing a file whose
+     * metrics changed still recognises its runs.
+     *
+     * @return array{average_pace_seconds_per_km?: int, total_ascent_meters?: int, average_heart_rate?: int}
+     */
+    public function metricAttributes(): array
+    {
+        return array_filter([
+            'average_pace_seconds_per_km' => $this->averagePaceSecondsPerKm,
+            'total_ascent_meters' => $this->totalAscentMeters,
+            'average_heart_rate' => $this->averageHeartRate,
+        ], static fn (?int $value): bool => $value !== null);
     }
 
     /**
      * Scalars only, so the session never holds a serialized object.
      *
-     * @return array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string}
+     * @return array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string, average_pace_seconds_per_km?: int|null, total_ascent_meters?: int|null, average_heart_rate?: int|null}
      */
     public function toSessionArray(): array
     {
@@ -63,11 +90,14 @@ final readonly class GarminCsvRow
             'distance_meters' => $this->distanceMeters,
             'moving_time_seconds' => $this->movingTimeSeconds,
             'start_date_local' => $this->startDateLocal->format(self::START_FORMAT),
+            'average_pace_seconds_per_km' => $this->averagePaceSecondsPerKm,
+            'total_ascent_meters' => $this->totalAscentMeters,
+            'average_heart_rate' => $this->averageHeartRate,
         ];
     }
 
     /**
-     * @param  array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string}  $row
+     * @param  array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string, average_pace_seconds_per_km?: int|null, total_ascent_meters?: int|null, average_heart_rate?: int|null}  $row
      */
     public static function fromSessionArray(array $row): self
     {
@@ -80,6 +110,15 @@ final readonly class GarminCsvRow
             movingTimeSeconds: (int) $row['moving_time_seconds'],
             startDateLocal: $startDateLocal,
             activityDate: $startDateLocal->startOfDay(),
+            /*
+             * A reviewed-but-unconfirmed upload parked in the session before the metrics
+             * existed has no such keys. Reading them as null lets it still be confirmed
+             * after a deploy instead of failing to rebuild and sending the owner back to
+             * upload the file again.
+             */
+            averagePaceSecondsPerKm: $row['average_pace_seconds_per_km'] ?? null,
+            totalAscentMeters: $row['total_ascent_meters'] ?? null,
+            averageHeartRate: $row['average_heart_rate'] ?? null,
         );
     }
 
