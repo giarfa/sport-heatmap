@@ -675,4 +675,30 @@ decisions:
     source: askquestion
     spec: US-013
     supersedes: null
-updated_at: '2026-10-13T20:16:46+00:00'
+  -
+    id: 0bbe55b2ef7a08c4
+    ts: '2026-10-17T06:44:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: 'us-015 fix target version'
+    label: 'US-015 fix target version'
+    value: '2.0.0 (not a 1.0.1 patch)'
+    question: null
+    rationale: "2.0.0 is unshipped; its window navigation is the defect's main exposure"
+    source: askquestion
+    spec: US-015
+    supersedes: null
+  -
+    id: 31f1b269a2732f1a
+    ts: '2026-10-17T06:44:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: 'us-015 severity'
+    label: 'US-015 severity'
+    value: High
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-015
+    supersedes: null
+updated_at: '2026-10-17T06:44:40+00:00'

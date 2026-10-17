@@ -1,0 +1,223 @@
+code: US-015
+plan_body: |
+  **Release:** 2.0.0
+
+  ## Technical Solution
+
+  FR-004 says each cell holds that day's total distance. That breaks for the last day of every window (always a Sunday). `Activity::activity_date` is cast `date`, so every write path stores it in the model date format `2026-10-11 00:00:00`. That covers Eloquent and the factory, the Strava upsert (CarbonImmutable bound by the grammar) and the Garmin import. The local DB has 263 rows, all in that one format. `DailyRunningDistance`, `DailyRuns` and `ResolveSyncStatus::runsInWindow` bound the window with `whereBetween('activity_date', [startsOn->toDateString(), endsOn->toDateString()])`. SQLite compares TEXT, and `'2026-10-11 00:00:00' <= '2026-10-11'` is false, so the last day drops out.
+
+  ### Approach — compare as a half-open day range, change no stored row
+  1. **One query scope owns the rule.** Add `#[Scope] protected function onDaysBetween(Builder $query, CarbonInterface $firstDay, CarbonInterface $lastDay): void` to `App\Models\Activity` (the `Illuminate\Database\Eloquent\Attributes\Scope` attribute, Laravel 13). It applies `where('activity_date', '>=', firstDay->toDateString())` and `where('activity_date', '<', CarbonImmutable::instance($lastDay)->addDay()->toDateString())`. A half-open range of plain date strings is correct whether a row holds `Y-m-d` or `Y-m-d 00:00:00`. Both sort `>=` their own day and `<` the next day, so the comparison no longer depends on the write format. A block comment above it states the root cause.
+  2. **Route every `activity_date` range through it:**
+     - `App\Support\Heatmap\DailyRunningDistance` — `onDaysBetween($window->startsOn, $window->endsOn)`. Fixes the cell distance, the week total, the trend bar (built from the same rows) and the intensity calibration (it reads these daily totals).
+     - `App\Support\Heatmap\DailyRuns` — same. Fixes the day detail.
+     - `App\Support\Heatmap\LeadInDistance` — `onDaysBetween($leadInStart, $window->startsOn->subDay())`. Same result as today's hand-written `>= / <` pair. That pair worked only because of the string ordering, and its block comment becomes a pointer to the scope.
+     - `App\Support\Sync\ResolveSyncStatus::runsInWindow` — **same bug, not named in the spec.** The CSV-only "runs in window" count misses a run on the window's last day. Fix it here so AC 3 ("every `activity_date` range comparison in the app") holds.
+     - `App\Actions\Strava\ReconcileStravaWindow` — both `whereBetween('activity_date', [$window->startsOn, $window->endsOn])` calls (the stored-rows load inside the `orWhere` closure, and the delete). They bind Carbon objects, so they compare `Y-m-d 00:00:00` with equality and are **correct today**, but only because both sides use the same format. Moving them to the scope makes every comparison follow one rule, without changing what they return.
+  3. **Exact-date matching stays as is.** `PlanGarminImport` uses `whereIn('activity_date', [CarbonImmutable …])`, which binds through the grammar's `Y-m-d H:i:s`, the same format the rows are written in. Add a block comment saying it must keep binding Carbon objects, not `toDateString()`. `OldestRunDate` (`MIN()` parsed with `CarbonImmutable::parse`) and `StartTimeMatcher` (compares formatted Carbon values) need no change.
+  4. **Grid cache:** bump the key segment `heatmap:grid:v4` → `v5` in `HeatmapGridCache::key()` and extend its block comment: a fix that changes the content of a cached grid gets a bump too, not only a change to its shape. Proving the TTL instead wouldn't work. The key carries `$today` and the TTL is 86 400 s, so a past window cached before the deploy would keep hiding its Sunday until midnight.
+
+  ### Rejected alternatives
+  - **Store `Y-m-d` and migrate the rows.** A `date:Y-m-d` cast only changes serialization, not storage. Storing plain dates would need a custom cast or a `$dateFormat` override, plus a data migration. It would also break `PlanGarminImport`'s Carbon-bound `whereIn`, and for a while the formats would be mixed. That's more risk than a read-side fix, and the read-side fix leaves no stored row changed.
+  - **`whereDate()`.** Laravel compiles it on SQLite as `strftime('%Y-%m-%d', activity_date)`. That wraps the column, so the query can't use the `(user_id, activity_date)` index that serves the only query the dashboard makes (PRD Data model).
+  - **`endsOn->endOfDay()` bound.** It works for the current format, but it hard-codes the `00:00:00` time suffix, which is the same coupling to the write format that caused this bug.
+
+  ### Laravel idioms & quality (Andrew)
+  No new class, route, package or migration. The shared rule lives in a model scope, and the query count and shape are unchanged: the grid still runs 3 grouped queries on a cache miss and the index still serves them. Every non-obvious decision gets a `/* … */` block comment (`.ai/rules/app.md`). Larastan level 5 and Pint run via `php artisan larapilot:quality`.
+
+  ### Cost (Aurora)
+  None.
+
+  ## Git & Branching
+  - Mode: GITFLOW, no automatic push
+  - Release: **2.0.0**. TASK-00 runs `php artisan larapilot:release-feature --semver=2.0.0 --spec=US-015 --slug=last-day-of-window`, which branches `feature/US-015-last-day-of-window` **from `release/2.0.0`**
+  - Per task: one Conventional Commit `type(US-015): TASK-NN …`, with code, tests and domain docs together. The TASK-01 commit body names the root cause (AC)
+  - PR prepared locally toward `release/2.0.0` (not `develop`); push / remote PR only if the user asks
+  - Merge into `release/2.0.0` after `larapilot-review` approval (auto-approve is on). US-015 is the last open story of v2.0.0, so approval hands over to `/larapilot-release`
+
+  ## Test Data Strategy
+  - The stored format does not change and no model, migration, enum or relationship changes, so **no factory or seeder change** (AC: "updated only if the stored format changes").
+  - Tests use the existing `ActivityFactory` on the in-memory SQLite of `phpunit.xml`. That's where the bug shows, because the factory writes through Eloquent's `date` cast. To prove the scope doesn't depend on the format, insert one row with a raw `Y-m-d` value via `DB::table('activities')`.
+  - **Never run `php artisan migrate:fresh --seed`** in this spec. The development database holds real data (it contains the 2026-10-11 17 507 m run the bug report cites), so manual verification reads it as it is.
+
+  ## Test Strategy
+  - Bar: NORMAL. Pest-free PHPUnit classes like the existing suite (`Tests\TestCase`, `RefreshDatabase`), no Playwright, Dusk or browser E2E.
+  - **Regression (TASK-01, ships with the fix):** a Feature test that stores a run through Eloquent on the window's last Sunday and GETs `/?to=2026-10-11`. The response shows 17.5 km in the Sunday cell, in the week total, in the last trend bar, and in the day detail. A second case freezes today on a Sunday and checks today's run appears on the current window. Both fail on `release/2.0.0` without the fix.
+  - **Boundaries (TASK-02):** the window's first day and the lead-in's last day count exactly once (no double count across the boundary). The scope accepts both stored formats. `ResolveSyncStatus` counts a last-day run. `ReconcileStravaWindow` still deletes a Strava run on the window's last day that Strava no longer returns, and still keeps a Garmin one. The cache key uses `v5`.
+  - **Manual test handoff:** on Herd, open `/?to=2026-10-11`. The Sunday cell shows 17.5 km and its detail, and the week's total and last trend bar include it.
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch on release/2.0.0'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for US-015 on release `2.0.0`: create `feature/US-015-last-day-of-window` from `release/2.0.0` and prepare the internal PR description toward `release/2.0.0`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. The working tree carries uncommitted `.larapilot/` changes (backlog, decisions, intake, releases, ledger, `specs/US-015.yaml`). Commit them on `release/2.0.0` first as `chore(US-015): record the bug triage`, so `release-feature` finds a clean tree.
+      2. `php artisan larapilot:release-feature --semver=2.0.0 --spec=US-015 --slug=last-day-of-window`
+      3. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`.
+      4. Draft the internal PR title/body toward `base` (`release/2.0.0`): "US-015 Fix: a run on the last Sunday of a window is missing from the grid"
+
+      ## Completion Criteria
+      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
+      - [ ] PR title/body drafted toward `release/2.0.0` (not `develop`)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — no behavior change
+
+      ## Git Deliverables
+      - Commit: `chore(US-015): TASK-00 bootstrap feature branch for release/2.0.0` (only if the command did not already leave a commit; an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/2.0.0`; open remote only if the user requests
+    type: Impl
+    status: TODO
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+  -
+    id: TASK-01
+    title: "Count the window's last day in every activity_date range (scope, cache v5, regression test)"
+    body: |-
+      ## Description
+      Fix: a run on the last day of a window is missing from the grid (FR-004, FR-005, FR-006, FR-019, FR-020). Add an `Activity::onDaysBetween()` scope that compares `activity_date` as a half-open range of plain date strings. Route every `activity_date` range query through it, and bump the grid cache key so no grid cached before the fix is served again. The root cause is in the plan's Technical Solution.
+
+      ## Files Involved
+      - app/Models/Activity.php — `#[Scope] protected function onDaysBetween(Builder $query, CarbonInterface $firstDay, CarbonInterface $lastDay): void` + block comment with the root cause; keep the class `@property` docblock intact (`.ai/rules/models.md`)
+      - app/Support/Heatmap/DailyRunningDistance.php
+      - app/Support/Heatmap/DailyRuns.php
+      - app/Support/Heatmap/LeadInDistance.php — replace the `>= / <` pair and rewrite its block comment to point at the scope
+      - app/Support/Sync/ResolveSyncStatus.php — `runsInWindow()`
+      - app/Actions/Strava/ReconcileStravaWindow.php — the stored-rows load (inside the `orWhere` closure: `$query->onDaysBetween(...)->orWhereIn(...)`, keep the grouping) and the delete
+      - app/Support/Garmin/PlanGarminImport.php — block comment only: the `whereIn` must keep binding CarbonImmutable values (grammar `Y-m-d H:i:s` = the written format), never `toDateString()`
+      - app/Support/Heatmap/HeatmapGridCache.php — key segment `v4` → `v5`, comment extended (content fixes bump too)
+      - tests/Feature/Dashboard/LastDayOfWindowTest.php (new) — the regression test
+      - tests/Feature/Dashboard/HeatmapGridCacheTest.php — update any hard-coded `v4` key
+      - .larapilot/docs/devs/heatmap-dashboard.md, .larapilot/docs/devs/activity-sync.md, .larapilot/docs/devs/README.md
+
+      ## Steps
+      1. Write `LastDayOfWindowTest` first and watch it fail. Use the setup of the sibling tests (`WindowNavigationTest`, `DayDetailTest`): `Carbon::setTestNow`, and an athlete from `allowlistedAthlete()` or the displayed athlete the public dashboard renders (`.ai/rules/tests.md`). Two cases:
+         - "today" is Saturday 17 Oct 2026, with a run on Sunday 11 Oct 2026 of 17 507 m stored through `Activity::factory()`. `GET /?to=2026-10-11` shows `17.5` in the Sunday cell, the week total, the last trend bar's accessible name and the day detail.
+         - "today" is Sunday 11 Oct 2026, with a run that day. `GET /` shows it on the current window.
+      2. Add the scope and route `DailyRunningDistance`, `DailyRuns`, `LeadInDistance`, `ResolveSyncStatus::runsInWindow`, and both `ReconcileStravaWindow` queries through it. The query count doesn't change; `WeeklyTrendTest`'s lead-in query counter matches `"activity_date" < ?`, which the scope still produces.
+      3. Add the `PlanGarminImport` block comment. Bump the cache key to `v5`.
+      4. `php artisan test` — the full suite, so `WeeklyTrendTest`, `LeadInDistanceTest`, `ReconcileStravaWindowTest` and the Garmin flows stay green.
+      5. `vendor/bin/pint --dirty --format agent`.
+
+      ## Completion Criteria
+      - [ ] A run on the last day of a past window and of the current window on a Sunday appears in its cell, its detail, the week total, the trend's last bar, and the intensity calibration
+      - [ ] No `activity_date` range comparison in `app/` uses `whereBetween` with date strings any more (`grep -rn "whereBetween('activity_date'" app` is empty)
+      - [ ] Stored rows unchanged, no migration
+      - [ ] Grid cache key is `v5`
+      - [ ] `LastDayOfWindowTest` fails on `release/2.0.0` and passes on the branch
+      - [ ] Tests pass
+
+      ## Test Data
+      - N/A — the stored format does not change, so `ActivityFactory` and the seeders stay as they are. Do **not** run `migrate:fresh --seed` (the development database holds real data)
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md`: new subsection on how `activity_date` is stored (`Y-m-d 00:00:00` through the `date` cast, on every write path) and how window ranges must compare it (`Activity::onDaysBetween`, half-open, never `whereBetween` with date strings, never `whereDate`). Note the rejected alternatives and the `v5` cache bump under Key decisions & invariants / Extension points & gotchas
+      - [ ] `.larapilot/docs/devs/activity-sync.md`: the reconcile window queries and the sync-status window count use the same scope
+      - [ ] Folder `README.md` index rows updated (`Last updated by: US-015`)
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `fix(US-015): TASK-01 count the window's last day in every activity_date range`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update locally toward `release/2.0.0`; open remote only if the user requests
+      - Commit body names the root cause: the `date` cast writes `Y-m-d 00:00:00`, SQLite compares TEXT, so `<= 'Y-m-d'` excluded the window's last day
+    type: Fix
+    status: TODO
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-02
+    title: 'Cover window boundaries, sync status and reconcile on the last day'
+    body: |-
+      ## Description
+      Add PHPUnit coverage for the window boundaries and every query the fix touched. The regression test proves the bug is fixed; these tests prove nothing gets counted twice and nothing else moved.
+
+      ## Files Involved
+      - tests/Unit/Models/ActivityTest.php — the scope
+      - tests/Unit/Support/Heatmap/DailyRunsTest.php
+      - tests/Feature/Dashboard/LeadInDistanceTest.php
+      - tests/Feature/Dashboard/HeatmapGridTest.php (or a `DailyRunningDistance` case beside it)
+      - tests/Unit/Support/Sync/ResolveSyncStatusTest.php
+      - tests/Feature/Strava/ReconcileStravaWindowTest.php
+      - tests/Feature/Dashboard/HeatmapGridCacheTest.php
+
+      ## Steps
+      1. Reuse `ActivityFactory`; do not duplicate factory definitions.
+      2. `onDaysBetween` includes the first and last day and excludes the day before and the day after. It does so both for a row stored through Eloquent (`Y-m-d 00:00:00`) and for a row inserted with `DB::table('activities')` as a raw `Y-m-d`.
+      3. `DailyRunningDistance` / `DailyRuns`: runs on the window's first Monday and last Sunday are both returned. A run on the Sunday before the window isn't.
+      4. `LeadInDistance`: the Sunday just before the window is in lead-in week 3, and the window's first Monday isn't in the lead-in. Together with step 3, that means no run is counted on both sides of the boundary.
+      5. `ResolveSyncStatus`: a CSV-only athlete's "runs in window" count includes a run on the window's last day.
+      6. `ReconcileStravaWindow`: a Strava run stored on the window's last day that Strava no longer returns is deleted. A Garmin run on that day survives (`Http::fake()` + `Http::preventStrayRequests()`, `.ai/rules/tests.md`).
+      7. `HeatmapGridCache`: a grid cached under the `v4` key is not served (the key now uses `v5`).
+      8. Sanity check: `git stash` the TASK-01 app changes (or check out `release/2.0.0`'s versions of the five query classes) and confirm `LastDayOfWindowTest` and the step-3/5 boundary tests fail. Then restore.
+      9. `php artisan test`. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites.
+
+      ## Completion Criteria
+      - [ ] Boundary days covered for the window and the lead-in, no double count
+      - [ ] Scope proven independent of the stored format
+      - [ ] Sync status and reconcile covered on the last day
+      - [ ] Regression tests shown to fail without the fix
+      - [ ] Tests pass locally
+
+      ## Git Deliverables
+      - Commit: `test(US-015): TASK-02 cover the window boundaries of every activity_date range`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update locally toward `release/2.0.0`; open remote only if the user requests
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 2
+    dependencies:
+      - TASK-01
+  -
+    id: TASK-03
+    title: 'CHANGELOG, quality gate and manual check'
+    body: |-
+      ## Description
+      CHANGELOG entry, the quality gate, and the manual check against the real development data.
+
+      ## Files Involved
+      - CHANGELOG.md — `## [Unreleased]` → `### Fixed`
+
+      ## Steps
+      1. Add a `### Fixed` entry under `[Unreleased]` in product words: "A run on the last day of a window — the Sunday of its bottom row, or today when today is a Sunday — is now counted in its day cell, the day detail, the week total, the weekly chart, and the legend's scale (US-015)."
+      2. `php artisan larapilot:quality` — Pint and Larastan level 5 clean.
+      3. Manual test handoff on Herd (no seeding): open `/?to=2026-10-11`. The Sunday 11 Oct cell is shaded and its detail lists the 17.5 km run. The week's total and the last trend bar include it. Previous / Next still land on whole windows.
+      4. `php artisan test`.
+
+      ## Completion Criteria
+      - [ ] CHANGELOG `Fixed` entry present
+      - [ ] `larapilot:quality` passes
+      - [ ] Manual check on `/?to=2026-10-11` done and noted in the PR body
+      - [ ] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes
+
+      ## Domain Docs
+      - N/A — the domain docs were updated in TASK-01; this task changes no behavior
+
+      ## Git Deliverables
+      - Commit: `chore(US-015): TASK-03 changelog and quality gate`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update locally toward `release/2.0.0`; open remote only if the user requests
+    type: Impl
+    status: TODO
+    assignee: Albert
+    estimate_hours: 1
+    dependencies:
+      - TASK-01
+updated_at: '2026-10-17T06:50:25+00:00'

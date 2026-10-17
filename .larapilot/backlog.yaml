@@ -872,3 +872,67 @@ specs:
       subject: 'chore(US-014): record the review'
       committed_at: '2026-10-13T22:51:29+02:00'
       url: 'https://github.com/giarfa/sport-heatmap/commit/9f7889fc2e7742117bac0f9f48089a55f67d201d'
+  -
+    code: US-015
+    title: 'Fix: a run on the last Sunday of a window is missing from the grid'
+    epic:
+      code: EP-004
+      title: Maintenance
+    priority: HIGH
+    points: 2
+    status: 'IN PROGRESS'
+    body: |
+      #### US-015: Fix — a run on the last Sunday of a window is missing from the grid
+
+      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** IN PROGRESS
+      **Blocked by:** -
+      **Type:** Fix
+      **Severity:** High
+      **Security:** Lars/Oliver — no
+      **Related:** US-004 (introduced the date-string window bounds in `DailyRunningDistance`), US-012 (copied them into `DailyRuns`), US-013 (window navigation — every past window ends on a Sunday)
+      **Release:** 2.0.0
+      **Found in:** v0.1.0 (still present in v1.0.0)
+      **Traces to:** FR-004 · FR-005 · FR-006 · FR-019 · FR-020 — no journey (the PRD has no `## User Journeys`)
+      **Promise broken:** FR-004 "Each cell represents one calendar day and carries that day's total running distance."
+      **Logged:** nothing logged — the query silently returns fewer rows, no exception
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want the run I did on the last Sunday of a window to appear in that window's grid,
+      so that my long Sunday run counts in the cell, the weekly total, the trend, and the scale like every other day.
+
+      **Demonstrates**
+      The window ending Sunday 11 Oct 2026 (`/?to=2026-10-11`) shows the 17.5 km run of that day in its
+      Sunday cell, in its week's total, in the last bar of the weekly trend, and in the day detail; the
+      current window shows today's run on a Sunday. A regression test stores a run on a window's last
+      day through Eloquent on SQLite and fails without the fix.
+
+      **Steps to Reproduce**
+      1. Have an athlete with a run on a Sunday (local data: 2026-10-11, 17 507 m).
+      2. Open the window that ends on that Sunday — `/?to=2026-10-11`, or Previous from the current window.
+      3. The Sunday cell renders as a 0 km rest day, the week total and trend bar omit the run, and the day has no detail.
+      4. Same on the current window when today is Sunday: today's run never shows until Monday.
+
+      **Expected / Actual**
+      Expected: the Sunday cell carries 17.5 km and its run detail. Actual: 0 km, no detail.
+
+      **Root cause**
+      `Activity::activity_date` is cast `date`, so Eloquent writes it in the model's date format
+      (`2026-10-11 00:00:00`). `DailyRunningDistance` and `DailyRuns` bound the window with
+      `whereBetween('activity_date', [startsOn->toDateString(), endsOn->toDateString()])`, and SQLite
+      compares the column as text: `'2026-10-11 00:00:00' <= '2026-10-11'` is false, so the window's
+      last day falls out of the range. The lower bound and `LeadInDistance`'s `>= / <` pair happen to be
+      correct only by accident of the same string ordering.
+
+      **Acceptance Criteria**
+      - [ ] Bug fixed — the promise holds again: a run on the last day of any window (past windows, and the current window on a Sunday) appears in that day's cell distance, its run detail, the week total, the weekly trend's last bar, and the intensity calibration
+      - [ ] The first day of the window and the lead-in weeks of the trend (`LeadInDistance`) still include exactly their own days — no run is counted twice across the window boundary
+      - [ ] Every `activity_date` range comparison in the app (`DailyRunningDistance`, `DailyRuns`, `LeadInDistance`, `ReconcileStravaWindow`, the Garmin import matching) compares the stored value consistently with how it is written; stored rows are left unchanged or migrated in one step, never mixed formats
+      - [ ] Regression test covers the failure — a run stored through Eloquent on SQLite on the window's last day is read back by the grid — and fails without the fix (Anne)
+      - [ ] Grid cache: no cached window built before the fix keeps serving the missing day (bump the grid cache key version, or prove the TTL covers it)
+      - [ ] Root cause named in the fix commit; `heatmap-dashboard.md` documents how `activity_date` is stored and how window ranges must compare it
+      - [ ] No security regression; factory/seeder updated only if the stored format changes
+    status_history:
+      - { status: PLANNED, at: '2026-10-17T06:50:25+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-17T06:59:39+00:00' }
+    rework: false
