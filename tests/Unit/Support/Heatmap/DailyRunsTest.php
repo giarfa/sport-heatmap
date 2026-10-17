@@ -97,4 +97,21 @@ class DailyRunsTest extends TestCase
         $this->assertNull($garmin->pace());
         $this->assertNull($garmin->heartRate());
     }
+
+    public function test_the_windows_first_and_last_day_are_read_and_the_days_around_them_are_not(): void
+    {
+        $athlete = $this->allowlistedAthlete();
+        $window = HeatmapWindow::current(Carbon::parse('2026-10-11')); // Monday 22 Jun to Sunday 11 Oct
+
+        Activity::factory()->for($athlete)->onDate($window->startsOn->subDay())->create(['name' => 'Sunday before']);
+        Activity::factory()->for($athlete)->onDate($window->startsOn)->create(['name' => 'First Monday']);
+        Activity::factory()->for($athlete)->onDate($window->endsOn)->create(['name' => 'Last Sunday']);
+        Activity::factory()->for($athlete)->onDate($window->endsOn->addDay())->create(['name' => 'Monday after']);
+
+        $runs = (new DailyRuns)($athlete, $window);
+
+        $this->assertSame(['2026-06-22', '2026-10-11'], array_keys($runs));
+        $this->assertSame('First Monday', $runs['2026-06-22'][0]->name);
+        $this->assertSame('Last Sunday', $runs['2026-10-11'][0]->name);
+    }
 }

@@ -8,6 +8,7 @@ use App\Models\Activity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ActivityTest extends TestCase
@@ -175,5 +176,38 @@ class ActivityTest extends TestCase
     public function test_the_sport_type_enum_exposes_exactly_the_three_running_types(): void
     {
         $this->assertSame(['Run', 'TrailRun', 'VirtualRun'], SportType::values());
+    }
+
+    public function test_on_days_between_includes_both_ends_and_nothing_beyond_them(): void
+    {
+        $athlete = User::factory()->create();
+
+        foreach (['2026-10-04', '2026-10-05', '2026-10-08', '2026-10-11', '2026-10-12'] as $date) {
+            Activity::factory()->for($athlete)->onDate(Carbon::parse($date))->create();
+        }
+
+        $dates = Activity::query()
+            ->onDaysBetween(Carbon::parse('2026-10-05'), Carbon::parse('2026-10-11'))
+            ->orderBy('activity_date')
+            ->get()
+            ->map(fn (Activity $activity): string => $activity->activity_date->toDateString())
+            ->all();
+
+        $this->assertSame(['2026-10-05', '2026-10-08', '2026-10-11'], $dates);
+    }
+
+    public function test_on_days_between_does_not_depend_on_the_format_the_date_was_stored_in(): void
+    {
+        $athlete = User::factory()->create();
+
+        Activity::factory()->for($athlete)->onDate(Carbon::parse('2026-10-11'))->create(); // "Y-m-d 00:00:00" through the cast
+        $storedAsPlainDate = Activity::factory()->for($athlete)->onDate(Carbon::parse('2026-10-11'))->create();
+        DB::table('activities')->where('id', $storedAsPlainDate->id)->update(['activity_date' => '2026-10-11']);
+        $dayAfter = Activity::factory()->for($athlete)->onDate(Carbon::parse('2026-10-12'))->create();
+        DB::table('activities')->where('id', $dayAfter->id)->update(['activity_date' => '2026-10-12']);
+
+        $found = Activity::query()->onDaysBetween(Carbon::parse('2026-10-05'), Carbon::parse('2026-10-11'))->count();
+
+        $this->assertSame(2, $found);
     }
 }

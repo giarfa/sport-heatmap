@@ -4,6 +4,7 @@ namespace Tests\Feature\Dashboard;
 
 use App\Models\Activity;
 use App\Models\User;
+use App\Support\Heatmap\DailyRunningDistance;
 use App\Support\Heatmap\HeatmapWindow;
 use App\Support\Heatmap\LeadInDistance;
 use Carbon\CarbonImmutable;
@@ -54,5 +55,33 @@ class LeadInDistanceTest extends TestCase
         $this->runOn(User::factory()->create(), '2026-05-12', 15_000);
 
         $this->assertSame([0, 0, 0], app(LeadInDistance::class)($athlete, $window));
+    }
+
+    public function test_a_run_on_the_boundary_is_counted_on_one_side_of_it_only(): void
+    {
+        $athlete = User::factory()->create();
+        $window = HeatmapWindow::current(CarbonImmutable::parse('2026-09-05')); // starts Monday 18 May
+
+        $this->runOn($athlete, '2026-05-17', 11_000); // Sunday before the window: the lead-in's
+        $this->runOn($athlete, '2026-05-18', 13_000); // first Monday: the window's
+
+        $leadIn = app(LeadInDistance::class)($athlete, $window);
+        $daily = app(DailyRunningDistance::class)($athlete, $window);
+
+        $this->assertSame([0, 0, 11_000], $leadIn);
+        $this->assertSame(['2026-05-18' => 13_000], $daily);
+    }
+
+    public function test_the_window_counts_its_last_day_as_stored_through_eloquent(): void
+    {
+        $athlete = User::factory()->create();
+        $window = HeatmapWindow::current(CarbonImmutable::parse('2026-10-11')); // ends Sunday 11 Oct
+
+        $this->runOn($athlete, '2026-10-11', 17_507);
+        $this->runOn($athlete, '2026-10-12', 5_000); // the Monday after: another window's
+
+        $daily = app(DailyRunningDistance::class)($athlete, $window);
+
+        $this->assertSame(['2026-10-11' => 17_507], $daily);
     }
 }
