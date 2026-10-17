@@ -54,6 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the 5 MB limit, the per-IP throttle and the review step still apply. A signed-out visitor's
   review shows only the start of a clashing stored run (US-011).
 
+### Fixed
+
+- **A run on the last day of a window is now counted.** A run on the Sunday that ends a window
+  (the bottom row of the grid), or today's run when today is a Sunday, was shown as a rest day:
+  missing from its day cell, the day detail, the week total, the weekly chart and the legend's
+  scale. It now appears everywhere, and the grids shown before the fix are rebuilt (US-015).
+
 ## [1.0.0] - 2026-10-12
 
 A public, read-only dashboard and a Garmin Connect CSV import alongside the Strava sync. Covers
