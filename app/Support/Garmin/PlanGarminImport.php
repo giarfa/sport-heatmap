@@ -36,6 +36,12 @@ final readonly class PlanGarminImport
          * One query for every row, served by the (user_id, activity_date)
          * index: a conflict or an identical run can only exist on a date the
          * file contains.
+         *
+         * The dates are bound as CarbonImmutable on purpose: the grammar writes them as
+         * "Y-m-d H:i:s", the very format the `date` cast stores activity_date in, so the
+         * equality matches. Binding toDateString() here would compare "2026-10-11" with
+         * "2026-10-11 00:00:00" as TEXT and match nothing. A range belongs to
+         * Activity::onDaysBetween instead.
          */
         $stored = $dates === [] ? collect() : $athlete->activities()
             ->whereIn('activity_date', array_map(

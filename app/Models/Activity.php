@@ -4,8 +4,12 @@ namespace App\Models;
 
 use App\Enums\ActivitySource;
 use App\Enums\SportType;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\ActivityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -97,6 +101,28 @@ class Activity extends Model
         }
 
         return "https://www.strava.com/activities/{$this->strava_activity_id}";
+    }
+
+    /**
+     * Restrict to runs on the given days, both ends included.
+     *
+     * @param  Builder<Activity>  $query
+     */
+    #[Scope]
+    protected function onDaysBetween(Builder $query, CarbonInterface $firstDay, CarbonInterface $lastDay): void
+    {
+        /*
+         * The `date` cast writes activity_date as "Y-m-d 00:00:00", and SQLite compares the
+         * column as TEXT. `<= 'Y-m-d'` therefore excluded the window's last day, because
+         * "2026-10-11 00:00:00" sorts after "2026-10-11" — and the last day of a window is
+         * always a Sunday, the day of the long run. The range is half-open, `>=` the first
+         * day and `<` the day after the last, so it holds whether a row carries "Y-m-d" or
+         * "Y-m-d 00:00:00" and never depends on how the row was written. Not whereDate():
+         * it wraps the column in strftime() and the (user_id, activity_date) index no
+         * longer serves the query.
+         */
+        $query->where('activity_date', '>=', $firstDay->toDateString())
+            ->where('activity_date', '<', CarbonImmutable::instance($lastDay)->addDay()->toDateString());
     }
 
     /**

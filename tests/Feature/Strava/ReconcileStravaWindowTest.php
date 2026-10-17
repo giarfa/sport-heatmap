@@ -73,6 +73,21 @@ class ReconcileStravaWindowTest extends TestCase
         $this->assertSame(0, Activity::count());
     }
 
+    public function test_a_strava_run_on_the_windows_last_day_that_strava_no_longer_returns_is_deleted_and_a_garmin_run_survives(): void
+    {
+        $user = $this->allowlistedAthlete();
+        $window = HeatmapWindow::current();
+
+        $stravaRun = Activity::factory()->for($user)->onDate($window->endsOn)->create();
+        $garminRun = Activity::factory()->for($user)->garminImported()->onDate($window->endsOn)->create();
+
+        $outcome = $this->reconcile($user, $window, []);
+
+        $this->assertSame(1, $outcome->deleted);
+        $this->assertFalse(Activity::whereKey($stravaRun->id)->exists());
+        $this->assertTrue(Activity::whereKey($garminRun->id)->exists());
+    }
+
     public function test_an_activity_outside_the_window_is_left_untouched(): void
     {
         $user = $this->allowlistedAthlete();

@@ -44,7 +44,7 @@ class ReconcileStravaWindow
             $storedRows = $user->activities()
                 ->select(['id', 'source', 'strava_activity_id', 'start_date_local', 'activity_date'])
                 ->where(function (Builder $query) use ($window, $fetchedIds): void {
-                    $query->whereBetween('activity_date', [$window->startsOn, $window->endsOn])
+                    $query->onDaysBetween($window->startsOn, $window->endsOn)
                         ->orWhereIn('strava_activity_id', $fetchedIds);
                 })
                 ->get();
@@ -128,7 +128,7 @@ class ReconcileStravaWindow
              */
             $deleted = $user->activities()
                 ->where('source', ActivitySource::Strava)
-                ->whereBetween('activity_date', [$window->startsOn, $window->endsOn])
+                ->onDaysBetween($window->startsOn, $window->endsOn)
                 ->whereNotIn('strava_activity_id', $seenIds)
                 ->delete();
 

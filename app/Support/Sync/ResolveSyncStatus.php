@@ -78,10 +78,7 @@ final readonly class ResolveSyncStatus
     private function runsInWindow(User $athlete, HeatmapWindow $window): int
     {
         return $athlete->activities()
-            ->whereBetween('activity_date', [
-                $window->startsOn->toDateString(),
-                $window->endsOn->toDateString(),
-            ])
+            ->onDaysBetween($window->startsOn, $window->endsOn)
             ->count();
     }
 }

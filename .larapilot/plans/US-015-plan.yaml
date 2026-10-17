@@ -63,8 +63,8 @@ tasks:
       4. Draft the internal PR title/body toward `base` (`release/2.0.0`): "US-015 Fix: a run on the last Sunday of a window is missing from the grid"
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] PR title/body drafted toward `release/2.0.0` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/2.0.0` (not `develop`)
 
       ## Test Data
       - N/A — git only
@@ -77,7 +77,7 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally toward `release/2.0.0`; open remote only if the user requests
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
@@ -111,21 +111,21 @@ tasks:
       5. `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] A run on the last day of a past window and of the current window on a Sunday appears in its cell, its detail, the week total, the trend's last bar, and the intensity calibration
-      - [ ] No `activity_date` range comparison in `app/` uses `whereBetween` with date strings any more (`grep -rn "whereBetween('activity_date'" app` is empty)
-      - [ ] Stored rows unchanged, no migration
-      - [ ] Grid cache key is `v5`
-      - [ ] `LastDayOfWindowTest` fails on `release/2.0.0` and passes on the branch
-      - [ ] Tests pass
+      - [x] A run on the last day of a past window and of the current window on a Sunday appears in its cell, its detail, the week total, the trend's last bar, and the intensity calibration
+      - [x] No `activity_date` range comparison in `app/` uses `whereBetween` with date strings any more (`grep -rn "whereBetween('activity_date'" app` is empty)
+      - [x] Stored rows unchanged, no migration
+      - [x] Grid cache key is `v5`
+      - [x] `LastDayOfWindowTest` fails on `release/2.0.0` and passes on the branch
+      - [x] Tests pass
 
       ## Test Data
       - N/A — the stored format does not change, so `ActivityFactory` and the seeders stay as they are. Do **not** run `migrate:fresh --seed` (the development database holds real data)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md`: new subsection on how `activity_date` is stored (`Y-m-d 00:00:00` through the `date` cast, on every write path) and how window ranges must compare it (`Activity::onDaysBetween`, half-open, never `whereBetween` with date strings, never `whereDate`). Note the rejected alternatives and the `v5` cache bump under Key decisions & invariants / Extension points & gotchas
-      - [ ] `.larapilot/docs/devs/activity-sync.md`: the reconcile window queries and the sync-status window count use the same scope
-      - [ ] Folder `README.md` index rows updated (`Last updated by: US-015`)
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md`: new subsection on how `activity_date` is stored (`Y-m-d 00:00:00` through the `date` cast, on every write path) and how window ranges must compare it (`Activity::onDaysBetween`, half-open, never `whereBetween` with date strings, never `whereDate`). Note the rejected alternatives and the `v5` cache bump under Key decisions & invariants / Extension points & gotchas
+      - [x] `.larapilot/docs/devs/activity-sync.md`: the reconcile window queries and the sync-status window count use the same scope
+      - [x] Folder `README.md` index rows updated (`Last updated by: US-015`)
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `fix(US-015): TASK-01 count the window's last day in every activity_date range`
@@ -133,11 +133,17 @@ tasks:
       - PR: prepare/update locally toward `release/2.0.0`; open remote only if the user requests
       - Commit body names the root cause: the `date` cast writes `Y-m-d 00:00:00`, SQLite compares TEXT, so `<= 'Y-m-d'` excluded the window's last day
     type: Fix
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
       - TASK-00
+    commit:
+      sha: 76fde323a8f70606781f19a7759416c0b7e58fb7
+      short_sha: 76fde32
+      subject: "fix(US-015): TASK-01 count the window's last day in every activity_date range"
+      committed_at: '2026-10-17T09:01:22+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/76fde323a8f70606781f19a7759416c0b7e58fb7'
   -
     id: TASK-02
     title: 'Cover window boundaries, sync status and reconcile on the last day'
@@ -166,22 +172,28 @@ tasks:
       9. `php artisan test`. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites.
 
       ## Completion Criteria
-      - [ ] Boundary days covered for the window and the lead-in, no double count
-      - [ ] Scope proven independent of the stored format
-      - [ ] Sync status and reconcile covered on the last day
-      - [ ] Regression tests shown to fail without the fix
-      - [ ] Tests pass locally
+      - [x] Boundary days covered for the window and the lead-in, no double count
+      - [x] Scope proven independent of the stored format
+      - [x] Sync status and reconcile covered on the last day
+      - [x] Regression tests shown to fail without the fix
+      - [x] Tests pass locally
 
       ## Git Deliverables
       - Commit: `test(US-015): TASK-02 cover the window boundaries of every activity_date range`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update locally toward `release/2.0.0`; open remote only if the user requests
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
       - TASK-01
+    commit:
+      sha: 82f50674481d0e10e2e9130a86ed4b9227824480
+      short_sha: 82f5067
+      subject: 'test(US-015): TASK-02 cover the window boundaries of every activity_date range'
+      committed_at: '2026-10-17T09:02:30+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/82f50674481d0e10e2e9130a86ed4b9227824480'
   -
     id: TASK-03
     title: 'CHANGELOG, quality gate and manual check'
@@ -199,10 +211,10 @@ tasks:
       4. `php artisan test`.
 
       ## Completion Criteria
-      - [ ] CHANGELOG `Fixed` entry present
-      - [ ] `larapilot:quality` passes
-      - [ ] Manual check on `/?to=2026-10-11` done and noted in the PR body
-      - [ ] Tests pass
+      - [x] CHANGELOG `Fixed` entry present
+      - [x] `larapilot:quality` passes
+      - [x] Manual check on `/?to=2026-10-11` done and noted in the PR body
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes
@@ -215,9 +227,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update locally toward `release/2.0.0`; open remote only if the user requests
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 1
     dependencies:
       - TASK-01
-updated_at: '2026-10-17T06:50:25+00:00'
+    commit:
+      sha: 78a46cd965601bbfe3f3e77993f0b3a34c74a549
+      short_sha: 78a46cd
+      subject: 'chore(US-015): TASK-03 changelog and quality gate'
+      committed_at: '2026-10-17T09:03:15+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/78a46cd965601bbfe3f3e77993f0b3a34c74a549'
+updated_at: '2026-10-17T07:03:15+00:00'

@@ -35,10 +35,7 @@ final readonly class DailyRuns
                 'total_ascent_meters',
                 'average_heart_rate',
             ])
-            ->whereBetween('activity_date', [
-                $window->startsOn->toDateString(),
-                $window->endsOn->toDateString(),
-            ])
+            ->onDaysBetween($window->startsOn, $window->endsOn)
             ->orderBy('start_date_local')
             ->get();
 
