@@ -330,7 +330,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   uninitialized readonly property and every request fails until midnight.
 - **Invariant — how `activity_date` is stored, and how a window range compares it
   (`US-015`).** The column is cast `date`, so every write path — Eloquent and the
-  factory, the Strava upsert, the Garmin import — stores it as `Y-m-d 00:00:00`, and
+  factory, the Strava `updateOrCreate`, the Garmin import — stores it as `Y-m-d 00:00:00`, and
   SQLite compares it as TEXT. A range over days goes through
   `Activity::onDaysBetween($firstDay, $lastDay)`, which is half-open: `>=` the first
   day and `<` the day after the last, both as plain `Y-m-d` strings. That holds for a
