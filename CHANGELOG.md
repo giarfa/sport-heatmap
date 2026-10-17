@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-17
+
+Window navigation, a weekly distance chart, per-run metrics in a day detail, and a Garmin CSV
+import open to every visitor and to runs of any age. Covers US-011 through US-015 (EP-002
+Activity sync, EP-003 Heatmap, EP-004 Maintenance).
+
 ### Added
 
 - **Weekly distance chart** beside the heatmap: one bar per week of the shown 16 weeks, oldest on
