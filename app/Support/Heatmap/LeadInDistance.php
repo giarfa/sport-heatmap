@@ -29,15 +29,13 @@ final readonly class LeadInDistance
         $leadInStart = $window->startsOn->subWeeks(self::LEAD_IN_WEEKS);
 
         /*
-         * The upper bound is exclusive (`< startsOn`) rather than `BETWEEN … AND startsOn - 1 day`.
-         * SQLite stores the date column as "2026-05-17 00:00:00", which sorts after the plain
-         * "2026-05-17" a BETWEEN bound would compare it with, so a run on the lead-in's last
-         * day (the Sunday before the window) would silently drop out of the average.
+         * The lead-in ends on the Sunday before the window. Activity::onDaysBetween owns
+         * the comparison, so that Sunday is counted here and the window's first Monday is
+         * not: a run is on one side of the boundary, never both and never neither.
          */
         $rows = $athlete->activities()
             ->selectRaw('activity_date, SUM(distance_meters) as meters')
-            ->where('activity_date', '>=', $leadInStart->toDateString())
-            ->where('activity_date', '<', $window->startsOn->toDateString())
+            ->onDaysBetween($leadInStart, $window->startsOn->subDay())
             ->groupBy('activity_date')
             ->get();
 

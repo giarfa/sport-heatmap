@@ -187,7 +187,7 @@ class WindowNavigationTest extends TestCase
     {
         $athlete = $this->allowlistedAthlete();
         $this->runOn($athlete, '2026-07-02', 10_000);
-        $keyOf = fn (string $to): string => "heatmap:grid:v4:{$athlete->id}:g0:"
+        $keyOf = fn (string $to): string => "heatmap:grid:v5:{$athlete->id}:g0:"
             .HeatmapWindow::fromRequestedEnd($to, now())->startsOn->toDateString().':2026-09-05';
 
         $this->actingAs($athlete)->get('/?to=2026-08-09')->assertOk();

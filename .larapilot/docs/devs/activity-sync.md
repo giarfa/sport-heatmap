@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-003` |
-| **Last updated by** | `US-013` — 2026-10-13 |
+| **Last updated by** | `US-015` — 2026-10-17 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
@@ -171,6 +171,13 @@ so `down()` deletes them first.
   leave the last good grid in place. The sync still fetches and reconciles only the
   current 112 days (`US-013`): older windows are never touched by it, but their cached
   grids are retired with the rest because the athlete's data changed.
+- **Invariant — the reconcile's window queries use `Activity::onDaysBetween()`
+  (`US-015`).** Both the stored-rows load and the delete-on-absence bound the window
+  with it, as does the sync status's "runs in window" count. The rows are stored as
+  `Y-m-d 00:00:00` and a plain `Y-m-d` string bound would exclude the window's last
+  day; the scope's half-open range does not depend on the stored format
+  (`heatmap-dashboard.md`, **how `activity_date` is stored**). The Garmin import's
+  exact-date `whereIn` is the exception: it binds `CarbonImmutable` values on purpose.
 - **Invariant — an athlete removed from the allowlist stops being synced**, the
   same rule the web guard enforces.
 - **Invariant — skipping a CSV-only athlete is not a failure.** No warning or

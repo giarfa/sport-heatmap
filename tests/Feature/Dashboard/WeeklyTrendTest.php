@@ -210,8 +210,9 @@ class WeeklyTrendTest extends TestCase
         $cold = $this->queriesOfRequest();
         $warm = $this->queriesOfRequest();
 
-        // Daily totals, the day detail's runs, and the trend's lead-in weeks.
-        $this->assertSame(1, $this->countMatching($cold, '"activity_date" < ?'), 'one lead-in query');
+        // Every day range ends on `"activity_date" < ?` (Activity::onDaysBetween): the daily totals,
+        // the day detail's runs, the trend's lead-in weeks, and the sync card's run count.
+        $this->assertSame(4, $this->countMatching($cold, '"activity_date" < ?'), 'four ranged queries');
         $this->assertSame(2, $this->countMatching($cold, 'sum(distance_meters)'), 'daily totals + lead-in');
         $this->assertSame(0, $this->countMatching($warm, 'sum(distance_meters)'), 'a warm request runs no aggregate');
         $this->assertSame(count($warm) + 3, count($cold));
