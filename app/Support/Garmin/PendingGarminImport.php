@@ -8,13 +8,14 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * The one reader and writer of the parsed upload awaiting the owner's review.
+ * The one reader and writer of the parsed upload awaiting the visitor's review.
  *
  * The session is the only binding between the upload, the review and the
  * confirm: no route parameter or form field names an import, so no request can
- * reach any import but the one in its own session. Nothing is stored in the
- * database until the owner confirms, and an abandoned review leaves only this
- * entry behind, which the next upload replaces.
+ * reach any import but the one in its own session — which is what keeps two
+ * signed-out visitors apart. Nothing is stored in the database until the
+ * visitor confirms, and an abandoned review leaves only this entry behind,
+ * which the next upload replaces.
  */
 final readonly class PendingGarminImport
 {

@@ -5,15 +5,14 @@ namespace App\Support\Garmin;
 use App\Data\Garmin\GarminCsvRow;
 use App\Data\Garmin\ParsedGarminCsv;
 use App\Exceptions\Garmin\GarminCsvRejectedException;
-use App\Support\Heatmap\HeatmapWindow;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use SplFileObject;
 use Throwable;
 
 /**
- * Reads a Garmin Connect "Activities" export into running rows inside the
- * heatmap window, counting and explaining every row it does not keep.
+ * Reads a Garmin Connect "Activities" export into running rows dated today or
+ * earlier, at any age, counting and explaining every row it does not keep.
  *
  * Writes nothing: the result is planned and reviewed before any row is stored.
  * A file that cannot be read as an export at all is rejected whole; a single
@@ -25,11 +24,24 @@ final readonly class ParseGarminCsv
 
     /*
      * Bounds on what one upload can put in the session and in front of the
-     * planner. 5 MB of minimal rows is ~100k rows; a real 16-week export holds
-     * a few hundred runs at most, and a real export with hundreds of unreadable
-     * rows is not one this importer can help with.
+     * planner. 5 MB of minimal rows is ~100k rows. Older runs are kept (US-013), so
+     * a full export of several years of training is the normal case: 5,000 runs is
+     * about 13 years at one a day, and the 5 MB limit still bounds the file itself.
+     * A real export with hundreds of unreadable rows is not one this importer can
+     * help with.
      */
-    private const MAX_RUNS = 1_000;
+    private const MAX_RUNS = 5_000;
+
+    /*
+     * Plausibility bounds on the run metrics: the file is attacker-supplied for a
+     * signed-out visitor and the values are shown on the public map, so a reading no
+     * run can have counts as "not recorded".
+     */
+    private const MAX_PACE_SECONDS_PER_KM = 36_000;
+
+    private const MAX_ASCENT_METERS = 20_000;
+
+    private const MAX_HEART_RATE = 250;
 
     private const MAX_INVALID_ROWS = 100;
 
@@ -40,7 +52,7 @@ final readonly class ParseGarminCsv
     /**
      * @throws GarminCsvRejectedException
      */
-    public function __invoke(string $path, HeatmapWindow $window, CarbonInterface $today): ParsedGarminCsv
+    public function __invoke(string $path, CarbonInterface $today): ParsedGarminCsv
     {
         $this->assertLooksLikeText($path);
 
@@ -51,7 +63,7 @@ final readonly class ParseGarminCsv
         $columns = null;
         $rows = [];
         $ignoredByType = [];
-        $outsideWindow = 0;
+        $futureDated = 0;
         $invalid = [];
         $dataRows = 0;
         $todayDate = $today->format('Y-m-d');
@@ -95,8 +107,13 @@ final readonly class ParseGarminCsv
                 continue;
             }
 
-            if ($startDateLocal->format('Y-m-d') > $todayDate || ! $window->contains($startDateLocal)) {
-                $outsideWindow++;
+            /*
+             * Only a run that has not happened yet is skipped. A run of any age is kept:
+             * the heatmap can be navigated back to it (US-013), and which window it falls
+             * in is the dashboard's business, not the importer's.
+             */
+            if ($startDateLocal->format('Y-m-d') > $todayDate) {
+                $futureDated++;
 
                 continue;
             }
@@ -128,6 +145,9 @@ final readonly class ParseGarminCsv
                 movingTimeSeconds: $movingTimeSeconds,
                 startDateLocal: $startDateLocal,
                 activityDate: $startDateLocal->startOfDay(),
+                averagePaceSecondsPerKm: $this->paceSecondsPerKm($this->cell($cells, $columns, 'avg_pace')),
+                totalAscentMeters: $this->ascentMeters($this->cell($cells, $columns, 'total_ascent')),
+                averageHeartRate: $this->heartRate($this->cell($cells, $columns, 'avg_hr')),
             );
 
             /*
@@ -146,7 +166,7 @@ final readonly class ParseGarminCsv
             throw GarminCsvRejectedException::empty();
         }
 
-        return new ParsedGarminCsv(array_values($rows), $ignoredByType, $outsideWindow, $invalid);
+        return new ParsedGarminCsv(array_values($rows), $ignoredByType, $futureDated, $invalid);
     }
 
     /**
@@ -238,6 +258,63 @@ final readonly class ParseGarminCsv
         }
 
         return (int) round((int) $parts[1] * 3_600 + (int) $parts[2] * 60 + (float) $parts[3]);
+    }
+
+    /**
+     * The raw text of an optional column, or '' when this file has no such column.
+     *
+     * @param  array<int, string|null>  $cells
+     * @param  array<string, int>  $columns
+     */
+    private function cell(array $cells, array $columns, string $key): string
+    {
+        return isset($columns[$key]) ? trim((string) ($cells[$columns[$key]] ?? '')) : '';
+    }
+
+    /**
+     * Average pace as whole seconds per kilometre: "5:23" → 323, "1:05:10" → 3910.
+     *
+     * Garmin writes "--" when it did not record one. A metric that is unreadable or
+     * zero is null, never 0 — a stored 0 would read on the dashboard as a real
+     * measurement — and it never makes the row invalid: the run itself is fine.
+     */
+    private function paceSecondsPerKm(string $raw): ?int
+    {
+        $seconds = $this->durationSeconds($raw);
+
+        return $seconds === null || $seconds === 0 || $seconds > self::MAX_PACE_SECONDS_PER_KM ? null : $seconds;
+    }
+
+    /**
+     * Total ascent as whole metres, "," thousands separators handled ("1,234" → 1234),
+     * with an optional decimal part rounded. A flat run's 0 is a real reading and stays 0.
+     */
+    private function ascentMeters(string $raw): ?int
+    {
+        $metres = str_replace(',', '', $raw);
+
+        if (! preg_match('/^\d{1,6}(\.\d+)?$/', $metres)) {
+            return null;
+        }
+
+        $ascent = (int) round((float) $metres);
+
+        return $ascent > self::MAX_ASCENT_METERS ? null : $ascent;
+    }
+
+    /**
+     * Average heart rate as whole bpm. Up to three digits keeps a malformed cell from
+     * becoming an absurd reading; 0 means the strap was off, so it is not recorded.
+     */
+    private function heartRate(string $raw): ?int
+    {
+        if (! preg_match('/^\d{1,3}(\.\d+)?$/', $raw)) {
+            return null;
+        }
+
+        $bpm = (int) round((float) $raw);
+
+        return $bpm === 0 || $bpm > self::MAX_HEART_RATE ? null : $bpm;
     }
 
     private function name(string $raw): string

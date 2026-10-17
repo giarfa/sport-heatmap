@@ -10,6 +10,7 @@
 /**
  * @var array{
  *     window_weeks: int,
+ *     navigation_step_weeks: int,
  *     grid_cache_ttl: int,
  * } $config
  */
@@ -28,6 +29,20 @@ $config = [
     */
 
     'window_weeks' => 16,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Navigation step
+    |--------------------------------------------------------------------------
+    |
+    | Previous and Next move the window by this many weeks (FR-019). It is a
+    | literal for the same reason window_weeks is: the step is part of the
+    | product definition, and a deployment file must not change how far a shared
+    | link's neighbours are.
+    |
+    */
+
+    'navigation_step_weeks' => 4,
 
     /*
     |--------------------------------------------------------------------------

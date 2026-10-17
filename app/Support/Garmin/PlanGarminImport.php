@@ -12,7 +12,7 @@ use Carbon\CarbonImmutable;
 /**
  * Sorts parsed Garmin rows against the athlete's stored activities into new
  * rows, conflicts, and rows already imported. Reads only; nothing is written
- * until the owner confirms the review.
+ * until the visitor confirms the review. With no athlete yet, every row is new.
  */
 final readonly class PlanGarminImport
 {
@@ -21,8 +21,12 @@ final readonly class PlanGarminImport
     /**
      * @param  array<int, GarminCsvRow>  $rows
      */
-    public function __invoke(User $athlete, array $rows): GarminImportPlan
+    public function __invoke(?User $athlete, array $rows): GarminImportPlan
     {
+        if ($athlete === null) {
+            return new GarminImportPlan($rows, [], [], null);
+        }
+
         $dates = array_values(array_unique(array_map(
             static fn (GarminCsvRow $row): string => $row->activityDate->toDateString(),
             $rows,
@@ -32,6 +36,12 @@ final readonly class PlanGarminImport
          * One query for every row, served by the (user_id, activity_date)
          * index: a conflict or an identical run can only exist on a date the
          * file contains.
+         *
+         * The dates are bound as CarbonImmutable on purpose: the grammar writes them as
+         * "Y-m-d H:i:s", the very format the `date` cast stores activity_date in, so the
+         * equality matches. Binding toDateString() here would compare "2026-10-11" with
+         * "2026-10-11 00:00:00" as TEXT and match nothing. A range belongs to
+         * Activity::onDaysBetween instead.
          */
         $stored = $dates === [] ? collect() : $athlete->activities()
             ->whereIn('activity_date', array_map(
@@ -42,6 +52,7 @@ final readonly class PlanGarminImport
             ->keyBy('id');
 
         $alreadyImported = [];
+        $alreadyImportedActivities = [];
 
         /*
          * Identity first, for the whole file, before any conflict is claimed.
@@ -56,6 +67,7 @@ final readonly class PlanGarminImport
 
             if ($identical !== null) {
                 $alreadyImported[$index] = $row;
+                $alreadyImportedActivities[$index] = $identical;
                 $stored->forget($identical->id);
             }
         }
@@ -103,6 +115,11 @@ final readonly class PlanGarminImport
 
         $newRows = array_diff_key($rows, $alreadyImported, $conflicts);
 
-        return new GarminImportPlan($newRows, $conflicts, $alreadyImported);
+        /*
+         * The matched stored run rides along so the apply step can fill its empty
+         * metrics without a second lookup. The fingerprint still hashes only the row
+         * indexes: which runs are already imported is what the visitor was shown.
+         */
+        return new GarminImportPlan($newRows, $conflicts, $alreadyImported, $athlete->id, $alreadyImportedActivities);
     }
 }

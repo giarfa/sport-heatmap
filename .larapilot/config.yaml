@@ -4,13 +4,18 @@ settings:
   backlog: STANDARD
   git_mode: GITFLOW
   testing: NORMAL
+  account: NONE
   auto_approve: true
   lucille: true
   decision_log: true
   code_history: false
+  comments: false
   dashboard_auth: false
   api_auth: false
   security_scan: false
+  aikido: false
+  errors: false
+  boogle: false
   github: false
   gitlab: false
   bitbucket: false
@@ -19,6 +24,11 @@ settings:
   notify_slack: false
   notify_discord: false
   notify_telegram: false
+  release_mode: true
+  project_docs: false
+  prior_art: true
+  hooks: false
+  errors_provider: ''
 frontend:
   repo_path: null
   stack: null

@@ -22,7 +22,7 @@
                 <div><dt>Skipped</dt><dd>{{ $summary->skipped }}</dd></div>
                 <div><dt>Already imported</dt><dd>{{ $summary->alreadyImported }}</dd></div>
                 <div><dt>Not runs, ignored</dt><dd>{{ $summary->ignoredTotal() }}</dd></div>
-                <div><dt>Outside 16 weeks</dt><dd>{{ $summary->outsideWindow }}</dd></div>
+                <div><dt>Future-dated</dt><dd>{{ $summary->futureDated }}</dd></div>
                 <div><dt>Unreadable rows</dt><dd>{{ count($summary->invalid) }}</dd></div>
             </dl>
         </section>

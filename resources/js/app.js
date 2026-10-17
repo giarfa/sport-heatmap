@@ -70,3 +70,65 @@ document.addEventListener('click', function (event) {
         }
     });
 });
+
+/*
+ * Day cell detail (FR-011): a ran day's button opens one shared native <dialog>,
+ * filled from that day's inert <template> — the runs are already in the page, so
+ * nothing is fetched. showModal() gives the focus trap, Esc and the inert page;
+ * focus goes back to the cell that opened it, and a click on the backdrop closes.
+ * Without JS the cells are buttons that do nothing, the same fall-back as the theme
+ * toggle, and each cell's screen-reader text still names the day and its distance.
+ */
+(function () {
+    var dialog = document.getElementById('day-dialog');
+
+    if (!dialog) {
+        return;
+    }
+
+    var titleSlot = dialog.querySelector('[data-dlg-title]');
+    var bodySlot = dialog.querySelector('[data-dlg-body]');
+    var opener = null;
+
+    function open(cell) {
+        var template = document.getElementById('day-' + cell.getAttribute('data-day'));
+
+        if (!template) {
+            return;
+        }
+
+        var content = template.content.cloneNode(true);
+
+        titleSlot.replaceChildren(content.querySelector('h2'), content.querySelector('.dlg-sub'));
+        bodySlot.replaceChildren(content.querySelector('.runs'));
+        bodySlot.scrollTop = 0;
+
+        opener = cell;
+        cell.classList.add('is-open');
+        dialog.showModal();
+    }
+
+    document.addEventListener('click', function (event) {
+        var cell = event.target.closest('[data-day]');
+
+        if (cell) {
+            open(cell);
+
+            return;
+        }
+
+        if (event.target.closest('[data-dlg-close]') || event.target === dialog) {
+            dialog.close();
+        }
+    });
+
+    dialog.addEventListener('close', function () {
+        if (!opener) {
+            return;
+        }
+
+        opener.classList.remove('is-open');
+        opener.focus();
+        opener = null;
+    });
+})();

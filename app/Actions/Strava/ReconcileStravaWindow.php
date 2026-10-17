@@ -44,7 +44,7 @@ class ReconcileStravaWindow
             $storedRows = $user->activities()
                 ->select(['id', 'source', 'strava_activity_id', 'start_date_local', 'activity_date'])
                 ->where(function (Builder $query) use ($window, $fetchedIds): void {
-                    $query->whereBetween('activity_date', [$window->startsOn, $window->endsOn])
+                    $query->onDaysBetween($window->startsOn, $window->endsOn)
                         ->orWhereIn('strava_activity_id', $fetchedIds);
                 })
                 ->get();
@@ -69,7 +69,9 @@ class ReconcileStravaWindow
                 /*
                  * Garmin wins permanently. The owner chose Garmin's values for this
                  * twin; upserting here — even as a no-op — would write Strava's
-                 * values and source back over that choice every night.
+                 * values and source back over that choice every night. That includes
+                 * its pace, ascent and heart rate: they came with the CSV or stay as
+                 * stored, and no later step could restore them (FR-002).
                  */
                 if (isset($garminOwnedIds[$activity->stravaActivityId])) {
                     continue;
@@ -81,7 +83,9 @@ class ReconcileStravaWindow
                  * it would count the same run twice on the map. Only the Strava id
                  * is stored — Garmin's values stay — and the row is claimed so a
                  * second Strava activity cannot link to it too. Only that one
-                 * column is filled, so nothing else on the row can change.
+                 * column is filled, so nothing else on the row can change — the
+                 * run metrics Strava reports for this activity are not copied in,
+                 * and a metric the CSV left empty stays empty.
                  */
                 if (! isset($storedStravaIds[$activity->stravaActivityId])) {
                     $twin = $this->startTimeMatcher->closest($activity->startDateLocal, $unlinkedGarmin);
@@ -124,7 +128,7 @@ class ReconcileStravaWindow
              */
             $deleted = $user->activities()
                 ->where('source', ActivitySource::Strava)
-                ->whereBetween('activity_date', [$window->startsOn, $window->endsOn])
+                ->onDaysBetween($window->startsOn, $window->endsOn)
                 ->whereNotIn('strava_activity_id', $seenIds)
                 ->delete();
 

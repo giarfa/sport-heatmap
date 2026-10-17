@@ -10,9 +10,10 @@ use Illuminate\Validation\Rule;
 class ConfirmGarminImportRequest extends FormRequest
 {
     /**
-     * Access is decided by the route's auth middleware and the allowlist that
-     * strava.fresh re-checks on every request; which import is confirmed comes
-     * from the session, never from this request.
+     * The import is open to signed-out visitors (US-011); strava.fresh still
+     * re-checks a signed-in owner's allowlist. Which import is confirmed — and
+     * for which athlete — comes from the session and the server-side target,
+     * never from this request.
      */
     public function authorize(): bool
     {

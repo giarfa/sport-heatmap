@@ -19,8 +19,8 @@ class ActivityFactory extends Factory
      * Define the model's default state.
      *
      * Distance and moving time are always derived from one another at a plausible
-     * pace, and activity_date is always derived from start_date_local, so a
-     * generated record can never contradict itself.
+     * pace, the stored average pace is that same pace, and activity_date is always
+     * derived from start_date_local, so a generated record can never contradict itself.
      *
      * @return array<string, mixed>
      */
@@ -49,7 +49,34 @@ class ActivityFactory extends Factory
             'start_date_local' => $startDateLocal,
             'activity_date' => $startDateLocal->toDateString(),
             'source' => ActivitySource::Strava,
+            'average_pace_seconds_per_km' => $secondsPerKilometre,
+            'total_ascent_meters' => fake()->numberBetween(5, 180),
+            'average_heart_rate' => fake()->numberBetween(135, 172),
         ];
+    }
+
+    /**
+     * A run with none of the optional metrics, like every row of a Garmin export
+     * whose pace, ascent and heart rate columns hold `--`.
+     */
+    public function withoutMetrics(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'average_pace_seconds_per_km' => null,
+            'total_ascent_meters' => null,
+            'average_heart_rate' => null,
+        ]);
+    }
+
+    /**
+     * A run recorded without a heart-rate strap: pace and ascent are there, heart
+     * rate is not.
+     */
+    public function withoutHeartRate(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'average_heart_rate' => null,
+        ]);
     }
 
     /**

@@ -25,7 +25,7 @@ The product deliberately stays personal and small: one athlete, one screen, no s
 
 ### FR-001: Strava OAuth connection and sign-in
 
-Signing in is how the owner connects Strava, not how the dashboard is viewed: the dashboard itself is public and read-only (FR-017). A single "Connect with Strava" action starts the official Strava OAuth2 authorization-code flow requesting the read-only `activity:read_all` scope; on callback the application stores the athlete id, access token, refresh token, and token expiry, then establishes the local session. The stored tokens are what the daily sync (FR-002) runs on, with or without a session.
+Signing in is how the owner connects Strava, not how the dashboard is viewed: the dashboard itself is public (FR-017), and runs can reach it from a Garmin CSV import with no Strava sign-in at all (FR-018). A single "Connect with Strava" action starts the official Strava OAuth2 authorization-code flow requesting the read-only `activity:read_all` scope; on callback the application stores the athlete id, access token, refresh token, and token expiry, then establishes the local session. The stored tokens are what the daily sync (FR-002) runs on, with or without a session.
 
 Access is restricted to an allowlist of Strava athlete ids configured in the environment: any other athlete completing the flow is rejected with an explicit message and no session, no stored tokens, and no persisted athlete record. The access token is refreshed transparently via the refresh token whenever it is expired or within a safety margin of expiring.
 
@@ -51,6 +51,8 @@ Only Strava activities whose sport type is a running type — `Run`, `TrailRun`,
 
 Distances arrive from Strava in metres and are stored as integer metres to avoid floating-point drift across aggregation. All presentation is metric: day cells and week totals are rendered in kilometres to one decimal place. Miles appear nowhere in the interface.
 
+Each run also stores, when Strava reports them, its average pace (seconds per kilometre, derived from `average_speed`), total ascent (whole metres, from `total_elevation_gain`), and average heart rate (whole bpm, from `average_heartrate`). A value Strava does not report stays empty. They are shown in the day cell detail (FR-011).
+
 **MoSCoW:** Must
 
 ### FR-004: The 16 × 7 heatmap grid
@@ -58,7 +60,7 @@ Distances arrive from Strava in metres and are stored as integer metres to avoid
 The dashboard renders a fixed grid of 16 week-rows by 7 weekday-columns:
 
 - Columns are weekdays in ISO-8601 order, Monday through Sunday, with persistent day-of-week headers.
-- Rows are consecutive calendar weeks, oldest at the top; the bottom row is the current, in-progress week. The window is rolling and always ends on the current week.
+- Rows are consecutive calendar weeks, oldest at the top; the bottom row is the current, in-progress week. The window is rolling and opens on the current week; window navigation (FR-019) moves it to earlier periods.
 - Each cell represents one calendar day and carries that day's total running distance.
 - A day's date is derived from the activity's Strava *local* start date, so an activity is attributed to the day the athlete ran it regardless of server timezone.
 - Days in the current week that have not happened yet are rendered as out-of-range and are visually distinct from a completed 0 km rest day.
@@ -107,9 +109,19 @@ An explicit control triggers the sync job on demand, for the case where a run wa
 
 ### FR-011: Day cell detail
 
-Interacting with a day cell reveals what made up that day's distance: the activity names, their individual distances and moving times, and links to each on Strava. A day with two runs currently reads as one number; this makes the underlying activities inspectable without leaving the dashboard.
-
-**MoSCoW:** Should
+**MoSCoW:** Must · **Persona:** The Committed Amateur Runner
+**Actor & trigger:** any visitor of the dashboard, signed in or not, tapping, clicking, or keyboard-activating a day cell that holds at least one run
+**Behavior:** reveals what made up that day's distance without leaving the dashboard: for each run, its name, distance (km, one decimal), moving time, average pace (min:ss per km), total ascent (metres), and average heart rate (bpm), with `—` for a value the source did not record. Strava-sourced runs link to their Strava page; Garmin-imported runs carry no link (FR-008). A day with two runs no longer reads as one number only.
+**Done means:**
+- a day with runs opens its detail by tap, click, Enter, or Space; Esc closes it and returns focus to the cell
+- days with no run and future days open no detail
+- every value is labelled with its unit; a missing pace, ascent, or heart rate reads `—`, never `0`
+- a Strava-sourced run links to its Strava activity; a Garmin-imported run has no link
+- a signed-out visitor sees the same detail, average heart rate included; opening it writes nothing and calls no Strava endpoint (FR-017)
+- after a sync or a confirmed import the detail agrees with the grid
+**Out of this FR:** charts, splits, or per-kilometre data; training-load scores or any derived metric (Out of Scope); editing an activity
+**Depends on:** FR-003 (stored metrics from Strava), FR-018 (stored metrics from Garmin), FR-008, FR-009, FR-017
+**Source:** interview — larapilot-feature US-012, 2026-10-12
 
 ### FR-012: Disconnect and purge
 
@@ -145,33 +157,73 @@ Displaying non-running sports (rides, swims, strength) on the same map, and supp
 
 **MoSCoW:** Must · **Persona:** The Committed Amateur Runner
 **Actor & trigger:** anyone opening the home page, signed in or not — typically the runner on a device with no session, or someone the runner shared the link with
-**Behavior:** the home page renders the displayed athlete's last synced heatmap, weekly totals, legend, and sync status without a Strava sign-in. The displayed athlete is the first id in the allowlist, in configured order, that has a connected user record; when no allowlisted athlete has connected, it is the first stored athlete (lowest id) with at least one activity of either source, whatever the allowlist says. A signed-out visit is strictly read-only.
+**Behavior:** the home page renders the displayed athlete's last synced heatmap, weekly totals, legend, and sync status without a Strava sign-in. The displayed athlete is the first id in the allowlist, in configured order, that has a connected user record; when no allowlisted athlete has connected, it is the first stored athlete (lowest id) with at least one activity of either source, whatever the allowlist says. Viewing is read-only; the one write a signed-out visitor can make is the Garmin CSV import (FR-018), offered on the dashboard and on the connect screen.
 **Done means:**
 - a signed-out visit to the home page returns the same grid, legend, and sync status the signed-in owner sees
 - a connected allowlisted athlete is always displayed ahead of any other stored athlete
 - when no allowlisted athlete has connected, the first stored athlete with at least one activity is displayed — including one removed from the allowlist
-- when no stored athlete has any activity, the home page shows the connect screen instead of an error
-- a signed-out visit writes no row and makes no call to Strava, and never triggers a token refresh
+- when no stored athlete has any activity, the home page shows the connect screen instead of an error, and the connect screen offers the Garmin CSV import
+- every visitor, signed in or not, sees the "Import Garmin CSV" entry point on the dashboard
+- viewing the home page signed out writes no row and makes no call to Strava, and never triggers a token refresh; only a confirmed Garmin import writes
+- an athlete with no Strava connection (CSV-only) shows no stale or failed sync warning; the status reflects the latest import
 - the page keeps `noindex, nofollow` and the "Powered by Strava" attribution
-**Out of this FR:** SEO and any marketing surface; per-visitor maps (FR-016); any write action for signed-out visitors
+**Out of this FR:** SEO and any marketing surface; per-visitor maps (FR-016); any signed-out write other than the Garmin CSV import (FR-018)
 **Depends on:** FR-001 (connected athlete and stored tokens), FR-002 (data), FR-007 (sync status)
 **Source:** interview — larapilot-feature, 2026-10-11
 
 ### FR-018: Garmin Connect CSV import
 
 **MoSCoW:** Must · **Persona:** The Committed Amateur Runner
-**Actor & trigger:** the signed-in owner, uploading an "Activities" CSV exported from the Garmin Connect website
-**Behavior:** parses Italian or English Garmin Connect exports, keeps only running types inside the 112-day window (FR-003), and stores them as Garmin-sourced activities. A CSV row whose start falls on the same date within ±2 minutes of a stored activity of either source is a conflict: before anything is written, the owner reviews every conflict side by side and chooses Overwrite or Skip per row, with apply-to-all shortcuts. An overwritten activity is Garmin's permanently (FR-002).
+**Actor & trigger:** any visitor, signed in or not, uploading an "Activities" CSV exported from the Garmin Connect website — typically the runner using the dashboard with CSV imports only
+**Behavior:** parses Italian or English Garmin Connect exports, keeps only running types (FR-003) dated today or earlier, at any age — not only inside the current 112-day window, so older runs fill the windows FR-019 navigates to — and stores them as Garmin-sourced activities. A signed-in owner imports into their own athlete; a signed-out visitor imports into the displayed athlete (FR-017), and when none is displayed the first confirmed import creates a local CSV-only athlete with no Strava connection. A signed-out import never calls Strava. A CSV row whose start falls on the same date within ±2 minutes of a stored activity of either source is a conflict: before anything is written, the importer reviews every conflict side by side and chooses Overwrite or Skip per row, with apply-to-all shortcuts. An overwritten activity is Garmin's permanently (FR-002). Each run also stores its average pace, total ascent, and average heart rate from the optional `Passo medio` / `Avg Pace`, `Ascesa totale` / `Total Ascent`, and `FC Media` / `Avg HR` columns; a missing column, a `--` placeholder, or an unreadable value leaves that metric empty without rejecting the row. On Overwrite a `--` metric keeps the stored value; an already-imported run gains only the metrics it lacks.
 **Done means:**
 - the sample export (`client-materials/Activities (1).csv`) imports its `Corsa` rows as runs and ignores its `Escursionismo` rows
 - an unrecognised header set, a missing required column, or a non-CSV file is rejected with an explicit message and nothing written
-- no conflicting row is written until the owner confirms the review; abandoning it writes nothing
+- no conflicting row is written until the importer confirms the review; abandoning it writes nothing
+- a signed-out visitor completes the whole import without a Strava sign-in; the pending upload is bound to that visitor's session and never visible to another
+- with no athlete stored, the first confirmed import creates a CSV-only athlete that the home page then displays, and the nightly sync skips it without an error
 - Skip leaves the stored activity untouched; Overwrite replaces it with the CSV values, and the next sync neither reverts nor duplicates it
 - re-importing the same file changes nothing
-- a summary reports imported, overwritten, skipped, already-imported, ignored, outside-window, and invalid counts
-**Out of this FR:** Garmin Connect API or automatic sync; FIT/GPX/TCX files; exports in languages other than Italian and English; history beyond the 112-day window
-**Depends on:** FR-001 (signed-in owner), FR-002 (source-aware reconciliation), FR-003 (run-only filter)
+- `"5:23"` pace is stored as 323 seconds per km, ascent and heart rate as whole numbers; the sample's `--` metrics import as empty, never as zero
+- a run dated before the current window is stored and goes through the same conflict review; a future-dated row is skipped
+- a summary reports imported, overwritten, skipped, already-imported, ignored, future-dated, and invalid counts
+**Out of this FR:** Garmin Connect API or automatic sync; FIT/GPX/TCX files; exports in languages other than Italian and English
+**Depends on:** FR-002 (source-aware reconciliation), FR-003 (run-only filter), FR-017 (displayed athlete)
 **Source:** interview — larapilot-feature, 2026-10-11 · client-materials/Activities (1).csv
+
+### FR-019: Window navigation
+
+**MoSCoW:** Must · **Persona:** The Committed Amateur Runner
+**Actor & trigger:** any visitor of the dashboard, signed in or not, choosing Previous or Next above the grid
+**Behavior:** the 16-week window (FR-004) moves 4 weeks back or forward and the page renders that window's grid, weekly totals, and legend. The home page opens on the current window; each window has its own URL, so a reload or a shared link keeps it. Next never goes past the current window; Previous stops once the shown window holds the athlete's oldest stored run. The intensity scale is computed from the shown window (FR-006). Older history comes from Garmin CSV imports (FR-018); the Strava sync still covers only the current 112 days (FR-002).
+**Done means:**
+- Previous shows the window ending 4 weeks earlier; Next moves 4 weeks forward and lands on the current window at most
+- Next is disabled on the current window; Previous is disabled when the shown window holds the oldest stored run, or no run is stored
+- the shown period is stated as a date range above the grid
+- a future, malformed, or unparseable window in the URL renders the current window without an error; a mid-week date is read as that week
+- a past window renders no out-of-range future cells and no partial week total
+- after a sync or a confirmed import, every window shows the new data; no cached window survives the write
+- a signed-out visitor navigates the same way; navigating writes nothing and calls no Strava endpoint (FR-017)
+- both controls are keyboard-reachable links named "Previous 4 weeks" and "Next 4 weeks"; a disabled control is announced as disabled and is not a link; no horizontal page scroll at 375 px (FR-009)
+**Out of this FR:** changing the window length (FR-014); a date picker or jump-to-date; fetching Strava history older than the current 112 days
+**Depends on:** FR-004, FR-006, FR-009, FR-017, FR-018
+**Source:** interview — larapilot-feature US-013, 2026-10-12
+
+### FR-020: Weekly mileage trend
+
+**MoSCoW:** Should · **Persona:** The Committed Amateur Runner
+**Actor & trigger:** any visitor of the dashboard, signed in or not, opening any window
+**Behavior:** a server-rendered chart beside the grid (stacked below it on narrow screens) draws one bar per week of the shown 16-week window, oldest on the left, each bar equal to that week's total (FR-005), with a 4-week rolling average line over the bars. The chart follows window navigation (FR-019).
+**Done means:**
+- each bar's value equals the weekly total of the same row, to 0.1 km; the y-axis starts at 0 km
+- each line point is the mean of that week and the three before it, including stored weeks before the shown window; on the current window the line stops at the last completed week; a week with fewer than three weeks of history since the oldest stored run has no point
+- the in-progress week's bar is marked partial, never by colour alone
+- a 0 km week shows a zero-height bar with a visible baseline; a window with no stored run shows an empty-state message instead of the chart
+- the chart has an accessible name and a text alternative with each week's dates, total, and average; no horizontal page scroll at 375 px; WCAG 2.2 AA in light and dark themes (FR-009)
+- after a sync or a confirmed import the chart shows the new data; rendering it writes nothing and calls no Strava endpoint (FR-017)
+**Out of this FR:** changing the window length, rolling 4/8/16-week totals and streak counters (FR-014); targets, goals, or training advice (Out of Scope); any JavaScript charting library
+**Depends on:** FR-005, FR-009, FR-017, FR-019
+**Source:** interview — larapilot-feature US-014, 2026-10-12
 
 ## MVP Scope
 
@@ -193,19 +245,21 @@ Displaying non-running sports (rides, swims, strength) on the same map, and supp
 - Mobile-first responsive layout down to 375 px, light and dark themes, WCAG 2.2 AA, no colour-only encoding (FR-009).
 - Public, read-only home page showing the owner's last synced heatmap without a Strava sign-in (FR-017).
 - Garmin Connect CSV import with per-conflict Overwrite/Skip review; Garmin wins permanently on overwrite (FR-018).
+- Day-cell detail with per-run distance, moving time, average pace, total ascent, average heart rate, and Strava links for Strava-sourced runs (FR-011).
+- Previous / Next navigation moving the 16-week window by 4 weeks, back to the oldest stored run (FR-019).
+- Weekly mileage trend chart — weekly-total bars with a 4-week rolling average, beside the grid (FR-020).
 
 ### Out of Scope
 
 - **Multi-sport display and multi-athlete support (FR-016)** — the intensity scale is only meaningful across comparable efforts, and a 60 km ride in the same cell as an 8 km run destroys it. Multi-athlete would turn a personal dashboard into an application with signup, quotas, and a full privacy surface; that is a different product.
 - **Any social, coaching, or advisory layer** — no training-load scores, no recommendations, no comparisons against other athletes. The product is a mirror.
-- **Historical archive beyond the visible window** — activities outside the rolling 112 days are not retained; the window is the product. Revisit if FR-014 is ever built.
+- **Strava history beyond the current window** — the Strava sync fetches only the current 112 days; older runs reach the dashboard through Garmin CSV imports (FR-018) and window navigation (FR-019).
 - **Miles, or any imperial unit anywhere in the interface.**
 - **SEO and any marketing surface** — the dashboard is publicly reachable by link (FR-017) but served `noindex, nofollow`, with no other public pages.
 
 ### Future Phases
 
 - Manual on-demand re-sync (FR-010).
-- Day-cell detail with per-activity breakdown and Strava links (FR-011).
 - Disconnect and purge flow (FR-012) — **Violet:** this becomes a Must, not a Should, the moment a second athlete can ever authorise this instance.
 - Configurable fixed-band intensity mode (FR-013).
 - Adjustable window and rolling aggregates / streaks (FR-014).
@@ -236,7 +290,7 @@ Displaying non-running sports (rides, swims, strength) on the same map, and supp
 ### Data model _(Mike)_
 
 - **`users`** — extended with `strava_athlete_id` (unique), `strava_access_token` (encrypted text), `strava_refresh_token` (encrypted text), `strava_token_expires_at`. Nullable password; no registration.
-- **`activities`** — `source` (Strava or Garmin CSV), `strava_activity_id` (unique, nullable — absent on Garmin-imported rows, kept on an overwritten Strava twin so the sync can recognise and leave it alone), `user_id`, `sport_type`, `name`, `distance_meters` (integer), `moving_time_seconds` (integer), `start_date_local` (datetime), `activity_date` (date, indexed). The index on `(user_id, activity_date)` serves the only query the product makes.
+- **`activities`** — `source` (Strava or Garmin CSV), `strava_activity_id` (unique, nullable — absent on Garmin-imported rows, kept on an overwritten Strava twin so the sync can recognise and leave it alone), `user_id`, `sport_type`, `name`, `distance_meters` (integer), `moving_time_seconds` (integer), `start_date_local` (datetime), `activity_date` (date, indexed), and the nullable metrics `average_pace_seconds_per_km`, `total_ascent_meters`, `average_heart_rate` (integers; empty when the source did not record them, never zero). The index on `(user_id, activity_date)` serves the only query the product makes.
 - **`sync_runs`** — `started_at`, `finished_at`, `status`, `activities_upserted`, `activities_deleted`, `error_message`. Powers FR-007.
 - **No materialised daily aggregate.** Grouping roughly a hundred rows by `activity_date` costs nothing; the assembled grid is cached and invalidated on sync completion. A `daily_mileage` table would be denormalisation without a problem to solve.
 
@@ -278,6 +332,8 @@ Single-athlete instance holding the owner's own data, displayed publicly and rea
 
 **Accepted risk — fallback display (FR-017):** when no allowlisted athlete has connected, the home page publicly displays the first stored athlete with activities, even one removed from the allowlist. Removing an athlete from the allowlist therefore no longer hides their stored data on its own; deleting their rows does. The owner accepted this on 2026-10-11.
 
+**Accepted risk — public heart rate (FR-011):** the day cell detail shows each run's average heart rate to every visitor. Heart rate is health data — a special category under GDPR Art. 9 — and the public dashboard (FR-017) discloses it to anyone with the link, including for a CSV-only athlete. The owner accepted this on 2026-10-12; deleting the runs, or a later change hiding the metric, is the remedy.
+
 ### Security _(Lars)_
 
 - OAuth tokens encrypted at rest; client credentials in `.env` only, never committed.
@@ -285,6 +341,7 @@ Single-athlete instance holding the owner's own data, displayed publicly and rea
 - Rate limiting on the OAuth callback route and on the manual re-sync trigger (FR-010).
 - Read-only Strava scope; no write capability is ever requested.
 - `SECURITY.md` and a `security.txt` are deferred while the instance is private; both become required before any public deployment.
+- **Accepted risk — open Garmin import (FR-018):** the CSV import is open to any visitor, with no sign-in and no passphrase, by the owner's choice on 2026-10-12. Anyone who reaches the site can import runs and overwrite stored ones. Kept: CSRF, the 5 MB limit, throttling on upload and confirm, and pending rows bound to the visitor's session. Acceptable only while the instance is private; it must be re-decided before any public deployment.
 - **Oliver:** no red-team pass at inception — deferred to `larapilot-ship`, and only if the instance is ever exposed publicly.
 
 ### Documentation _(Albert)_
@@ -322,3 +379,7 @@ Not a constraint at this scale: one athlete, ~100 rows in the window, one page, 
 | 2026-10-11 | larapilot-feature US-007 | Change request FR-001: sign-in no longer gates viewing (before: "Signing in to the dashboard *is* authorising Strava"). Added FR-017 Public read-only dashboard (MoSCoW: Must); Out of Scope, SEO, Auth, and Privacy & legal updated; Strava API Agreement risk accepted |
 | 2026-10-11 | larapilot-feature US-008 | Added FR-018 Garmin Connect CSV import (MoSCoW: Must). Change request FR-002: delete-on-absence now Strava-sourced only and Garmin-overwritten activities are never reverted or re-added (before: every local activity absent from the response was deleted). FR-008 clarified: no deep-link for imported activities. Data model gains activity source |
 | 2026-10-11 | larapilot-feature US-009 | Change request FR-017: when no allowlisted athlete has connected, the home page displays the first stored athlete with activities (before: "an athlete removed from the allowlist is never displayed" and "when no allowlisted athlete has connected yet, the home page shows the connect screen"). Privacy & legal: fallback-display risk accepted |
+| 2026-10-12 | larapilot-feature US-011 | Change request FR-017: the Garmin CSV import is the one signed-out write, offered on the dashboard and connect screen; CSV-only athletes show no stale-sync warning (before: "A signed-out visit is strictly read-only", no write action for signed-out visitors). Change request FR-018: actor is any visitor (before: "the signed-in owner"); signed-out imports go to the displayed athlete or a new CSV-only athlete. FR-001 clarified. Security: open-import risk accepted |
+| 2026-10-12 | larapilot-feature US-012 | FR-011 Day cell detail rewritten and raised Should → Must (before: one line — names, distances, moving times, Strava links); it now also shows average pace, total ascent, and average heart rate, with Strava links only on Strava-sourced runs. FR-003: the Strava sync stores the three metrics. FR-018: optional pace, ascent, and heart-rate columns. Data model gains three nullable metrics; FR-011 moved from Future Phases to In Scope; public heart-rate risk accepted |
+| 2026-10-12 | larapilot-feature US-013 | Added FR-019 Window navigation (MoSCoW: Must): Previous / Next move the 16-week window by 4 weeks, back to the oldest stored run. Change request FR-004: the window opens on the current week (before: "always ends on the current week"). Change request FR-018: runs of any past date are imported, only future-dated rows skipped (before: "keeps only running types inside the 112-day window"; summary "outside-window" count becomes "future-dated"). Out of Scope: historical archive line narrowed to Strava history beyond the current window |
+| 2026-10-12 | larapilot-feature US-014 | Added FR-020 Weekly mileage trend (MoSCoW: Should): weekly-total bars with a 4-week rolling average beside the grid, following window navigation; listed in In Scope (assigned to release 2.0.0) |

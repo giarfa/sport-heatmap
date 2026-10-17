@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Weekly distance — breakpoints</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+  body { margin: 0; padding: 1.5rem; font: 14px/1.4 Inter, ui-sans-serif, system-ui, sans-serif; background: #e2e8f0; color: #0f172a; }
+  h1 { font-size: 1.125rem; margin: 0 0 0.25rem; }
+  p { margin: 0 0 1.5rem; color: #475569; }
+  .row { display: flex; gap: 1.5rem; align-items: flex-start; overflow-x: auto; padding-bottom: 1rem; }
+  figure { margin: 0; flex: none; }
+  figcaption { font-size: 0.75rem; font-weight: 600; margin-bottom: 0.375rem; }
+  iframe { display: block; border: 1px solid #94a3b8; border-radius: 0.5rem; background: #fff; height: 1500px; }
+</style>
+</head>
+<body>
+  <h1>US-014 — the dashboard with the trend card, at each breakpoint</h1>
+  <p>Below 1024 px the trend card stacks under the grid and the legend; from 1024 px it sits in the rail beside the grid. This harness page scrolls sideways on purpose; the frames inside it must not.</p>
+  <div class="row">
+    <figure><figcaption>320 px</figcaption><iframe src="index.html" width="320" title="Dashboard at 320 pixels"></iframe></figure>
+    <figure><figcaption>375 px — design origin</figcaption><iframe src="index.html" width="375" title="Dashboard at 375 pixels"></iframe></figure>
+    <figure><figcaption>375 px — dark</figcaption><iframe src="index.html#dark" width="375" title="Dashboard at 375 pixels, dark theme"></iframe></figure>
+    <figure><figcaption>768 px</figcaption><iframe src="index.html" width="768" title="Dashboard at 768 pixels"></iframe></figure>
+  </div>
+  <div class="row">
+    <figure><figcaption>1024 px — chart moves into the rail</figcaption><iframe src="index.html" width="1024" style="height:1100px" title="Dashboard at 1024 pixels"></iframe></figure>
+    <figure><figcaption>1280 px — dark</figcaption><iframe src="index.html#dark" width="1280" style="height:1100px" title="Dashboard at 1280 pixels, dark theme"></iframe></figure>
+  </div>
+</body>
+</html>

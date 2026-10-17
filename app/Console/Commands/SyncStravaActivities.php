@@ -63,6 +63,12 @@ class SyncStravaActivities extends Command
 
                 $activities = $this->stravaClient->activitiesInWindow($athlete, $window);
                 $outcome = $outcome->plus(($this->reconcileStravaWindow)($athlete, $window, $activities));
+
+                /*
+                 * Per athlete, as each one is written: a later athlete failing must not leave
+                 * the cached windows of one that was already reconciled showing the old data.
+                 */
+                $this->gridCache->forgetAthlete($athlete);
             }
 
             $syncRun->update([
@@ -77,12 +83,6 @@ class SyncStravaActivities extends Command
                 'Synced %d athlete(s): %d upserted, %d deleted.',
                 $athletes->count(), $outcome->upserted, $outcome->deleted,
             ));
-
-            $today = now();
-
-            foreach ($athletes as $athlete) {
-                $this->gridCache->forget($athlete, $window, $today);
-            }
 
             return self::SUCCESS;
         } catch (StravaApiException|StravaReconnectRequiredException $exception) {
@@ -109,7 +109,9 @@ class SyncStravaActivities extends Command
      * Athletes eligible to sync: connected (Strava identity and tokens present)
      * and still on the allowlist. An athlete removed from the allowlist must
      * stop being synced, the same rule EnsureFreshStravaToken enforces on the
-     * web.
+     * web. The CSV-only athlete a guest's Garmin import creates (US-011) has
+     * no Strava id and is never selected, so nothing is fetched or logged for
+     * it — skipping it is not a failure.
      *
      * @return Collection<int, User>
      */

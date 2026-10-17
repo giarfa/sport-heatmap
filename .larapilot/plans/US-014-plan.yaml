@@ -1,0 +1,392 @@
+code: US-014
+plan_body: |
+  **Release:** 2.0.0
+
+  ## Technical Solution
+
+  FR-020 adds a server-rendered weekly-distance chart (bars + 4-week rolling average) to the dashboard rail, between the legend and the sync card. It is pure Blade + inline SVG + CSS: no new frontend dependency, no script (PRD Technical Architecture; mockup `.larapilot/mockups/US-014/README.md`).
+
+  ### Data flow
+  1. **Bars come from the grid, not a second sum.** `HeatmapBuilder` already produces 16 `WeekRow`s with `totalMeters` (FR-005). The trend is built from those exact rows, so every bar equals the weekly total the grid prints, to 0.1 km.
+  2. **Lead-in weeks — the one extra query.** The rolling average of the first three shown weeks needs the 3 weeks before the window. New `App\Support\Heatmap\LeadInDistance` runs one grouped `SUM(distance_meters)` over `[startsOn − 21 days, startsOn − 1 day]` (served by the `(user_id, activity_date)` index) and folds the days into 3 weekly totals in PHP (no SQLite week functions). It runs **only on a grid cache miss**, inside the build closure. That makes it +1 query on a miss and +0 on a hit (AC: at most one extra query).
+  3. **Oldest run.** `OldestRunDate` is already read on every request (US-013). The controller passes it into the build closure, so the history rule ("no point for a week with fewer than three weeks of history since the week of the oldest stored run") costs no query.
+  4. **Built inside `HeatmapBuilder`, cached with the grid.** `HeatmapBuilder` gains a constructor dependency `BuildWeeklyTrend` and two trailing parameters (`array $leadInWeekMeters = []`, `?CarbonInterface $oldestRun = null`). After assembling the weeks it builds the `WeeklyTrend` from them. `HeatmapGrid` gains a required `public WeeklyTrend $trend`. Because the trend sits in the cached grid, the existing generation bump (`HeatmapGridCache::forgetAthlete` on sync and confirmed import) retires it with the grid, and no separate chart cache can outlive a write.
+     - *Rejected:* (a) widening `DailyRunningDistance` by 21 days. It costs zero queries but feeds pre-window days into `CalibrateIntensityScale` and breaks FR-006 (scale from the shown window only). (b) Building the trend in the controller per request: either an extra query on every request or a second cache. (c) A `withTrend()` on a nullable property, which would leave a half-built grid type that Blade has to null-check.
+  5. **Cache shape.** `HeatmapGridCache` key segment `v3` → `v4` (HeatmapGrid gains a readonly property; see the existing comment on uninitialized readonly properties). The new classes (`WeeklyTrend`, `TrendBar`, `TrendTick`) are added to `cache.serializable_classes`, or the database store restores them as `__PHP_Incomplete_Class`.
+
+  ### The trend arithmetic (`App\Support\Heatmap\BuildWeeklyTrend`)
+  All in **integer metres**, rounded once at the edge, and pinned to the mockup fixture as the R-7 legend is pinned (`.ai/rules/heatmap.md` spirit):
+  - **Bar km** = `WeekRow::kilometres()` (same string the grid prints). Geometry uses that 0.1-km-rounded value, as the mockup generator does.
+  - **Rolling average** for week *i* = mean of weeks *i−3 … i*, taking lead-in weeks for *i < 3*. Sum metres, divide by 4, round half-up to 0.1 km. The mockup's 18 May point is (22.0 + 0.0 + 18.6 + 38.8)/4 = 19.85, which must render **19.9**. A test pins this half-up case.
+  - **No point** when the week is partial (so on the current window the line stops at the last completed week), when there is no oldest run, or when `weekStart < startOfWeek(oldestRun) + 3 weeks`. Unknown weeks are never averaged as 0 km. Points are contiguous by construction (history gap only at the start, partial only at the end), but the builder still returns **segments** (`array<int, string>` of polyline `points`) so a future rule can't draw a line across a gap. A lone point becomes a 4-unit horizontal tick (`x−2,y x+2,y`).
+  - **Y axis:** `max` = the largest of the bar values **and** the line points (a point fed by lead-in weeks can outrun every bar). `step` = the smallest of 5, 10, 20, 25, 30, 40, 50, 75, 100, 150, 200 that is ≥ max ÷ 3 (200 when none). `top = step × ⌈max ÷ step⌉`. Ticks every `step` from 0 to `top`; only the top label carries " km". Fixtures: current window → step 30 / top 90; past window → step 25 / top 75.
+  - **SVG geometry** (`viewBox 0 0 160 100`, `preserveAspectRatio="none"`): slot *i* bar `x = i*10+2`, width 6; point `x = i*10+5`; `y = 100 − km/top*100`. Coordinates are rendered with 2 decimals. A 0 km week becomes a baseline stub, never a gap. A partial bar is washed fill + dashed outline + an HTML `PARTIAL` tag at `bottom: calc({h}% + 2px)`.
+  - **X labels:** weeks 1, 5, 9, 13 (`j M`), flush with their bars.
+  - **Strings:** SVG title `Weekly running distance, {grid label}, oldest week first`. Per-bar accessible name / tooltip: `18 – 24 May 2026: 38.8 km; 4-week average 19.9 km` · `31 Aug – 6 Sep 2026: 44.1 km so far, partial week` · `15 – 21 Jun 2026: 55.2 km; no 4-week average yet`. Ranges crossing a year read `29 Dec 2025 – 4 Jan 2026`. Table row header: the range without the year (`18 – 24 May`). Note: `4-week average 67.7 km · week of 24 Aug` (the last drawn point), or `The 4-week average starts once 4 weeks of runs are stored.` when no point exists. Key flags: `hasPartial`, `hasZeroWeek`.
+  - **Empty:** `WeeklyTrend::isEmpty()` mirrors `HeatmapGrid::hasRuns()`. An empty window shows `No runs in this window, so there is nothing to chart.` with no axis and no bars.
+
+  ### Rendering
+  - `resources/views/components/weekly-trend.blade.php` and `weekly-trend-skeleton.blade.php`, **markup only** (no arithmetic, like `heatmap-legend.blade.php`). The dashboard rail order is legend → trend → sync, and the rail `aria-label` becomes `Legend, weekly trend and sync detail` (mockup `index.html`). The skeleton shows when `$status->showsSkeleton()` (16 bars, `aria-hidden`). The connect screen is untouched, so it has no chart.
+  - CSS: port **Part 2 → "Weekly trend"** of `.larapilot/mockups/US-014/trend.css` into `resources/css/app.css` next to the grid rules. **Do not port "Window navigation"** from Part 2: US-013 owns and already shipped it, and the README says it is drawn for context only. No new tokens: bars `--lv-2`, line `--ink` over a `--surface-card` halo, gridlines `--hairline`, axis text `--ink-muted`, `vector-effect: non-scaling-stroke` on every stroke.
+  - FR-017: the build path reads only, has no `strava.fresh` side effects for guests, and calls no Strava endpoint.
+
+  ### Laravel idioms & quality (Andrew)
+  Final readonly DTOs in `app/Data/Heatmap`, invokable `final readonly` support classes in `app/Support/Heatmap`, block comments (`/* … */`) for every non-obvious decision (`.ai/rules/app.md`), no Form Request (no new input), no new route, no new package. The hot path is unchanged in shape: the cached grid on a hit, 3 grouped queries on a miss (daily distance, daily runs, lead-in). Larastan level 5 and Pint via `php artisan larapilot:quality`.
+
+  ### Cost (Aurora)
+  None. One inline SVG of ~20 elements per page, no script, no font, no new service.
+
+  ## Git & Branching
+  - Mode: GITFLOW, no automatic push
+  - Release: **2.0.0**. TASK-00 runs `php artisan larapilot:release-feature --semver=2.0.0 --spec=US-014 --slug=weekly-mileage-trend`, which branches `feature/US-014-weekly-mileage-trend` **from `release/2.0.0`**
+  - Per task: one Conventional Commit `type(US-014): TASK-NN …`, with code, tests and domain docs together
+  - PR prepared locally toward `release/2.0.0` (not `develop`); push / remote PR only if the user asks
+  - Merge into `release/2.0.0` after `larapilot-review` approval (auto-approve is on). US-014 is the last open story of v2.0.0, so approval hands over to `/larapilot-release`
+
+  ## Test Data Strategy
+  - No model, migration, enum or relationship changes, so no factory change.
+  - `TrainingBlockSeeder` already seeds 7 weeks of Garmin history before the 16-week block, so after `php artisan migrate:fresh --seed` the current window draws a line from its first week. Previous shows a window with the 0 km week, and history-gap behaviour is reachable by stepping back. Verify this during TASK-04 (manual) and do not change the seeder.
+  - Unit fixtures reuse the mockup's dataset (README **Sample data**): the 16 weekly totals of the current window, the 3 lead-in weeks (22.0, 0.0, 18.6 km), and the oldest run in the week of 30 Mar 2026, with "today" Saturday 5 Sep 2026.
+
+  ## Test Strategy
+  - Bar: **NORMAL**. PHPUnit (the project's runner) feature and unit tests. **No** Playwright, Dusk, browser or viewport suites.
+  - Unit (`tests/Unit/Support/Heatmap/BuildWeeklyTrendTest.php`, `LeadInDistanceTest` as feature-DB test): every number in the README's sample table (bars + averages); the half-up 19.85 → 19.9 case; axis step/top 30/90 and 25/75; a line point that outruns every bar raises the top; the short-history first point (6 Jul); 0 km stub; partial bar with no point; past window with no partial and a full 16-point line; lone point → tick; no oldest run → no points; accessible-name strings including a year-crossing range; empty window.
+  - Feature (`tests/Feature/Dashboard/WeeklyTrendTest.php`): the card renders in the rail with 16 named bars whose values equal the grid's week totals; `?to=` past window; empty window message; connect screen has no chart; skeleton during the first sync; guest sees the same card, writes no domain row, and makes no HTTP call (`Http::preventStrayRequests()`); after `forgetAthlete` (sync or confirmed import) the chart shows the new data; **query budget**: a cache-miss request makes exactly one more query than the grid alone, and a cache-hit request makes none for the chart.
+  - Existing tests to keep green: `HeatmapBuilderTest` (new constructor dependency), `HeatmapGridCacheTest` (key v4, new serializable classes), `WindowNavigationTest`, `PublicDashboardTest`.
+  - **Manual test handoff:** at 320 / 375 / 768 / 1024 / 1280 px in light and dark, check no horizontal page scroll, the chart beside the grid from `lg` and stacked below the legend under `lg`, the `<details>` summary reachable by keyboard with a visible focus ring, and the partial tag aligned on its bar. Then Previous → the line spans 16 weeks with no PARTIAL.
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch on release/2.0.0'
+    body: |
+      ## Description
+      Bootstrap Gitflow for US-014 on release `2.0.0`: create `feature/US-014-weekly-mileage-trend` from `release/2.0.0` and prepare the internal PR description toward `release/2.0.0`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `php artisan larapilot:release-feature --semver=2.0.0 --spec=US-014 --slug=weekly-mileage-trend`
+      2. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`.
+      3. Draft the internal PR title/body toward `base` (`release/2.0.0`): "US-014 Weekly mileage trend beside the heatmap"
+
+      ## Completion Criteria
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/2.0.0` (not `develop`)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — no behavior change
+
+      ## Git Deliverables
+      - Commit: `chore(US-014): TASK-00 bootstrap feature branch for release/2.0.0` (only if the command did not already leave a commit; an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/2.0.0`; open remote only if the user requests
+    type: Impl
+    status: DONE
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+  -
+    id: TASK-01
+    title: 'Weekly trend builder, DTOs, and lead-in distance query'
+    body: |
+      ## Description
+      Add the weekly-trend model: the `WeeklyTrend` / `TrendBar` / `TrendTick` DTOs, the `LeadInDistance` query (the one extra query), and `BuildWeeklyTrend`, which turns 16 `WeekRow`s + 3 lead-in weekly totals + the oldest run date into every number and string the chart prints. No rendering and no wiring yet.
+
+      ## Files Involved
+      - app/Data/Heatmap/WeeklyTrend.php (new; final readonly: `bars`, `ticks`, `xLabels`, `lineSegments`, `title`, `note`, `hasPartial`, `hasZeroWeek`, `isEmpty()`)
+      - app/Data/Heatmap/TrendBar.php (new; final readonly: `rangeLabel` (no year, table), `accessibleName` (with year), `kilometres`, `averageKilometres` (?string), `x`, `y`, `height` (2-decimal strings), `heightPercent`, `isPartial`, `isZero`)
+      - app/Data/Heatmap/TrendTick.php (new; final readonly: `label`, `bottomPercent`, `y`)
+      - app/Support/Heatmap/LeadInDistance.php (new; invokable, `(User $athlete, HeatmapWindow $window): array<int, int>`, 3 weekly metre totals, oldest first)
+      - app/Support/Heatmap/BuildWeeklyTrend.php (new; invokable, `(array<int, WeekRow> $weeks, array<int, int> $leadInWeekMeters, ?CarbonInterface $oldestRun, string $windowLabel): WeeklyTrend`)
+
+      ## Steps
+      1. `php artisan make:class` for each new class, then make them `final readonly` with PHPDoc array shapes, matching `IntensityScale` / `LegendRow` / `DailyRunningDistance`.
+      2. `LeadInDistance`: one `selectRaw('activity_date, SUM(distance_meters) as meters')` over `[startsOn->subDays(21), startsOn->subDay()]`, `groupBy('activity_date')`, folded into 3 weekly buckets in PHP. Add a block comment on why it is separate from `DailyRunningDistance` (FR-006: the scale must see only the shown window).
+      3. `BuildWeeklyTrend`, per the plan's **The trend arithmetic**: integer-metre rolling mean with half-up rounding to 0.1 km; the no-point rules (partial week, no oldest run, `weekStart < startOfWeek(oldestRun)+3 weeks`); y-axis nice step over bars **and** points; geometry `x = i*10+2` / point `x = i*10+5` / `y = 100 − km/top*100` from the printed 0.1-km values, 2-decimal output; lone point → 4-unit tick; polyline segments; x labels at weeks 1/5/9/13; all strings exactly as in mockup `.larapilot/mockups/US-014/index.html` and the README **Accessibility** section.
+      4. Block comments (`/* … */`) on the decisions that would otherwise be "simplified" away: rounding from the printed value, max covering line points, never averaging unknown weeks as 0, segments rather than one polyline.
+      5. Write the unit tests in this task only as far as needed to drive the code. The full fixture suite is TASK-02.
+
+      ## Completion Criteria
+      - [x] For the mockup dataset, `BuildWeeklyTrend` yields the README sample table, step 30 / top 90, and the `index.html` polyline `points` string exactly
+      - [x] `LeadInDistance` issues exactly one query and returns 3 weekly totals (zeros for empty weeks)
+      - [x] No Eloquent model, request, or view reaches the DTOs; Blade will need no arithmetic
+      - [x] Larastan level 5 clean on the new files
+
+      ## Test Data
+      - N/A — no model/schema changes; fixtures are built in tests from the mockup dataset
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md`: new **Weekly trend** subsection under Technical design (classes, the rolling-average and axis rules, the history rule) and Architectural choices (separate lead-in query vs widening the daily query, rejected because of FR-006)
+      - [x] Folder `README.md` index row: last touched by `US-014`
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-014): TASK-01 weekly trend builder and lead-in distance query`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes only
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 6
+    dependencies:
+      - TASK-00
+    commit:
+      sha: 5a4f5ef71ed158ce31b23eb67e97a4f61c4ea086
+      short_sha: 5a4f5ef
+      subject: 'feat(US-014): TASK-01 weekly trend builder and lead-in distance query'
+      committed_at: '2026-10-13T22:44:10+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5a4f5ef71ed158ce31b23eb67e97a4f61c4ea086'
+  -
+    id: TASK-02
+    title: 'Pin the weekly trend to the mockup fixture (unit tests)'
+    body: |
+      ## Description
+      Add PHPUnit coverage that pins `BuildWeeklyTrend` and `LeadInDistance` to the mockup contract, the same way `CalibrateIntensityScaleTest` pins R-7.
+
+      ## Files Involved
+      - tests/Unit/Support/Heatmap/BuildWeeklyTrendTest.php (new — `php artisan make:test --phpunit --unit Support/Heatmap/BuildWeeklyTrendTest` then move if needed)
+      - tests/Feature/Dashboard/LeadInDistanceTest.php (new; uses the DB)
+
+      ## Steps
+      1. Use `ActivityFactory` / `UserFactory` states (check them first). Build `WeekRow` fixtures through `HeatmapBuilder` from daily metres, not by hand, so the bars are the grid's totals.
+      2. Fixture: the README **Sample data**: current window 18 May – 6 Sep 2026, today Sat 5 Sep 2026, lead-in 22.0 / 0.0 / 18.6 km, oldest run in the week of 30 Mar 2026.
+      3. Cover:
+         - every bar and every average in the README table; the partial week has no average and the line stops at 24 Aug
+         - 19.85 → **19.9** (half-up) for the 18 May point
+         - axis: current step 30 / top 90 (tick labels `0`, `30`, `60`, `90 km`); past window (20 Apr – 9 Aug) step 25 / top 75, no partial bar, 16 points, the 4 May 0 km stub
+         - a lead-in-fed point higher than every bar raises `top`
+         - short history: oldest run in the week of 15 Jun means the first point falls on 6 Jul and earlier weeks have none (never averaged as 0)
+         - lone point → tick segment; no oldest run → no segment and the "starts once 4 weeks" note
+         - accessible names: normal, partial, no-average, and a year-crossing range (`29 Dec 2025 – 4 Jan 2026`)
+         - empty window → `isEmpty()` true
+         - `LeadInDistance`: one query (`DB::enableQueryLog()` / `DB::listen`), 3 buckets, a run on `startsOn` itself excluded, a run 21 days before included, other athletes' runs excluded
+      4. `php artisan test --compact tests/Unit/Support/Heatmap/BuildWeeklyTrendTest.php tests/Feature/Dashboard/LeadInDistanceTest.php`
+      5. Do **not** add Playwright, Dusk, browser, or viewport suites.
+
+      ## Completion Criteria
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar: every rule in the plan's **The trend arithmetic** has a test that would fail if the rule changed
+
+      ## Git Deliverables
+      - Commit: `test(US-014): TASK-02 pin the weekly trend to the mockup fixture`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes only
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-01
+    commit:
+      sha: 2dffc6bedab4e5cd654dcd1a017f5f02f85776b1
+      short_sha: 2dffc6b
+      subject: 'test(US-014): TASK-02 pin the weekly trend to the mockup fixture'
+      committed_at: '2026-10-13T22:45:14+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/2dffc6bedab4e5cd654dcd1a017f5f02f85776b1'
+  -
+    id: TASK-03
+    title: 'Carry the trend in the cached window grid'
+    body: |
+      ## Description
+      Wire the trend into the cached window payload: `HeatmapBuilder` builds it, `HeatmapGrid` carries it, the controller feeds the lead-in totals and the oldest run into the build closure, and the cache key and serializable classes move with the new shape.
+
+      ## Files Involved
+      - app/Support/Heatmap/HeatmapBuilder.php (constructor gains `BuildWeeklyTrend`; `__invoke` gains `array $leadInWeekMeters = []`, `?CarbonInterface $oldestRun = null`)
+      - app/Data/Heatmap/HeatmapGrid.php (new required `public WeeklyTrend $trend`)
+      - app/Support/Heatmap/HeatmapGridCache.php (key `v3` → `v4`; update the comment explaining the bump)
+      - config/cache.php (`serializable_classes` += `WeeklyTrend`, `TrendBar`, `TrendTick`)
+      - app/Http/Controllers/DashboardController.php (inject `LeadInDistance`; the build closure passes `$leadIn($athlete, $window)` and `$oldestRun`; `$oldestRun` is already read before the closure)
+      - tests/Unit/Support/Heatmap/HeatmapBuilderTest.php (constructor update)
+      - tests/Feature/Dashboard/HeatmapGridCacheTest.php (key / restore expectations, if any assert the shape)
+
+      ## Steps
+      1. Build the trend at the end of `HeatmapBuilder::__invoke` from the `$weeks` it just built, plus `HeatmapGrid::label()`'s range string. Add a block comment: the trend is built from the same `WeekRow`s so a bar cannot disagree with its row.
+      2. Controller: keep `LeadInDistance` **inside** the closure, so it runs only on a cache miss. The uncached branch (`$canHoldRuns` false) also goes through `$build()` and gets an empty trend. Add a block comment on the query budget (AC: at most one extra query).
+      3. Bump the cache key to `v4` and register the new classes. Without that, a database-store hit restores `__PHP_Incomplete_Class` and the `instanceof` miss path rebuilds on every request.
+      4. `php artisan test --compact tests/Unit/Support/Heatmap tests/Feature/Dashboard`
+
+      ## Completion Criteria
+      - [x] `HeatmapGrid::$trend` is always set; no nullable path reaches Blade
+      - [x] Cache miss: exactly one query more than before; cache hit: no query for the chart
+      - [x] `forgetAthlete` (sync, confirmed import) retires the trend with the grid; there is no separate chart cache
+      - [x] Guest path unchanged: no write, no Strava call (FR-017)
+      - [x] Existing heatmap and dashboard tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md`: Functional flow step 3 (lead-in query on a miss, trend built with the grid), cache key `v4`, serializable classes, and the invariant "the chart lives in the cached grid, never in its own cache"
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-014): TASK-03 carry the weekly trend in the cached window grid`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes only
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-01
+    commit:
+      sha: 8c9700ebb1a9c2f8874267dceb4f789f5ff45b20
+      short_sha: 8c9700e
+      subject: 'feat(US-014): TASK-03 carry the weekly trend in the cached window grid'
+      committed_at: '2026-10-13T22:46:20+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/8c9700ebb1a9c2f8874267dceb4f789f5ff45b20'
+  -
+    id: TASK-04
+    title: 'Weekly trend card in the dashboard rail (Blade + CSS)'
+    body: |
+      ## Description
+      Render the trend card in the dashboard rail, mirroring the US-014 mockups: the SVG chart, the HTML axis labels and partial tag, the key, the note, the "Weekly figures" `<details>` table, the empty state and the first-sync skeleton. Light and dark, mobile-first.
+
+      **Mirrors:** `.larapilot/mockups/US-014/index.html` (primary, current window), `.larapilot/mockups/US-014/dark.html`, `.larapilot/mockups/US-014/past-window.html`, `.larapilot/mockups/US-014/states.html` (short history, figures expanded, empty window, first sync in flight, connect screen), `.larapilot/mockups/US-014/breakpoints.html`
+      **Design system:** Tailwind CSS (PRD Technical Architecture; `.larapilot/design-systems/tailwind/`). No new tokens: reuse `--lv-2`, `--ink`, `--surface-card`, `--hairline`, `--ink-muted`, `--accent` from `resources/css/app.css`.
+
+      ## Files Involved
+      - resources/views/components/weekly-trend.blade.php (new; `@props(['trend'])`; markup only, comment `{{-- Markup only … --}}` as in `heatmap-legend.blade.php`)
+      - resources/views/components/weekly-trend-skeleton.blade.php (new; 16 skeleton bars, `aria-hidden`)
+      - resources/views/dashboard.blade.php (rail: legend → trend → sync; rail `aria-label="Legend, weekly trend and sync detail"`; skeleton when `$status->showsSkeleton()`)
+      - resources/css/app.css (port **Part 2 → "Weekly trend"** of `.larapilot/mockups/US-014/trend.css`; **not** its "Window navigation" block or the mockup-only states gallery)
+
+      ## Steps
+      1. Read the mockup README (element table, Geometry, Accessibility, Deviations) and every screen listed above before writing markup. Never work from memory.
+      2. Card: `<section class="card p-4 trend" aria-labelledby="trend-heading">` with `h3` "Weekly distance". The SVG has `viewBox="0 0 160 100" preserveAspectRatio="none" role="group"`, named by its `<title>`. Each bar is `<g role="img"><title>…</title><rect …></g>`. Gridlines, baseline and line are `aria-hidden`. No text and no circles inside the SVG. The y labels, x labels and `PARTIAL` tag are HTML positioned in %.
+      3. Key: Weekly total · 4-week average · Partial week (only when `hasPartial`) · 0 km week (only when `hasZeroWeek`), drawn as shapes.
+      4. `<details class="trend-figures">` with `<summary>` "Weekly figures" (min 44 px tall, focus ring kept), and a table with an `sr-only` caption, `th scope="col"` / `th scope="row"`, the partial tag in the row header, and the missing average as `—` + `sr-only` "none".
+      5. Empty window: heading + `No runs in this window, so there is nothing to chart.`, with no axis and no bars. The connect screen is not touched.
+      6. `npm run build`; `php artisan migrate:fresh --seed`. Smoke at 320 / 375 / 768 / 1024 / 1280 px in light and dark: chart beside the grid from `lg`, stacked under the legend below `lg`, no horizontal page scroll at 375 px. Step back with Previous: no partial bar, 16-point line. The seeded data should give the current window a line from week 1.
+      7. Any visible difference from the mockups is raised in chat **before** it is coded, then `decision-log --topic="mockup deviation"` and a row in the README `## Deviations` (Mockup fidelity, ux-1).
+      8. `php artisan test --compact tests/Feature/Dashboard`
+
+      ## Completion Criteria
+      - [x] The card matches `index.html` / `dark.html` / `past-window.html` / `states.html` element by element
+      - [x] Partial and average are never conveyed by colour alone (dashed outline + washed fill + PARTIAL tag + "partial week" in the name; line vs bar shape); 0 km is a stub
+      - [x] Every stroke has `vector-effect: non-scaling-stroke`; plot height 9 rem below `lg`, 10 rem from `lg`
+      - [x] The Blade component does no arithmetic; every value comes from `WeeklyTrend` / `TrendBar` / `TrendTick`
+      - [x] UI usable at mobile/tablet/desktop (manual smoke under NORMAL); no new JS, no new package
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes; the existing `TrainingBlockSeeder` (7 Garmin weeks before the block) already exercises the line, the 0 km week and Previous
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md`: rail order, the trend card states (chart / empty / skeleton / absent on connect), the accessibility contract, and why labels are HTML outside the stretched SVG
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-014): TASK-04 weekly trend card in the dashboard rail`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes only
+    type: Impl
+    status: DONE
+    assignee: Joe
+    estimate_hours: 5
+    dependencies:
+      - TASK-03
+    commit:
+      sha: 0934658ff86ed70a57038dcbc7c1f2aa70965f01
+      short_sha: '0934658'
+      subject: 'feat(US-014): TASK-04 weekly trend card in the dashboard rail'
+      committed_at: '2026-10-13T22:47:45+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0934658ff86ed70a57038dcbc7c1f2aa70965f01'
+  -
+    id: TASK-05
+    title: 'Feature tests: rendering, guest read-only, cache, query budget'
+    body: |
+      ## Description
+      Add feature coverage for the trend on the real dashboard request: rendering, window navigation, empty and absent states, guest read-only, cache invalidation, and the query budget.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/WeeklyTrendTest.php (new — `php artisan make:test --phpunit Dashboard/WeeklyTrendTest`)
+
+      ## Steps
+      1. Use the existing factories, `TestCase` helpers (`allowlistedAthlete()` / `allowlistAthletes()` for signed-in cases), `Carbon::setTestNow` / `travelTo` for "today", and `Http::preventStrayRequests()` + `Http::fake()` in `setUp()` (`.ai/rules/tests.md`).
+      2. Cover:
+         - the card is in the rail between the legend and the sync card; 16 `role="img"` bars whose names carry the same km as the grid's week-total cells
+         - the current window's partial bar says "partial week" and has no average; `?to=` a past window → no partial, an average on every eligible week
+         - a window with no stored run → the empty-state message and no `<svg` for the trend
+         - no athlete → the connect screen and no trend card
+         - first sync in flight (the skeleton state the grid already uses) → trend skeleton, `aria-hidden`
+         - a signed-out visitor sees the same card; the request writes no domain row (activities/users/sync_runs counts unchanged) and sends no HTTP request
+         - after `HeatmapGridCache::forgetAthlete` (as a sync or a confirmed import does) plus a new activity, the next request shows the new bar value (no stale chart)
+         - query budget: count queries with `DB::listen` on a cold cache vs the same request with the trend's lead-in query excluded, so the trend adds exactly one; on a warm cache the chart adds none
+         - the `<details>` "Weekly figures" table has one row per bar
+      3. `php artisan test --compact tests/Feature/Dashboard/WeeklyTrendTest.php`, then the full suite `php artisan test --compact`
+      4. Do **not** add Playwright, Dusk, browser, or viewport suites.
+
+      ## Completion Criteria
+      - [x] Tests pass locally, full suite green
+      - [x] Every acceptance criterion of US-014 that a server test can observe has a test; the rest (layout at breakpoints, contrast) is in the manual test handoff
+
+      ## Git Deliverables
+      - Commit: `test(US-014): TASK-05 cover the weekly trend on the dashboard`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes only
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 4
+    dependencies:
+      - TASK-02
+      - TASK-04
+    commit:
+      sha: be62cf39b5908415056a1be8dfbb45ca345f4415
+      short_sha: be62cf3
+      subject: 'test(US-014): TASK-05 cover the weekly trend on the dashboard'
+      committed_at: '2026-10-13T22:49:01+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/be62cf39b5908415056a1be8dfbb45ca345f4415'
+  -
+    id: TASK-06
+    title: 'Changelog, domain docs, and quality gate'
+    body: |
+      ## Description
+      Close the spec: CHANGELOG entry, a final consistency pass on the domain doc, the quality gate, and the manual test handoff for the human review.
+
+      ## Files Involved
+      - CHANGELOG.md (`## [Unreleased]` → `### Added`)
+      - .larapilot/docs/devs/heatmap-dashboard.md (consistency pass only; the content landed with TASK-01/03/04)
+      - .larapilot/docs/devs/README.md (index row, if not already updated)
+
+      ## Steps
+      1. CHANGELOG, in the product's words (Marika: terse, factual, no praise). Example: **Weekly distance chart** beside the heatmap: one bar per week of the shown 16 weeks with a 4-week average line; it follows Previous / Next, marks the week in progress as partial, and lists every week's total and average under "Weekly figures".
+      2. Re-read `heatmap-dashboard.md` against the final code: `Last updated by` = `US-014` with today's date; no stale "rail = legend + sync" wording.
+      3. `vendor/bin/pint --dirty --format agent`, then `php artisan larapilot:quality`. Fix every finding.
+      4. Write the manual test handoff into the local PR notes: breakpoints 320/375/768/1024/1280 light+dark, keyboard to "Weekly figures", Previous / Next redraw, a sync or Garmin import followed by reload.
+
+      ## Completion Criteria
+      - [x] CHANGELOG Unreleased has the user-facing entry
+      - [x] Domain doc and index are current
+      - [x] `larapilot:quality` passes (Pint + Larastan level ≥ 5)
+      - [x] Manual test handoff written
+
+      ## Test Data
+      - N/A — no model/schema changes
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` final consistency pass; index row current
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-014): TASK-06 changelog, domain docs, and quality gate`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: finalize the local PR notes toward `release/2.0.0`
+    type: Impl
+    status: DONE
+    assignee: Albert
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-05
+    commit:
+      sha: 15ab2c5a06779fedafa37cea0341d9ebfc3df2f0
+      short_sha: 15ab2c5
+      subject: 'chore(US-014): TASK-06 changelog, domain docs, and quality gate'
+      committed_at: '2026-10-13T22:49:14+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/15ab2c5a06779fedafa37cea0341d9ebfc3df2f0'
+updated_at: '2026-10-13T20:49:15+00:00'

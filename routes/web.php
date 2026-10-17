@@ -26,12 +26,16 @@ Route::middleware('throttle:strava-oauth')->group(function (): void {
 });
 
 /*
- * The Garmin CSV import is owner-only: auth refuses guests (a GET is redirected
- * home, see bootstrap/app.php), and strava.fresh re-checks the allowlist on
- * every request. CSRF comes from the web group. No route takes an import id —
- * the pending upload lives in the owner's session only.
+ * The Garmin CSV import is open to signed-out visitors by the owner's choice
+ * (PRD Security, accepted risk — US-011): a guest imports into the displayed
+ * athlete, or creates the CSV-only athlete when none is displayed. What still
+ * guards it: CSRF from the web group, the 5 MB rule in the Form Request, the
+ * garmin-import throttle (per IP for guests) on upload and confirm, and the
+ * session binding — no route takes an import or an athlete id, so a request
+ * only reaches the pending upload in its own session. strava.fresh stays: a
+ * no-op for guests, it still re-checks a signed-in owner's allowlist and token.
  */
-Route::middleware(['auth', 'strava.fresh'])
+Route::middleware(['strava.fresh'])
     ->prefix('import/garmin')
     ->name('garmin.import.')
     ->group(function (): void {

@@ -22,7 +22,25 @@ final readonly class SyncStatus
         public ?SyncRun $lastSuccessfulRun,
         public int $runsInWindow,
         public bool $isSyncing,
+        public ?CarbonInterface $lastImportedAt = null,
     ) {}
+
+    /**
+     * The status of an athlete with no Strava connection. The nightly sync
+     * never touches them, so sync_runs say nothing about their map: what is
+     * current is the latest Garmin import, and there is nothing to warn about.
+     */
+    public static function forCsvOnly(?CarbonInterface $lastImportedAt, int $runsInWindow): self
+    {
+        return new self(
+            SyncHealth::CsvOnly,
+            lastRun: null,
+            lastSuccessfulRun: null,
+            runsInWindow: $runsInWindow,
+            isSyncing: false,
+            lastImportedAt: $lastImportedAt,
+        );
+    }
 
     public static function from(?SyncRun $lastRun, ?SyncRun $lastSuccessfulRun, int $runsInWindow, CarbonInterface $now): self
     {
@@ -58,7 +76,12 @@ final readonly class SyncStatus
 
     public function needsWarning(): bool
     {
-        return $this->health !== SyncHealth::Healthy;
+        return $this->health !== SyncHealth::Healthy && $this->health !== SyncHealth::CsvOnly;
+    }
+
+    public function isCsvOnly(): bool
+    {
+        return $this->health === SyncHealth::CsvOnly;
     }
 
     /**
@@ -86,6 +109,7 @@ final readonly class SyncStatus
             SyncHealth::NeverSynced => 'Never synced',
             SyncHealth::Failed => "Sync failed {$this->relative($this->lastRun?->finished_at)}",
             SyncHealth::Stale, SyncHealth::Healthy => "Synced {$this->relative($this->lastSuccessfulRun?->finished_at)}",
+            SyncHealth::CsvOnly => $this->lastImportedAt === null ? 'Never imported' : "Imported {$this->relative($this->lastImportedAt)}",
         };
     }
 
@@ -124,7 +148,7 @@ final readonly class SyncStatus
             SyncHealth::Failed => "Last sync failed {$this->relative($this->lastRun?->finished_at)}",
             SyncHealth::Stale => "Last successful sync was {$this->relative($this->lastSuccessfulRun?->finished_at)}",
             SyncHealth::NeverSynced => 'Waiting for the first sync',
-            SyncHealth::Healthy => '',
+            SyncHealth::Healthy, SyncHealth::CsvOnly => '',
         };
     }
 
@@ -141,7 +165,7 @@ final readonly class SyncStatus
                 (int) config('strava.sync_hour'),
                 (string) config('strava.sync_timezone'),
             ),
-            SyncHealth::Healthy => '',
+            SyncHealth::Healthy, SyncHealth::CsvOnly => '',
         };
     }
 
@@ -164,18 +188,30 @@ final readonly class SyncStatus
      * would have nothing to show if it read the same field.
      */
 
+    public function detailHeading(): string
+    {
+        return $this->isCsvOnly() ? 'Import' : 'Sync';
+    }
+
+    public function lastRunHeading(): string
+    {
+        return $this->isCsvOnly() ? 'Last import' : 'Last run';
+    }
+
     /**
      * The absolute "Last run" stamp the detail card prints, in the sync
      * timezone — the sync hour is expressed in it, so a 04:12 row must not
-     * print as 02:12.
+     * print as 02:12. A CSV-only athlete gets the latest import instead.
      */
     public function lastRunLabel(): string
     {
-        if ($this->lastRun === null) {
+        $moment = $this->isCsvOnly() ? $this->lastImportedAt : $this->lastRun?->started_at;
+
+        if ($moment === null) {
             return 'Never';
         }
 
-        return $this->lastRun->started_at
+        return $moment
             ->copy()
             ->setTimezone((string) config('strava.sync_timezone'))
             ->format('j M Y, H:i');
@@ -183,17 +219,39 @@ final readonly class SyncStatus
 
     public function lastRunRelative(): ?string
     {
+        if ($this->isCsvOnly()) {
+            return $this->lastImportedAt?->diffForHumans();
+        }
+
         return $this->lastRun?->started_at->diffForHumans();
     }
 
     public function outcomeLabel(): string
     {
+        if ($this->isCsvOnly()) {
+            return 'Garmin CSV';
+        }
+
         return $this->lastRun?->status->label() ?? '—';
     }
 
     public function outcomeModifier(): ?string
     {
+        if ($this->isCsvOnly()) {
+            return null;
+        }
+
         return $this->lastRun?->status->dotModifier();
+    }
+
+    /**
+     * The line above an empty grid, naming how this athlete's map fills in.
+     */
+    public function emptyWindowNote(): string
+    {
+        return $this->isCsvOnly()
+            ? 'No runs found in the last 16 weeks. The map fills in after your next import.'
+            : 'No runs found in the last 16 weeks. The map fills in after your next activity syncs.';
     }
 
     private function failedReason(): string

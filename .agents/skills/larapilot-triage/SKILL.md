@@ -82,14 +82,15 @@ request: {the user's words, unedited}
 verdict: Bug | Bug — requirement gap | Feature | Feature — change request
 evidence: FR-XXX done-means "…" | US-XXX criterion "…" | regression since {release} | none
 maps to: US-XXX ({status}) | —
+version: found in vA.B.C | — (release mode only: the version the user runs, from data.release.last_shipped unless they say otherwise)
 settled by: evidence | user
 ```
 
 The target skill takes the block as answers already given. Zoey's start line is posted here; her end line and the single `usage-log` come from the target skill and cover this triage.
 
-## Handoff from `larapilot-aikido`
+## Handoff from `larapilot-security`
 
-A request with an **Aikido finding** block is measured like any other, with one rule: a known vulnerability in shipped code is a **Bug** when an FR or an NFR names security for that area, a **Bug — requirement gap** otherwise. Do not ask about the verdict. Put the block under `evidence` in the **Triage handoff**, unchanged.
+A request with a **Security finding** block (Aikido or Hackly, named in `scanner:`) is measured like any other, with one rule: a known vulnerability in shipped code is a **Bug** when an FR or an NFR names security for that area, a **Bug — requirement gap** otherwise. Do not ask about the verdict. Put the block under `evidence` in the **Triage handoff**, unchanged.
 
 ## Handoff from `larapilot-error`
 

@@ -17,7 +17,7 @@ final readonly class GarminImportSummary
         public int $skipped,
         public int $alreadyImported,
         public array $ignoredByType,
-        public int $outsideWindow,
+        public int $futureDated,
         public array $invalid,
     ) {}
 
@@ -33,7 +33,7 @@ final readonly class GarminImportSummary
      *     skipped: int,
      *     already_imported: int,
      *     ignored_by_type: array<string, int>,
-     *     outside_window: int,
+     *     future_dated: int,
      *     invalid: array<int, array{line: int, reason: string}>,
      * }
      */
@@ -45,7 +45,7 @@ final readonly class GarminImportSummary
             'skipped' => $this->skipped,
             'already_imported' => $this->alreadyImported,
             'ignored_by_type' => $this->ignoredByType,
-            'outside_window' => $this->outsideWindow,
+            'future_dated' => $this->futureDated,
             'invalid' => $this->invalid,
         ];
     }
@@ -57,19 +57,27 @@ final readonly class GarminImportSummary
      *     skipped: int,
      *     already_imported: int,
      *     ignored_by_type: array<string, int>,
-     *     outside_window: int,
+     *     future_dated?: int,
+     *     outside_window?: int,
      *     invalid: array<int, array{line: int, reason: string}>,
      * }  $summary
      */
     public static function fromSessionArray(array $summary): self
     {
+        /*
+         * A pending upload or summary stored in a session before US-013 carries
+         * `outside_window`, the count of rows the old importer dropped for being outside the
+         * 112 days. It must still open, so the missing `future_dated` reads as 0: the old
+         * number counted a different thing, and showing it under "Future-dated" would be false.
+         * The session lives for one visit, so this branch dies out by itself.
+         */
         return new self(
             imported: $summary['imported'],
             overwritten: $summary['overwritten'],
             skipped: $summary['skipped'],
             alreadyImported: $summary['already_imported'],
             ignoredByType: $summary['ignored_by_type'],
-            outsideWindow: $summary['outside_window'],
+            futureDated: $summary['future_dated'] ?? 0,
             invalid: $summary['invalid'],
         );
     }

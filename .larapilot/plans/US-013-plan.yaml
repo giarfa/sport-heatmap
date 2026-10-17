@@ -1,0 +1,632 @@
+code: US-013
+plan_body: |
+  **Release:** 2.0.0
+
+  ## Technical Solution
+
+  US-013 makes the 16-week window navigable and stops the Garmin importer from dropping runs older than the current window. FR-019 is new; FR-004 and FR-018 change; FR-006, FR-009, and FR-017 must keep holding on every window.
+
+  **What already works (prior art, built in):** `HeatmapWindow` takes any date, `HeatmapBuilder` already renders a window that ends before today with no future cells and no partial week (`$date > $today` is the only Future rule), `DailyRunningDistance` / `DailyRuns` query any window through the `(user_id, activity_date)` index, and `CalibrateIntensityScale` calibrates on whatever daily totals it gets, so the legend follows the shown window (FR-006) with no change. No package and no JavaScript are added.
+
+  ### 1. The window from the URL (`app/Support/Heatmap/HeatmapWindow.php`)
+  - **URL shape:** the home page keeps `/` for the current window. A past window is `/?to=YYYY-MM-DD`, where the date is the **Sunday that ends the window** (it matches the heading "16 weeks to 9 Aug"). Any date is read as the week that contains it, so a mid-week date is that week (AC).
+  - New named constructors and queries on the readonly class: `endingInWeekOf(CarbonInterface $day)`; `fromRequestedEnd(string $requested, CarbonInterface $today)`; `previous()` (4 weeks back); `next(CarbonInterface $today)` (4 weeks forward, clamped to `current($today)`); `isCurrent(CarbonInterface $today)`. The 4-week step is a new literal `heatmap.navigation_step_weeks => 4` in `config/heatmap.php`, next to `window_weeks`, with the same "literal, not env()" rationale.
+  - **Parsing is strict and never throws:** only `^\d{4}-\d{2}-\d{2}$`, parsed with `CarbonImmutable::createFromFormat('!Y-m-d', …)` and a round-trip check (`2026-02-31` is unparseable, not 3 March). An empty, malformed, unparseable, or **future** week gives `current($today)`. The controller reads `to` through a private helper that returns `''` for anything non-string (`.ai/rules/http.md`: `?to[]=x` must not 500).
+  - A requested window **older than the oldest run** is rendered as asked (an empty grid with its date range); Previous is then disabled. It is not clamped, so a shared link never silently changes meaning.
+
+  ### 2. Navigation state (`app/Data/Heatmap/WindowNavigation.php`, new readonly DTO)
+  - Built per request, **outside** the grid cache, from the shown window, `$today`, and the athlete's oldest run date: `previousUrl: ?string`, `nextUrl: ?string`, `heading(): string`, `rangeLabel(): string`. The Blade component does no arithmetic, as with `heatmap-grid` and `heatmap-legend`.
+  - **Previous is available** only when `oldestRunDate !== null && oldestRunDate < window->startsOn`. That one rule covers both disabled cases of the AC: no run is stored, or the shown window already holds the oldest run. **Next is available** unless the window is the current one. Next from a window 1–3 weeks behind current lands on the current window (clamp), and its URL is plain `/` (no `to`), so the current window has one URL only.
+  - **Oldest run date:** new `app/Support/Heatmap/OldestRunDate.php`, one `MIN(activity_date)` aggregate served by the `(user_id, activity_date)` index. It is read fresh on every request, not cached: it is one indexed query, and a fresh read cannot outlive an import.
+
+  ### 3. Every window invalidated on write (`app/Support/Heatmap/HeatmapGridCache.php`)
+  - Today `forget()` drops only the current window's key. With navigable windows, a confirmed import of older runs or a sync would leave every other cached window stale. The cache store is `database`, which does not support tags.
+  - **Per-athlete generation counter:** `heatmap:grid:generation:{athleteId}` is stored with `forever()`. The grid key becomes `heatmap:grid:v3:{athleteId}:g{generation}:{windowStart}:{today}`. `forgetAthlete(User $athlete)` replaces `forget(...)` and increments the generation. Every window key changes in one write, and orphaned entries expire through `grid_cache_ttl`. A missing generation reads as 0. The `v3` bump follows the existing "shape of the key" rule in the key() comment.
+  - Callers: `SyncStravaActivities` (after each athlete's reconcile) and `ApplyGarminImport` (any import with a target, as today). Each replaces `forget($athlete, HeatmapWindow::current(), now())` with `forgetAthlete($athlete)`.
+  - The cached object stays `HeatmapGrid` with no new property. The new `HeatmapGrid::hasRuns()` is a method, so cached shapes do not change.
+
+  ### 4. Dashboard (`DashboardController`, `dashboard.blade.php`, new `<x-window-nav>`)
+  - The controller resolves `$window = HeatmapWindow::fromRequestedEnd($this->requestedEnd($request), $today)`, builds the grid through the cache exactly as now, then reads `OldestRunDate` and builds `WindowNavigation`.
+  - **Sync status is the same on every window:** `ResolveSyncStatus` is always called with `HeatmapWindow::current($today)`, never with the shown window. The chip, warning, sync card, and skeleton therefore do not move when the visitor navigates.
+  - **Empty window note:** it follows the **shown** grid (`$grid->hasRuns()`), not `status->runsInWindow`. Copy (Marika, terse): on the current window it stays as now; on a past window it reads "No runs stored in these 16 weeks."
+  - **Heading and range:** `h1` "Last 16 weeks" on the current window, "16 weeks to 9 Aug" on a past one (mirrors `US-014/past-window.html`). The range line above the grid stays `{grid label} · running distance per day` ("18 May – 6 Sep 2026"). The `<title>` follows the heading.
+  - **Controls** (decision 46f30df8a6f0ac7a): `<nav class="win-nav" aria-label="Window">` holds two controls. Each is either an `<a class="win-btn" href>` with the accessible name "Previous 4 weeks" / "Next 4 weeks", or, when unavailable, a native `<button type="button" class="win-btn win-btn--off" disabled>` with the same name. A disabled button is announced as disabled and is not a link (AC). Visible text "Previous" / "Next" with arrows, and an sr-only " 4 weeks", so the visible label is contained in the accessible name (WCAG 2.5.3). Port `.win-nav`, `.win-btn`, and `.win-btn--off` from `US-014/trend.css` Part 2 into `resources/css/app.css`. Tap targets stay at the 2.75 rem (44 px) minimum, and the focus-visible outline comes from the layout.
+  - `noindex, nofollow` and the Strava attribution stay. A `?to=` page is not indexed either (FR-017).
+  - **Read-only by structure (FR-017):** navigation adds only reads (`OldestRunDate`, the grid queries on a cache miss). `strava.fresh` stays a no-op for guests, and nothing on the path calls `EnsureFreshAccessToken` or `StravaClient`.
+
+  ### 5. Garmin import keeps older runs (FR-018)
+  - `ParseGarminCsv::__invoke(string $path, CarbonInterface $today)` drops its `HeatmapWindow` argument. A running row dated **today or earlier** is kept at any age, and only a row after today is skipped, counted as `futureDated`. Callers: `UploadGarminCsvController`.
+  - **Rename `outsideWindow` → `futureDated`** in `ParsedGarminCsv`, `GarminImportSummary`, `ApplyGarminImport`, and the review and summary views. The label "Outside 16 weeks" becomes "Future-dated". `fromArray()` of both DTOs also reads the legacy `outside_window` key, so a pending upload already in a session when this deploys still opens.
+  - **Run cap:** `MAX_RUNS` goes from 1,000 to **5,000** (decision 17affbd2ffbcf2fe). Its comment is updated. The 5 MB rule of `UploadGarminCsvRequest` is unchanged.
+  - Conflict review, Overwrite / Skip, identity (re-import is a no-op), and metric backfill are unchanged in code. `PlanGarminImport` already queries stored runs by the file's dates, not by the window, so older runs go through the same rules (AC). This is pinned by tests.
+
+  ### 6. Strava sync unchanged (FR-002)
+  `SyncStravaActivities` still reconciles only `HeatmapWindow::current()`. `ReconcileStravaWindow` deletes only Strava-sourced rows inside the window bounds. A test pins that a Strava-sourced and a Garmin-sourced activity dated before the window survive a sync.
+
+  ### Query shape (Andrew, John)
+  Dashboard request on a cache hit: the existing sync status queries plus **one** new `MIN(activity_date)`. On a cache miss, add the existing two window queries (daily totals and daily runs). There are no per-week or per-cell queries, and an older window costs the same as the current one.
+
+  ### Risks & notes
+  - **US-012 not yet in `release/2.0.0`:** the US-012 branch is 15 commits ahead of `release/2.0.0`, and this plan builds on its cache key (`v2`), `DailyRuns`, and `DayRun`. TASK-00 checks that US-012 is merged into `release/2.0.0` before it branches. If it is not merged, TASK-00 stops and asks.
+  - **US-014** (same release) draws its chart for the shown window and invalidates through `HeatmapGridCache`. It inherits `forgetAthlete()` and `WindowNavigation`, so it needs no change of its own for navigation.
+  - The PRD's FR-006 wording "across the 112 days" already means the shown window. No PRD edit is needed.
+
+  ## Git & Branching
+  - Mode: `GITFLOW` — no automatic push
+  - Release: `2.0.0` → branch `feature/US-013-window-navigation` created by `php artisan larapilot:release-feature --semver=2.0.0 --spec=US-013 --slug=window-navigation`, from and toward `release/2.0.0`
+  - TASK-00: bootstrap (above). Precondition: US-012 merged into `release/2.0.0`
+  - Per task: one Conventional Commit `type(US-013): TASK-NN …`; code, tests, and domain docs ride in the same commit
+  - Push / remote PR **only** when the user asks; merge into `release/2.0.0` after review approval
+
+  ## Test Data Strategy
+  - Mike extends `TrainingBlockSeeder` with **7 weeks of Garmin-imported history before the 16-week block**, with weekly totals 28.4, 31.0, 33.5, 36.2, 22.0, **0.0** (calf strain), and 18.6 km. These are the US-014 mockup rows, so US-013 and US-014 share one demo dataset. After `migrate:fresh --seed` two Previous steps are possible; the second reaches the oldest run (week of 30 Mar for the 5 Sep reference), where Previous disables
+  - No model or schema change: `ActivityFactory` already has `garmin()`-style states. Add states only if a test needs one it lacks
+  - Verify `php artisan migrate:fresh --seed` in TASK-10
+
+  ## Test Strategy
+  - Bar: `NORMAL` — PHPUnit feature and unit tests; **no** Dusk, Playwright, or browser/viewport suites
+  - Unit: `HeatmapWindow` week math (ISO Monday start, a year boundary, mid-week, malformed, unparseable `2026-02-31`, future, previous/next clamping); `WindowNavigation` available/disabled rules
+  - Feature: dashboard navigation (URLs, disabled states, past-window grid with no future cells and no partial total, legend from the shown window, identical sync status, malformed `to` incl. `?to[]=x` → 200 current window, guest read-only with `Http::preventStrayRequests()` and no domain-row writes); cache invalidation of **past** windows after an import and after a sync; Garmin import of old and future rows, conflict review on an old run, re-import no-op, legacy session key; Strava sync leaves older activities alone
+  - Interleaved: each test task follows the implementation it covers
+  - **Manual test handoff** (UI): at 375 / 768 / 1280 px, light and dark — no horizontal page scroll with the nav row; Tab reaches both controls with a visible focus ring; a screen reader announces the disabled control as "Previous 4 weeks, dimmed/unavailable button"; walk Previous to the oldest window and Next back to `/`
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap the feature branch on release/2.0.0'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for US-013 on release `2.0.0`: create `feature/US-013-window-navigation` from `release/2.0.0` and prepare the internal PR description toward `release/2.0.0`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. Precondition: `git log --oneline release/2.0.0..feature/US-012-run-metrics-day-detail` is empty (US-012 merged into `release/2.0.0`). If it is not, **stop** and ask the user to merge US-012 first: this plan builds on its cache key, `DailyRuns`, and `DayRun`
+      2. Commit or stash the pending `.larapilot/` changes of the US-012 branch, so the tree is clean
+      3. `php artisan larapilot:release-feature --semver=2.0.0 --spec=US-013 --slug=window-navigation`
+      4. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`
+      5. Draft internal PR title/body toward `base` (`release/2.0.0`)
+
+      ## Completion Criteria
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/2.0.0` (not `develop`)
+
+      ## Git Deliverables
+      - Commit: `chore(US-013): TASK-00 bootstrap feature branch for release/2.0.0` (only if the command did not already leave a commit — an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/2.0.0` — open remote only if user requests
+    type: Impl
+    status: DONE
+    assignee: Sarah
+    estimate_hours: 1
+    dependencies: {}
+    commit:
+      sha: f7740be383dcb82ebec9297bc66440a5214fb8c2
+      short_sha: f7740be
+      subject: 'chore(US-013): TASK-00 bootstrap feature branch for release/2.0.0'
+      committed_at: '2026-10-13T21:56:07+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/f7740be383dcb82ebec9297bc66440a5214fb8c2'
+  -
+    id: TASK-01
+    title: 'Navigable HeatmapWindow: window from a URL date, previous, next, current'
+    body: |-
+      ## Description
+      Teach `HeatmapWindow` to build the window that ends in the week of any date, to parse the `to` query value strictly without throwing, and to step 4 weeks back and forward with Next clamped to the current window (FR-019, FR-004).
+
+      ## Files Involved
+      - app/Support/Heatmap/HeatmapWindow.php
+      - config/heatmap.php (`navigation_step_weeks => 4`, literal, documented like `window_weeks`; extend the `@var array{…}` shape)
+
+      ## Steps
+      1. `endingInWeekOf(CarbonInterface $day): self` — `endsOn` = Sunday of that ISO week, `startsOn` = Monday `window_weeks - 1` weeks earlier. Re-express `current()` through it
+      2. `fromRequestedEnd(string $requested, CarbonInterface $today): self` — accept only `^\d{4}-\d{2}-\d{2}$`, parse with `CarbonImmutable::createFromFormat('!Y-m-d', …)`, reject when `->format('Y-m-d') !== $requested` (round-trip catches `2026-02-31`), and never throw. Empty, malformed, unparseable, or a week after the current week → `current($today)`. A mid-week date → its week
+      3. `previous(): self` (back `navigation_step_weeks`), `next(CarbonInterface $today): self` (forward, never past `current($today)`), `isCurrent(CarbonInterface $today): bool`; reuse the existing `contains()` for date checks
+      4. `/* … */` block comments for the non-obvious choices: why the URL names the window's **end** week, why an unparseable value falls back silently instead of 404/422 (AC: "without an error"), why an old window is not clamped to the oldest run
+      5. `php artisan test --compact tests/Unit/Support/Heatmap` (existing tests stay green)
+
+      ## Completion Criteria
+      - [x] Any `Y-m-d` maps to the window ending in its ISO week; malformed / unparseable / future values give the current window, no exception
+      - [x] `previous()` moves 4 weeks back; `next()` moves 4 weeks forward and never past the current window
+      - [x] `current()` behaviour unchanged (existing tests green)
+      - [x] Pint + Larastan clean for the touched files
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the window is navigable: URL date → window, 4-week step, Next clamp, strict parsing and its silent fallback; rejected alternatives (path segment, window start in the URL, 404 on bad input)
+      - [x] Folder `README.md` index row updated (last spec: US-013)
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-013): TASK-01 navigable heatmap window`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-00
+    commit:
+      sha: ff47e82b77fb67b2c05349c5657f5cdde1e6c982
+      short_sha: ff47e82
+      subject: 'feat(US-013): TASK-01 navigable heatmap window'
+      committed_at: '2026-10-13T21:56:53+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ff47e82b77fb67b2c05349c5657f5cdde1e6c982'
+  -
+    id: TASK-02
+    title: 'Unit tests: HeatmapWindow navigation and parsing'
+    body: |-
+      ## Description
+      Pin the window math TASK-01 adds, so the URL contract and the 4-week step cannot drift.
+
+      ## Files Involved
+      - tests/Unit/Support/Heatmap/HeatmapWindowTest.php (new — `php artisan make:test --phpunit --unit Support/Heatmap/HeatmapWindowTest` then move under the existing folder if make:test does not nest)
+
+      ## Steps
+      1. Read the `testing-best-practices` skill; follow `tests/Unit/Support/Heatmap/HeatmapBuilderTest.php` style (dates named, not time-travelled)
+      2. Cases: a Sunday, a Monday, and a mid-week date map to the same window; a window spanning a year boundary (end week of 4 Jan 2027) starts on a Monday 15 weeks earlier and spans 112 days; `2026-02-31`, `2026-8-9`, `09-08-2026`, `''`, `abc` → current; a date in next week → current; today's own week → current and `isCurrent()` true
+      3. `previous()` of current ends 4 weeks earlier; `next()` of that is current again; `next()` from 2 weeks behind is clamped to current; `next()` of current is current
+      4. `php artisan test --compact --filter=HeatmapWindowTest`
+      5. Do **not** add Dusk, Playwright, or browser suites
+
+      ## Completion Criteria
+      - [x] Tests pass locally
+      - [x] Every parsing and clamping rule of TASK-01 has one case
+      - [x] Coverage matches the `NORMAL` bar
+
+      ## Git Deliverables
+      - Commit: `test(US-013): TASK-02 cover heatmap window navigation`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: remote update only if the user asks
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 2
+    dependencies:
+      - TASK-01
+    commit:
+      sha: 88630df9778343b62dafbf030ce10bcb838216ed
+      short_sha: 88630df
+      subject: 'test(US-013): TASK-02 cover heatmap window navigation'
+      committed_at: '2026-10-13T21:57:24+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/88630df9778343b62dafbf030ce10bcb838216ed'
+  -
+    id: TASK-03
+    title: 'Invalidate every cached window of an athlete on sync and import'
+    body: |-
+      ## Description
+      Replace the single-key `HeatmapGridCache::forget()` with an athlete-wide invalidation, so after a confirmed Garmin import or a Strava sync no cached window grid survives the write (AC; FR-019 "no cached window survives the write").
+
+      ## Files Involved
+      - app/Support/Heatmap/HeatmapGridCache.php
+      - app/Console/Commands/SyncStravaActivities.php
+      - app/Actions/Garmin/ApplyGarminImport.php
+      - tests/Feature/Dashboard/HeatmapGridCacheTest.php (adjust existing calls to the new API only — new cases are TASK-04)
+
+      ## Steps
+      1. Generation counter: `heatmap:grid:generation:{athleteId}` read with `get(…, 0)`, written with `forever()`; `forgetAthlete(User $athlete): void` increments it (`increment()`, falling back to `forever(…, 1)` when the key is missing)
+      2. Key becomes `heatmap:grid:v3:{athleteId}:g{generation}:{windowStart}:{today}`; update the key() comment — `v3` names the key format, the generation segment is what makes one write invalidate every window on a store with no tags (`cache.default` is `database`); orphaned entries expire through `grid_cache_ttl`
+      3. A read failure of the generation key is reported and treated as a miss-safe value (never serve a grid under a generation that cannot be read): same `try/catch` + `report()` shape as `remember()`
+      4. Remove `forget(User, HeatmapWindow, CarbonInterface)`; callers use `forgetAthlete($athlete)` — `SyncStravaActivities` per athlete after its reconcile, `ApplyGarminImport` for any import with a target (keep its existing comment's rule)
+      5. `php artisan test --compact tests/Feature/Dashboard tests/Feature/Garmin tests/Feature/Console`
+
+      ## Completion Criteria
+      - [x] One `forgetAthlete()` call changes the key of every window of that athlete, and only that athlete
+      - [x] Sync and confirmed import call `forgetAthlete()`; no caller passes a window any more
+      - [x] Existing cache, sync, and import tests green
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — cache key format v3, the generation counter, why not tags / why not a per-window forget loop
+      - [x] `.larapilot/docs/devs/activity-sync.md` and `.larapilot/docs/devs/garmin-csv-import.md` — the write now invalidates every window of the athlete
+      - [x] Folder `README.md` index rows updated
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-013): TASK-03 invalidate every cached window on write`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-00
+    commit:
+      sha: cfd993d5f7b525019f4f41787bacef37622528e0
+      short_sha: cfd993d
+      subject: 'feat(US-013): TASK-03 invalidate every cached window on write'
+      committed_at: '2026-10-13T21:58:38+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cfd993d5f7b525019f4f41787bacef37622528e0'
+  -
+    id: TASK-04
+    title: 'Feature tests: past windows are invalidated by import and sync'
+    body: |-
+      ## Description
+      Prove that a write reaches windows other than the current one, in both orders (cached before the write, read after).
+
+      ## Files Involved
+      - tests/Feature/Dashboard/HeatmapGridCacheTest.php
+
+      ## Steps
+      1. Use `ActivityFactory` states and `allowlistedAthlete()` / `allowlistAthletes()` from `Tests\TestCase`
+      2. Warm the cache for the current window **and** a window 8 weeks back (GET `/` and `/?to=…`); confirm a Garmin import containing a run in the past window; GET both again → the new run is on the past window and the current one
+      3. Same with `SyncStravaActivities` (`Http::fake()` + `Http::preventStrayRequests()` in `setUp()`): a run Strava returns inside the current window appears after the sync, and the previously cached past window is rebuilt (assert by a stored change visible in it)
+      4. `forgetAthlete()` of athlete A leaves athlete B's cached grid untouched
+      5. `php artisan test --compact --filter=HeatmapGridCacheTest`
+
+      ## Completion Criteria
+      - [x] Tests pass locally
+      - [x] A cached past window never survives a confirmed import or a sync
+      - [x] Coverage matches the `NORMAL` bar
+
+      ## Git Deliverables
+      - Commit: `test(US-013): TASK-04 cover cache invalidation of past windows`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: remote update only if the user asks
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 2
+    dependencies:
+      - TASK-03
+    commit:
+      sha: 9939091f3122482cf7548cd4d854b58034d21fa7
+      short_sha: '9939091'
+      subject: 'test(US-013): TASK-04 cover cache invalidation of past windows'
+      committed_at: '2026-10-13T21:59:21+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9939091f3122482cf7548cd4d854b58034d21fa7'
+  -
+    id: TASK-05
+    title: 'Dashboard serves any window: ?to=, oldest run, navigation state, steady sync status'
+    body: |-
+      ## Description
+      Make the home page render the window named by `?to=`, compute Previous / Next availability from the athlete's oldest stored run, keep the sync status identical on every window, and state the period above the grid (FR-019, FR-004, FR-006, FR-017).
+
+      ## Files Involved
+      - app/Http/Controllers/DashboardController.php
+      - app/Support/Heatmap/OldestRunDate.php (new — `php artisan make:class Support/Heatmap/OldestRunDate`)
+      - app/Data/Heatmap/WindowNavigation.php (new final readonly DTO)
+      - app/Data/Heatmap/HeatmapGrid.php (`hasRuns(): bool` — a method, no new property)
+      - app/Data/SyncStatus.php (empty-window copy for a past window, if the note stays on SyncStatus)
+      - resources/views/dashboard.blade.php (heading, `<title>`, empty note from the shown grid — the nav markup itself is TASK-06)
+
+      ## Steps
+      1. Controller: read `to` through a private `requestedEnd(Request $request): string` returning `''` for anything non-string (`.ai/rules/http.md`); `$window = HeatmapWindow::fromRequestedEnd(…, $today)`; grid through `HeatmapGridCache::remember()` unchanged
+      2. `OldestRunDate::__invoke(User $athlete): ?CarbonImmutable` — one `MIN(activity_date)`, served by the `(user_id, activity_date)` index; read fresh per request (comment why it is not inside the cached grid)
+      3. `WindowNavigation` (built in the controller or by a static `for(HeatmapWindow $window, CarbonInterface $today, ?CarbonInterface $oldestRun)`): `previousUrl` = `route('dashboard', ['to' => previous end])` only when `oldestRun !== null && oldestRun < window->startsOn`; `nextUrl` = `null` on the current window, `route('dashboard')` (no `to`) when next is current, else `route('dashboard', ['to' => …])`; `heading()` "Last 16 weeks" / "16 weeks to 9 Aug"; `rangeLabel()` reuses `HeatmapGrid::label()` format ("18 May – 6 Sep 2026")
+      4. `ResolveSyncStatus` is called with `HeatmapWindow::current($today)` — never the shown window — so chip, warning, sync card and skeleton are the same on every window; block comment states this
+      5. Empty-window note follows `$grid->hasRuns()`; past-window copy "No runs stored in these 16 weeks." (current-window copy unchanged)
+      6. Pass `navigation` to the view; `<title>` and `h1` use `navigation->heading()`
+      7. `php artisan test --compact tests/Feature/Dashboard`
+
+      ## Completion Criteria
+      - [x] `/` renders the current window exactly as before (existing dashboard tests green)
+      - [x] `/?to=<past Sunday>` renders that window's grid, weekly totals, legend, and date range; no future cells and no partial total
+      - [x] Previous / Next availability follows the oldest-run and current-window rules
+      - [x] Sync status identical on every window; empty note follows the shown window
+      - [x] At most one extra query per request (the `MIN`)
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — request flow with `?to=`, `OldestRunDate`, `WindowNavigation` rules, why sync status always reads the current window, query shape
+      - [x] Folder `README.md` index row updated (last spec: US-013)
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-013): TASK-05 serve any window on the dashboard`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-01
+      - TASK-03
+    commit:
+      sha: e4701e6a5b25f64b4886d9fcce9dbb366ab73b51
+      short_sha: e4701e6
+      subject: 'feat(US-013): TASK-05 serve any window on the dashboard'
+      committed_at: '2026-10-13T22:00:28+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e4701e6a5b25f64b4886d9fcce9dbb366ab73b51'
+  -
+    id: TASK-06
+    title: 'Previous / Next controls: <x-window-nav> component and styles (mobile first, light + dark)'
+    body: |-
+      ## Description
+      Render the two window controls above the grid as keyboard-reachable links named "Previous 4 weeks" and "Next 4 weeks", with a disabled control that is announced as disabled and is not a link (FR-019, FR-009).
+
+      Mirrors: `.larapilot/mockups/US-014/past-window.html` (nav row, heading "16 weeks to 9 Aug", range line) · `.larapilot/mockups/US-014/index.html` (nav row on the current window) · `.larapilot/mockups/US-014/breakpoints.html` (320–1280 px) · `.larapilot/mockups/US-014/dark.html`. Design system: Tailwind CSS 4 (PRD `## Technical Architecture`), tokens of `resources/css/app.css` — no new token.
+
+      **Agreed deviation** (decision 46f30df8a6f0ac7a): the drawn disabled `<span class="win-btn win-btn--off">` becomes `<button type="button" class="win-btn win-btn--off" disabled>`. Add a row to `.larapilot/mockups/US-014/README.md` `## Deviations` (create the section) naming US-013 as the owner of the nav row.
+
+      ## Files Involved
+      - resources/views/components/window-nav.blade.php (new — markup only, no arithmetic)
+      - resources/views/dashboard.blade.php (place `<x-window-nav :navigation="$navigation" />` between the range line and `.dash`, as in the mockup)
+      - resources/css/app.css (port `.win-nav`, `.win-btn`, `.win-btn--off` from `US-014/trend.css` Part 2)
+      - .larapilot/mockups/US-014/README.md (`## Deviations` row)
+
+      ## Steps
+      1. Read the US-014 mockup README (Responsive & navigation contract, Accessibility) and the screens above first
+      2. `<nav class="win-nav mt-3" aria-label="Window">`; each control: `<a class="win-btn" href="…">` or `<button type="button" class="win-btn win-btn--off" disabled>`; content `&larr; Previous<span class="sr-only"> 4 weeks</span>` / `Next<span class="sr-only"> 4 weeks</span> &rarr;` — arrows `aria-hidden`, visible label contained in the accessible name (WCAG 2.5.3)
+      3. Keep 2.75 rem min-height (44 px target), the layout's `:focus-visible` outline, `--control-border` / `--ink` / `--ink-muted` tokens; verify both themes reach WCAG 2.2 AA for text and the 3:1 non-text border (dashed border on the disabled control is a shape cue, not colour alone)
+      4. Mobile first: the row fits 320 px with no horizontal page scroll; smoke-check at 375, 768, 1280 px in light and dark during implement
+      5. `npm run build`; `php artisan test --compact tests/Feature/Dashboard`
+
+      ## Completion Criteria
+      - [x] Both controls present on every dashboard window; links named "Previous 4 weeks" / "Next 4 weeks"
+      - [x] A disabled control is a disabled `<button>`, never an `<a>`
+      - [x] No horizontal page scroll at 320/375 px; both themes meet AA for the controls
+      - [x] Deviation recorded in the US-014 mockup README
+      - [x] UI usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — the nav component, its accessibility contract, and the disabled-button deviation
+      - [x] Folder `README.md` index row updated (last spec: US-013)
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-013): TASK-06 previous and next window controls`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Joe
+    estimate_hours: 3
+    dependencies:
+      - TASK-05
+    commit:
+      sha: 1979b870e122b982509c9cb4ff0c3761a8a8893d
+      short_sha: 1979b87
+      subject: 'feat(US-013): TASK-06 previous and next window controls'
+      committed_at: '2026-10-13T22:01:18+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1979b870e122b982509c9cb4ff0c3761a8a8893d'
+  -
+    id: TASK-07
+    title: 'Feature tests: dashboard window navigation, signed in and signed out'
+    body: |-
+      ## Description
+      Cover every navigation acceptance criterion through HTTP: URLs, disabled states, past-window rendering, legend, sync status, bad input, guest read-only, and accessible names.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/WindowNavigationTest.php (new — `php artisan make:test --phpunit Dashboard/WindowNavigationTest`)
+
+      ## Steps
+      1. Fix "today" with `$this->travelTo()` only where the controller reads the clock; build data with `ActivityFactory` (Garmin and Strava states) and sign in with `allowlistedAthlete()`
+      2. `/` opens on the current window; Next is a disabled button; Previous links to `/?to=<Sunday 4 weeks earlier>`
+      3. `/?to=` past window: shows that period's runs and weekly totals, the range "d M – d M Y", heading "16 weeks to …", no `hm-cell--future` cell, no partial tag; Next links forward (and to plain `/` when the step lands on current)
+      4. Previous is disabled when the shown window holds the oldest run, and when no run is stored (CSV-less connected athlete with 0 activities, signed in)
+      5. Legend: a past window with different distances renders different thresholds than the current one (FR-006)
+      6. Sync status markup (chip + sync card) is identical between `/` and `/?to=…`
+      7. `?to=2026-02-31`, `?to=garbage`, `?to[]=x`, a future Sunday → 200 and the current window; a Wednesday → the window ending that Sunday
+      8. Signed-out visitor: same navigation; `Http::preventStrayRequests()`; counts of `activities`, `users`, `sync_runs` unchanged; an expired-token athlete's tokens unchanged after the visit (no refresh)
+      9. Accessible names: the rendered HTML contains links whose text resolves to "Previous 4 weeks" / "Next 4 weeks", and `disabled` on the button form
+      10. `php artisan test --compact --filter=WindowNavigationTest` — no Dusk/Playwright/browser suites
+
+      ## Completion Criteria
+      - [x] Tests pass locally
+      - [x] Every FR-019 "Done means" bullet that HTTP can observe has a case
+      - [x] Coverage matches the `NORMAL` bar
+
+      ## Git Deliverables
+      - Commit: `test(US-013): TASK-07 cover dashboard window navigation`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: remote update only if the user asks
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-05
+      - TASK-06
+    commit:
+      sha: 6cb917601a21c55d08be289b88a635023e20ea3e
+      short_sha: 6cb9176
+      subject: 'test(US-013): TASK-07 cover dashboard window navigation'
+      committed_at: '2026-10-13T22:02:38+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6cb917601a21c55d08be289b88a635023e20ea3e'
+  -
+    id: TASK-08
+    title: 'Garmin import keeps runs of any age; only future-dated rows are skipped'
+    body: |-
+      ## Description
+      Stop dropping Garmin rows outside the current 112 days: keep every running row dated today or earlier, skip and count only future-dated rows, rename the counter and its label, and raise the per-import run cap to 5,000 (FR-018 changed; decision 17affbd2ffbcf2fe).
+
+      ## Files Involved
+      - app/Support/Garmin/ParseGarminCsv.php (drop the `HeatmapWindow` argument; `futureDated` counter; `MAX_RUNS = 5_000` + comment)
+      - app/Http/Controllers/Garmin/UploadGarminCsvController.php (call without the window)
+      - app/Data/Garmin/ParsedGarminCsv.php, app/Data/Garmin/GarminImportSummary.php (`outsideWindow` → `futureDated`; `toArray()` writes `future_dated`; `fromArray()` also reads legacy `outside_window` — block comment: a pending upload serialized before the deploy must still open)
+      - app/Actions/Garmin/ApplyGarminImport.php (pass `futureDated`)
+      - resources/views/garmin/review.blade.php, resources/views/garmin/summary.blade.php ("Outside 16 weeks" → "Future-dated")
+      - tests/Feature/Garmin/* and tests/Feature/Garmin/ParseGarminCsvTest.php (update existing assertions that expected outside-window skips — new cases are TASK-09)
+
+      ## Steps
+      1. In the parser keep the `> $todayDate` check only; remove `! $window->contains(...)`
+      2. Rename across DTOs, action, and views; `grep -rn "outsideWindow\|outside_window\|Outside 16 weeks" app resources tests` is empty afterwards except the legacy read in `fromArray()`
+      3. Raise `MAX_RUNS`; update its comment (a full export, years of runs; the 5 MB rule still bounds the file)
+      4. `PlanGarminImport` and `ApplyGarminImport` need no logic change: confirm by reading that stored runs are matched by the file's dates, not by the window
+      5. `php artisan test --compact tests/Feature/Garmin tests/Unit/Support/Garmin`
+
+      ## Completion Criteria
+      - [x] A running row dated before the current window is planned and imported like any other
+      - [x] A row after today is skipped and counted as future-dated; the review and summary say "Future-dated"
+      - [x] A pending upload stored under the old key still opens the review
+      - [x] An import of up to 5,000 runs is accepted; 5,001 is rejected with the existing message
+      - [x] Existing Garmin tests green after updating the renamed counter
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — runs of any age kept, future-dated rule, the counter rename and legacy key, the 5,000 cap and why
+      - [x] Folder `README.md` index row updated
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-013): TASK-08 keep older Garmin runs and count future-dated rows`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-03
+    commit:
+      sha: 6723d9c334e185691133b549d85ef1bbc278e2cf
+      short_sha: 6723d9c
+      subject: 'feat(US-013): TASK-08 keep older Garmin runs and count future-dated rows'
+      committed_at: '2026-10-13T22:04:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/6723d9c334e185691133b549d85ef1bbc278e2cf'
+  -
+    id: TASK-09
+    title: 'Feature tests: older Garmin runs, future-dated rows, Strava sync bounds'
+    body: |-
+      ## Description
+      Pin the FR-018 change and the unchanged FR-002 sync bounds.
+
+      ## Files Involved
+      - tests/Feature/Garmin/GarminImportFlowTest.php
+      - tests/Feature/Garmin/ParseGarminCsvTest.php
+      - tests/Feature/Garmin/GuestGarminImportTest.php (signed-out older import, if not already covered by the flow test)
+      - tests/Feature/Strava/… or the existing sync test file that covers `ReconcileStravaWindow`
+
+      ## Steps
+      1. A CSV with one run 30 weeks ago, one in the window, and one tomorrow → 2 imported, 1 future-dated; the summary shows the counts
+      2. An old row within ±2 min of a stored old activity goes through the conflict review; Overwrite replaces it, Skip leaves it; re-importing the same file changes nothing; an already-imported old run gains only missing metrics
+      3. The sample `client-materials/Activities (1).csv` still imports its `Corsa` rows and ignores `Escursionismo` (now regardless of date)
+      4. A pending upload serialized with `outside_window` opens the review and confirms
+      5. Cap: a generated CSV with 5,000 runs is accepted, 5,001 is rejected (build rows in the test, keep it fast)
+      6. Strava sync: a Strava-sourced and a Garmin-sourced activity dated before the current window survive `SyncStravaActivities`; the request uses `after` = current window start (`Http::fake()` + `Http::preventStrayRequests()` in `setUp()`)
+      7. `php artisan test --compact tests/Feature/Garmin tests/Feature/Strava` — no browser suites
+
+      ## Completion Criteria
+      - [x] Tests pass locally
+      - [x] Every changed FR-018 bullet and the FR-002 bound have a case
+      - [x] Coverage matches the `NORMAL` bar
+
+      ## Git Deliverables
+      - Commit: `test(US-013): TASK-09 cover older Garmin runs and sync bounds`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: remote update only if the user asks
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-08
+    commit:
+      sha: 74176fc9fbce1cf041a4b96545341ab09651b366
+      short_sha: 74176fc
+      subject: 'test(US-013): TASK-09 cover older Garmin runs and sync bounds'
+      committed_at: '2026-10-13T22:05:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/74176fc9fbce1cf041a4b96545341ab09651b366'
+  -
+    id: TASK-10
+    title: 'Seed 7 weeks of Garmin history before the training block'
+    body: |-
+      ## Description
+      Extend the demo dataset so Previous is demonstrable after `migrate:fresh --seed`: 7 Garmin-imported weeks before the 16-week block, matching the US-014 mockup rows so both specs share one fixture.
+
+      ## Files Involved
+      - database/seeders/TrainingBlockSeeder.php
+      - tests/Feature/Database/TrainingBlockSeederTest.php
+      - database/factories/ActivityFactory.php (only if a needed state is missing)
+
+      ## Steps
+      1. Add a `historyBeforeBlock()` step: the 7 weeks immediately before the block's first week, relative to the seeder's current week as the block already is (for the 5 Sep 2026 reference: weeks of 30 Mar … 11 May), weekly totals 28.4, 31.0, 33.5, 36.2, 22.0, **0.0**, 18.6 km, `source = garmin_csv`, metrics filled as the existing Garmin rows do
+      2. Keep the existing block untouched (its legend 7.2 / 9.9 / 14.1 km is pinned by R-7, `.ai/rules/heatmap.md`)
+      3. Seeder test: the oldest seeded run is 7 weeks before the block start; one Previous step from the current window shows seeded runs; weekly totals of the history weeks match the list
+      4. `php artisan migrate:fresh --seed`; `php artisan test --compact --filter=TrainingBlockSeederTest`
+
+      ## Completion Criteria
+      - [x] `migrate:fresh --seed` succeeds and the dashboard has an earlier window with runs
+      - [x] The current window's seeded data and legend are unchanged
+      - [x] Seeder test updated and green
+
+      ## Test Data
+      - [x] `TrainingBlockSeeder` creates the 7 history weeks through `Activity::factory()` with Garmin source
+      - [x] `ActivityFactory` updated in this same task only if a state is added
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — demo dataset section: the history weeks and why they mirror the US-014 mockup
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-013): TASK-10 seed Garmin history before the training block`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Mike
+    estimate_hours: 2
+    dependencies:
+      - TASK-00
+    commit:
+      sha: 33676b28a46218cd94d1497f29fa6b888e97fe37
+      short_sha: 33676b2
+      subject: 'feat(US-013): TASK-10 seed Garmin history before the training block'
+      committed_at: '2026-10-13T22:06:53+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/33676b28a46218cd94d1497f29fa6b888e97fe37'
+  -
+    id: TASK-11
+    title: 'CHANGELOG, domain doc index, and quality gate'
+    body: |-
+      ## Description
+      Close the spec: user-facing CHANGELOG entries, a final consistency pass on the touched domain docs and their index, and the Pint + Larastan gate.
+
+      ## Files Involved
+      - CHANGELOG.md (`## [Unreleased]`)
+      - .larapilot/docs/devs/README.md
+      - .larapilot/docs/devs/heatmap-dashboard.md, garmin-csv-import.md, activity-sync.md (consistency only — content was written in each task)
+
+      ## Steps
+      1. CHANGELOG `### Added`: Previous / Next window navigation with a URL per window. `### Changed`: Garmin import keeps runs of any age and reports future-dated rows; up to 5,000 runs per import
+      2. Check each touched domain doc has `Last updated by: US-013`, no stale "outside the window" wording, and the decisions referenced by id (46f30df8a6f0ac7a, 17affbd2ffbcf2fe)
+      3. `vendor/bin/pint --dirty --format agent`; `php artisan larapilot:quality`; `php artisan test --compact`
+      4. Prepare the manual test handoff notes (plan Test Strategy) in the local PR body
+
+      ## Completion Criteria
+      - [x] CHANGELOG updated under Unreleased
+      - [x] Domain docs and index current
+      - [x] `larapilot:quality` passes; full test suite green
+      - [x] Manual test handoff notes in the PR body
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/README.md` index rows for heatmap-dashboard, garmin-csv-import, activity-sync name US-013
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-013): TASK-11 changelog, domain docs, and quality gate`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/2.0.0` — open/update the remote only if the user asks
+    type: Impl
+    status: DONE
+    assignee: Albert
+    estimate_hours: 2
+    dependencies:
+      - TASK-02
+      - TASK-04
+      - TASK-07
+      - TASK-09
+      - TASK-10
+    commit:
+      sha: 0558857cc98dfbcf6bac6f528429e9e838de325c
+      short_sha: '0558857'
+      subject: 'chore(US-013): TASK-11 changelog, domain docs, and quality gate'
+      committed_at: '2026-10-13T22:07:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0558857cc98dfbcf6bac6f528429e9e838de325c'
+updated_at: '2026-10-13T20:07:24+00:00'

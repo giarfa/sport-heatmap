@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Dashboard (dark) — Sport Heatmap</title>
+<meta name="description" content="Training dashboard — daily running distance and weekly trend over 16 weeks.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] } } } }</script>
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=inter:400,500,600,700" rel="stylesheet">
+<link rel="stylesheet" href="trend.css">
+<script>if (location.hash === '#dark') { document.documentElement.classList.remove('light'); document.documentElement.classList.add('dark'); }</script>
+</head>
+<body class="min-h-screen font-sans antialiased">
+  <a href="#main" class="skip-link">Skip to content</a>
+  <header class="sticky top-0 z-10 border-b" style="background: var(--surface-card); border-color: var(--hairline);">
+    <div class="mx-auto flex h-14 max-w-5xl items-center justify-between px-3 sm:px-6">
+      <a href="index.html" class="flex items-center gap-2" style="color: var(--ink);">
+        <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true" class="shrink-0"><rect x="3" y="17" width="12" height="12" rx="3" fill="#86b6ef"/><rect x="17" y="17" width="12" height="12" rx="3" fill="#2a78d6"/><rect x="3" y="3" width="12" height="12" rx="3" fill="#3987e5"/><rect x="17" y="3" width="12" height="12" rx="3" fill="#104281"/></svg>
+        <span class="text-sm font-semibold tracking-tight">Heatmap</span>
+      </a>
+      <div class="flex items-center gap-1">
+        <span class="sync-chip"><span aria-hidden="true" class="sync-dot sync-dot--ok"></span>Synced 6 hours ago</span>
+        <button type="button" data-theme-toggle aria-pressed="true" class="grid h-11 w-11 place-items-center rounded-lg" style="color: var(--ink-muted);">
+          <span class="sr-only">Toggle dark mode</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+  <main id="main" class="mx-auto max-w-5xl px-3 py-6 sm:px-6">
+    <h1 class="text-lg font-semibold tracking-tight sm:text-xl">Last 16 weeks</h1>
+    <p class="mt-0.5 text-sm" style="color: var(--ink-muted);">18 May – 6 Sep 2026 · running distance per day</p>
+<nav class="win-nav mt-3" aria-label="Window">
+      <a href="past-window.html" class="win-btn">&larr; <span aria-hidden="true">Previous</span><span class="sr-only">Previous 4 weeks</span></a>
+      <span class="win-btn win-btn--off"><span aria-hidden="true">Next</span><span class="sr-only">Next 4 weeks, unavailable</span> &rarr;</span>
+    </nav>
+    <div class="dash mt-4">
+      <section class="card dash-grid p-3 sm:p-5" aria-labelledby="grid-heading">
+        <h2 id="grid-heading" class="sr-only">Daily running distance, 16 weeks by weekday</h2>
+          <table class="hm">
+            <caption class="sr-only">Sixteen rows, one per week, oldest first. Seven columns, Monday to Sunday, plus a weekly total column.</caption>
+            <colgroup><col class="hm-col-week"><col span="7" class="hm-col-day"><col class="hm-col-total"></colgroup>
+            <thead><tr><td class="hm-th-week"><span class="sr-only">Week starting</span></td><th scope="col" class="hm-th-day"><abbr title="Monday">Mo</abbr></th><th scope="col" class="hm-th-day"><abbr title="Tuesday">Tu</abbr></th><th scope="col" class="hm-th-day"><abbr title="Wednesday">We</abbr></th><th scope="col" class="hm-th-day"><abbr title="Thursday">Th</abbr></th><th scope="col" class="hm-th-day"><abbr title="Friday">Fr</abbr></th><th scope="col" class="hm-th-day"><abbr title="Saturday">Sa</abbr></th><th scope="col" class="hm-th-day"><abbr title="Sunday">Su</abbr></th><th scope="col" class="hm-th-total">Week</th></tr></thead>
+            <tbody>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>18 May</th>
+              <td class="hm-td"><span class="sr-only">Monday 18 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Monday 18 May 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Tuesday 19 May 2026: 8.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Tuesday 19 May 2026 — 8.2 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 20 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 20 May 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 21 May 2026: 10.1 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Thursday 21 May 2026 — 10.1 km"></span></td><td class="hm-td"><span class="sr-only">Friday 22 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 22 May 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 23 May 2026: 14.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 23 May 2026 — 14.5 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 24 May 2026: 6.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Sunday 24 May 2026 — 6.0 km"></span></td>
+              <td class="hm-total"><span class="hm-total-num">38.8</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>25 May</th>
+              <td class="hm-td"><span class="sr-only">Monday 25 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Monday 25 May 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Tuesday 26 May 2026: 8.6 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Tuesday 26 May 2026 — 8.6 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 27 May 2026: 6.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Wednesday 27 May 2026 — 6.2 km"></span></td><td class="hm-td"><span class="sr-only">Thursday 28 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Thursday 28 May 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Friday 29 May 2026: 9.8 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Friday 29 May 2026 — 9.8 km"></span></td><td class="hm-td"><span class="sr-only">Saturday 30 May 2026: 16.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 30 May 2026 — 16.2 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 31 May 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Sunday 31 May 2026 — rest"></span></td>
+              <td class="hm-total"><span class="hm-total-num">40.8</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>1 Jun</th>
+              <td class="hm-td"><span class="sr-only">Monday 1 Jun 2026: 5.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Monday 1 Jun 2026 — 5.5 km"></span></td><td class="hm-td"><span class="sr-only">Tuesday 2 Jun 2026: 9.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Tuesday 2 Jun 2026 — 9.0 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 3 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 3 Jun 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 4 Jun 2026: 10.4 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Thursday 4 Jun 2026 — 10.4 km"></span></td><td class="hm-td"><span class="sr-only">Friday 5 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 5 Jun 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 6 Jun 2026: 18.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 6 Jun 2026 — 18.0 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 7 Jun 2026: 7.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Sunday 7 Jun 2026 — 7.2 km"></span></td>
+              <td class="hm-total"><span class="hm-total-num">50.1</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>8 Jun</th>
+              <td class="hm-td"><span class="sr-only">Monday 8 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Monday 8 Jun 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Tuesday 9 Jun 2026: 7.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Tuesday 9 Jun 2026 — 7.0 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 10 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 10 Jun 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 11 Jun 2026: 8.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Thursday 11 Jun 2026 — 8.5 km"></span></td><td class="hm-td"><span class="sr-only">Friday 12 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 12 Jun 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 13 Jun 2026: 12.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Saturday 13 Jun 2026 — 12.0 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 14 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Sunday 14 Jun 2026 — rest"></span></td>
+              <td class="hm-total"><span class="hm-total-num">27.5</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>15 Jun</th>
+              <td class="hm-td"><span class="sr-only">Monday 15 Jun 2026: 6.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Monday 15 Jun 2026 — 6.0 km"></span></td><td class="hm-td"><span class="sr-only">Tuesday 16 Jun 2026: 10.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Tuesday 16 Jun 2026 — 10.2 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 17 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 17 Jun 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 18 Jun 2026: 12.4 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Thursday 18 Jun 2026 — 12.4 km"></span></td><td class="hm-td"><span class="sr-only">Friday 19 Jun 2026: 6.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Friday 19 Jun 2026 — 6.5 km"></span></td><td class="hm-td"><span class="sr-only">Saturday 20 Jun 2026: 20.1 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 20 Jun 2026 — 20.1 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 21 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Sunday 21 Jun 2026 — rest"></span></td>
+              <td class="hm-total"><span class="hm-total-num">55.2</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>22 Jun</th>
+              <td class="hm-td"><span class="sr-only">Monday 22 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Monday 22 Jun 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Tuesday 23 Jun 2026: 11.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Tuesday 23 Jun 2026 — 11.0 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 24 Jun 2026: 7.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Wednesday 24 Jun 2026 — 7.0 km"></span></td><td class="hm-td"><span class="sr-only">Thursday 25 Jun 2026: 13.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Thursday 25 Jun 2026 — 13.2 km"></span></td><td class="hm-td"><span class="sr-only">Friday 26 Jun 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 26 Jun 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 27 Jun 2026: 22.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 27 Jun 2026 — 22.5 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 28 Jun 2026: 8.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Sunday 28 Jun 2026 — 8.0 km"></span></td>
+              <td class="hm-total"><span class="hm-total-num">61.7</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>29 Jun</th>
+              <td class="hm-td"><span class="sr-only">Monday 29 Jun 2026: 6.4 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Monday 29 Jun 2026 — 6.4 km"></span></td><td class="hm-td"><span class="sr-only">Tuesday 30 Jun 2026: 12.1 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Tuesday 30 Jun 2026 — 12.1 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 1 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 1 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 2 Jul 2026: 14.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Thursday 2 Jul 2026 — 14.0 km"></span></td><td class="hm-td"><span class="sr-only">Friday 3 Jul 2026: 7.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Friday 3 Jul 2026 — 7.2 km"></span></td><td class="hm-td"><span class="sr-only">Saturday 4 Jul 2026: 24.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 4 Jul 2026 — 24.2 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 5 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Sunday 5 Jul 2026 — rest"></span></td>
+              <td class="hm-total"><span class="hm-total-num">63.9</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>6 Jul</th>
+              <td class="hm-td"><span class="sr-only">Monday 6 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Monday 6 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Tuesday 7 Jul 2026: 8.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Tuesday 7 Jul 2026 — 8.0 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 8 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 8 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 9 Jul 2026: 9.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Thursday 9 Jul 2026 — 9.5 km"></span></td><td class="hm-td"><span class="sr-only">Friday 10 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 10 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 11 Jul 2026: 14.8 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 11 Jul 2026 — 14.8 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 12 Jul 2026: 6.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Sunday 12 Jul 2026 — 6.5 km"></span></td>
+              <td class="hm-total"><span class="hm-total-num">38.8</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>13 Jul</th>
+              <td class="hm-td"><span class="sr-only">Monday 13 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Monday 13 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Tuesday 14 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Tuesday 14 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Wednesday 15 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 15 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 16 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Thursday 16 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Friday 17 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 17 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 18 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Saturday 18 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Sunday 19 Jul 2026: 5.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Sunday 19 Jul 2026 — 5.0 km"></span></td>
+              <td class="hm-total"><span class="hm-total-num">5.0</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>20 Jul</th>
+              <td class="hm-td"><span class="sr-only">Monday 20 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Monday 20 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Tuesday 21 Jul 2026: 6.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Tuesday 21 Jul 2026 — 6.0 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 22 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 22 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 23 Jul 2026: 7.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Thursday 23 Jul 2026 — 7.5 km"></span></td><td class="hm-td"><span class="sr-only">Friday 24 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 24 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 25 Jul 2026: 11.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Saturday 25 Jul 2026 — 11.0 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 26 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Sunday 26 Jul 2026 — rest"></span></td>
+              <td class="hm-total"><span class="hm-total-num">24.5</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>27 Jul</th>
+              <td class="hm-td"><span class="sr-only">Monday 27 Jul 2026: 5.8 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Monday 27 Jul 2026 — 5.8 km"></span></td><td class="hm-td"><span class="sr-only">Tuesday 28 Jul 2026: 10.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Tuesday 28 Jul 2026 — 10.5 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 29 Jul 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 29 Jul 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 30 Jul 2026: 12.8 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Thursday 30 Jul 2026 — 12.8 km"></span></td><td class="hm-td"><span class="sr-only">Friday 31 Jul 2026: 6.8 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Friday 31 Jul 2026 — 6.8 km"></span></td><td class="hm-td"><span class="sr-only">Saturday 1 Aug 2026: 21.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 1 Aug 2026 — 21.0 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 2 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Sunday 2 Aug 2026 — rest"></span></td>
+              <td class="hm-total"><span class="hm-total-num">56.9</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>3 Aug</th>
+              <td class="hm-td"><span class="sr-only">Monday 3 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Monday 3 Aug 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Tuesday 4 Aug 2026: 12.4 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Tuesday 4 Aug 2026 — 12.4 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 5 Aug 2026: 8.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Wednesday 5 Aug 2026 — 8.0 km"></span></td><td class="hm-td"><span class="sr-only">Thursday 6 Aug 2026: 14.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Thursday 6 Aug 2026 — 14.5 km"></span></td><td class="hm-td"><span class="sr-only">Friday 7 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 7 Aug 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 8 Aug 2026: 26.4 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 8 Aug 2026 — 26.4 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 9 Aug 2026: 8.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Sunday 9 Aug 2026 — 8.5 km"></span></td>
+              <td class="hm-total"><span class="hm-total-num">69.8</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>10 Aug</th>
+              <td class="hm-td"><span class="sr-only">Monday 10 Aug 2026: 6.8 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Monday 10 Aug 2026 — 6.8 km"></span></td><td class="hm-td"><span class="sr-only">Tuesday 11 Aug 2026: 13.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Tuesday 11 Aug 2026 — 13.0 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 12 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 12 Aug 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 13 Aug 2026: 15.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Thursday 13 Aug 2026 — 15.2 km"></span></td><td class="hm-td"><span class="sr-only">Friday 14 Aug 2026: 7.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Friday 14 Aug 2026 — 7.5 km"></span></td><td class="hm-td"><span class="sr-only">Saturday 15 Aug 2026: 28.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 15 Aug 2026 — 28.0 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 16 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Sunday 16 Aug 2026 — rest"></span></td>
+              <td class="hm-total"><span class="hm-total-num">70.5</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>17 Aug</th>
+              <td class="hm-td"><span class="sr-only">Monday 17 Aug 2026: 7.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Monday 17 Aug 2026 — 7.0 km"></span></td><td class="hm-td"><span class="sr-only">Tuesday 18 Aug 2026: 14.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Tuesday 18 Aug 2026 — 14.2 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 19 Aug 2026: 8.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Wednesday 19 Aug 2026 — 8.5 km"></span></td><td class="hm-td"><span class="sr-only">Thursday 20 Aug 2026: 16.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Thursday 20 Aug 2026 — 16.0 km"></span></td><td class="hm-td"><span class="sr-only">Friday 21 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 21 Aug 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 22 Aug 2026: 32.1 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 22 Aug 2026 — 32.1 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 23 Aug 2026: 9.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Sunday 23 Aug 2026 — 9.0 km"></span></td>
+              <td class="hm-total"><span class="hm-total-num">86.8</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>24 Aug</th>
+              <td class="hm-td"><span class="sr-only">Monday 24 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Monday 24 Aug 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Tuesday 25 Aug 2026: 10.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Tuesday 25 Aug 2026 — 10.0 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 26 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 26 Aug 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 27 Aug 2026: 11.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Thursday 27 Aug 2026 — 11.5 km"></span></td><td class="hm-td"><span class="sr-only">Friday 28 Aug 2026: 6.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Friday 28 Aug 2026 — 6.0 km"></span></td><td class="hm-td"><span class="sr-only">Saturday 29 Aug 2026: 16.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 29 Aug 2026 — 16.0 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 30 Aug 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Sunday 30 Aug 2026 — rest"></span></td>
+              <td class="hm-total"><span class="hm-total-num">43.5</span><span class="hm-total-unit"> km</span></td>
+            </tr>
+            <tr class="hm-row hm-row-current">
+              <th scope="row" class="hm-th-week"><span class="sr-only">Week of </span>31 Aug</th>
+              <td class="hm-td"><span class="sr-only">Monday 31 Aug 2026: 5.5 km</span><span aria-hidden="true" class="hm-cell hm-cell--l1" title="Monday 31 Aug 2026 — 5.5 km"></span></td><td class="hm-td"><span class="sr-only">Tuesday 1 Sep 2026: 9.2 km</span><span aria-hidden="true" class="hm-cell hm-cell--l2" title="Tuesday 1 Sep 2026 — 9.2 km"></span></td><td class="hm-td"><span class="sr-only">Wednesday 2 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Wednesday 2 Sep 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Thursday 3 Sep 2026: 11.0 km</span><span aria-hidden="true" class="hm-cell hm-cell--l3" title="Thursday 3 Sep 2026 — 11.0 km"></span></td><td class="hm-td"><span class="sr-only">Friday 4 Sep 2026: rest day, 0 km</span><span aria-hidden="true" class="hm-cell hm-cell--rest" title="Friday 4 Sep 2026 — rest"></span></td><td class="hm-td"><span class="sr-only">Saturday 5 Sep 2026: 18.4 km</span><span aria-hidden="true" class="hm-cell hm-cell--l4" title="Saturday 5 Sep 2026 — 18.4 km"></span></td><td class="hm-td"><span class="sr-only">Sunday 6 Sep 2026: not yet</span><span aria-hidden="true" class="hm-cell hm-cell--future"></span></td>
+              <td class="hm-total"><span class="hm-total-num">44.1</span><span class="hm-total-unit"> km</span>
+                <span class="hm-partial">partial</span></td>
+            </tr>
+            </tbody>
+          </table>
+      </section>
+      <aside class="rail" aria-label="Legend, weekly trend and sync detail">
+        <div class="card p-4">
+            <h3 class="hm-legend-title">Intensity</h3>
+            <p class="hm-legend-note">Calibrated to your 68 running days in this window — recomputed after every sync.</p>
+            <ul class="hm-legend-list"><li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-cell--rest"></span><span class="hm-key-name">Rest</span><span class="hm-key-range">0 km</span></li><li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-cell--l1"></span><span class="hm-key-name">Easy</span><span class="hm-key-range">0.1 – 7.2 km</span></li><li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-cell--l2"></span><span class="hm-key-name">Steady</span><span class="hm-key-range">7.2 – 9.9 km</span></li><li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-cell--l3"></span><span class="hm-key-name">Hard</span><span class="hm-key-range">9.9 – 14.1 km</span></li><li class="hm-key"><span aria-hidden="true" class="hm-cell hm-key-swatch hm-cell--l4"></span><span class="hm-key-name">Peak</span><span class="hm-key-range">14.1+ km</span></li></ul>
+        </div>
+          <section class="card p-4 trend" aria-labelledby="trend-heading">
+            <h3 id="trend-heading" class="trend-title">Weekly distance</h3>
+            <p class="trend-note">4-week average <strong>67.7 km</strong> · week of 24 Aug</p>
+            <div class="trend-chart">
+              <div class="trend-y" aria-hidden="true"><span style="bottom: 0.0%">0</span><span style="bottom: 33.33%">30</span><span style="bottom: 66.67%">60</span><span style="bottom: 100.0%">90 km</span></div>
+              <div class="trend-plot">
+                <svg viewBox="0 0 160 100" preserveAspectRatio="none" role="group" aria-labelledby="trend-svg-title">
+                  <title id="trend-svg-title">Weekly running distance, 18 May – 6 Sep 2026, oldest week first</title>
+                  <g aria-hidden="true"><line class="trend-gridline" x1="0" x2="160" y1="66.67" y2="66.67"/><line class="trend-gridline" x1="0" x2="160" y1="33.33" y2="33.33"/><line class="trend-gridline" x1="0" x2="160" y1="0.0" y2="0.0"/><line class="trend-baseline" x1="0" x2="160" y1="100" y2="100"/></g>
+                  <g role="img"><title>18 – 24 May 2026: 38.8 km; 4-week average 19.9 km</title><rect class="trend-bar" x="2" y="56.89" width="6" height="43.11"/></g><g role="img"><title>25 – 31 May 2026: 40.8 km; 4-week average 24.5 km</title><rect class="trend-bar" x="12" y="54.67" width="6" height="45.33"/></g><g role="img"><title>1 – 7 Jun 2026: 50.1 km; 4-week average 37.1 km</title><rect class="trend-bar" x="22" y="44.33" width="6" height="55.67"/></g><g role="img"><title>8 – 14 Jun 2026: 27.5 km; 4-week average 39.3 km</title><rect class="trend-bar" x="32" y="69.44" width="6" height="30.56"/></g><g role="img"><title>15 – 21 Jun 2026: 55.2 km; 4-week average 43.4 km</title><rect class="trend-bar" x="42" y="38.67" width="6" height="61.33"/></g><g role="img"><title>22 – 28 Jun 2026: 61.7 km; 4-week average 48.6 km</title><rect class="trend-bar" x="52" y="31.44" width="6" height="68.56"/></g><g role="img"><title>29 Jun – 5 Jul 2026: 63.9 km; 4-week average 52.1 km</title><rect class="trend-bar" x="62" y="29.0" width="6" height="71.0"/></g><g role="img"><title>6 – 12 Jul 2026: 38.8 km; 4-week average 54.9 km</title><rect class="trend-bar" x="72" y="56.89" width="6" height="43.11"/></g><g role="img"><title>13 – 19 Jul 2026: 5.0 km; 4-week average 42.4 km</title><rect class="trend-bar" x="82" y="94.44" width="6" height="5.56"/></g><g role="img"><title>20 – 26 Jul 2026: 24.5 km; 4-week average 33.0 km</title><rect class="trend-bar" x="92" y="72.78" width="6" height="27.22"/></g><g role="img"><title>27 Jul – 2 Aug 2026: 56.9 km; 4-week average 31.3 km</title><rect class="trend-bar" x="102" y="36.78" width="6" height="63.22"/></g><g role="img"><title>3 – 9 Aug 2026: 69.8 km; 4-week average 39.0 km</title><rect class="trend-bar" x="112" y="22.44" width="6" height="77.56"/></g><g role="img"><title>10 – 16 Aug 2026: 70.5 km; 4-week average 55.4 km</title><rect class="trend-bar" x="122" y="21.67" width="6" height="78.33"/></g><g role="img"><title>17 – 23 Aug 2026: 86.8 km; 4-week average 71.0 km</title><rect class="trend-bar" x="132" y="3.56" width="6" height="96.44"/></g><g role="img"><title>24 – 30 Aug 2026: 43.5 km; 4-week average 67.7 km</title><rect class="trend-bar" x="142" y="51.67" width="6" height="48.33"/></g><g role="img"><title>31 Aug – 6 Sep 2026: 44.1 km so far, partial week</title><rect class="trend-bar trend-bar--partial" x="152" y="51.0" width="6" height="49.0"/></g>
+                  <g aria-hidden="true"><polyline class="trend-line-halo" points="5,77.89 15,72.78 25,58.78 35,56.33 45,51.78 55,46.0 65,42.11 75,39.0 85,52.89 95,63.33 105,65.22 115,56.67 125,38.44 135,21.11 145,24.78"/><polyline class="trend-line" points="5,77.89 15,72.78 25,58.78 35,56.33 45,51.78 55,46.0 65,42.11 75,39.0 85,52.89 95,63.33 105,65.22 115,56.67 125,38.44 135,21.11 145,24.78"/></g>
+                </svg>
+                <span class="trend-partial-tag" aria-hidden="true" style="bottom: calc(49.0% + 2px)">partial</span>
+              </div>
+              <div class="trend-x" aria-hidden="true"><span>18 May</span><span>15 Jun</span><span>13 Jul</span><span>10 Aug</span></div>
+            </div>
+            <ul class="trend-key">
+              <li><span aria-hidden="true" class="trend-key-swatch trend-key-swatch--bar"></span>Weekly total</li>
+              <li><span aria-hidden="true" class="trend-key-swatch trend-key-swatch--line"></span>4-week average</li>
+              <li><span aria-hidden="true" class="trend-key-swatch trend-key-swatch--partial"></span>Partial week</li>
+            </ul>
+            <details class="trend-figures">
+              <summary>Weekly figures</summary>
+              <table class="trend-table">
+                <caption class="sr-only">Weekly total and 4-week rolling average, 18 May – 6 Sep 2026, oldest week first</caption>
+                <thead><tr><th scope="col">Week</th><th scope="col">Total</th><th scope="col">4-wk avg</th></tr></thead>
+                <tbody><tr><th scope="row">18 – 24 May</th><td>38.8 km</td><td>19.9 km</td></tr><tr><th scope="row">25 – 31 May</th><td>40.8 km</td><td>24.5 km</td></tr><tr><th scope="row">1 – 7 Jun</th><td>50.1 km</td><td>37.1 km</td></tr><tr><th scope="row">8 – 14 Jun</th><td>27.5 km</td><td>39.3 km</td></tr><tr><th scope="row">15 – 21 Jun</th><td>55.2 km</td><td>43.4 km</td></tr><tr><th scope="row">22 – 28 Jun</th><td>61.7 km</td><td>48.6 km</td></tr><tr><th scope="row">29 Jun – 5 Jul</th><td>63.9 km</td><td>52.1 km</td></tr><tr><th scope="row">6 – 12 Jul</th><td>38.8 km</td><td>54.9 km</td></tr><tr><th scope="row">13 – 19 Jul</th><td>5.0 km</td><td>42.4 km</td></tr><tr><th scope="row">20 – 26 Jul</th><td>24.5 km</td><td>33.0 km</td></tr><tr><th scope="row">27 Jul – 2 Aug</th><td>56.9 km</td><td>31.3 km</td></tr><tr><th scope="row">3 – 9 Aug</th><td>69.8 km</td><td>39.0 km</td></tr><tr><th scope="row">10 – 16 Aug</th><td>70.5 km</td><td>55.4 km</td></tr><tr><th scope="row">17 – 23 Aug</th><td>86.8 km</td><td>71.0 km</td></tr><tr><th scope="row">24 – 30 Aug</th><td>43.5 km</td><td>67.7 km</td></tr><tr><th scope="row">31 Aug – 6 Sep <span class="trend-table-partial">partial</span></th><td>44.1 km</td><td><span aria-hidden="true">—</span><span class="sr-only">none</span></td></tr></tbody>
+              </table>
+            </details>
+          </section>
+          <div class="card p-4">
+            <div class="sync-detail">
+              <h3 class="text-xs font-semibold">Sync</h3>
+              <dl>
+                <div class="sync-detail-row"><dt>Last run</dt><dd class="sync-detail-value">Today 04:12<span class="block" style="color: var(--ink-muted);">6 hours ago</span></dd></div>
+                <div class="sync-detail-row"><dt>Outcome</dt><dd class="sync-detail-value sync-detail-outcome"><span aria-hidden="true" class="sync-dot sync-dot--ok"></span>Succeeded</dd></div>
+                <div class="sync-detail-row"><dt>Runs in window</dt><dd class="sync-detail-value">68</dd></div>
+              </dl>
+            </div>
+          </div>
+      </aside>
+    </div>
+    <p class="mt-6 text-xs" style="color: var(--ink-muted);">Owner? <a href="#" class="inline-flex min-h-11 items-center underline underline-offset-2" style="color: var(--accent);">Connect with Strava</a> <span aria-hidden="true">·</span> <a href="#" class="inline-flex min-h-11 items-center underline underline-offset-2" style="color: var(--accent);">Import Garmin CSV</a></p>
+  </main>
+  <footer class="mx-auto max-w-5xl px-3 pb-8 sm:px-6">
+    <p class="text-xs" style="color: var(--ink-muted);"><a href="https://www.strava.com" class="underline underline-offset-2" style="color: var(--accent);">Powered by Strava</a> · runs only · distances in kilometres <span class="sm:hidden">· synced 6 hours ago</span></p>
+  </footer>
+  <script>
+    document.querySelector('[data-theme-toggle]').addEventListener('click', function () {
+      var dark = document.documentElement.classList.toggle('dark');
+      document.documentElement.classList.toggle('light', !dark);
+      this.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    });
+  </script>
+</body>
+</html>

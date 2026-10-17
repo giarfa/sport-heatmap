@@ -138,4 +138,30 @@ class SyncStatusTest extends TestCase
         $this->assertTrue($status->isSyncing);
         $this->assertFalse($status->showsSkeleton());
     }
+
+    public function test_a_csv_only_status_never_warns_and_reads_as_the_latest_import(): void
+    {
+        $status = SyncStatus::forCsvOnly(now()->subHours(3), 12);
+
+        $this->assertSame(SyncHealth::CsvOnly, $status->health);
+        $this->assertFalse($status->needsWarning());
+        $this->assertFalse($status->showsSkeleton());
+        $this->assertSame('Imported 3 hours ago', $status->chipLabel());
+        $this->assertSame('ok', $status->chipDotModifier());
+        $this->assertSame('Import', $status->detailHeading());
+        $this->assertSame('Last import', $status->lastRunHeading());
+        $this->assertSame('5 Sep 2026, 08:00', $status->lastRunLabel());
+        $this->assertSame('Garmin CSV', $status->outcomeLabel());
+        $this->assertNull($status->outcomeModifier());
+        $this->assertSame('No runs found in the last 16 weeks. The map fills in after your next import.', $status->emptyWindowNote());
+    }
+
+    public function test_a_strava_status_keeps_its_sync_headings_and_empty_window_copy(): void
+    {
+        $status = SyncStatus::from(null, null, 0, now());
+
+        $this->assertSame('Sync', $status->detailHeading());
+        $this->assertSame('Last run', $status->lastRunHeading());
+        $this->assertSame('No runs found in the last 16 weeks. The map fills in after your next activity syncs.', $status->emptyWindowNote());
+    }
 }

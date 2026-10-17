@@ -2,11 +2,13 @@
 
 namespace Tests\Unit\Support\Sync;
 
+use App\Enums\SyncHealth;
 use App\Models\Activity;
 use App\Models\SyncRun;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapWindow;
 use App\Support\Sync\ResolveSyncStatus;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -59,6 +61,43 @@ class ResolveSyncStatusTest extends TestCase
         Activity::factory()->for($otherAthlete)->onDate($window->endsOn->subDays(2))->create();
 
         $status = (new ResolveSyncStatus)($athlete, $window, now());
+
+        $this->assertSame(2, $status->runsInWindow);
+    }
+
+    public function test_a_csv_only_athlete_ignores_a_failed_and_a_stale_sync_history(): void
+    {
+        $athlete = User::factory()->csvOnly()->create();
+        Activity::factory()->garminImported()->for($athlete)->create([
+            'activity_date' => now()->subDays(3)->toDateString(),
+            'updated_at' => now()->subHours(2),
+        ]);
+        Activity::factory()->garminImported()->for($athlete)->create([
+            'activity_date' => now()->subDays(5)->toDateString(),
+            'updated_at' => now()->subDays(4),
+        ]);
+        SyncRun::factory()->stale()->create();
+        SyncRun::factory()->failed()->create();
+
+        $status = app(ResolveSyncStatus::class)($athlete, HeatmapWindow::current(), now());
+
+        $this->assertSame(SyncHealth::CsvOnly, $status->health);
+        $this->assertFalse($status->needsWarning());
+        $this->assertSame('Imported 2 hours ago', $status->chipLabel());
+        $this->assertSame(2, $status->runsInWindow);
+    }
+
+    public function test_a_csv_only_athletes_count_includes_a_run_on_the_windows_last_day(): void
+    {
+        $athlete = User::factory()->csvOnly()->create();
+        $window = HeatmapWindow::current(CarbonImmutable::parse('2026-10-11'));
+
+        Activity::factory()->garminImported()->for($athlete)->onDate($window->endsOn)->create();
+        Activity::factory()->garminImported()->for($athlete)->onDate($window->startsOn)->create();
+        Activity::factory()->garminImported()->for($athlete)->onDate($window->startsOn->subDay())->create();
+        Activity::factory()->garminImported()->for($athlete)->onDate($window->endsOn->addDay())->create();
+
+        $status = app(ResolveSyncStatus::class)($athlete, $window, now());
 
         $this->assertSame(2, $status->runsInWindow);
     }

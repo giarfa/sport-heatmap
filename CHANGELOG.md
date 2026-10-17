@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-17
+
+Window navigation, a weekly distance chart, per-run metrics in a day detail, and a Garmin CSV
+import open to every visitor and to runs of any age. Covers US-011 through US-015 (EP-002
+Activity sync, EP-003 Heatmap, EP-004 Maintenance).
+
+### Added
+
+- **Weekly distance chart** beside the heatmap: one bar per week of the shown 16 weeks, oldest on
+  the left, with a 4-week average line over them. The average of a week includes the weeks before
+  the window, and starts only once three weeks of runs are stored behind it, so a missing week is
+  never counted as 0 km. The week in progress is marked "partial" and has no average, so the line
+  stops at the last completed week; a 0 km week is a flat marker on the baseline, never a gap. The
+  chart follows Previous / Next, sits beside the grid from 1024 px and under it on a phone, and
+  lists every week's dates, total and average under "Weekly figures". A window with no runs says
+  so instead of drawing an empty chart, and signed-out visitors see the same chart (US-014).
+- **Pace, ascent and heart rate per run**, and a **day cell detail**. Tap, click, or press Enter or
+  Space on a day with runs on the heatmap to open its detail: each run's name, distance, moving
+  time, average pace (`5:23 /km`), total ascent (`45 m`) and average heart rate (`152 bpm`), with
+  "View on Strava" on runs that came from Strava. A bottom sheet on a phone, a centred dialog
+  from 640 px, Esc closes it. The nightly Strava sync stores the three metrics, runs already
+  stored gain them on the next sync, and the Garmin CSV import reads them from the optional
+  `Passo medio` / `Ascesa totale` / `FC Media` (or `Avg Pace` / `Total Ascent` / `Avg HR`)
+  columns. A metric that is not recorded reads "—", never 0. The review shows the metrics of the
+  stored run and the file side by side; Overwrite keeps a stored value where the file has "--",
+  and a run that was already imported gains only the metrics it lacked. Signed-out visitors see
+  the same detail, heart rate included (US-012).
+- **Previous / Next navigation** on the heatmap. "Previous 4 weeks" moves the 16-week window four
+  weeks back, "Next 4 weeks" moves it forward and stops on the current window. The period is
+  always stated above the grid ("18 May – 6 Sep 2026"), and each window has its own address
+  (`/?to=2026-08-09`, the Sunday of its last week), so a reload or a shared link keeps it. A
+  malformed, impossible, or future date opens the current window instead of an error. Previous is
+  disabled once the window holds your oldest stored run. Each window computes its own legend, the
+  sync status is the same on every window, and a signed-out visitor navigates the same way
+  (US-013).
+
+### Changed
+
+- The **Garmin CSV import keeps runs of any age**. Until now it skipped every run outside the last
+  16 weeks; now only rows dated after today are skipped, and the review and summary count them as
+  "Future-dated" in place of "Outside 16 weeks". Older runs go through the same conflict review,
+  Overwrite / Skip, and re-import rules, and the limit per import rises from 1,000 to 5,000 runs.
+  After a confirmed import or a Strava sync, every window shows the new data. The Strava sync is
+  unchanged: it fetches only the last 16 weeks and never deletes an older run (US-013).
+
+- The **Garmin CSV import is open to signed-out visitors**: every visitor sees "Import Garmin CSV"
+  on the home page, and the connect screen offers it beside "Connect with Strava". A signed-out
+  import lands on the displayed athlete's map; on a fresh install the first confirmed import
+  creates a local CSV-only athlete (no Strava connection) that the home page then displays, with
+  an "Imported …" status instead of a sync warning. The nightly sync skips that athlete. CSRF,
+  the 5 MB limit, the per-IP throttle and the review step still apply. A signed-out visitor's
+  review shows only the start of a clashing stored run (US-011).
+
+### Fixed
+
+- **A run on the last day of a window is now counted.** A run on the Sunday that ends a window
+  (the bottom row of the grid), or today's run when today is a Sunday, was shown as a rest day:
+  missing from its day cell, the day detail, the week total, the weekly chart and the legend's
+  scale. It now appears everywhere, and the grids shown before the fix are rebuilt (US-015).
+
 ## [1.0.0] - 2026-10-12
 
 A public, read-only dashboard and a Garmin Connect CSV import alongside the Strava sync. Covers

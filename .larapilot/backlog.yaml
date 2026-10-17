@@ -621,3 +621,326 @@ specs:
       subject: 'chore(US-010): record the plan, backlog state and usage'
       committed_at: '2026-10-11T15:51:27+02:00'
       url: 'https://github.com/giarfa/sport-heatmap/commit/4fd303b17cddc315a59a4cd5d48c9e45afee4590'
+  -
+    code: US-011
+    title: 'Garmin CSV import open to signed-out visitors (CSV-only dashboard)'
+    epic:
+      code: EP-002
+      title: 'Activity sync'
+    priority: HIGH
+    points: 5
+    status: DONE
+    body: |-
+      #### US-011: Garmin CSV import open to signed-out visitors (CSV-only dashboard)
+
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Change request
+      **Supersedes:** US-008 criterion "A signed-in owner sees an "Import Garmin CSV" entry point on the dashboard; signed-out visitors do not, and a signed-out GET or POST to the import pages is refused with nothing written" · US-007 / FR-017 promise "A signed-out visit is strictly read-only"
+      **Traces to:** FR-018 (MoSCoW: Must, changed) · FR-017 (changed) · FR-001 (clarified) · FR-002 · FR-007 · FR-009 — no journey (the PRD has no `## User Journeys`)
+      **Prior art:** built-in — reuses the US-008 import pipeline; no package
+      **Security:** Lars — import open to any visitor by the owner's choice (decision journal, 2026-10-12); accepted risk recorded in PRD Security
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want to import my Garmin Connect CSV from the dashboard without signing in with Strava,
+      so that I can use the heatmap with CSV imports only.
+
+      **Demonstrates**
+      On a fresh install with no athlete stored, a signed-out browser opens the home page, follows "Import Garmin CSV" from the
+      connect screen, uploads `.larapilot/client-materials/Activities (1).csv`, confirms the review, and the home page then shows
+      the imported runs with no stale-sync warning; with an athlete already displayed, a signed-out import lands on that athlete's map.
+
+      **Acceptance Criteria**
+      - [x] Every visitor, signed in or not, sees "Import Garmin CSV" on the dashboard; a signed-out visitor sees it alongside "Connect with Strava"
+      - [x] The connect screen (no stored athlete has any activity) also offers "Import Garmin CSV"
+      - [x] A signed-out visitor can GET and POST every import page — upload, review, confirm, cancel, summary — with no Strava sign-in; every FR-018 behavior holds unchanged: Italian/English headers, run-only filter, 112-day window, ±2-minute conflict review with Overwrite/Skip, single transaction, idempotent re-import, summary counts, raw file never kept
+      - [x] A signed-in owner's import still targets their own athlete; a signed-out import targets the displayed athlete (FR-017 rules); when no athlete is displayed, confirming the first import creates a local CSV-only athlete (no Strava id, no tokens) that the home page then displays
+      - [x] A signed-out import never calls Strava and never reads or refreshes a token
+      - [x] Pending rows are bound to the visitor's own session: two concurrent signed-out sessions never see or confirm each other's upload, and no route accepts an import id
+      - [x] CSRF, the 5 MB limit, and the `garmin-import` throttle on upload and confirm stay in force for signed-out requests
+      - [x] The nightly sync skips an athlete with no Strava connection without logging an error or warning
+      - [x] A CSV-only athlete shows no stale or failed sync warning on the dashboard; the sync status reflects the latest import (FR-007)
+      - [x] Viewing the home page signed out stays read-only — no row written, no Strava call, no token refresh; only a confirmed import writes, and it invalidates the grid cache
+      - [x] The entry points and import pages meet FR-009: usable at 375 px, 44 px targets, labelled controls, light and dark themes; `noindex, nofollow` and "Powered by Strava" stay
+      - [x] Feature tests (Strava HTTP faked, stray requests prevented): a guest sees the link on the dashboard and on the connect screen; a guest import end to end with both header-language fixtures into the displayed athlete and into a newly created CSV-only athlete; two guest sessions stay isolated; a guest import makes no Strava request; the sync skips a CSV-only athlete; no stale warning for a CSV-only athlete; the signed-in owner flow is unchanged
+      - [x] The developer domain docs for the import, sync, and heatmap domains are updated
+
+      **Notes for planning**
+      - 🗄️ Mike: `users.strava_athlete_id` and the token columns are already nullable; `name` and `email` are not — the CSV-only athlete needs a placeholder for both, settled in planning. No migration expected.
+      - 🔐 Lars: drop `auth` from the `garmin.import.*` group; `strava.fresh` stays (a no-op for guests, still guards a signed-in owner). The `Authenticate` redirect for import GETs in `bootstrap/app.php` becomes dead for these routes.
+      - 🔎 Tom: the controllers resolve the owner from `$request->user()` (`ShowGarminImportReviewController`, `ConfirmGarminImportController`); the target athlete must be resolved once and the same on review and confirm — the displayed athlete can change between them only if an allowlisted athlete connects mid-review, which re-runs the review.
+
+
+      ## Rework Feedback
+
+      - resources/views/garmin/review.blade.php:66-76 — [Medium, Robert + Lars] guest disclosure of stored-run details. A signed-out visitor can upload crafted rows within ±2 min of stored runs and the conflict review shows the displayed athlete's activity name, distance, moving time and Strava link (private activities included) without confirming anything. Owner decision (2026-10-12): mask it. For a guest (no signed-in user), the "Stored" side of each clash shows only the stored start time and "Clashes with a stored run" — no name, no distance, no moving time, no Strava link, no source label. The Garmin-file side (the visitor's own data) and the Overwrite/Skip choice stay as they are. The signed-in owner's review is unchanged.
+      - Decide the guest/owner switch once (controller or a view flag from `$request->user()`), not by re-deriving auth in Blade.
+      - tests/Feature/Garmin/GuestGarminImportTest.php — add: a guest's review with a clash does not contain the stored run's name, distance, moving time or Strava URL, and does show "Clashes with a stored run" and the stored start; the signed-in owner's review still shows all stored details.
+      - .larapilot/docs/devs/garmin-csv-import.md — replace the "open (Medium)" disclosure note with the masking rule and its reason; drop it from the open items in .larapilot/docs/review/US-011.md.
+      - FR-009 still holds on the masked cell: 375 px layout, light and dark.
+    status_history:
+      - { status: PLANNED, at: '2026-10-12T07:22:49+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-12T07:25:21+00:00' }
+      - { status: REVIEW, at: '2026-10-12T07:38:54+00:00' }
+      - { status: TODO, at: '2026-10-12T19:15:04+00:00' }
+      - { status: PLANNED, at: '2026-10-12T19:17:44+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-12T19:19:25+00:00' }
+      - { status: REVIEW, at: '2026-10-12T19:21:19+00:00' }
+      - { status: DONE, at: '2026-10-12T19:23:10+00:00' }
+    rework: false
+    merge_commit:
+      sha: 84d1938e344640be1760eede949822f765553570
+      short_sha: 84d1938
+      subject: 'docs(US-011): record the rework review findings'
+      committed_at: '2026-10-12T21:21:17+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/84d1938e344640be1760eede949822f765553570'
+  -
+    code: US-012
+    title: 'Average pace, total ascent and average heart rate per run, shown in the day cell detail'
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: HIGH
+    points: 8
+    status: DONE
+    body: |
+      #### US-012: Average pace, total ascent and average heart rate per run, shown in the day cell detail
+
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Feature
+      **Traces to:** FR-011 (MoSCoW: Must — raised from Should) · FR-018 (extended) · FR-003 (extended) · FR-008 · FR-009 · FR-017 — no journey (the PRD has no `## User Journeys`)
+      **Prior art:** built-in — the existing Garmin CSV parser gains three optional columns; Strava's activity summary already returns `average_speed`, `total_elevation_gain`, `average_heartrate` under the current `activity:read_all` scope; no package
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want each run's average pace, total ascent, and average heart rate imported from my Garmin CSV and synced from Strava, and shown when I open a day on the heatmap,
+      so that I can see how each run went, not only how far it was.
+
+      **Demonstrates**
+      Importing a Garmin export whose `Passo medio`, `Ascesa totale`, and `FC Media` columns hold values, then tapping one of those days on the
+      dashboard, opens a detail listing each run with distance, moving time, `5:23 /km`-style pace, ascent in metres, and heart rate in bpm;
+      a Strava run on another day shows the same metrics after the nightly sync and links to Strava, while the sample export's `--` values read `—`.
+
+      **Acceptance Criteria**
+
+      _Import and sync_
+      - [x] A Garmin export with `Passo medio` / `Ascesa totale` / `FC Media` (Italian) or `Avg Pace` / `Total Ascent` / `Avg HR` (English) stores them per run: pace as seconds per km (`"5:23"` → 323), ascent as whole metres (thousands separators handled), heart rate as whole bpm
+      - [x] The three columns are optional: a file without them, or with `--` in them (every row of `client-materials/Activities (1).csv`), still imports and the metrics stay empty — never `0`
+      - [x] An unreadable metric value (e.g. pace `"abc"`) leaves only that metric empty; the row still imports and is not counted as invalid
+      - [x] The nightly Strava sync stores the same metrics for Strava runs: pace from `average_speed` (rounded to whole s/km; empty when the speed is 0 or absent), ascent from `total_elevation_gain` (rounded), heart rate from `average_heartrate` when present; Strava runs already stored gain them on the next sync
+      - [x] **Overwrite** replaces the three metrics with the CSV's; a `--` metric in the CSV keeps the stored value; the nightly sync never reverts a Garmin-won run's metrics (FR-002)
+      - [x] A CSV row matching an already-imported Garmin run (counted "already imported") fills only that run's empty metrics from the CSV and changes nothing already set; re-importing the same file still changes nothing
+      - [x] The conflict review page shows pace, ascent, and heart rate side by side for the stored run and the CSV row
+
+      _Day cell detail (FR-011)_
+      - [x] Tapping, clicking, or pressing Enter/Space on a day with runs opens its detail: for each run, the name, distance (km, one decimal), moving time, pace (`5:23 /km`), ascent (`45 m`), and heart rate (`152 bpm`); a missing metric reads `—`
+      - [x] A Strava-sourced run links to its Strava activity; a Garmin-imported run has no link (FR-008)
+      - [x] Days with no run and future days open no detail
+      - [x] A signed-out visitor sees the same detail, heart rate included (accepted privacy risk, PRD Privacy & legal); opening it writes no row and calls no Strava endpoint (FR-017)
+      - [x] FR-009: usable at 375 px without horizontal page scrolling; keyboard-operable (Esc closes and returns focus to the cell); every value labelled with its unit; light and dark themes meet WCAG 2.2 AA; no imperial unit anywhere
+      - [x] After a sync or a confirmed import the detail agrees with the grid (same cache invalidation as the grid)
+
+      _Tests_
+      - [x] Feature tests (Strava HTTP faked): new Italian and English fixtures with metric values; the sample's `--` rows import empty metrics; an unreadable metric; Strava runs with and without heart rate and with zero speed; Overwrite keeping a stored value on `--`; backfill of an already-imported run; the day detail for a Strava run (link) and a Garmin run (no link); a signed-out view writes nothing
+
+      **Notes for planning**
+      - 🗄️ Mike: one reversible migration adds nullable integers `average_pace_seconds_per_km`, `total_ascent_meters`, `average_heart_rate` to `activities`.
+      - 🔎 Tom: confirm the exact English Garmin header texts (`Avg Pace`, `Total Ascent`, `Avg HR`) against a real English export in planning, not guessed; a pace may arrive as `m:ss` or `h:mm:ss`.
+      - ✨ Joe: the app has no Alpine or Livewire — the detail is server-rendered with the cached grid and opened with native elements or a small vanilla script; no new JS dependency.
+      - The developer domain docs for the sync, Garmin import, and heatmap domains are updated in this spec.
+    status_history:
+      - { status: PLANNED, at: '2026-10-13T18:43:54+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-13T18:46:25+00:00' }
+      - { status: REVIEW, at: '2026-10-13T19:07:24+00:00' }
+      - { status: DONE, at: '2026-10-13T19:39:41+00:00' }
+    rework: false
+    merge_commit:
+      sha: eb547ef78fae7363b1c83f1c303994aa32ca1eed
+      short_sha: eb547ef
+      subject: 'chore(US-012): log the implement session'
+      committed_at: '2026-10-13T21:07:29+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/eb547ef78fae7363b1c83f1c303994aa32ca1eed'
+  -
+    code: US-013
+    title: 'Previous / Next window navigation, with older Garmin runs kept'
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: HIGH
+    points: 8
+    status: DONE
+    body: |
+      #### US-013: Previous / Next window navigation, with older Garmin runs kept
+
+      **Epic:** EP-003 | **Priority:** HIGH | **Points:** 8 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Feature
+      **Release:** 2.0.0
+      **Supersedes:** US-004 criterion "the window always ends on the current week" · US-008 criterion "rows outside the 112-day window are skipped and counted as outside-window"
+      **Traces to:** FR-019 (MoSCoW: Must — new) · FR-004 (changed) · FR-018 (changed) · FR-006 · FR-009 · FR-017 — no journey (the PRD has no `## User Journeys`)
+      **Prior art:** built-in — `HeatmapWindow` already accepts any date and the daily query and grid cache are keyed on the window start; plain Blade links, no package, no new JavaScript
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want Previous and Next buttons that move the 16-week heatmap 4 weeks at a time, and my older Garmin runs kept when I import them,
+      so that I can look back at earlier training blocks, not only the last 16 weeks.
+
+      **Demonstrates**
+      After implementing this spec, importing a full Garmin Connect export and pressing Previous shows the 16-week window ending 4 weeks earlier, with that period's runs, weekly totals, legend, and date range, down to the window holding the oldest stored run; Next walks forward again and stops on the current window.
+
+      **Acceptance Criteria**
+      - [x] The home page opens on the current window, ending on the current week (unchanged)
+      - [x] Previous shows the 16-week window ending 4 weeks earlier; Next moves 4 weeks forward and never past the current window
+      - [x] Next is disabled on the current window; Previous is disabled once the shown window holds the athlete's oldest stored run, or when no run is stored
+      - [x] The shown period is always stated above the grid as a date range (e.g. "18 May – 6 Sep 2026")
+      - [x] Each window has its own URL on the home page, so a reload or a shared link keeps it; a future, malformed, or unparseable window renders the current window without an error, and a mid-week date is read as that week
+      - [x] A past window renders no out-of-range future cells and no partial week total
+      - [x] The legend and intensity scale are computed from the shown window only (FR-006)
+      - [x] The sync status is the same on every window
+      - [x] Garmin CSV import: running rows dated today or earlier are kept at any age; only future-dated rows are skipped, and the summary counts them as "future-dated" instead of "outside-window"
+      - [x] Older runs go through the same conflict review, Overwrite / Skip, and re-import rules as runs in the current window
+      - [x] After a confirmed Garmin import or a Strava sync, every window of that athlete shows the new data; no cached window grid survives the write
+      - [x] The Strava sync still fetches and reconciles only the current 112 days and never deletes an activity outside them
+      - [x] A signed-out visitor navigates the same way; navigating writes no row, calls no Strava endpoint, and triggers no token refresh (FR-017)
+      - [x] Both controls are keyboard-reachable links named "Previous 4 weeks" and "Next 4 weeks"; a disabled control is announced as disabled and is not a link
+      - [x] At 375 px the controls and grid cause no horizontal page scroll; both themes meet WCAG 2.2 AA contrast for the controls (FR-009)
+    status_history:
+      - { status: PLANNED, at: '2026-10-13T19:48:10+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-13T19:56:04+00:00' }
+      - { status: REVIEW, at: '2026-10-13T20:09:33+00:00' }
+      - { status: DONE, at: '2026-10-13T20:16:43+00:00' }
+    rework: false
+    merge_commit:
+      sha: d4f5881ef349d9afa0b4f95d027679dcdd6b79c3
+      short_sha: d4f5881
+      subject: 'chore(US-013): move to REVIEW and log the implement session'
+      committed_at: '2026-10-13T22:09:36+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d4f5881ef349d9afa0b4f95d027679dcdd6b79c3'
+  -
+    code: US-014
+    title: 'Weekly mileage trend beside the heatmap'
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: MEDIUM
+    points: 5
+    status: DONE
+    body: |
+      #### US-014: Weekly mileage trend beside the heatmap
+
+      **Epic:** EP-003 | **Priority:** MEDIUM | **Points:** 5 | **Status:** DONE
+      **Blocked by:** US-013
+      **Release:** 2.0.0
+      **Type:** Feature
+      **Traces to:** FR-020 (MoSCoW: Should) · FR-005 · FR-009 · FR-017 · FR-019 — no journey (the PRD has no User Journeys section)
+      **Prior art:** custom — server-rendered inline SVG in a Blade component; a JavaScript charting library (Chart.js, ApexCharts) would be a new frontend dependency, which the Technical Architecture rules out
+      **Mockup:** required before planning — `/larapilot-design US-014`
+
+      **User Story**
+      As The Committed Amateur Runner,
+      I want a chart of my total kilometres week by week, with a rolling average, next to the heatmap,
+      so that I can see at a glance whether my running volume is building, holding, or dropping.
+
+      **Demonstrates**
+      After implementing this spec, opening the dashboard shows 16 weekly-total bars with a 4-week rolling average line beside the grid (stacked below it on a phone); choosing Previous or Next redraws the chart for the shown window, and every bar matches the weekly total of its row.
+
+      **Acceptance Criteria**
+      - [x] The dashboard shows a trend chart with one bar per week of the shown 16-week window, oldest on the left, current week on the right; each bar's value equals the FR-005 weekly total of the same row, to 0.1 km
+      - [x] A 4-week rolling average line is drawn over the bars: each point is the mean of that week and the three weeks before it, including stored weeks before the shown window; on the current window the line stops at the last completed week
+      - [x] The y-axis starts at 0 km and labels at least 0 and the top gridline in km
+      - [x] The in-progress week's bar is marked partial with the FR-005 convention, and its accessible name says "partial"
+      - [x] Previous / Next (FR-019) re-render the chart for the shown window; a past window has no partial bar and the line spans all 16 weeks
+      - [x] A 0 km week renders a zero-height bar with a visible baseline marker, never a gap
+      - [x] A shown window with no stored run shows an empty-state message in place of the chart; the connect screen (no athlete) shows no chart
+      - [x] No line point is drawn for a week with fewer than three weeks of history since the week of the oldest stored run — unknown weeks are never averaged as 0 km
+      - [x] After a sync or a confirmed Garmin import the chart shows the new data; no cached chart survives the write
+      - [x] A signed-out visitor sees the same chart; rendering it writes no row and calls no Strava endpoint (FR-017)
+      - [x] From `lg` up the chart sits beside the grid; below `lg` it stacks under the grid and legend; no horizontal page scroll at 375 px (FR-009)
+      - [x] The chart has an accessible name and a text alternative listing each week's date range, total km, and rolling average; partial and average are never conveyed by colour alone; WCAG 2.2 AA contrast in light and dark themes (FR-009)
+      - [x] The chart is server-rendered SVG with no new frontend dependency, and adds at most one database query to the dashboard request
+    status_history:
+      - { status: PLANNED, at: '2026-10-13T20:22:20+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-13T20:39:50+00:00' }
+      - { status: REVIEW, at: '2026-10-13T20:51:30+00:00' }
+      - { status: DONE, at: '2026-10-17T06:40:34+00:00' }
+    rework: false
+    merge_commit:
+      sha: 9f7889fc2e7742117bac0f9f48089a55f67d201d
+      short_sha: 9f7889f
+      subject: 'chore(US-014): record the review'
+      committed_at: '2026-10-13T22:51:29+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9f7889fc2e7742117bac0f9f48089a55f67d201d'
+  -
+    code: US-015
+    title: 'Fix: a run on the last Sunday of a window is missing from the grid'
+    epic:
+      code: EP-004
+      title: Maintenance
+    priority: HIGH
+    points: 2
+    status: DONE
+    body: |
+      #### US-015: Fix — a run on the last Sunday of a window is missing from the grid
+
+      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Fix
+      **Severity:** High
+      **Security:** Lars/Oliver — no
+      **Related:** US-004 (introduced the date-string window bounds in `DailyRunningDistance`), US-012 (copied them into `DailyRuns`), US-013 (window navigation — every past window ends on a Sunday)
+      **Release:** 2.0.0
+      **Found in:** v0.1.0 (still present in v1.0.0)
+      **Traces to:** FR-004 · FR-005 · FR-006 · FR-019 · FR-020 — no journey (the PRD has no `## User Journeys`)
+      **Promise broken:** FR-004 "Each cell represents one calendar day and carries that day's total running distance."
+      **Logged:** nothing logged — the query silently returns fewer rows, no exception
+
+      **User Story**
+      As the Committed Amateur Runner,
+      I want the run I did on the last Sunday of a window to appear in that window's grid,
+      so that my long Sunday run counts in the cell, the weekly total, the trend, and the scale like every other day.
+
+      **Demonstrates**
+      The window ending Sunday 11 Oct 2026 (`/?to=2026-10-11`) shows the 17.5 km run of that day in its
+      Sunday cell, in its week's total, in the last bar of the weekly trend, and in the day detail; the
+      current window shows today's run on a Sunday. A regression test stores a run on a window's last
+      day through Eloquent on SQLite and fails without the fix.
+
+      **Steps to Reproduce**
+      1. Have an athlete with a run on a Sunday (local data: 2026-10-11, 17 507 m).
+      2. Open the window that ends on that Sunday — `/?to=2026-10-11`, or Previous from the current window.
+      3. The Sunday cell renders as a 0 km rest day, the week total and trend bar omit the run, and the day has no detail.
+      4. Same on the current window when today is Sunday: today's run never shows until Monday.
+
+      **Expected / Actual**
+      Expected: the Sunday cell carries 17.5 km and its run detail. Actual: 0 km, no detail.
+
+      **Root cause**
+      `Activity::activity_date` is cast `date`, so Eloquent writes it in the model's date format
+      (`2026-10-11 00:00:00`). `DailyRunningDistance` and `DailyRuns` bound the window with
+      `whereBetween('activity_date', [startsOn->toDateString(), endsOn->toDateString()])`, and SQLite
+      compares the column as text: `'2026-10-11 00:00:00' <= '2026-10-11'` is false, so the window's
+      last day falls out of the range. The lower bound and `LeadInDistance`'s `>= / <` pair happen to be
+      correct only by accident of the same string ordering.
+
+      **Acceptance Criteria**
+      - [x] Bug fixed — the promise holds again: a run on the last day of any window (past windows, and the current window on a Sunday) appears in that day's cell distance, its run detail, the week total, the weekly trend's last bar, and the intensity calibration
+      - [x] The first day of the window and the lead-in weeks of the trend (`LeadInDistance`) still include exactly their own days — no run is counted twice across the window boundary
+      - [x] Every `activity_date` range comparison in the app (`DailyRunningDistance`, `DailyRuns`, `LeadInDistance`, `ReconcileStravaWindow`, the Garmin import matching) compares the stored value consistently with how it is written; stored rows are left unchanged or migrated in one step, never mixed formats
+      - [x] Regression test covers the failure — a run stored through Eloquent on SQLite on the window's last day is read back by the grid — and fails without the fix (Anne)
+      - [x] Grid cache: no cached window built before the fix keeps serving the missing day (bump the grid cache key version, or prove the TTL covers it)
+      - [x] Root cause named in the fix commit; `heatmap-dashboard.md` documents how `activity_date` is stored and how window ranges must compare it
+      - [x] No security regression; factory/seeder updated only if the stored format changes
+    status_history:
+      - { status: PLANNED, at: '2026-10-17T06:50:25+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-17T06:59:39+00:00' }
+      - { status: REVIEW, at: '2026-10-17T07:04:06+00:00' }
+      - { status: DONE, at: '2026-10-17T07:07:10+00:00' }
+    rework: false
+    merge_commit:
+      sha: a54c22d74783d9ff070792eb4bd2084db6d7abd5
+      short_sha: a54c22d
+      subject: 'chore(US-015): move the spec to review'
+      committed_at: '2026-10-17T09:04:09+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/a54c22d74783d9ff070792eb4bd2084db6d7abd5'

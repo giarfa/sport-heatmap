@@ -259,4 +259,446 @@ decisions:
     source: askquestion
     spec: US-009
     supersedes: null
-updated_at: '2026-10-11T13:38:25+00:00'
+  -
+    id: 3c27d164b7479dea
+    ts: '2026-10-12T07:12:39+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin csv import access'
+    label: 'Garmin CSV import access'
+    value: 'Open to any visitor — no Strava sign-in and no passphrase'
+    question: null
+    rationale: 'Owner wants to use the dashboard with CSV import only; accepted risk: anyone who reaches the site can import and overwrite runs'
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 5c9bc43e26d1179a
+    ts: '2026-10-12T07:12:39+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'signed-out garmin import target athlete'
+    label: 'Signed-out Garmin import target athlete'
+    value: 'The displayed athlete (FR-017 rules); the first import creates a local CSV-only athlete when none is displayed'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: cad613c1d64d31d9
+    ts: '2026-10-12T07:12:39+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'signed-out garmin import moscow'
+    label: 'Signed-out Garmin import MoSCoW'
+    value: Must
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 9f7901704fd28766
+    ts: '2026-10-12T19:15:04+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-review
+    topic: 'guest conflict review disclosure'
+    label: 'guest conflict review disclosure'
+    value: "mask stored-run details for guests: stored side shows only start time and 'Clashes with a stored run'; owner view unchanged"
+    question: null
+    rationale: "Guests could enumerate the displayed athlete's private activity details via crafted CSV rows; the accepted PRD risk covers import/overwrite, not disclosure"
+    source: askquestion
+    spec: US-011
+    supersedes: null
+  -
+    id: 2bf701d5b4e5cc1d
+    ts: '2026-10-12T19:42:16+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'activity metrics display surface'
+    label: 'activity metrics display surface'
+    value: 'Day cell detail (build FR-011 in the same spec)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 0e75c44a46e3f8f0
+    ts: '2026-10-12T19:42:16+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'activity metrics source'
+    label: 'activity metrics source'
+    value: 'Garmin CSV and Strava sync both store avg pace, total ascent, avg HR'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: e68e6805296f2e88
+    ts: '2026-10-12T19:42:16+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'activity metrics moscow'
+    label: 'activity metrics MoSCoW'
+    value: Must
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: c148c677511f0230
+    ts: '2026-10-12T19:43:05+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'average heart rate public visibility'
+    label: 'average heart rate public visibility'
+    value: 'Shown to every visitor; accepted privacy risk (health data on public dashboard)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 5707f23aa83acff5
+    ts: '2026-10-12T19:43:05+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'day cell detail mockup'
+    label: 'day cell detail mockup'
+    value: 'No mockup; plan directly'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 330f1ac3885d9fe8
+    ts: '2026-10-12T19:47:27+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-settings
+    topic: 'release mode'
+    label: 'release mode'
+    value: 'YES'
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 993cc3e365241349
+    ts: '2026-10-12T19:47:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 1.0.0 scope'
+    label: 'release 1.0.0 scope'
+    value: 'v1.0 (1.0.0) = US-001..US-010, status planned'
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 4bdebdf2e0f2956b
+    ts: '2026-10-12T19:48:57+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 2.0.0 scope'
+    label: 'release 2.0.0 scope'
+    value: 'v2.0 (2.0.0) = US-011, status planned'
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 6e4275753050307b
+    ts: '2026-10-12T19:51:00+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 0.1.0 import'
+    label: 'release 0.1.0 import'
+    value: '0.1.0 registered as shipped from tag v0.1.0 (2026-09-07)'
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 570d5332edcdb0b0
+    ts: '2026-10-12T19:51:30+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 1.0.0 scope'
+    label: 'release 1.0.0 scope'
+    value: 'v1.0 (1.0.0) = US-007..US-010; US-001..US-006 belong to shipped 0.1.0'
+    question: null
+    rationale: 'v0.1.0 tag already contains US-001..US-006'
+    source: askquestion
+    spec: null
+    supersedes: 993cc3e365241349
+  -
+    id: 431cb548e00d3ceb
+    ts: '2026-10-12T19:53:47+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release 1.0.0 ship'
+    label: 'release 1.0.0 ship'
+    value: 'shipped 2026-10-12 via release-ship from release/1.0.0 cut at 4007fbd (US-011 excluded); not pushed'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: ee28b17afa733157
+    ts: '2026-10-12T20:06:51+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'window navigation step'
+    label: 'window navigation step'
+    value: '16-week window moves 4 weeks per Previous/Next'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 9cf6a6a125f3481d
+    ts: '2026-10-12T20:06:51+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'window navigation history source'
+    label: 'window navigation history source'
+    value: 'navigation + Garmin import keeps runs of any past date; Strava sync stays on the current 112 days'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: ba9b56d5310c0997
+    ts: '2026-10-12T20:06:52+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'window navigation moscow'
+    label: 'window navigation MoSCoW'
+    value: 'Must (FR-019)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 3531ca1c374f05aa
+    ts: '2026-10-12T20:06:52+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'window navigation earliest bound'
+    label: 'window navigation earliest bound'
+    value: 'Previous disabled once the window holds the oldest stored run'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: b2172447d95c93f1
+    ts: '2026-10-12T20:06:52+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'us-013 release'
+    label: 'US-013 release'
+    value: 2.0.0
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 41bbdbad7fc857c3
+    ts: '2026-10-12T20:06:52+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'us-013 mockup'
+    label: 'US-013 mockup'
+    value: 'no mockup, plan directly'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 8774b104ce1fdd1d
+    ts: '2026-10-12T20:14:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'weekly mileage trend chart form'
+    label: 'weekly mileage trend chart form'
+    value: 'Weekly-total bars with a 4-week rolling average line'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-014
+    supersedes: null
+  -
+    id: 741ef117212fdc11
+    ts: '2026-10-12T20:14:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'weekly mileage trend period'
+    label: 'weekly mileage trend period'
+    value: 'Same 16-week window as the grid, follows Previous/Next'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-014
+    supersedes: null
+  -
+    id: 105915468214b9aa
+    ts: '2026-10-12T20:14:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'weekly mileage trend placement'
+    label: 'weekly mileage trend placement'
+    value: 'Beside the grid from lg up, stacked below on mobile'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-014
+    supersedes: null
+  -
+    id: d14b5d84132062dc
+    ts: '2026-10-12T20:14:42+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'weekly mileage trend moscow and release'
+    label: 'weekly mileage trend MoSCoW and release'
+    value: 'FR-020 Should, MEDIUM, release 2.0.0, blocked by US-013, mockup first'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-014
+    supersedes: null
+  -
+    id: 117b78c0ccbc7128
+    ts: '2026-10-13T18:33:21+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'release of us-012'
+    label: 'release of US-012'
+    value: 2.0.0
+    question: null
+    rationale: null
+    source: chat
+    spec: US-012
+    supersedes: null
+  -
+    id: 98fe4bd16f3263d6
+    ts: '2026-10-13T18:40:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'us-012 english garmin metric headers'
+    label: 'US-012 English Garmin metric headers'
+    value: 'Avg Pace / Total Ascent / Avg HR, as in the existing English fixture; unconfirmed by a real English export'
+    question: null
+    rationale: 'No official Garmin header spec; the Italian sample is real and the English names follow the same family; a real export later is a one-line fix in GarminCsvColumns'
+    source: askquestion
+    spec: US-012
+    supersedes: null
+  -
+    id: c2e7680eedc81066
+    ts: '2026-10-13T18:51:30+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-implement
+    topic: 'us-012 mockups approval'
+    label: 'US-012 mockups approval'
+    value: 'Approved as drawn: bottom sheet / centred dialog, guest review shows stored start only'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-012
+    supersedes: null
+  -
+    id: 46f30df8a6f0ac7a
+    ts: '2026-10-13T19:44:56+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'us-013 window navigation design'
+    label: 'US-013 window navigation design'
+    value: 'Adopt the US-014 mockup nav row (past-window.html, .win-nav/.win-btn) as the US-013 contract; the disabled control is a native disabled <button>, not a span'
+    question: null
+    rationale: 'US-013 has no mockup; the US-014 drawing already fits the tokens; a disabled button is announced as disabled and is not a link (AC)'
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 17affbd2ffbcf2fe
+    ts: '2026-10-13T19:44:57+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'garmin import run cap'
+    label: 'Garmin import run cap'
+    value: 'Raise ParseGarminCsv MAX_RUNS from 1000 to 5000 runs per import'
+    question: null
+    rationale: 'Older runs are now kept at any age; a full export can exceed 1000 runs; the 5 MB upload limit still bounds the file'
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 2480c87b9210e0c2
+    ts: '2026-10-13T19:56:11+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-implement
+    topic: 'us-012 merge before us-013'
+    label: 'US-012 merge before US-013'
+    value: 'Merge US-012 into release/2.0.0 locally, then branch US-013 from the release'
+    question: null
+    rationale: "US-013 builds on US-012's cache key, DailyRuns, and DayRun; TASK-00 precondition"
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 54bb5d4247c100f0
+    ts: '2026-10-13T20:16:46+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-review
+    topic: 'us-013 review verdict'
+    label: 'US-013 review verdict'
+    value: 'Approve; PlanGarminImport quadratic Medium left open as follow-up'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-013
+    supersedes: null
+  -
+    id: 0bbe55b2ef7a08c4
+    ts: '2026-10-17T06:44:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: 'us-015 fix target version'
+    label: 'US-015 fix target version'
+    value: '2.0.0 (not a 1.0.1 patch)'
+    question: null
+    rationale: "2.0.0 is unshipped; its window navigation is the defect's main exposure"
+    source: askquestion
+    spec: US-015
+    supersedes: null
+  -
+    id: 31f1b269a2732f1a
+    ts: '2026-10-17T06:44:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: 'us-015 severity'
+    label: 'US-015 severity'
+    value: High
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-015
+    supersedes: null
+updated_at: '2026-10-17T06:44:40+00:00'
