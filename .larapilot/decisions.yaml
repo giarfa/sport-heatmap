@@ -987,4 +987,17 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-18T18:05:02+00:00'
+  -
+    id: 678626df7848681c
+    ts: '2026-10-18T18:14:03+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'v2.0.2 ship gate'
+    label: 'v2.0.2 ship gate'
+    value: 'GO — no Critical/High/Medium; one Low (pre-2.0.2 recallers) closed by clearing remember_token after deploy'
+    question: null
+    rationale: "Lars verdict on Oliver's red-team of tag v2.0.2"
+    source: chat
+    spec: null
+    supersedes: null
+updated_at: '2026-10-18T18:14:03+00:00'
