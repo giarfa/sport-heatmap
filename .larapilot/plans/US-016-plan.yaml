@@ -205,11 +205,11 @@ tasks:
       7. Paste the evidence (commands and one-line results, not full output) into the local PR body under `## Verification (--no-dev)`
 
       ## Completion Criteria
-      - [ ] After `composer install --no-dev`: no `/larapilot*` route, no Boost/MCP route, Larapilot/Boost/MCP absent from `vendor/`
-      - [ ] `/larapilot`, the probed `/larapilot/api/*` routes and the `.env`/dump endpoints return 404 unauthenticated (Oliver's re-test)
-      - [ ] `package:discover` and the full suite pass after the subsequent dev install
-      - [ ] Worktree removed; main working copy, its `vendor/` and its SQLite database untouched
-      - [ ] Evidence recorded in the PR body
+      - [x] After `composer install --no-dev`: no `/larapilot*` route, no Boost/MCP route, Larapilot/Boost/MCP absent from `vendor/`
+      - [x] `/larapilot`, the probed `/larapilot/api/*` routes and the `.env`/dump endpoints return 404 unauthenticated (Oliver's re-test)
+      - [x] `package:discover` and the full suite pass after the subsequent dev install
+      - [x] Worktree removed; main working copy, its `vendor/` and its SQLite database untouched
+      - [x] Evidence recorded in the PR body
 
       ## Test Data
       - N/A — the worktree uses its own empty SQLite file; no factory or seeder change
@@ -222,10 +222,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR body with the evidence
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 1
     dependencies:
       - TASK-01
       - TASK-02
-updated_at: '2026-10-18T13:20:48+00:00'
+    commit:
+      sha: 20831a39a95c0043607195ee6098f4c942d59e84
+      short_sha: 20831a3
+      subject: 'chore(US-016): TASK-03 record --no-dev verification'
+      committed_at: '2026-10-18T15:23:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/20831a39a95c0043607195ee6098f4c942d59e84'
+updated_at: '2026-10-18T13:23:40+00:00'
