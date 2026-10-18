@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Garmin import review is throttled like the upload and the confirm (ten a minute), and a
   reload reuses its plan while the stored runs on the upload's dates are unchanged, so a guest can
   no longer make the host re-plan the whole file on every reload (US-018).
+- Signing in no longer sets a year-long remember-me cookie; a session now ends with the session
+  lifetime (US-019).
+- The owner can sign out from the dashboard; signing out keeps the Strava connection and the
+  nightly sync (US-019).
 - A crafted `Cache-Control` header can no longer tie up the host: `symfony/http-foundation` is
   updated to a release that fixes CVE-2026-108082 (US-017).
 - `.env.example` now ships production-safe values (`APP_ENV=production`, `APP_DEBUG=false`,

@@ -42,10 +42,10 @@ class EnsureFreshStravaToken
 
         /*
          * The allowlist is re-evaluated on every request, not only at connect
-         * time. It is the only access control in this product, and the session
-         * plus the remember-me cookie it mints outlive an edit to .env by weeks —
-         * so checking it once would make removal from the allowlist a change that
-         * takes effect only after the athlete happens to log out.
+         * time. It is the only access control in this product, and a session
+         * lasts up to SESSION_LIFETIME, outliving an edit to .env — so checking
+         * it once would make removal from the allowlist a change that takes
+         * effect only after the athlete happens to sign out.
          */
         $athleteId = $user->strava_athlete_id;
 
@@ -83,8 +83,10 @@ class EnsureFreshStravaToken
     }
 
     /**
-     * Drop the session and the remember-me cookie together — leaving the latter
-     * would sign the athlete straight back in on the next request.
+     * Drop the session and any recaller together. The app no longer mints a
+     * remember-me cookie, but a browser may still hold one from before 2.0.2:
+     * Auth::logout() cycles the stored remember token so it stops working,
+     * where leaving it would sign the athlete straight back in.
      */
     private function endSession(Request $request): void
     {

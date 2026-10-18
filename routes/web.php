@@ -7,6 +7,7 @@ use App\Http\Controllers\Garmin\ShowGarminImportFormController;
 use App\Http\Controllers\Garmin\ShowGarminImportReviewController;
 use App\Http\Controllers\Garmin\ShowGarminImportSummaryController;
 use App\Http\Controllers\Garmin\UploadGarminCsvController;
+use App\Http\Controllers\SignOutController;
 use App\Http\Controllers\Strava\StravaCallbackController;
 use App\Http\Controllers\Strava\StravaRedirectController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,15 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', DashboardController::class)
     ->middleware('strava.fresh')
     ->name('dashboard');
+
+/*
+ * Sign out is POST only, so a cross-site link or a prefetch cannot sign the
+ * owner out; CSRF comes from the web group. No `auth` middleware: no `login`
+ * route exists, so a guest would get a 500 instead of the dashboard. No
+ * `strava.fresh`: signing out must never reach Strava, or depend on it. No
+ * throttle: the route does no work worth limiting.
+ */
+Route::post('/logout', SignOutController::class)->name('logout');
 
 /*
  * Both OAuth routes are throttled, not just the callback: the redirect route is

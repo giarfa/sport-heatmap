@@ -58,7 +58,8 @@
         header has no width left for a second control, and Strava orange is
         reserved for the connect screen's button. Every visitor can import a
         Garmin CSV (US-011); a guest also gets the Strava sign-in, a signed-in
-        owner — already connected — does not.
+        owner — already connected — gets Sign out instead, in the same line for
+        the same header-width reason (US-019).
     --}}
     <p class="mt-6 text-xs" style="color: var(--ink-muted);">
         @guest
@@ -73,5 +74,14 @@
         <a href="{{ route('garmin.import.create') }}"
            class="inline-flex min-h-11 items-center underline underline-offset-2"
            style="color: var(--accent);">Import Garmin CSV</a>
+        @auth
+            <span aria-hidden="true">·</span>
+            <form method="POST" action="{{ route('logout') }}" class="inline">
+                @csrf
+                <button type="submit"
+                        class="inline-flex min-h-11 items-center underline underline-offset-2"
+                        style="color: var(--accent);">Sign out</button>
+            </form>
+        @endauth
     </p>
 @endsection

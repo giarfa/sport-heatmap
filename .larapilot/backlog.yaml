@@ -1149,11 +1149,11 @@ specs:
       title: Maintenance
     priority: LOW
     points: 2
-    status: PLANNED
+    status: DONE
     body: |
       #### US-019: Fix — the owner cannot sign out, and sign-in issues a 400-day remember-me cookie
 
-      **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** PLANNED
+      **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** DONE
       **Blocked by:** -
       **Type:** Fix
       **Severity:** Low
@@ -1184,15 +1184,24 @@ specs:
       Expected: a sign-out, and no long-lived cookie. Actual: no sign-out; a ~400-day remember-me cookie on every sign-in.
 
       **Acceptance Criteria**
-      - [ ] Bug fixed — the promise holds again: a CSRF-protected `POST /logout` (named route) logs out, invalidates the session, regenerates the CSRF token, and redirects to the dashboard; a `GET` is not routed; a request without a CSRF token answers 419
-      - [ ] The signed-in dashboard shows a "Sign out" control (a form posting to the route, keyboard reachable, Marika's terse register); guests do not see it
-      - [ ] Sign-in calls `Auth::login` without `remember`, so no `remember_web_*` cookie is set; the callback's existing fixation and open-redirect guarantees stay
-      - [ ] Signing out does not delete or revoke the stored Strava tokens: the nightly sync for that athlete still runs
-      - [ ] Regression tests (Anne): the callback response carries no remember cookie (fails on the current code); `POST /logout` ends the session and the next request is a guest; without a CSRF token it answers 419; a guest posting to it is redirected without error; the sign-out control renders only when signed in
-      - [ ] Developer domain doc `strava-connection.md` updated (sign-out, no remember-me, session lifetime as the bound); `.env.example` comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie (shared with US-017 — whichever lands second updates it); README "Signing in" mentions Sign out
-      - [ ] Root cause named in the fix commit
-      - [ ] No security regression (Lars/Oliver): Oliver re-tests session reuse after sign-out and the absence of the remember cookie
-      - [ ] Factory/seeder — not applicable (no schema change; `remember_token` stays unused)
+      - [x] Bug fixed — the promise holds again: a CSRF-protected `POST /logout` (named route) logs out, invalidates the session, regenerates the CSRF token, and redirects to the dashboard; a `GET` is not routed; a request without a CSRF token answers 419
+      - [x] The signed-in dashboard shows a "Sign out" control (a form posting to the route, keyboard reachable, Marika's terse register); guests do not see it
+      - [x] Sign-in calls `Auth::login` without `remember`, so no `remember_web_*` cookie is set; the callback's existing fixation and open-redirect guarantees stay
+      - [x] Signing out does not delete or revoke the stored Strava tokens: the nightly sync for that athlete still runs
+      - [x] Regression tests (Anne): the callback response carries no remember cookie (fails on the current code); `POST /logout` ends the session and the next request is a guest; without a CSRF token it answers 419; a guest posting to it is redirected without error; the sign-out control renders only when signed in
+      - [x] Developer domain doc `strava-connection.md` updated (sign-out, no remember-me, session lifetime as the bound); `.env.example` comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie (shared with US-017 — whichever lands second updates it); README "Signing in" mentions Sign out
+      - [x] Root cause named in the fix commit
+      - [x] No security regression (Lars/Oliver): Oliver re-tests session reuse after sign-out and the absence of the remember cookie
+      - [x] Factory/seeder — not applicable (no schema change; `remember_token` stays unused)
     status_history:
       - { status: PLANNED, at: '2026-10-18T17:17:44+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-18T17:40:28+00:00' }
+      - { status: REVIEW, at: '2026-10-18T17:43:59+00:00' }
+      - { status: DONE, at: '2026-10-18T18:02:57+00:00' }
     rework: false
+    merge_commit:
+      sha: 93f0a711e4562938080404548fa5b9bfb2212e16
+      short_sha: 93f0a71
+      subject: 'chore(US-019): move spec to REVIEW, record the plan and usage'
+      committed_at: '2026-10-18T19:44:03+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/93f0a711e4562938080404548fa5b9bfb2212e16'
