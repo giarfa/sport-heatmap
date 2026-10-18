@@ -5,11 +5,11 @@ epic:
   title: Maintenance
 priority: MEDIUM
 points: 2
-status: 'IN PROGRESS'
+status: REVIEW
 body: |
   #### US-017: Fix — a host built from the repository runs a vulnerable http-foundation and development defaults
 
-  **Epic:** EP-004 | **Priority:** MEDIUM | **Points:** 2 | **Status:** IN PROGRESS
+  **Epic:** EP-004 | **Priority:** MEDIUM | **Points:** 2 | **Status:** REVIEW
   **Blocked by:** -
   **Type:** Fix
   **Severity:** Medium
@@ -55,4 +55,7 @@ status_history:
   -
     status: 'IN PROGRESS'
     at: '2026-10-18T16:09:25+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-18T16:13:15+00:00'
 rework: false
