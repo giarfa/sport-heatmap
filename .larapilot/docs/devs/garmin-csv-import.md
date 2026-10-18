@@ -162,6 +162,21 @@ new and no query runs.
    Ties go to the earlier CSV row, then the lower stored id.
 4. **New**: everything else.
 
+**The review reuses its plan** (`RememberedGarminImportPlan`, `US-018`). The review
+is a GET a visitor can reload, so the plan is computed once and kept in the session
+under the pending entry (`garmin_import.pending.plan`: the target athlete id, a
+stamp, and the row indexes of the new rows plus the stored run id of each conflict
+and each already-imported row). On the next render the stored runs on the upload's
+dates are loaded once (`PlanGarminImport::storedRuns()`), the **stamp** — a SHA-256 of
+each such run's `source`, `start_date_local`, `activity_date`, `distance_meters` and
+`moving_time_seconds`, by id — is recomputed, and when the athlete and the stamp match
+the plan is rebuilt from the parsed rows and those loaded runs with no planning. Any
+run added, removed or changed on one of those dates, a different target, or a new
+upload re-plans: `put()` replaces the whole pending entry, so a new upload carries no
+old plan, and `forget()` drops it with the entry. With no target nothing is
+remembered (no database work to save). The confirm never reuses it: it plans fresh
+under its lock.
+
 The result is a `GarminImportPlan` (`newRows`, `conflicts`, `alreadyImported`,
 all keyed by the row's index in the parsed file, `alreadyImportedActivities` —
 the stored run each already-imported row matched, so the apply step needs no
@@ -286,6 +301,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, future-dated count, invalid list; session round-trip (`fromSessionArray()` tolerates the pre-`US-013` `outside_window` key and reads the missing `future_dated` as 0, so an upload or summary in flight across the deploy still opens) |
 | Rejection | `app/Exceptions/Garmin/GarminCsvRejectedException.php` | Owner-facing messages; no file content beyond a column name |
 | Target | `app/Support/Garmin/ResolveGarminImportTarget.php` | Signed-in owner, else displayed athlete, else null |
+| Remembered plan | `app/Support/Garmin/RememberedGarminImportPlan.php`, `PendingGarminImport::rememberPlan()` / `rememberedPlan()` | The review's plan, kept in the session with a stamp of the planner's database inputs and reused while it holds (`US-018`) |
 | Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query through `Activity::onDates()`, per-date indexes, claiming; all new with no target |
 | CSV-only athlete | `app/Actions/Garmin/CreateCsvOnlyAthlete.php`, `User::isCsvOnly()`, `UserFactory::csvOnly()` | Placeholder identity (`NAME`, `EMAIL` constants), reused by `firstOrCreate` |
 | Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id — shared with the sync |
@@ -329,6 +345,8 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | Fingerprint carries the target id | Compare the conflicts only | A plan with no conflicts hashes the same for every athlete, so a target change between review and confirm would go unnoticed |
 | Masked stored side for guests (start + "Clashes with a stored run") | Accept the disclosure (rejected by the owner, decision journal); hide clashes from guests entirely | Hiding clashes would stop the visitor making an informed Overwrite / Skip choice; the start time is enough to recognise the run |
 | Throttle the review with the upload's and confirm's `garmin-import` limiter, and index stored runs by date (US-018) | A looser limit for the review; a cached plan alone; leave the scan | Each render re-plans every row against the stored runs, so an open (guest) route repeated in a loop was unbounded work: rows × stored runs per reload. One shared limiter means the three routes cannot be hammered in turn to get ten of each. Indexing makes the work rows × runs-of-that-date, and the plan keeps the same results because the matcher already required the same date |
+| Remember the review's plan in the session, stamped with the planner's inputs (US-018) | Cache it; stamp by `updated_at` or a count / `MAX(updated_at)` aggregate; re-plan every render | The plan belongs to one visitor's pending upload, which already lives in the session, so it dies with the upload and needs no key or TTL, and one guest's plan can never reach another's. `updated_at` has one-second resolution and a query-builder write does not touch it; an aggregate cannot see a run whose distance changed. A stamp over exactly the columns the planner compares can. The stored runs are loaded once per render and feed the stamp, the planner and a reused plan alike, so the review costs one activities query hit or miss, and the runs it renders (name, metrics, link) are always current |
+| The confirm still plans fresh (US-018) | Confirm from the remembered plan | The confirm's fingerprint exists to compare the review against the database at write time, inside the lock; a remembered plan would compare it with itself |
 | Wall-clock dates built in UTC | Parse with the app timezone | Same contract as Strava's `start_date_local`; a conversion moves late-evening runs to the wrong day |
 
 ## Key decisions & invariants
@@ -376,6 +394,12 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
   know (PRD Security).
 - **Invariant — the raw file is never persisted.** _Breaks if:_ the upload is
   `store()`d — an export carries heart rate, cadence and locations.
+- **Invariant — a remembered plan is reused only while every input of the planner is
+  unchanged.** _Breaks if:_ the planner starts reading a stored column the stamp
+  leaves out (`RememberedGarminImportPlan::stampOf()`), or a new field joins what
+  the plan is made from: a reload would then show a stale review. The confirm's
+  fingerprint would still refuse a stale write, but the visitor would answer a
+  review that no longer matches.
 - **Invariant — nothing is written before confirm**, and a stale confirm writes
   nothing.
 - **Invariant — a rejection message never echoes file content** beyond a

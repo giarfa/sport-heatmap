@@ -5,7 +5,9 @@ namespace App\Support\Garmin;
 use App\Data\Garmin\GarminCsvRow;
 use App\Data\Garmin\GarminImportConflict;
 use App\Data\Garmin\GarminImportPlan;
+use App\Models\Activity;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Sorts parsed Garmin rows against the athlete's stored activities into new
@@ -17,28 +19,38 @@ final readonly class PlanGarminImport
     public function __construct(private StartTimeMatcher $startTimeMatcher) {}
 
     /**
+     * The athlete's stored runs on the dates the rows contain, by id.
+     *
+     * One query for every row, served by the (user_id, activity_date) index: a
+     * conflict or an identical run can only exist on a date the file contains.
+     *
      * @param  array<int, GarminCsvRow>  $rows
+     * @return Collection<int, Activity>
      */
-    public function __invoke(?User $athlete, array $rows): GarminImportPlan
+    public function storedRuns(User $athlete, array $rows): Collection
     {
-        if ($athlete === null) {
-            return new GarminImportPlan($rows, [], [], null);
-        }
-
         $dates = array_values(array_unique(array_map(
             static fn (GarminCsvRow $row): string => $row->activityDate->toDateString(),
             $rows,
         )));
 
-        /*
-         * One query for every row, served by the (user_id, activity_date)
-         * index: a conflict or an identical run can only exist on a date the
-         * file contains.
-         */
-        $stored = $dates === [] ? collect() : $athlete->activities()
+        return $dates === [] ? new Collection : $athlete->activities()
             ->onDates($dates)
             ->get()
             ->keyBy('id');
+    }
+
+    /**
+     * @param  array<int, GarminCsvRow>  $rows
+     * @param  Collection<int, Activity>|null  $stored  The runs storedRuns() returned, when the caller already loaded them
+     */
+    public function __invoke(?User $athlete, array $rows, ?Collection $stored = null): GarminImportPlan
+    {
+        if ($athlete === null) {
+            return new GarminImportPlan($rows, [], [], null);
+        }
+
+        $stored ??= $this->storedRuns($athlete, $rows);
 
         /*
          * Both passes below look a row's candidates up by date instead of

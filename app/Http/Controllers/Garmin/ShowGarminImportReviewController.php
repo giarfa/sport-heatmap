@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Garmin;
 
 use App\Http\Controllers\Controller;
 use App\Support\Garmin\PendingGarminImport;
-use App\Support\Garmin\PlanGarminImport;
+use App\Support\Garmin\RememberedGarminImportPlan;
 use App\Support\Garmin\ResolveGarminImportTarget;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,12 +14,14 @@ class ShowGarminImportReviewController extends Controller
 {
     /**
      * Plan the pending upload against the stored activities as they are now,
-     * and show every conflict side by side. Reads only.
+     * and show every conflict side by side. Reads only. The plan is made once
+     * and reused on a reload while the stored runs on the upload's dates are
+     * unchanged; a stored run that changed, or a new upload, plans again.
      */
     public function __invoke(
         Request $request,
         PendingGarminImport $pendingImport,
-        PlanGarminImport $planGarminImport,
+        RememberedGarminImportPlan $plan,
         ResolveGarminImportTarget $resolveImportTarget,
     ): View|RedirectResponse {
         $parsed = $pendingImport->parsed();
@@ -29,7 +31,7 @@ class ShowGarminImportReviewController extends Controller
             return redirect()->route('garmin.import.create')->with('status', 'Upload a Garmin CSV to review an import.');
         }
 
-        $plan = $planGarminImport($resolveImportTarget($request->user()), $parsed->rows);
+        $reviewPlan = $plan($resolveImportTarget($request->user()), $parsed);
 
         /*
          * A signed-in owner reviews their own athlete; a guest reviews the displayed athlete's
@@ -38,7 +40,7 @@ class ShowGarminImportReviewController extends Controller
          */
         return view('garmin.review', [
             'parsed' => $parsed,
-            'plan' => $plan,
+            'plan' => $reviewPlan,
             'token' => $token,
             'showsStoredRunDetails' => $request->user() !== null,
         ]);

@@ -54,6 +54,9 @@ class ConfirmGarminImportController extends Controller
                 $athlete = $resolveImportTarget($signedIn);
 
                 /*
+                 * Planned fresh, never through RememberedGarminImportPlan: the fingerprint
+                 * has to compare against the database at write time, inside this lock.
+                 *
                  * The plan is recomputed from the session rows against the database
                  * as it is now, never taken from the form. A sync or a second tab
                  * may have changed the stored runs since the review rendered; if
