@@ -1085,11 +1085,11 @@ specs:
       title: Maintenance
     priority: LOW
     points: 3
-    status: REVIEW
+    status: DONE
     body: |
       #### US-018: Fix — a guest can hammer the Garmin import review, and any page can be framed
 
-      **Epic:** EP-004 | **Priority:** LOW | **Points:** 3 | **Status:** REVIEW
+      **Epic:** EP-004 | **Priority:** LOW | **Points:** 3 | **Status:** DONE
       **Blocked by:** -
       **Type:** Fix
       **Severity:** Low
@@ -1120,20 +1120,27 @@ specs:
       Expected: the review is throttled like upload and confirm, its plan is reused on reload, and no page can be framed. Actual: unthrottled review with rows × stored-runs work on every reload; no security headers.
 
       **Acceptance Criteria**
-      - [ ] Bug fixed — the promise holds again: `GET /import/garmin/review` carries `throttle:garmin-import`, the same limiter as upload and confirm (per user, else per IP)
-      - [ ] Reloading the review reuses the plan while the pending upload and the stored runs on its dates are unchanged; a stored run added, changed, or removed on one of those dates re-plans it. Matching indexes stored runs by date instead of scanning them per row
-      - [ ] Every web response carries `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`; `Strict-Transport-Security` only on secure requests. The CSP is limited to `frame-ancestors`, so no script, style, or Vite asset is blocked
-      - [ ] Regression tests (Anne): the eleventh review request in a minute answers 429 and fails without the throttle; the headers are asserted on the dashboard, a Garmin import page, and a 404, and fail without the middleware; HSTS is absent on HTTP and present on HTTPS; a second review render does not re-plan (fails without the reuse)
-      - [ ] The existing Garmin import tests stay green: conflict review, Overwrite/Skip, apply-to-all, summary counts, session binding
-      - [ ] Developer domain doc `garmin-import.md` updated (throttling on review, plan reuse and its invalidation); the security headers recorded where request handling is documented (`heatmap-dashboard.md` or the README, whichever already covers middleware)
-      - [ ] Root cause named in the fix commit
-      - [ ] No security regression (Lars/Oliver): Oliver re-tests framing of `/import/garmin/review` from another origin (refused) and the review reload loop (429)
-      - [ ] Factory/seeder — not applicable unless the plan reuse adds a column; then the factory covers it
+      - [x] Bug fixed — the promise holds again: `GET /import/garmin/review` carries `throttle:garmin-import`, the same limiter as upload and confirm (per user, else per IP)
+      - [x] Reloading the review reuses the plan while the pending upload and the stored runs on its dates are unchanged; a stored run added, changed, or removed on one of those dates re-plans it. Matching indexes stored runs by date instead of scanning them per row
+      - [x] Every web response carries `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`; `Strict-Transport-Security` only on secure requests. The CSP is limited to `frame-ancestors`, so no script, style, or Vite asset is blocked
+      - [x] Regression tests (Anne): the eleventh review request in a minute answers 429 and fails without the throttle; the headers are asserted on the dashboard, a Garmin import page, and a 404, and fail without the middleware; HSTS is absent on HTTP and present on HTTPS; a second review render does not re-plan (fails without the reuse)
+      - [x] The existing Garmin import tests stay green: conflict review, Overwrite/Skip, apply-to-all, summary counts, session binding
+      - [x] Developer domain doc `garmin-import.md` updated (throttling on review, plan reuse and its invalidation); the security headers recorded where request handling is documented (`heatmap-dashboard.md` or the README, whichever already covers middleware)
+      - [x] Root cause named in the fix commit
+      - [x] No security regression (Lars/Oliver): Oliver re-tests framing of `/import/garmin/review` from another origin (refused) and the review reload loop (429)
+      - [x] Factory/seeder — not applicable unless the plan reuse adds a column; then the factory covers it
     status_history:
       - { status: PLANNED, at: '2026-10-18T16:46:27+00:00' }
       - { status: 'IN PROGRESS', at: '2026-10-18T16:47:26+00:00' }
       - { status: REVIEW, at: '2026-10-18T16:57:05+00:00' }
+      - { status: DONE, at: '2026-10-18T17:08:49+00:00' }
     rework: false
+    merge_commit:
+      sha: 3c884352fb2249c5f8a0cae8b7c984147bd5bfb2
+      short_sha: 3c88435
+      subject: 'chore(US-018): move spec to REVIEW, record the plan, review and usage'
+      committed_at: '2026-10-18T18:57:12+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3c884352fb2249c5f8a0cae8b7c984147bd5bfb2'
   -
     code: US-019
     title: 'Fix: the owner cannot sign out, and sign-in issues a 400-day remember-me cookie'
@@ -1142,11 +1149,11 @@ specs:
       title: Maintenance
     priority: LOW
     points: 2
-    status: TODO
+    status: PLANNED
     body: |
       #### US-019: Fix — the owner cannot sign out, and sign-in issues a 400-day remember-me cookie
 
-      **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** TODO
+      **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** PLANNED
       **Blocked by:** -
       **Type:** Fix
       **Severity:** Low
@@ -1186,3 +1193,6 @@ specs:
       - [ ] Root cause named in the fix commit
       - [ ] No security regression (Lars/Oliver): Oliver re-tests session reuse after sign-out and the absence of the remember cookie
       - [ ] Factory/seeder — not applicable (no schema change; `remember_token` stays unused)
+    status_history:
+      - { status: PLANNED, at: '2026-10-18T17:17:44+00:00' }
+    rework: false
