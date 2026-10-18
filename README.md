@@ -37,13 +37,19 @@ restricted to an explicit allowlist of athlete ids.
    composer setup
    ```
 
-3. **Point `APP_URL` at the Herd domain.** In `.env`:
+3. **Set the development overrides.** `.env.example` ships production-safe values, so
+   `composer setup` leaves you with a production-style `.env`. For local work, change these in
+   `.env`:
 
    ```dotenv
+   APP_ENV=local
+   APP_DEBUG=true
    APP_URL=https://sport-heatmap.test
    ```
 
-   It must match the domain Herd serves, or the OAuth callback will not line up.
+   `APP_URL` must match the domain Herd serves, or the OAuth callback will not line up. Add
+   `LOG_LEVEL=debug` if you want the full log. Leave `SESSION_SECURE_COOKIE=true` — Herd serves
+   HTTPS.
 
 4. **Watch assets while developing:**
 
@@ -52,7 +58,9 @@ restricted to an explicit allowlist of athlete ids.
    ```
 
    `composer run dev` is also available: it runs the PHP server, queue listener, log tail and
-   Vite together for people who prefer `php artisan serve` over Herd.
+   Vite together for people who prefer `php artisan serve` over Herd. That server answers on plain
+   HTTP, where browsers drop `Secure` cookies, so set `SESSION_SECURE_COOKIE=false` in `.env` for
+   that setup only.
 
 ## Registering the Strava application
 
@@ -111,6 +119,10 @@ A few things worth knowing before the first attempt:
   state rather than an error. Press the button again to reconnect.
 - **Removing yourself from the allowlist signs you out immediately.** It is re-checked on every
   request, not only at connect time, so an existing session does not outlive the edit.
+- **Sign out is under the map.** A signed-in owner presses **Sign out** in the line below the map.
+  No remember-me cookie is set, so a session lasts `SESSION_LIFETIME` minutes. Signing out keeps the
+  Strava connection and the nightly sync. After upgrading to 2.0.2, one sign-out revokes any older
+  remember-me cookie.
 
 ### Before putting this on a real host
 
@@ -129,13 +141,17 @@ one `APP_ENV` value away from handing all of that to a stranger. `--no-dev` leav
 a plain `composer install` on a host puts them back. After installing, check that the dashboard is
 gone: `php artisan route:list --path=larapilot` must list no route.
 
-Three settings are not safe at their `.env.example` defaults:
+`.env.example` ships these values for a host. Keep them, and set `APP_URL` to the host's own
+`https` URL:
 
-| Key | Set it to | Why |
+| Key | Value | Why |
 | --- | --- | --- |
-| `APP_DEBUG` | `false` | Otherwise any unhandled error renders a stack trace, environment variables included, to whoever triggered it |
 | `APP_ENV` | `production` | Turns off the development affordances that assume a trusted visitor |
-| `SESSION_SECURE_COOKIE` | `true` | Sign-in issues a long-lived remember-me cookie; without this it is sent over plain HTTP too |
+| `APP_DEBUG` | `false` | Otherwise any unhandled error renders a stack trace, environment variables included, to whoever triggered it |
+| `APP_URL` | `https://…` | The host's own HTTPS URL; the OAuth callback and generated links are built from it |
+| `LOG_STACK` | `daily` | One file per day, old ones rotated out, instead of a single log that grows forever |
+| `LOG_LEVEL` | `warning` | `debug` writes request detail to disk that nobody on a real host needs |
+| `SESSION_SECURE_COOKIE` | `true` | Without it the sign-in cookies are also sent over plain HTTP |
 
 If the app sits behind a reverse proxy or CDN, also configure trusted proxies — the OAuth rate
 limiter keys on the client IP, and every request arriving from the proxy's address collapses that
@@ -249,9 +265,9 @@ The home page (`/`) is **public and read-only**. A signed-out visitor sees the h
 totals, legend and sync status of the **first connected athlete of `STRAVA_ALLOWED_ATHLETE_IDS`, in
 configured order** — the same content the signed-in owner sees, without a Strava sign-in. A guest
 request never refreshes a token, calls Strava, or writes a row. Signing in is only needed to connect
-Strava, from the discreet "Owner? Connect with Strava" line under the map, and stays
-allowlist-only. While no allowlisted athlete has connected yet, the home page shows the stored
-athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
+Strava, from the discreet "Owner? Connect with Strava" line under the map (a signed-in owner gets
+**Sign out** there), and stays allowlist-only. While no allowlisted athlete has connected yet, the
+home page shows the stored athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
 appears only when no stored athlete has any activity. Removing an athlete from the allowlist
 therefore no longer hides their stored runs — deleting their user row does. The page keeps
 `noindex, nofollow`: reachable by link, not promoted.

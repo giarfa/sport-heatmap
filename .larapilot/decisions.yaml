@@ -857,4 +857,134 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-18T11:58:33+00:00'
+  -
+    id: 7a49e6c11034766b
+    ts: '2026-10-18T13:47:31+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'v2.0.1 release'
+    label: 'v2.0.1 release'
+    value: 'Notes + ship: merge US-016 into release/2.0.1, write notes, release-ship without push'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 8edc7626e129ebc7
+    ts: '2026-10-18T13:51:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'v2.0.0 red-team low findings'
+    label: 'v2.0.0 red-team low findings'
+    value: 'Waived before the v2.0.1 deploy; review throttle, security headers and logout/remember cookie move to 2.0.2'
+    question: null
+    rationale: 'Owner chose to deploy the High fix now on a private host'
+    source: askquestion
+    spec: null
+    supersedes: 0a21f31052862439
+  -
+    id: d03a644596851f9f
+    ts: '2026-10-18T13:51:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'vulnerable dependencies v2.0.0'
+    label: 'vulnerable dependencies v2.0.0'
+    value: 'symfony/http-foundation CVE-2026-108082 (Medium) accepted for the v2.0.1 deploy, mitigated by private access; update in 2.0.2'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: ed90994bbfc7111a
+  -
+    id: 4947d5313e52d37a
+    ts: '2026-10-18T13:51:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'env example hardening'
+    label: 'env example hardening'
+    value: 'Accepted for the v2.0.1 deploy: production values set on the host (APP_ENV, APP_DEBUG, LOG_*, SESSION_SECURE_COOKIE, APP_URL); .env.example hardening moves to 2.0.2'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: 81488d7e18ce9e86
+  -
+    id: e07384d363988cd8
+    ts: '2026-10-18T13:51:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'v2.0.1 ship gate'
+    label: 'v2.0.1 ship gate'
+    value: 'GO — accept both Mediums, deploy v2.0.1 now; all five open fixes go to 2.0.2'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 7cb3d870c5d266d4
+    ts: '2026-10-18T14:18:07+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: '2.0.2 fix spec grouping'
+    label: '2.0.2 fix spec grouping'
+    value: 'Three fix specs by fix: host hardening (US-017), Garmin review throttle + security headers (US-018), sign-out (US-019)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 25b77eeca09dcc53
+    ts: '2026-10-18T14:18:07+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: 'sign-out and remember-me cookie'
+    label: 'sign-out and remember-me cookie'
+    value: 'CSRF-protected sign-out; sign-in issues no remember-me cookie'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-019
+    supersedes: null
+  -
+    id: ca78fb49bcab8335
+    ts: '2026-10-18T14:18:08+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: 'prd security clarification 2.0.2'
+    label: 'PRD security clarification 2.0.2'
+    value: 'Clarify PRD Security: clean composer audit + safe .env.example, security headers, sign-out, throttled import routes'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 630085e3d1d7371b
+    ts: '2026-10-18T17:08:49+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-review
+    topic: 'us-018 approval without oliver manual re-test'
+    label: 'US-018 approval without Oliver manual re-test'
+    value: 'Approved on automated evidence; manual framing/429 re-test deferred to before v2.0.2 ship (Herd on PHP 8.3)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-018
+    supersedes: null
+  -
+    id: e7113bd8483dcdf7
+    ts: '2026-10-18T18:05:02+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'v2.0.2 ship'
+    label: 'v2.0.2 ship'
+    value: 'Merge US-018 and US-019 into release/2.0.2, write notes, ship v2.0.2 without push'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-10-18T18:05:02+00:00'

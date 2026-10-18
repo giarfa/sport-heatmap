@@ -44,3 +44,48 @@
 - **Routed to:** spec-add US-016 (release 2.0.1, found in v2.0.0)
 - **Security:** yes — Lars/Oliver tagged; Oliver re-tests `/larapilot*` unauthenticated on a `--no-dev` install
 - **Occurrences:** 2026-10-18 Repository
+
+## BUG-20261018-vulnerable-http-foundation-dev-env-defaults
+
+- **Reported:** 2026-10-18 (v2.0.0 security assessment; accepted for the v2.0.1 deploy only — `.larapilot/docs/security/v2.0.1.md`)
+- **Severity:** Medium (OWASP A06, A05, A09)
+- **Environment:** Repository / deployment configuration — v2.0.1 tagged, deployed privately under host-side mitigations
+- **Summary:** `symfony/http-foundation` 8.1.6 carries CVE-2026-108082 (ReDoS via `Cache-Control`, before routing and throttling); `.env.example` ships development values (`APP_ENV=local`, `APP_DEBUG=true`, `LOG_STACK=single`, `LOG_LEVEL=debug`, `SESSION_SECURE_COOKIE=false`, `http` `APP_URL`). CI's `composer audit` step fails.
+- **Steps to reproduce:** 1. `composer audit` → PKSA-xmwy-rmx5-m7h4. 2. `cp .env.example .env` → any 500 renders the debug page; one unrotated log.
+- **Expected / Actual:** Expected no advisory and production-safe example values / Actual 8.1.6 and development defaults.
+- **Promise broken:** none written — requirement gap. Clarified in PRD Security on 2026-10-18: clean `composer audit` and production-safe `.env.example` at ship.
+- **Logs:** nothing logged — found by review
+- **Affected spec:** US-001 (DONE — introduced the lock and `.env.example`); US-016 (DONE — closed the Boost part)
+- **Routed to:** spec-add US-017 (release 2.0.2, found in v2.0.0)
+- **Security:** yes — Lars/Oliver tagged
+- **Occurrences:** 2026-10-18 Repository
+
+## BUG-20261018-garmin-review-unthrottled-pages-frameable
+
+- **Reported:** 2026-10-18 (v2.0.0 security assessment; deferred out of v2.0.1 the same day)
+- **Severity:** Low (OWASP A04, A05)
+- **Environment:** Repository — v2.0.1
+- **Summary:** `GET /import/garmin/review` has no throttle and re-plans every uploaded row against every stored run on each reload; no response carries security headers, so the review's Overwrite controls can be framed and trick-clicked.
+- **Steps to reproduce:** 1. As a guest, upload a large CSV on the owner's run dates. 2. Reload the review in a loop — no 429, full re-plan each time. 3. Embed `/import/garmin/review` in an `<iframe>` from another page — it renders.
+- **Expected / Actual:** Expected the review throttled like upload/confirm, its plan reused, no framing / Actual none of the three.
+- **Promise broken:** none written — requirement gap. Clarified in PRD Security on 2026-10-18: security headers on every response; every working Garmin import route throttled, review not re-matched on reload (FR-018).
+- **Logs:** nothing logged — found by review
+- **Affected spec:** US-008 (DONE — review), US-011 (DONE — guest import and throttling)
+- **Routed to:** spec-add US-018 (release 2.0.2, found in v2.0.0)
+- **Security:** yes — Lars/Oliver tagged
+- **Occurrences:** 2026-10-18 Repository
+
+## BUG-20261018-no-sign-out-remember-cookie
+
+- **Reported:** 2026-10-18 (v2.0.0 security assessment; deferred out of v2.0.1 the same day)
+- **Severity:** Low (OWASP A07)
+- **Environment:** Repository — v2.0.1
+- **Summary:** there is no sign-out, and `Auth::login($user, remember: true)` issues a remember-me cookie of about 400 days on every sign-in.
+- **Steps to reproduce:** 1. Sign in with Strava on a shared device. 2. Nothing ends the session. 3. The remember cookie signs the device back in after the session expires.
+- **Expected / Actual:** Expected a sign-out and no long-lived cookie / Actual neither.
+- **Promise broken:** none written — requirement gap. Clarified in PRD Security on 2026-10-18 (owner's choice): CSRF-protected sign-out, no remember-me cookie (FR-001).
+- **Logs:** nothing logged — found by review
+- **Affected spec:** US-002 (DONE — sign-in)
+- **Routed to:** spec-add US-019 (release 2.0.2, found in v2.0.0)
+- **Security:** yes — Lars/Oliver tagged
+- **Occurrences:** 2026-10-18 Repository

@@ -8,6 +8,7 @@ use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -67,6 +68,22 @@ class StravaConnectFlowTest extends TestCase
         $this->assertSame(self::ALLOWED_ATHLETE_ID, $user->strava_athlete_id);
         $this->assertSame('fresh-access-token', $user->strava_access_token);
         $this->assertSame('fresh-refresh-token', $user->strava_refresh_token);
+    }
+
+    /**
+     * A recaller outlives SESSION_LIFETIME by about 400 days and signs a lost or
+     * shared device back in; sign-in must not mint one (US-019).
+     */
+    public function test_a_successful_sign_in_sets_no_remember_me_cookie(): void
+    {
+        $this->fakeTokenEndpoint(self::ALLOWED_ATHLETE_ID);
+
+        $response = $this->withOAuthState()->get($this->callbackUrl());
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticated();
+        $response->assertCookieMissing(Auth::guard()->getRecallerName());
+        $this->assertEmpty(User::query()->sole()->getRememberToken());
     }
 
     /**

@@ -41,10 +41,21 @@ releases:
   -
     version: 2.0.1
     title: 'Fixes for 2.0.0'
-    status: in_progress
+    status: shipped
     branch: release/2.0.1
     specs:
       - US-016
     created_at: '2026-10-18T11:44:24+00:00'
+    shipped_at: '2026-10-18T15:47:13+02:00'
+  -
+    version: 2.0.2
+    title: 'Security follow-ups for 2.0.1'
+    status: in_progress
+    branch: release/2.0.2
+    specs:
+      - US-017
+      - US-018
+      - US-019
+    created_at: '2026-10-18T14:16:55+00:00'
     shipped_at: null
-updated_at: '2026-10-18T13:18:42+00:00'
+updated_at: '2026-10-18T16:09:25+00:00'

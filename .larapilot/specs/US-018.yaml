@@ -1,0 +1,71 @@
+code: US-018
+title: 'Fix: a guest can hammer the Garmin import review, and any page can be framed'
+epic:
+  code: EP-004
+  title: Maintenance
+priority: LOW
+points: 3
+status: DONE
+body: |
+  #### US-018: Fix — a guest can hammer the Garmin import review, and any page can be framed
+
+  **Epic:** EP-004 | **Priority:** LOW | **Points:** 3 | **Status:** DONE
+  **Blocked by:** -
+  **Type:** Fix
+  **Severity:** Low
+  **Security:** Lars/Oliver — yes (OWASP A04, A05; v2.0.0 assessment, two Low findings, deferred out of v2.0.1 on 2026-10-18)
+  **Related:** US-011 (opened the Garmin import to guests and set its throttling), US-008 (introduced the import review)
+  **Release:** 2.0.2
+  **Found in:** v2.0.0
+  **Traces to:** FR-018 · Technical Architecture › Security (Lars) — no journey (the PRD has no `## User Journeys`)
+  **Promise broken:** Security (Lars), clarified on 2026-10-18: "every web response carries `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: same-origin`, plus `Strict-Transport-Security` on HTTPS — no page, the Garmin import review included, can be framed by another site" and "upload, review, and confirm share the `garmin-import` limit, and reloading the review does not match the upload against the stored runs again while neither has changed."
+  **Logged:** nothing logged — found by review (`.larapilot/docs/security/red-team-v2.0.0.md`)
+
+  **User Story**
+  As the Committed Amateur Runner who owns the instance,
+  I want the open Garmin import to resist abuse and its Overwrite button to be unclickable from another site,
+  so that a guest cannot exhaust my small host and a framing page cannot trick me into overwriting my runs.
+
+  **Demonstrates**
+  The eleventh `GET /import/garmin/review` in a minute from one guest answers 429, a reload of the review does not
+  re-run the matching while neither the upload nor the stored runs changed, and every web response — the dashboard,
+  the import pages, a 404 — carries the four security headers (HSTS on HTTPS only).
+
+  **Steps to Reproduce**
+  1. As a guest, upload a valid CSV with many rows on the owner's run dates.
+  2. Reload `GET /import/garmin/review` in a loop: no throttle (`routes/web.php:44`), and each request re-plans every row against every stored run on those dates (`app/Support/Garmin/PlanGarminImport.php`, nested loop).
+  3. Separately, any page inside the perimeter can embed `/import/garmin/review` in an `<iframe>`: no response sets `X-Frame-Options`, CSP `frame-ancestors`, `X-Content-Type-Options`, or `Referrer-Policy` (`bootstrap/app.php` has no header middleware); the "Overwrite" controls (`resources/views/garmin/review.blade.php:105-107`) can be trick-clicked — CSRF does not stop UI redress.
+
+  **Expected / Actual**
+  Expected: the review is throttled like upload and confirm, its plan is reused on reload, and no page can be framed. Actual: unthrottled review with rows × stored-runs work on every reload; no security headers.
+
+  **Acceptance Criteria**
+  - [x] Bug fixed — the promise holds again: `GET /import/garmin/review` carries `throttle:garmin-import`, the same limiter as upload and confirm (per user, else per IP)
+  - [x] Reloading the review reuses the plan while the pending upload and the stored runs on its dates are unchanged; a stored run added, changed, or removed on one of those dates re-plans it. Matching indexes stored runs by date instead of scanning them per row
+  - [x] Every web response carries `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`; `Strict-Transport-Security` only on secure requests. The CSP is limited to `frame-ancestors`, so no script, style, or Vite asset is blocked
+  - [x] Regression tests (Anne): the eleventh review request in a minute answers 429 and fails without the throttle; the headers are asserted on the dashboard, a Garmin import page, and a 404, and fail without the middleware; HSTS is absent on HTTP and present on HTTPS; a second review render does not re-plan (fails without the reuse)
+  - [x] The existing Garmin import tests stay green: conflict review, Overwrite/Skip, apply-to-all, summary counts, session binding
+  - [x] Developer domain doc `garmin-import.md` updated (throttling on review, plan reuse and its invalidation); the security headers recorded where request handling is documented (`heatmap-dashboard.md` or the README, whichever already covers middleware)
+  - [x] Root cause named in the fix commit
+  - [x] No security regression (Lars/Oliver): Oliver re-tests framing of `/import/garmin/review` from another origin (refused) and the review reload loop (429)
+  - [x] Factory/seeder — not applicable unless the plan reuse adds a column; then the factory covers it
+status_history:
+  -
+    status: PLANNED
+    at: '2026-10-18T16:46:27+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-10-18T16:47:26+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-18T16:57:05+00:00'
+  -
+    status: DONE
+    at: '2026-10-18T17:08:49+00:00'
+rework: false
+merge_commit:
+  sha: 3c884352fb2249c5f8a0cae8b7c984147bd5bfb2
+  short_sha: 3c88435
+  subject: 'chore(US-018): move spec to REVIEW, record the plan, review and usage'
+  committed_at: '2026-10-18T18:57:12+02:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/3c884352fb2249c5f8a0cae8b7c984147bd5bfb2'

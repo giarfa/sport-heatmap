@@ -1,0 +1,10 @@
+intro: null
+public_token: null
+versions:
+  2.0.1:
+    title: 'Security fixes'
+    summary: 'Deployed sites no longer carry the developer tools.'
+    items:
+      US-016:
+        title: 'Developer dashboard removed from deployed sites'
+updated_at: '2026-10-18T13:47:27+00:00'

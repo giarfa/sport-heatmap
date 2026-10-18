@@ -1,0 +1,71 @@
+code: US-019
+title: 'Fix: the owner cannot sign out, and sign-in issues a 400-day remember-me cookie'
+epic:
+  code: EP-004
+  title: Maintenance
+priority: LOW
+points: 2
+status: DONE
+body: |
+  #### US-019: Fix — the owner cannot sign out, and sign-in issues a 400-day remember-me cookie
+
+  **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** DONE
+  **Blocked by:** -
+  **Type:** Fix
+  **Severity:** Low
+  **Security:** Lars/Oliver — yes (OWASP A07; v2.0.0 assessment, Low finding, deferred out of v2.0.1 on 2026-10-18)
+  **Related:** US-002 (introduced Strava sign-in and `remember: true`)
+  **Release:** 2.0.2
+  **Found in:** v2.0.0
+  **Traces to:** FR-001 · Technical Architecture › Security (Lars) — no journey (the PRD has no `## User Journeys`)
+  **Promise broken:** Security (Lars), clarified on 2026-10-18: "a signed-in owner can sign out from the dashboard; a CSRF-protected `POST` ends the session. Sign-in issues no remember-me cookie, so a session ends with the session lifetime or on sign-out. The nightly sync (FR-002) runs on the stored tokens and needs no session."
+  **Logged:** nothing logged — found by review (`.larapilot/docs/security/red-team-v2.0.0.md`)
+
+  **User Story**
+  As the Committed Amateur Runner who owns the instance,
+  I want to sign out, and not stay signed in for a year on every device I used,
+  so that a lost or shared device does not keep owner access to my instance.
+
+  **Demonstrates**
+  Signed in, the dashboard offers "Sign out"; pressing it returns the signed-out dashboard and the next request is a
+  guest. Signing in through Strava sets no `remember_web_*` cookie. The nightly sync still runs for the owner with no
+  session.
+
+  **Steps to Reproduce**
+  1. Sign in with Strava on a shared device.
+  2. Nothing in the UI or `routes/web.php` ends the session.
+  3. `Auth::login($user, remember: true)` (`app/Http/Controllers/Strava/StravaCallbackController.php:124`) sets a remember-me cookie with Laravel's default lifetime of about 400 days, which signs the device back in after the session expires.
+
+  **Expected / Actual**
+  Expected: a sign-out, and no long-lived cookie. Actual: no sign-out; a ~400-day remember-me cookie on every sign-in.
+
+  **Acceptance Criteria**
+  - [x] Bug fixed — the promise holds again: a CSRF-protected `POST /logout` (named route) logs out, invalidates the session, regenerates the CSRF token, and redirects to the dashboard; a `GET` is not routed; a request without a CSRF token answers 419
+  - [x] The signed-in dashboard shows a "Sign out" control (a form posting to the route, keyboard reachable, Marika's terse register); guests do not see it
+  - [x] Sign-in calls `Auth::login` without `remember`, so no `remember_web_*` cookie is set; the callback's existing fixation and open-redirect guarantees stay
+  - [x] Signing out does not delete or revoke the stored Strava tokens: the nightly sync for that athlete still runs
+  - [x] Regression tests (Anne): the callback response carries no remember cookie (fails on the current code); `POST /logout` ends the session and the next request is a guest; without a CSRF token it answers 419; a guest posting to it is redirected without error; the sign-out control renders only when signed in
+  - [x] Developer domain doc `strava-connection.md` updated (sign-out, no remember-me, session lifetime as the bound); `.env.example` comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie (shared with US-017 — whichever lands second updates it); README "Signing in" mentions Sign out
+  - [x] Root cause named in the fix commit
+  - [x] No security regression (Lars/Oliver): Oliver re-tests session reuse after sign-out and the absence of the remember cookie
+  - [x] Factory/seeder — not applicable (no schema change; `remember_token` stays unused)
+status_history:
+  -
+    status: PLANNED
+    at: '2026-10-18T17:17:44+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-10-18T17:40:28+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-18T17:43:59+00:00'
+  -
+    status: DONE
+    at: '2026-10-18T18:02:57+00:00'
+rework: false
+merge_commit:
+  sha: 93f0a711e4562938080404548fa5b9bfb2212e16
+  short_sha: 93f0a71
+  subject: 'chore(US-019): move spec to REVIEW, record the plan and usage'
+  committed_at: '2026-10-18T19:44:03+02:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/93f0a711e4562938080404548fa5b9bfb2212e16'

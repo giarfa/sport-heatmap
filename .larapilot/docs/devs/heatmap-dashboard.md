@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-015` — 2026-10-17 |
+| **Last updated by** | `US-019` — 2026-10-18 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -21,6 +21,12 @@ share stops working.
 
 ## Functional flow
 
+0. **Every web response**, this screen's and a 404's alike, leaves through the global
+   `SetSecurityHeaders` middleware (`US-018`): `Content-Security-Policy: frame-ancestors
+   'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+   same-origin`, and `Strict-Transport-Security: max-age=31536000` on secure requests only. No
+   page can be framed by another site, so the Garmin review's Overwrite controls cannot be
+   trick-clicked. A header the route already set is kept.
 1. `GET /` runs the `strava.fresh` middleware (see `strava-connection.md`), then
    `DashboardController`.
 2. The athlete to render is resolved:
@@ -147,9 +153,11 @@ reachable but not promoted (decision `4918d74ff18e8b0f`); the meta description
 no longer calls it private.
 
 **Owner UI.** A signed-in owner gets the same line without the Strava link:
-"Runs missing from Strava? Import Garmin CSV" (same 44 px target and
-`--accent` ink). Every visitor can import since US-011 (see
-`garmin-csv-import.md`).
+"Runs missing from Strava? Import Garmin CSV · Sign out" (same 44 px target and
+`--accent` ink). Sign out is a native `<form method="POST">` with `@csrf` and a
+submit button, so it is keyboard reachable without script and cannot be
+triggered by a link or prefetch (US-019, see `strava-connection.md`). Every
+visitor can import since US-011 (see `garmin-csv-import.md`).
 
 **Connect screen.** When no athlete can be displayed, `strava/connect.blade.php`
 says "Connect Strava or import a Garmin Connect CSV to build your 16-week
@@ -204,8 +212,9 @@ calibrated bands, upper-inclusive.
 | Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
 | Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `weekly-trend`, `weekly-trend-skeleton`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
+| Security headers | `app/Http/Middleware/SetSecurityHeaders.php`, registered with `$middleware->prepend()` in `bootstrap/app.php` (`US-018`) | Global: the four headers on every response, HSTS when `isSecure()`; a header already on the response is left alone |
 | Config | `config/heatmap.php` | Literals `window_weeks` (16), `navigation_step_weeks` (4) and `grid_cache_ttl` (86 400) |
-| Tests | `tests/Feature/Dashboard/*`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
+| Tests | `tests/Feature/Dashboard/*`, `tests/Feature/Routing/SecurityHeadersTest.php`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
 
 A dashboard request costs one grouped query, one run query and one lead-in query on a cache miss, zero on a hit, plus
 three small indexed queries for the sync status and one `MIN()` for the oldest run (`US-013`).
@@ -269,6 +278,10 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 | Rolling average in integer metres, half-up (US-014) | Float mean and `round()` | A float mean of exact half-way values depends on summation order: the US-014 mockup README prints 24.5, 33.0 and 39.0 for weeks whose exact means are 24.55, 33.05 and 39.05 km (its generator rounded `98.19999999999999 / 4` down). Integer math reads 24.6, 33.1 and 39.1 and cannot drift; `BuildWeeklyTrendTest` pins this |
 | The chart is server-rendered inline SVG in a Blade component (US-014) | Chart.js / ApexCharts; a client-rendered canvas | A charting library is a new frontend dependency the Technical Architecture rules out, would need its own accessible text alternative, and would draw nothing for a guest with scripts off. One SVG of about 20 elements costs no script, no font, no service |
 | The line is drawn as segments, not one polyline (US-014) | A single `points` string | The history and partial-week rules only cut the ends of the line today, but a single polyline would draw straight across any future gap; splitting at every missing point makes that impossible by construction |
+| Security headers on a **global**, outermost middleware (US-018) | The `web` group; each controller; the server config | A URL that matches no route is a 404 that never enters group middleware, and it must be unframeable too; prepended, so the 503 of maintenance mode and the 413 of an oversized upload, which other global middleware end the request with, carry the headers as well. The host is not defined yet, so a server-level header cannot be relied on, and the headers must travel with the code |
+| Strict values (`DENY`, `frame-ancestors 'none'`), each set only when absent (US-018) | Overwrite always; `SAMEORIGIN` for everything | The Larapilot development dashboard frames its own mockups on purpose and sets `SAMEORIGIN` and `frame-ancestors 'self'`. A second CSP would be enforced beside it and its `'none'` would win, so the design viewer would stop loading. Global middleware runs after the route's, so "absent" is decidable. The app has no framing need of its own, so the strict values cost nothing |
+| CSP limited to `frame-ancestors` (US-018) | A full `default-src` / `script-src` policy | The layout carries an inline theme script and Vite serves the assets; a wider policy would block them. The finding was framing, and `frame-ancestors` alone closes it |
+| HSTS only on secure requests, without `includeSubDomains` or `preload` (US-018) | Always send it; add both directives | Browsers ignore HSTS over HTTP, but a header sent where TLS is not guaranteed misleads. The other subdomains of the host are unknown and both directives are close to irreversible once cached |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
 | CSV-only athlete: latest import = newest `updated_at` of its `garmin_csv` activities (US-011) | A `users.garmin_imported_at` column | No migration for one stamp; the cost is that a re-import that changes nothing does not move it |
 | CSV-only athlete ignores `sync_runs` | Show the instance-wide sync state | `sync_runs` describe the Strava sync, which never selects this athlete — a failed or stale sync of someone else would put a false warning over a map only imports change |
@@ -279,6 +292,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 | The Strava link in the detail opens in the same tab | `target="_blank" rel="noopener"` | The approved mockup and the US-008 review link do the same; the visible behaviour is the mockup's |
 | Guests and owner share the per-athlete grid cache | A separate guest cache | Same data, same key; a separate cache would double the rebuilds and could disagree with the owner's view |
 | Guests see the same sync warning, reason included | A reduced guest warning | Decision `f75e292def892fad`; the reason is already non-secret and HTML-escaped |
+| "Sign out" for the signed-in owner as a POST form button in the same line (US-019) | A header button; a `GET` link; a menu | Same header-width reasoning as the line itself; a `GET` link could be triggered cross-site or by a prefetch, so it has to be a form posting with a CSRF token |
 | "Import Garmin CSV" for every visitor as a text line under the map (US-011) | A header button; a menu; owner-only | The same reasoning as the guest line: discreet, no header budget at 375 px, one screen with no nav. Open to guests by the owner's choice so the map works with CSV imports only |
 | Connect screen: Garmin import as a secondary outline button below the Strava one | A second orange button; a text link | Strava's brand guidelines put orange on the connect button only; a full-width 44 px control reads as an equal way in on a phone |
 | Guest sign-in as a footer text link | Header button; Strava-orange button on the map | Discreet, fits the 375 px header budget, keeps orange reserved for the connect screen |
@@ -367,6 +381,12 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 
 ## Extension points & gotchas
 
+- **Behind a TLS-terminating proxy, `isSecure()` is false until the proxy is trusted**
+  (`TrustProxies`), so `Strict-Transport-Security` would silently never be sent. Deployment
+  is not defined yet: configure trusted proxies when it is (`US-018`).
+- A new header that must differ for one route is set by that route's middleware; the global
+  one leaves an existing header alone. A page that legitimately needs framing must set both
+  `X-Frame-Options` and `Content-Security-Policy`, or the stricter pair is added.
 - The test suite runs the `array` store without serialization; a test that
   needs the real round trip sets `cache.default` to `database`
   (`HeatmapGridCacheTest`).
@@ -397,7 +417,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 
 ## Related
 
-- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`, `US-010`, `US-011`, `US-012`, `US-013`
+- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`, `US-010`, `US-011`, `US-012`, `US-013`, `US-018`
 - Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`, `US-010-plan.yaml`, `US-013-plan.yaml`
 - Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`, `US-009.md`, `US-010.md`
 - Other domains: `strava-connection.md`, `activity-sync.md`, `garmin-csv-import.md`
