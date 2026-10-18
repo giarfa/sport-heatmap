@@ -857,4 +857,17 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-18T11:58:33+00:00'
+  -
+    id: 7a49e6c11034766b
+    ts: '2026-10-18T13:47:31+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'v2.0.1 release'
+    label: 'v2.0.1 release'
+    value: 'Notes + ship: merge US-016 into release/2.0.1, write notes, release-ship without push'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-10-18T13:47:31+00:00'
