@@ -1,0 +1,36 @@
+# What was decided about each vulnerable dependency, and the trend of the checks.
+# Written by php artisan larapilot:vendor-audit and larapilot:vendor-link: commit it.
+decisions: []
+history:
+  -
+    checked_at: '2026-10-17T07:12:06+00:00'
+    components: 231
+    critical: 1
+    high: 2
+    medium: 1
+    low: 0
+    unknown: 0
+  -
+    checked_at: '2026-10-18T11:57:38+00:00'
+    components: 231
+    critical: 1
+    high: 2
+    medium: 1
+    low: 0
+    unknown: 0
+  -
+    checked_at: '2026-10-18T11:59:32+00:00'
+    components: 231
+    critical: 0
+    high: 0
+    medium: 0
+    low: 0
+    unknown: 0
+  -
+    checked_at: '2026-10-18T12:01:45+00:00'
+    components: 231
+    critical: 0
+    high: 0
+    medium: 0
+    low: 0
+    unknown: 0

@@ -701,4 +701,160 @@ decisions:
     source: askquestion
     spec: US-015
     supersedes: null
-updated_at: '2026-10-17T06:44:40+00:00'
+  -
+    id: 35c0cfb4e31d86eb
+    ts: '2026-10-17T07:09:30+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'v2.0.0 ship'
+    label: 'v2.0.0 ship'
+    value: 'Write release notes, then ship v2.0.0 (merge to main, tag, back-merge develop, no push)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: ab21c553e0db5ac9
+    ts: '2026-10-17T07:11:49+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'deploy platform'
+    label: 'deploy platform'
+    value: 'Custom VPS / Deployer'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: e4697a86c99e976f
+    ts: '2026-10-17T07:11:49+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'deployment exposure'
+    label: 'deployment exposure'
+    value: 'Private — behind basic auth, VPN or IP allowlist; open Garmin import and deferred SECURITY.md stay acceptable'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 1d3434890098c744
+    ts: '2026-10-17T07:11:49+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'edge cdn waf'
+    label: 'edge CDN WAF'
+    value: 'None — host TLS only'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: fbeb55c5118f471c
+    ts: '2026-10-17T07:11:49+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'observability stack'
+    label: 'observability stack'
+    value: 'Laravel log files only, no external SaaS'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 39587e44654893d1
+    ts: '2026-10-18T11:44:28+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'larapilot dashboard in production'
+    label: 'larapilot dashboard in production'
+    value: 'Move andreapollastri/larapilot to require-dev; deploy with composer install --no-dev (v2.0.1)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: ed90994bbfc7111a
+    ts: '2026-10-18T11:44:28+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'vulnerable dependencies v2.0.0'
+    label: 'vulnerable dependencies v2.0.0'
+    value: 'Update symfony/http-foundation, league/commonmark, shell-quote, source-map-js in v2.0.1'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 81488d7e18ce9e86
+    ts: '2026-10-18T11:44:28+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'env example hardening'
+    label: 'env example hardening'
+    value: 'Harden .env.example for production and document keys in README (v2.0.1)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 0a21f31052862439
+    ts: '2026-10-18T11:44:28+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'v2.0.0 red-team low findings'
+    label: 'v2.0.0 red-team low findings'
+    value: 'Fix in v2.0.1 before deploy: review throttle, security headers, logout/remember cookie, commonmark'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 5210b8532bf4a530
+    ts: '2026-10-18T11:58:32+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-vendor-check
+    topic: 'vendor advisory decision: shell-quote'
+    label: 'vendor advisory decision: shell-quote'
+    value: 'Update now'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 18c1ca4f41889690
+    ts: '2026-10-18T11:58:33+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-vendor-check
+    topic: 'vendor advisory decision: league/commonmark'
+    label: 'vendor advisory decision: league/commonmark'
+    value: 'Update now'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: aecf043b5a5861e5
+    ts: '2026-10-18T11:58:33+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-vendor-check
+    topic: 'vendor advisory decision: source-map-js'
+    label: 'vendor advisory decision: source-map-js'
+    value: 'Update now'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-10-18T11:58:33+00:00'
