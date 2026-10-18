@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureFreshStravaToken;
+use App\Http\Middleware\SetSecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'strava.fresh' => EnsureFreshStravaToken::class,
         ]);
+
+        // Global, not in the web group: a URL that matches no route is a 404
+        // that never enters group middleware, and it must be unframeable too.
+        $middleware->append(SetSecurityHeaders::class);
 
         // No route uses auth today (the Garmin import opened to guests in
         // US-011). Kept so a future auth route cannot throw on the missing

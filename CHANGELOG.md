@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Every web response now carries `Content-Security-Policy: frame-ancestors 'none'`,
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin`,
+  plus `Strict-Transport-Security` on HTTPS, so no other site can frame a page, the Garmin
+  import review's Overwrite buttons included (US-018).
 - A crafted `Cache-Control` header can no longer tie up the host: `symfony/http-foundation` is
   updated to a release that fixes CVE-2026-108082 (US-017).
 - `.env.example` now ships production-safe values (`APP_ENV=production`, `APP_DEBUG=false`,
