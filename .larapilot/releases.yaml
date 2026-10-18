@@ -43,7 +43,8 @@ releases:
     title: 'Fixes for 2.0.0'
     status: planned
     branch: release/2.0.1
-    specs: {}
+    specs:
+      - US-016
     created_at: '2026-10-18T11:44:24+00:00'
     shipped_at: null
-updated_at: '2026-10-18T11:44:24+00:00'
+updated_at: '2026-10-18T12:06:32+00:00'

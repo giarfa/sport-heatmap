@@ -29,3 +29,18 @@
 - **Routed to:** spec-add US-015 (release 2.0.0, found in v0.1.0)
 - **Security:** no
 - **Occurrences:** 2026-10-17 Local
+
+## BUG-20261018-larapilot-production-dependency
+
+- **Reported:** 2026-10-18 (v2.0.0 security assessment, `.larapilot/docs/security/v2.0.0.md` — Lars, with Oliver's red-team report)
+- **Severity:** High (OWASP A05, A01)
+- **Environment:** Repository / deployment configuration — v2.0.0 is not deployed (NO-GO)
+- **Summary:** `andreapollastri/larapilot` is in `require` (`composer.json:13`), so the Larapilot dashboard — and Boost/MCP through it — install on every host, `--no-dev` included. Under `APP_ENV=local` (the `.env.example:2` default) `AccessPolicy::mode()` serves it open, without sign-in.
+- **Steps to reproduce:** 1. `composer install --no-dev`. 2. Keep `APP_ENV=local` from `.env.example`. 3. `GET /larapilot` with no session — the dashboard opens and can read `.env`, download the database, and write files under `/larapilot/*`.
+- **Expected / Actual:** Expected no `/larapilot/*` route on a deployed host / Actual routes registered, exposure governed by `APP_ENV` alone.
+- **Promise broken:** none written — requirement gap. Security (Lars) "client credentials in `.env` only"; FR-001 owner-only access. Clarified in PRD Security on 2026-10-18: no developer tooling on a deployed host.
+- **Logs:** nothing logged — found by review
+- **Affected spec:** US-001 (DONE — introduced `composer.json`)
+- **Routed to:** spec-add US-016 (release 2.0.1, found in v2.0.0)
+- **Security:** yes — Lars/Oliver tagged; Oliver re-tests `/larapilot*` unauthenticated on a `--no-dev` install
+- **Occurrences:** 2026-10-18 Repository
