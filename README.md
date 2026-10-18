@@ -115,7 +115,21 @@ A few things worth knowing before the first attempt:
 ### Before putting this on a real host
 
 The OAuth routes are reachable without a session, which makes them the part of this app a stranger
-can actually touch. Three settings are not safe at their `.env.example` defaults:
+can actually touch. Start with how the code is installed, then the settings.
+
+**Install without the development tools.** Every deployment runs:
+
+```bash
+composer install --no-dev --optimize-autoloader
+```
+
+The Larapilot dashboard (`/larapilot/*`) and Laravel Boost are development-only dependencies. The
+dashboard can read `.env`, dump the database and write files, so a host that has it installed is
+one `APP_ENV` value away from handing all of that to a stranger. `--no-dev` leaves both out, and
+a plain `composer install` on a host puts them back. After installing, check that the dashboard is
+gone: `php artisan route:list --path=larapilot` must list no route.
+
+Three settings are not safe at their `.env.example` defaults:
 
 | Key | Set it to | Why |
 | --- | --- | --- |

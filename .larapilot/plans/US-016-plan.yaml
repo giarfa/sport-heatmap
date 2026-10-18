@@ -108,12 +108,12 @@ tasks:
       9. `CHANGELOG.md` `[Unreleased]` → `### Security`: the developer dashboard and Boost are development-only dependencies; deployments with `composer install --no-dev` no longer register `/larapilot/*`
 
       ## Completion Criteria
-      - [ ] Regression test observed red on the pre-fix manifest, green after
-      - [ ] `andreapollastri/larapilot` under `require-dev` with constraint `^5.0`; absent from `require`
-      - [ ] `composer.lock`: `andreapollastri/larapilot`, `laravel/boost`, `laravel/mcp` in `packages-dev`, none in `packages`; no locked version changed
-      - [ ] Local dev install still discovers Larapilot; `php artisan larapilot:*` runs; `/larapilot` opens on Herd
-      - [ ] Full suite and `larapilot:quality` green
-      - [ ] CHANGELOG `[Unreleased]` updated
+      - [x] Regression test observed red on the pre-fix manifest, green after
+      - [x] `andreapollastri/larapilot` under `require-dev` with constraint `^5.0`; absent from `require`
+      - [x] `composer.lock`: `andreapollastri/larapilot`, `laravel/boost`, `laravel/mcp` in `packages-dev`, none in `packages`; no locked version changed
+      - [x] Local dev install still discovers Larapilot; `php artisan larapilot:*` runs; `/larapilot` opens on Herd
+      - [x] Full suite and `larapilot:quality` green
+      - [x] CHANGELOG `[Unreleased]` updated
 
       ## Test Data
       - N/A — no model or schema change
@@ -126,11 +126,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Fix
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 1.5
     dependencies:
       - TASK-00
+    commit:
+      sha: 29a8c965d6a18f5f13685f7640ceba4edff48b03
+      short_sha: 29a8c96
+      subject: 'fix(deps): US-016 TASK-01 move andreapollastri/larapilot to require-dev'
+      committed_at: '2026-10-18T15:20:12+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/29a8c965d6a18f5f13685f7640ceba4edff48b03'
   -
     id: TASK-02
     title: 'README: deployments run composer install --no-dev'
@@ -216,4 +222,4 @@ tasks:
     dependencies:
       - TASK-01
       - TASK-02
-updated_at: '2026-10-18T13:18:50+00:00'
+updated_at: '2026-10-18T13:20:12+00:00'
