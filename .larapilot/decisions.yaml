@@ -922,4 +922,43 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-18T13:51:41+00:00'
+  -
+    id: 7cb3d870c5d266d4
+    ts: '2026-10-18T14:18:07+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: '2.0.2 fix spec grouping'
+    label: '2.0.2 fix spec grouping'
+    value: 'Three fix specs by fix: host hardening (US-017), Garmin review throttle + security headers (US-018), sign-out (US-019)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 25b77eeca09dcc53
+    ts: '2026-10-18T14:18:07+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: 'sign-out and remember-me cookie'
+    label: 'sign-out and remember-me cookie'
+    value: 'CSRF-protected sign-out; sign-in issues no remember-me cookie'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-019
+    supersedes: null
+  -
+    id: ca78fb49bcab8335
+    ts: '2026-10-18T14:18:08+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-bug
+    topic: 'prd security clarification 2.0.2'
+    label: 'PRD security clarification 2.0.2'
+    value: 'Clarify PRD Security: clean composer audit + safe .env.example, security headers, sign-out, throttled import routes'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-10-18T14:18:08+00:00'

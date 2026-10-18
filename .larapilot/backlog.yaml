@@ -1014,3 +1014,158 @@ specs:
       subject: 'chore(US-016): move the spec to review and log the session'
       committed_at: '2026-10-18T15:24:39+02:00'
       url: 'https://github.com/giarfa/sport-heatmap/commit/235cb6aa646ad498b2ad6e7c1f93bae51d15e854'
+  -
+    code: US-017
+    title: 'Fix: a host built from the repository runs a vulnerable http-foundation and development defaults'
+    epic:
+      code: EP-004
+      title: Maintenance
+    priority: MEDIUM
+    points: 2
+    status: TODO
+    body: |
+      #### US-017: Fix — a host built from the repository runs a vulnerable http-foundation and development defaults
+
+      **Epic:** EP-004 | **Priority:** MEDIUM | **Points:** 2 | **Status:** TODO
+      **Blocked by:** -
+      **Type:** Fix
+      **Severity:** Medium
+      **Security:** Lars/Oliver — yes (OWASP A06, A05, A09; v2.0.0 assessment, two Medium findings, accepted for the v2.0.1 deploy only)
+      **Related:** US-001 (project foundation — introduced `composer.lock` and `.env.example`), US-016 (closed the Boost part of the `.env.example` finding)
+      **Release:** 2.0.2
+      **Found in:** v2.0.0
+      **Traces to:** Technical Architecture › Security (Lars) — no journey (the PRD has no `## User Journeys`)
+      **Promise broken:** Security (Lars), clarified on 2026-10-18: "`composer audit` reports no open advisory on the shipped `composer.lock`, and `.env.example` ships production-safe values (`APP_DEBUG=false`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`, an `https` `APP_URL`), so a host built from it shows no debug page and keeps rotated logs."
+      **Logged:** nothing logged — found by review (`.larapilot/docs/security/v2.0.0.md`, `v2.0.1.md`)
+
+      **User Story**
+      As the Committed Amateur Runner who owns the instance,
+      I want the code I deploy to carry no known-vulnerable package and no development defaults,
+      so that a crafted header cannot tie up my host and a host built from the example file leaks no debug details.
+
+      **Demonstrates**
+      `composer audit` on the branch reports no advisory, and the CI `composer audit` step is green again. A fresh
+      `.env` copied from `.env.example` serves a generic error page on a forced 500 (no stack trace) and writes to a
+      daily log file. The local Herd setup still runs with the development overrides the README names.
+
+      **Steps to Reproduce**
+      1. `composer audit` on `v2.0.1` — PKSA-xmwy-rmx5-m7h4 / CVE-2026-108082 against `symfony/http-foundation` 8.1.6 (fixed in 8.1.7). The `Cache-Control` request header is parsed before routing and throttling (`vendor/symfony/http-foundation/HeaderBag.php:151`), so `curl -H 'Cache-Control: <crafted>' /up` reaches it without signing in.
+      2. `cp .env.example .env` — `APP_ENV=local` (`.env.example:2`), `APP_DEBUG=true` (`:4`), `APP_URL=http://localhost` (`:5`), `LOG_STACK=single` (`:19`), `LOG_LEVEL=debug` (`:21`), `SESSION_SECURE_COOKIE=false` (`:37`).
+      3. Any 500 renders the debug page; the log is one file that never rotates.
+
+      **Expected / Actual**
+      Expected: no advisory on the lock; production-safe example values. Actual: http-foundation 8.1.6; development values in `.env.example`; CI's `composer audit` step fails.
+
+      **Acceptance Criteria**
+      - [ ] Bug fixed — the promise holds again: `symfony/http-foundation` is 8.1.7 or later in `composer.lock` and `composer audit` reports no advisory; only the packages the update needs change in the lock
+      - [ ] `.env.example` ships `APP_ENV=production`, `APP_DEBUG=false`, an `https` `APP_URL`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`; the comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie once US-019 removes it (whichever lands second updates it)
+      - [ ] README: "Local setup on Herd" names the development overrides to set after copying (`APP_ENV=local`, `APP_DEBUG=true`, the Herd `https://….test` `APP_URL`); "Before putting this on a real host" lists the production keys as the example's own values, so the host checklist and the file agree
+      - [ ] Regression test (Anne): reads `.env.example` and fails while `APP_DEBUG` is `true`, `APP_ENV` is `local`, `LOG_STACK` is `single`, `LOG_LEVEL` is `debug`, or `SESSION_SECURE_COOKIE` is `false`; it fails on the current file
+      - [ ] The full suite and `larapilot:quality` pass after the update; CI's `composer audit` step is green
+      - [ ] Root cause named in the fix commit (`fix(deps): …` / `fix(config): …`); no domain behavior changes, so no developer domain doc changes
+      - [ ] No security regression (Lars/Oliver): Oliver re-sends the crafted `Cache-Control` header to `/up` and forces a 500 on a host built from the example file — no stack trace, no environment details
+      - [ ] Factory/seeder — not applicable (no schema change)
+  -
+    code: US-018
+    title: 'Fix: a guest can hammer the Garmin import review, and any page can be framed'
+    epic:
+      code: EP-004
+      title: Maintenance
+    priority: LOW
+    points: 3
+    status: TODO
+    body: |
+      #### US-018: Fix — a guest can hammer the Garmin import review, and any page can be framed
+
+      **Epic:** EP-004 | **Priority:** LOW | **Points:** 3 | **Status:** TODO
+      **Blocked by:** -
+      **Type:** Fix
+      **Severity:** Low
+      **Security:** Lars/Oliver — yes (OWASP A04, A05; v2.0.0 assessment, two Low findings, deferred out of v2.0.1 on 2026-10-18)
+      **Related:** US-011 (opened the Garmin import to guests and set its throttling), US-008 (introduced the import review)
+      **Release:** 2.0.2
+      **Found in:** v2.0.0
+      **Traces to:** FR-018 · Technical Architecture › Security (Lars) — no journey (the PRD has no `## User Journeys`)
+      **Promise broken:** Security (Lars), clarified on 2026-10-18: "every web response carries `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: same-origin`, plus `Strict-Transport-Security` on HTTPS — no page, the Garmin import review included, can be framed by another site" and "upload, review, and confirm share the `garmin-import` limit, and reloading the review does not match the upload against the stored runs again while neither has changed."
+      **Logged:** nothing logged — found by review (`.larapilot/docs/security/red-team-v2.0.0.md`)
+
+      **User Story**
+      As the Committed Amateur Runner who owns the instance,
+      I want the open Garmin import to resist abuse and its Overwrite button to be unclickable from another site,
+      so that a guest cannot exhaust my small host and a framing page cannot trick me into overwriting my runs.
+
+      **Demonstrates**
+      The eleventh `GET /import/garmin/review` in a minute from one guest answers 429, a reload of the review does not
+      re-run the matching while neither the upload nor the stored runs changed, and every web response — the dashboard,
+      the import pages, a 404 — carries the four security headers (HSTS on HTTPS only).
+
+      **Steps to Reproduce**
+      1. As a guest, upload a valid CSV with many rows on the owner's run dates.
+      2. Reload `GET /import/garmin/review` in a loop: no throttle (`routes/web.php:44`), and each request re-plans every row against every stored run on those dates (`app/Support/Garmin/PlanGarminImport.php`, nested loop).
+      3. Separately, any page inside the perimeter can embed `/import/garmin/review` in an `<iframe>`: no response sets `X-Frame-Options`, CSP `frame-ancestors`, `X-Content-Type-Options`, or `Referrer-Policy` (`bootstrap/app.php` has no header middleware); the "Overwrite" controls (`resources/views/garmin/review.blade.php:105-107`) can be trick-clicked — CSRF does not stop UI redress.
+
+      **Expected / Actual**
+      Expected: the review is throttled like upload and confirm, its plan is reused on reload, and no page can be framed. Actual: unthrottled review with rows × stored-runs work on every reload; no security headers.
+
+      **Acceptance Criteria**
+      - [ ] Bug fixed — the promise holds again: `GET /import/garmin/review` carries `throttle:garmin-import`, the same limiter as upload and confirm (per user, else per IP)
+      - [ ] Reloading the review reuses the plan while the pending upload and the stored runs on its dates are unchanged; a stored run added, changed, or removed on one of those dates re-plans it. Matching indexes stored runs by date instead of scanning them per row
+      - [ ] Every web response carries `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`; `Strict-Transport-Security` only on secure requests. The CSP is limited to `frame-ancestors`, so no script, style, or Vite asset is blocked
+      - [ ] Regression tests (Anne): the eleventh review request in a minute answers 429 and fails without the throttle; the headers are asserted on the dashboard, a Garmin import page, and a 404, and fail without the middleware; HSTS is absent on HTTP and present on HTTPS; a second review render does not re-plan (fails without the reuse)
+      - [ ] The existing Garmin import tests stay green: conflict review, Overwrite/Skip, apply-to-all, summary counts, session binding
+      - [ ] Developer domain doc `garmin-import.md` updated (throttling on review, plan reuse and its invalidation); the security headers recorded where request handling is documented (`heatmap-dashboard.md` or the README, whichever already covers middleware)
+      - [ ] Root cause named in the fix commit
+      - [ ] No security regression (Lars/Oliver): Oliver re-tests framing of `/import/garmin/review` from another origin (refused) and the review reload loop (429)
+      - [ ] Factory/seeder — not applicable unless the plan reuse adds a column; then the factory covers it
+  -
+    code: US-019
+    title: 'Fix: the owner cannot sign out, and sign-in issues a 400-day remember-me cookie'
+    epic:
+      code: EP-004
+      title: Maintenance
+    priority: LOW
+    points: 2
+    status: TODO
+    body: |
+      #### US-019: Fix — the owner cannot sign out, and sign-in issues a 400-day remember-me cookie
+
+      **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** TODO
+      **Blocked by:** -
+      **Type:** Fix
+      **Severity:** Low
+      **Security:** Lars/Oliver — yes (OWASP A07; v2.0.0 assessment, Low finding, deferred out of v2.0.1 on 2026-10-18)
+      **Related:** US-002 (introduced Strava sign-in and `remember: true`)
+      **Release:** 2.0.2
+      **Found in:** v2.0.0
+      **Traces to:** FR-001 · Technical Architecture › Security (Lars) — no journey (the PRD has no `## User Journeys`)
+      **Promise broken:** Security (Lars), clarified on 2026-10-18: "a signed-in owner can sign out from the dashboard; a CSRF-protected `POST` ends the session. Sign-in issues no remember-me cookie, so a session ends with the session lifetime or on sign-out. The nightly sync (FR-002) runs on the stored tokens and needs no session."
+      **Logged:** nothing logged — found by review (`.larapilot/docs/security/red-team-v2.0.0.md`)
+
+      **User Story**
+      As the Committed Amateur Runner who owns the instance,
+      I want to sign out, and not stay signed in for a year on every device I used,
+      so that a lost or shared device does not keep owner access to my instance.
+
+      **Demonstrates**
+      Signed in, the dashboard offers "Sign out"; pressing it returns the signed-out dashboard and the next request is a
+      guest. Signing in through Strava sets no `remember_web_*` cookie. The nightly sync still runs for the owner with no
+      session.
+
+      **Steps to Reproduce**
+      1. Sign in with Strava on a shared device.
+      2. Nothing in the UI or `routes/web.php` ends the session.
+      3. `Auth::login($user, remember: true)` (`app/Http/Controllers/Strava/StravaCallbackController.php:124`) sets a remember-me cookie with Laravel's default lifetime of about 400 days, which signs the device back in after the session expires.
+
+      **Expected / Actual**
+      Expected: a sign-out, and no long-lived cookie. Actual: no sign-out; a ~400-day remember-me cookie on every sign-in.
+
+      **Acceptance Criteria**
+      - [ ] Bug fixed — the promise holds again: a CSRF-protected `POST /logout` (named route) logs out, invalidates the session, regenerates the CSRF token, and redirects to the dashboard; a `GET` is not routed; a request without a CSRF token answers 419
+      - [ ] The signed-in dashboard shows a "Sign out" control (a form posting to the route, keyboard reachable, Marika's terse register); guests do not see it
+      - [ ] Sign-in calls `Auth::login` without `remember`, so no `remember_web_*` cookie is set; the callback's existing fixation and open-redirect guarantees stay
+      - [ ] Signing out does not delete or revoke the stored Strava tokens: the nightly sync for that athlete still runs
+      - [ ] Regression tests (Anne): the callback response carries no remember cookie (fails on the current code); `POST /logout` ends the session and the next request is a guest; without a CSRF token it answers 419; a guest posting to it is redirected without error; the sign-out control renders only when signed in
+      - [ ] Developer domain doc `strava-connection.md` updated (sign-out, no remember-me, session lifetime as the bound); `.env.example` comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie (shared with US-017 — whichever lands second updates it); README "Signing in" mentions Sign out
+      - [ ] Root cause named in the fix commit
+      - [ ] No security regression (Lars/Oliver): Oliver re-tests session reuse after sign-out and the absence of the remember cookie
+      - [ ] Factory/seeder — not applicable (no schema change; `remember_token` stays unused)

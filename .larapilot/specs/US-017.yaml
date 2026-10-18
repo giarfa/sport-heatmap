@@ -1,0 +1,50 @@
+code: US-017
+title: 'Fix: a host built from the repository runs a vulnerable http-foundation and development defaults'
+epic:
+  code: EP-004
+  title: Maintenance
+priority: MEDIUM
+points: 2
+status: TODO
+body: |
+  #### US-017: Fix — a host built from the repository runs a vulnerable http-foundation and development defaults
+
+  **Epic:** EP-004 | **Priority:** MEDIUM | **Points:** 2 | **Status:** TODO
+  **Blocked by:** -
+  **Type:** Fix
+  **Severity:** Medium
+  **Security:** Lars/Oliver — yes (OWASP A06, A05, A09; v2.0.0 assessment, two Medium findings, accepted for the v2.0.1 deploy only)
+  **Related:** US-001 (project foundation — introduced `composer.lock` and `.env.example`), US-016 (closed the Boost part of the `.env.example` finding)
+  **Release:** 2.0.2
+  **Found in:** v2.0.0
+  **Traces to:** Technical Architecture › Security (Lars) — no journey (the PRD has no `## User Journeys`)
+  **Promise broken:** Security (Lars), clarified on 2026-10-18: "`composer audit` reports no open advisory on the shipped `composer.lock`, and `.env.example` ships production-safe values (`APP_DEBUG=false`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`, an `https` `APP_URL`), so a host built from it shows no debug page and keeps rotated logs."
+  **Logged:** nothing logged — found by review (`.larapilot/docs/security/v2.0.0.md`, `v2.0.1.md`)
+
+  **User Story**
+  As the Committed Amateur Runner who owns the instance,
+  I want the code I deploy to carry no known-vulnerable package and no development defaults,
+  so that a crafted header cannot tie up my host and a host built from the example file leaks no debug details.
+
+  **Demonstrates**
+  `composer audit` on the branch reports no advisory, and the CI `composer audit` step is green again. A fresh
+  `.env` copied from `.env.example` serves a generic error page on a forced 500 (no stack trace) and writes to a
+  daily log file. The local Herd setup still runs with the development overrides the README names.
+
+  **Steps to Reproduce**
+  1. `composer audit` on `v2.0.1` — PKSA-xmwy-rmx5-m7h4 / CVE-2026-108082 against `symfony/http-foundation` 8.1.6 (fixed in 8.1.7). The `Cache-Control` request header is parsed before routing and throttling (`vendor/symfony/http-foundation/HeaderBag.php:151`), so `curl -H 'Cache-Control: <crafted>' /up` reaches it without signing in.
+  2. `cp .env.example .env` — `APP_ENV=local` (`.env.example:2`), `APP_DEBUG=true` (`:4`), `APP_URL=http://localhost` (`:5`), `LOG_STACK=single` (`:19`), `LOG_LEVEL=debug` (`:21`), `SESSION_SECURE_COOKIE=false` (`:37`).
+  3. Any 500 renders the debug page; the log is one file that never rotates.
+
+  **Expected / Actual**
+  Expected: no advisory on the lock; production-safe example values. Actual: http-foundation 8.1.6; development values in `.env.example`; CI's `composer audit` step fails.
+
+  **Acceptance Criteria**
+  - [ ] Bug fixed — the promise holds again: `symfony/http-foundation` is 8.1.7 or later in `composer.lock` and `composer audit` reports no advisory; only the packages the update needs change in the lock
+  - [ ] `.env.example` ships `APP_ENV=production`, `APP_DEBUG=false`, an `https` `APP_URL`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`; the comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie once US-019 removes it (whichever lands second updates it)
+  - [ ] README: "Local setup on Herd" names the development overrides to set after copying (`APP_ENV=local`, `APP_DEBUG=true`, the Herd `https://….test` `APP_URL`); "Before putting this on a real host" lists the production keys as the example's own values, so the host checklist and the file agree
+  - [ ] Regression test (Anne): reads `.env.example` and fails while `APP_DEBUG` is `true`, `APP_ENV` is `local`, `LOG_STACK` is `single`, `LOG_LEVEL` is `debug`, or `SESSION_SECURE_COOKIE` is `false`; it fails on the current file
+  - [ ] The full suite and `larapilot:quality` pass after the update; CI's `composer audit` step is green
+  - [ ] Root cause named in the fix commit (`fix(deps): …` / `fix(config): …`); no domain behavior changes, so no developer domain doc changes
+  - [ ] No security regression (Lars/Oliver): Oliver re-sends the crafted `Cache-Control` header to `/up` and forces a 500 on a host built from the example file — no stack trace, no environment details
+  - [ ] Factory/seeder — not applicable (no schema change)
