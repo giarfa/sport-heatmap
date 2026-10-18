@@ -1149,11 +1149,11 @@ specs:
       title: Maintenance
     priority: LOW
     points: 2
-    status: PLANNED
+    status: REVIEW
     body: |
       #### US-019: Fix — the owner cannot sign out, and sign-in issues a 400-day remember-me cookie
 
-      **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** PLANNED
+      **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** REVIEW
       **Blocked by:** -
       **Type:** Fix
       **Severity:** Low
@@ -1195,4 +1195,6 @@ specs:
       - [ ] Factory/seeder — not applicable (no schema change; `remember_token` stays unused)
     status_history:
       - { status: PLANNED, at: '2026-10-18T17:17:44+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-18T17:40:28+00:00' }
+      - { status: REVIEW, at: '2026-10-18T17:43:59+00:00' }
     rework: false
