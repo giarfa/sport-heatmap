@@ -1022,11 +1022,11 @@ specs:
       title: Maintenance
     priority: MEDIUM
     points: 2
-    status: TODO
+    status: 'IN PROGRESS'
     body: |
       #### US-017: Fix — a host built from the repository runs a vulnerable http-foundation and development defaults
 
-      **Epic:** EP-004 | **Priority:** MEDIUM | **Points:** 2 | **Status:** TODO
+      **Epic:** EP-004 | **Priority:** MEDIUM | **Points:** 2 | **Status:** IN PROGRESS
       **Blocked by:** -
       **Type:** Fix
       **Severity:** Medium
@@ -1065,6 +1065,10 @@ specs:
       - [ ] Root cause named in the fix commit (`fix(deps): …` / `fix(config): …`); no domain behavior changes, so no developer domain doc changes
       - [ ] No security regression (Lars/Oliver): Oliver re-sends the crafted `Cache-Control` header to `/up` and forces a 500 on a host built from the example file — no stack trace, no environment details
       - [ ] Factory/seeder — not applicable (no schema change)
+    status_history:
+      - { status: PLANNED, at: '2026-10-18T16:04:13+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-18T16:09:25+00:00' }
+    rework: false
   -
     code: US-018
     title: 'Fix: a guest can hammer the Garmin import review, and any page can be framed'

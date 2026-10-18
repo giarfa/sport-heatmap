@@ -1,0 +1,243 @@
+code: US-017
+plan_body: |-
+  **Release:** 2.0.2
+
+  ## Technical Solution
+
+  Two independent root causes, two fix commits, no application code change.
+
+  1. **Vulnerable dependency (OWASP A06).** `composer.lock` pins `symfony/http-foundation` v8.1.6, affected by PKSA-xmwy-rmx5-m7h4 / CVE-2026-108082 (ReDoS in `HeaderUtils::split()` reachable via the `Cache-Control` request header before routing and throttling). Fixed versions available: v8.1.7, v8.1.8, v8.1.9. Fix: `composer update symfony/http-foundation` — lock-only, **without** `--with-all-dependencies`; escalate to `--with-dependencies` only if Composer refuses, and record which extra packages moved and why in the commit body. `composer.json` constraints do not change (the package is a transitive dependency of `laravel/framework`). Acceptance: `git diff composer.lock` touches only `symfony/http-foundation` (plus anything the update provably required) and the `content-hash` stays unchanged.
+  2. **Development defaults in `.env.example` (OWASP A05/A09).** `composer setup` copies `.env.example` to `.env`, so a host built from the repository inherits `APP_ENV=local`, `APP_DEBUG=true`, `APP_URL=http://localhost`, `LOG_STACK=single`, `LOG_LEVEL=debug`, `SESSION_SECURE_COOKIE=false`. Fix: the example ships the production values (`APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://heatmap.example.com`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`); development becomes the explicit opt-in documented in README "Local setup on Herd". `config/logging.php` already rotates `daily` at `LOG_DAILY_DAYS` (default 14), and no code logs at `info`/`debug` that an operator relies on (`SyncStravaActivities` writes console output, not log lines), so `warning` loses nothing.
+
+  **`SESSION_SECURE_COOKIE` comment and US-019.** The spec asks that the comment stop mentioning the remember-me cookie once US-019 removes it, updated by whichever spec lands second. This plan writes the comment (and the matching README row) in wording that is true both before and after US-019 — "keep true on every HTTPS host: without it the sign-in cookies are sent over plain HTTP too" — so US-019 has nothing to update. TASK-02 records this in its commit body so US-019's planner sees it.
+
+  **Out of scope:** application code, config files (`config/*.php` defaults stay as Laravel ships them — the fix is the example file a host is built from), deploy scaffolding (still deferred to `larapilot-ship` per the PRD).
+
+  ## Git & Branching
+  - Mode: GITFLOW (no automatic push)
+  - Release: 2.0.2 — branch `feature/US-017-deps-and-env-defaults` from `release/2.0.2` via `php artisan larapilot:release-feature` (it opens `release/2.0.2`, still `planned`, from `develop`)
+  - TASK-00: bootstrap via `release-feature`
+  - Per task: one atomic commit. Following the US-016 precedent and this spec's acceptance criteria, fix commits carry the root-cause scope: `fix(deps): US-017 TASK-01 …`, `fix(config): US-017 TASK-02 …`; test/chore commits use `test(US-017): TASK-NN …`
+  - Push / remote PR: **skip** unless the user asks; internal PR toward `release/2.0.2`
+  - Merge into `release/2.0.2` after `larapilot-review` approval
+
+  ## Test Data Strategy
+  - No schema, model, or relationship change — factories and seeders are untouched (acceptance criterion: not applicable)
+  - No `migrate:fresh --seed` step: per project memory the dev database is the default SQLite file holding real data; nothing in this spec needs a reseed
+
+  ## Test Strategy
+  - Bar: NORMAL — PHPUnit (the project uses PHPUnit, not Pest), no browser/E2E
+  - New regression test `tests/Feature/Config/EnvironmentExampleTest.php`: parses `.env.example` (lines `KEY=VALUE`, comments and blanks skipped, surrounding quotes stripped) and asserts, via a `#[DataProvider]`, the production value of `APP_ENV`, `APP_DEBUG`, `LOG_STACK`, `LOG_LEVEL`, `SESSION_SECURE_COOKIE`, plus that `APP_URL` parses with scheme `https`. It reads the file — never `env()` — because `phpunit.xml` overrides `APP_ENV` and the test must judge what a host would inherit. Proven red against the pre-fix file before it is committed
+  - Dependency fix is guarded by `composer audit` (already a CI step in `.github/workflows/ci.yml`); no PHPUnit test pins a package version
+  - Gate (TASK-04): `php artisan test --compact`, `php artisan larapilot:quality`, `composer audit` all green
+  - Manual security handoff (Lars/Oliver): re-send a crafted `Cache-Control` header to `/up`; on a copy of the app with `.env` built from `.env.example` (plus `APP_KEY`), force a 500 and confirm a generic error page with no stack trace or environment details, and that `storage/logs/laravel-YYYY-MM-DD.log` is written
+
+  ## Documentation
+  - README "Local setup on Herd" and "Before putting this on a real host" (TASK-02), CHANGELOG `[Unreleased] › Security` (TASK-01, TASK-02)
+  - Developer domain docs: **none** — no domain behavior changes (acceptance criterion)
+
+  ## Risks
+  - `composer update` pulling more than the target package → refuse silently growing the lock; justify any extra package in the commit body
+  - A developer re-running `composer setup` locally now gets production values → README step 3 lists the overrides; their existing `.env` is never overwritten (`file_exists('.env') ||`)
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch for release/2.0.2'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for US-017 on release `2.0.2`: create `feature/US-017-deps-and-env-defaults` from `release/2.0.2` and prepare the internal PR description toward `release/2.0.2`. `release/2.0.2` is still `planned`; `release-feature` opens it from `develop`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `php artisan larapilot:release-feature --semver=2.0.2 --spec=US-017 --slug=deps-and-env-defaults`
+      2. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`.
+      3. Draft internal PR title/body toward `base` (`release/2.0.2`)
+
+      ## Completion Criteria
+      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
+      - [ ] PR title/body drafted toward `release/2.0.2` (not `develop`)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — git only
+
+      ## Git Deliverables
+      - Commit: `chore(US-017): TASK-00 bootstrap feature branch for release/2.0.2` (only if the command did not already leave a commit — an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/2.0.2` — open remote only if the user requests
+    type: Impl
+    status: TODO
+    assignee: Sarah
+    estimate_hours: 0.25
+    dependencies: {}
+  -
+    id: TASK-01
+    title: 'Update symfony/http-foundation to a fixed release (CVE-2026-108082)'
+    body: |-
+      ## Description
+      Fix: `composer.lock` pins `symfony/http-foundation` v8.1.6, affected by PKSA-xmwy-rmx5-m7h4 / CVE-2026-108082 (ReDoS in `HeaderUtils::split()` through the `Cache-Control` request header, reachable unauthenticated before routing and throttling). Update the lock to a fixed release (8.1.7 or later; 8.1.9 is available) touching only the packages the update needs.
+
+      ## Files Involved
+      - composer.lock
+      - CHANGELOG.md
+
+      ## Steps
+      1. `composer update symfony/http-foundation` — no `-W`. If Composer refuses, retry with `--with-dependencies` and note every extra package that moved in the commit body
+      2. `composer show symfony/http-foundation` → version ≥ 8.1.7
+      3. `git diff --stat composer.lock` and inspect: only `symfony/http-foundation` (plus anything step 1 provably required); `content-hash` unchanged; `composer.json` unchanged
+      4. `composer audit` → "No security vulnerability advisories found"
+      5. CHANGELOG `## [Unreleased]` → `### Security`: one line — a crafted `Cache-Control` header can no longer tie up the host (symfony/http-foundation updated, CVE-2026-108082) (US-017)
+      6. `php artisan test --compact`
+
+      ## Completion Criteria
+      - [ ] `symfony/http-foundation` ≥ 8.1.7 in `composer.lock`
+      - [ ] `composer audit` reports no advisory
+      - [ ] Only the packages the update needs changed in the lock; `composer.json` untouched
+      - [ ] CHANGELOG Unreleased Security entry added
+      - [ ] Full suite passes
+
+      ## Test Data
+      - N/A — no model/schema changes
+
+      ## Domain Docs
+      - N/A — dependency update, no domain behavior change (acceptance criterion)
+
+      ## Git Deliverables
+      - Commit: `fix(deps): US-017 TASK-01 update symfony/http-foundation to 8.1.x fixed release (CVE-2026-108082)` — body names the root cause: transitive dependency locked at a version affected by PKSA-xmwy-rmx5-m7h4, a ReDoS reachable through the `Cache-Control` request header before routing
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 0.75
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-02
+    title: 'Ship production-safe values in .env.example and align the README'
+    body: |-
+      ## Description
+      Fix: `.env.example` — which `composer setup` copies to `.env` — ships development defaults, so a host built from it renders the debug page on any 500 and writes one never-rotating debug log. Ship the production values and make development the documented opt-in.
+
+      ## Files Involved
+      - .env.example
+      - README.md ("Local setup on Herd", "Before putting this on a real host")
+      - CHANGELOG.md
+
+      ## Steps
+      1. `.env.example`: `APP_ENV=production` (line 2), `APP_DEBUG=false` (4), `APP_URL=https://heatmap.example.com` (5), `LOG_STACK=daily` (19), `LOG_LEVEL=warning` (21), `SESSION_SECURE_COOKIE=true` (37). Nothing else changes
+      2. Rewrite the comment above `SESSION_SECURE_COOKIE` so it holds before and after US-019 (no remember-me mention): e.g. `# Keep true on every HTTPS host: without it the sign-in cookies are also sent over plain HTTP.`
+      3. README "Local setup on Herd", step 3: after `composer setup` copied the production example, set the development overrides in `.env` — `APP_ENV=local`, `APP_DEBUG=true`, `APP_URL=https://sport-heatmap.test` (optionally `LOG_LEVEL=debug`); keep the note that `APP_URL` must match the Herd domain. `SESSION_SECURE_COOKIE=true` stays, Herd serves HTTPS
+      4. README "Before putting this on a real host": replace "Three settings are not safe at their `.env.example` defaults" with a table of the production keys **as the example's own values** (`APP_ENV=production`, `APP_DEBUG=false`, `APP_URL` = the host's `https` URL, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`) and the instruction to keep them; the `SESSION_SECURE_COOKIE` row's "Why" drops the remember-me wording the same way as step 2. Marika's terse register; the host checklist and the file must agree value for value
+      5. CHANGELOG `## [Unreleased]` → `### Security`: one line — `.env.example` now ships production-safe values; local development sets the overrides listed in the README (US-017)
+      6. `php artisan test --compact` (the suite runs with `phpunit.xml` env, unaffected by `.env.example`)
+
+      ## Completion Criteria
+      - [ ] `.env.example` ships `APP_ENV=production`, `APP_DEBUG=false`, an `https` `APP_URL`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`
+      - [ ] The `SESSION_SECURE_COOKIE` comment and README row no longer mention a remember-me cookie, and stay true once US-019 lands
+      - [ ] README "Local setup on Herd" names the development overrides (`APP_ENV=local`, `APP_DEBUG=true`, Herd `https://….test` `APP_URL`)
+      - [ ] README "Before putting this on a real host" lists the production keys as the example's own values
+      - [ ] CHANGELOG Unreleased Security entry added
+      - [ ] Full suite passes
+
+      ## Test Data
+      - N/A — no model/schema changes
+
+      ## Domain Docs
+      - N/A — configuration example and README only, no domain behavior change (acceptance criterion)
+
+      ## Git Deliverables
+      - Commit: `fix(config): US-017 TASK-02 ship production-safe values in .env.example` — body names the root cause (the example `composer setup` copies to `.env` carried Laravel's development defaults, so a host built from it ran with debug pages and an unrotated debug log) and notes that the `SESSION_SECURE_COOKIE` comment is now US-019-neutral
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 1
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-03
+    title: 'Regression test: .env.example ships production-safe values'
+    body: |-
+      ## Description
+      Add PHPUnit coverage that reads `.env.example` and fails while any development default is back: `APP_DEBUG=true`, `APP_ENV=local`, `LOG_STACK=single`, `LOG_LEVEL=debug`, `SESSION_SECURE_COOKIE=false`, or a non-`https` `APP_URL`.
+
+      ## Files Involved
+      - tests/Feature/Config/EnvironmentExampleTest.php (new — `php artisan make:test --phpunit EnvironmentExampleTest --no-interaction`, then move under `Config/` next to `StravaConfigTest`)
+
+      ## Steps
+      1. Class docblock states why it exists (v2.0.0 assessment, OWASP A05/A09; `composer setup` copies the file to `.env`), in the style of `tests/Unit/ComposerDependenciesTest.php`
+      2. Private helper parses `base_path('.env.example')` into `array<string, string>`: skip blanks and `#` lines, split on the first `=`, strip surrounding double quotes. Read the file — never `env()`/`config()`, which `phpunit.xml` overrides
+      3. `#[DataProvider]` of `array<string, array{string, string}>` key → production value: `APP_ENV`/`production`, `APP_DEBUG`/`false`, `LOG_STACK`/`daily`, `LOG_LEVEL`/`warning`, `SESSION_SECURE_COOKIE`/`true`; one test asserts the key exists and equals the value, with a message naming what a host would inherit
+      4. Separate test: `parse_url($values['APP_URL'], PHP_URL_SCHEME)` is `https`
+      5. Prove red on the pre-fix file: `git show develop:.env.example > .env.example && php artisan test --compact --filter=EnvironmentExampleTest` (expect failures for every key), then `git checkout -- .env.example` and re-run green
+      6. Do **not** add Playwright, Dusk, or browser suites
+
+      ## Completion Criteria
+      - [ ] Test fails on the pre-fix `.env.example` (all six cases) and passes on the fixed one
+      - [ ] Coverage matches the NORMAL bar
+      - [ ] `.env.example` restored to the fixed content before committing
+
+      ## Test Data
+      - N/A — reads a repository file, no factories
+
+      ## Domain Docs
+      - N/A — test only
+
+      ## Git Deliverables
+      - Commit: `test(US-017): TASK-03 guard .env.example against development defaults`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 0.75
+    dependencies:
+      - TASK-02
+  -
+    id: TASK-04
+    title: 'Verification gate and security retest handoff'
+    body: |-
+      ## Description
+      Run the spec's gates on the finished branch and prepare the Lars/Oliver retest notes for review.
+
+      ## Files Involved
+      - (none expected; Pint fixes only if the gate reports them)
+
+      ## Steps
+      1. `php artisan test --compact` — full suite green
+      2. `php artisan larapilot:quality` — Pint + Larastan green; if Pint reports issues, run `vendor/bin/pint --dirty --format agent` and commit as below (never amend an earlier task commit)
+      3. `composer audit` — no advisory (mirrors the CI step in `.github/workflows/ci.yml`)
+      4. `git diff release/2.0.2 --stat` — only `composer.lock`, `.env.example`, `README.md`, `CHANGELOG.md`, the new test
+      5. Write the manual security handoff for review (Lars/Oliver): (a) `curl -H 'Cache-Control: <crafted>' https://sport-heatmap.test/up` returns promptly; (b) on a scratch copy whose `.env` is `.env.example` + `APP_KEY`, force a 500 → generic error page, no stack trace, no environment details; a dated `storage/logs/laravel-YYYY-MM-DD.log` is written. Never run this against the dev database (project memory: default SQLite holds real data)
+
+      ## Completion Criteria
+      - [ ] Full suite passes
+      - [ ] `larapilot:quality` passes
+      - [ ] `composer audit` reports no advisory
+      - [ ] Branch diff limited to the files above
+      - [ ] Manual security retest steps recorded for review
+
+      ## Test Data
+      - N/A — verification only
+
+      ## Domain Docs
+      - N/A — no domain behavior change
+
+      ## Git Deliverables
+      - Commit: none expected; if the quality gate required formatting, `chore(US-017): TASK-04 apply Pint formatting`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: finalize local PR body toward `release/2.0.2` with the gate results
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 0.5
+    dependencies:
+      - TASK-01
+      - TASK-03
+updated_at: '2026-10-18T16:04:13+00:00'
