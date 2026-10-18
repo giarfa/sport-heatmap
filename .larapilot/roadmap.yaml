@@ -7,4 +7,14 @@ versions:
     items:
       US-016:
         title: 'Developer dashboard removed from deployed sites'
-updated_at: '2026-10-18T13:47:27+00:00'
+  2.0.2:
+    title: 'Security fixes'
+    summary: 'Safer defaults for a new host, a protected import review, and a way to sign out.'
+    items:
+      US-017:
+        title: 'Safe settings for a new host'
+      US-018:
+        title: 'Import review protected from overload; pages cannot be framed'
+      US-019:
+        title: 'Sign out, and no year-long sign-in cookie'
+updated_at: '2026-10-18T18:06:18+00:00'
