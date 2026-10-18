@@ -870,4 +870,56 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-18T13:47:31+00:00'
+  -
+    id: 8edc7626e129ebc7
+    ts: '2026-10-18T13:51:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'v2.0.0 red-team low findings'
+    label: 'v2.0.0 red-team low findings'
+    value: 'Waived before the v2.0.1 deploy; review throttle, security headers and logout/remember cookie move to 2.0.2'
+    question: null
+    rationale: 'Owner chose to deploy the High fix now on a private host'
+    source: askquestion
+    spec: null
+    supersedes: 0a21f31052862439
+  -
+    id: d03a644596851f9f
+    ts: '2026-10-18T13:51:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'vulnerable dependencies v2.0.0'
+    label: 'vulnerable dependencies v2.0.0'
+    value: 'symfony/http-foundation CVE-2026-108082 (Medium) accepted for the v2.0.1 deploy, mitigated by private access; update in 2.0.2'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: ed90994bbfc7111a
+  -
+    id: 4947d5313e52d37a
+    ts: '2026-10-18T13:51:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'env example hardening'
+    label: 'env example hardening'
+    value: 'Accepted for the v2.0.1 deploy: production values set on the host (APP_ENV, APP_DEBUG, LOG_*, SESSION_SECURE_COOKIE, APP_URL); .env.example hardening moves to 2.0.2'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: 81488d7e18ce9e86
+  -
+    id: e07384d363988cd8
+    ts: '2026-10-18T13:51:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'v2.0.1 ship gate'
+    label: 'v2.0.1 ship gate'
+    value: 'GO — accept both Mediums, deploy v2.0.1 now; all five open fixes go to 2.0.2'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-10-18T13:51:41+00:00'
