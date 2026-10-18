@@ -55,9 +55,9 @@ tasks:
       4. Draft the internal PR title/body toward `base` (`release/2.0.1`): title `fix(deps): ship Larapilot as a development dependency (US-016)`; body cites the v2.0.0 High finding (`.larapilot/docs/security/v2.0.0.md`) and leaves a placeholder for the TASK-03 evidence
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] Current branch is `feature/US-016-larapilot-dev-dependency`, based on `release/2.0.1`
-      - [ ] PR title/body drafted toward `release/2.0.1` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] Current branch is `feature/US-016-larapilot-dev-dependency`, based on `release/2.0.1`
+      - [x] PR title/body drafted toward `release/2.0.1` (not `develop`)
 
       ## Test Data
       - N/A — git only
@@ -70,10 +70,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally toward `release/2.0.1` — open remote only if the user requests
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
+    commit:
+      sha: d78d8721335480c9f44bb3fda8cfbc05fd999b9a
+      short_sha: d78d872
+      subject: 'chore(US-016): TASK-00 bootstrap feature branch for release/2.0.1'
+      committed_at: '2026-10-18T15:18:47+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d78d8721335480c9f44bb3fda8cfbc05fd999b9a'
   -
     id: TASK-01
     title: 'Regression test, then move Larapilot to require-dev and refresh the lock'
@@ -102,12 +108,12 @@ tasks:
       9. `CHANGELOG.md` `[Unreleased]` → `### Security`: the developer dashboard and Boost are development-only dependencies; deployments with `composer install --no-dev` no longer register `/larapilot/*`
 
       ## Completion Criteria
-      - [ ] Regression test observed red on the pre-fix manifest, green after
-      - [ ] `andreapollastri/larapilot` under `require-dev` with constraint `^5.0`; absent from `require`
-      - [ ] `composer.lock`: `andreapollastri/larapilot`, `laravel/boost`, `laravel/mcp` in `packages-dev`, none in `packages`; no locked version changed
-      - [ ] Local dev install still discovers Larapilot; `php artisan larapilot:*` runs; `/larapilot` opens on Herd
-      - [ ] Full suite and `larapilot:quality` green
-      - [ ] CHANGELOG `[Unreleased]` updated
+      - [x] Regression test observed red on the pre-fix manifest, green after
+      - [x] `andreapollastri/larapilot` under `require-dev` with constraint `^5.0`; absent from `require`
+      - [x] `composer.lock`: `andreapollastri/larapilot`, `laravel/boost`, `laravel/mcp` in `packages-dev`, none in `packages`; no locked version changed
+      - [x] Local dev install still discovers Larapilot; `php artisan larapilot:*` runs; `/larapilot` opens on Herd
+      - [x] Full suite and `larapilot:quality` green
+      - [x] CHANGELOG `[Unreleased]` updated
 
       ## Test Data
       - N/A — no model or schema change
@@ -120,11 +126,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Fix
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 1.5
     dependencies:
       - TASK-00
+    commit:
+      sha: 29a8c965d6a18f5f13685f7640ceba4edff48b03
+      short_sha: 29a8c96
+      subject: 'fix(deps): US-016 TASK-01 move andreapollastri/larapilot to require-dev'
+      committed_at: '2026-10-18T15:20:12+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/29a8c965d6a18f5f13685f7640ceba4edff48b03'
   -
     id: TASK-02
     title: 'README: deployments run composer install --no-dev'
@@ -142,9 +154,9 @@ tasks:
       4. Keep the README's existing voice (plain prose, reasons stated, no marketing)
 
       ## Completion Criteria
-      - [ ] README states every deployment runs `composer install --no-dev --optimize-autoloader`, with the reason
-      - [ ] README gives the `route:list --path=larapilot` check
-      - [ ] Host-key table unchanged
+      - [x] README states every deployment runs `composer install --no-dev --optimize-autoloader`, with the reason
+      - [x] README gives the `route:list --path=larapilot` check
+      - [x] Host-key table unchanged
 
       ## Test Data
       - N/A — documentation only
@@ -157,11 +169,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 0.5
     dependencies:
       - TASK-00
+    commit:
+      sha: 7ea318949858872d0e9d4c41b5d052150cf7f43e
+      short_sha: 7ea3189
+      subject: 'chore(US-016): TASK-02 document --no-dev deployments in the README'
+      committed_at: '2026-10-18T15:20:48+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/7ea318949858872d0e9d4c41b5d052150cf7f43e'
   -
     id: TASK-03
     title: 'Verify a --no-dev install: no /larapilot route, 404s, suite green after dev install'
@@ -187,11 +205,11 @@ tasks:
       7. Paste the evidence (commands and one-line results, not full output) into the local PR body under `## Verification (--no-dev)`
 
       ## Completion Criteria
-      - [ ] After `composer install --no-dev`: no `/larapilot*` route, no Boost/MCP route, Larapilot/Boost/MCP absent from `vendor/`
-      - [ ] `/larapilot`, the probed `/larapilot/api/*` routes and the `.env`/dump endpoints return 404 unauthenticated (Oliver's re-test)
-      - [ ] `package:discover` and the full suite pass after the subsequent dev install
-      - [ ] Worktree removed; main working copy, its `vendor/` and its SQLite database untouched
-      - [ ] Evidence recorded in the PR body
+      - [x] After `composer install --no-dev`: no `/larapilot*` route, no Boost/MCP route, Larapilot/Boost/MCP absent from `vendor/`
+      - [x] `/larapilot`, the probed `/larapilot/api/*` routes and the `.env`/dump endpoints return 404 unauthenticated (Oliver's re-test)
+      - [x] `package:discover` and the full suite pass after the subsequent dev install
+      - [x] Worktree removed; main working copy, its `vendor/` and its SQLite database untouched
+      - [x] Evidence recorded in the PR body
 
       ## Test Data
       - N/A — the worktree uses its own empty SQLite file; no factory or seeder change
@@ -204,10 +222,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR body with the evidence
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 1
     dependencies:
       - TASK-01
       - TASK-02
-updated_at: '2026-10-18T12:11:20+00:00'
+    commit:
+      sha: 20831a39a95c0043607195ee6098f4c942d59e84
+      short_sha: 20831a3
+      subject: 'chore(US-016): TASK-03 record --no-dev verification'
+      committed_at: '2026-10-18T15:23:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/20831a39a95c0043607195ee6098f4c942d59e84'
+updated_at: '2026-10-18T13:23:40+00:00'

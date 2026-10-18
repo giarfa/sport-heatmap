@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- The Larapilot developer dashboard and Laravel Boost are development-only dependencies. A
+  deployment installed with `composer install --no-dev` no longer carries them, so `/larapilot/*`
+  is not registered and nothing under it can read `.env`, download the database, or write files,
+  whatever `APP_ENV` says (US-016).
+
 ## [2.0.0] - 2026-10-17
 
 Window navigation, a weekly distance chart, per-run metrics in a day detail, and a Garmin CSV
