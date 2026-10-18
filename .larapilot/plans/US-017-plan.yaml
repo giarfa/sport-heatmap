@@ -56,8 +56,8 @@ tasks:
       3. Draft internal PR title/body toward `base` (`release/2.0.2`)
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] PR title/body drafted toward `release/2.0.2` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/2.0.2` (not `develop`)
 
       ## Test Data
       - N/A — git only
@@ -70,10 +70,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally toward `release/2.0.2` — open remote only if the user requests
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.25
     dependencies: {}
+    commit:
+      sha: 065802a983497640c0351cd50686d97a0e7bd238
+      short_sha: 065802a
+      subject: 'chore(US-017): TASK-00 bootstrap feature branch for release/2.0.2'
+      committed_at: '2026-10-18T18:09:31+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/065802a983497640c0351cd50686d97a0e7bd238'
   -
     id: TASK-01
     title: 'Update symfony/http-foundation to a fixed release (CVE-2026-108082)'
@@ -94,11 +100,11 @@ tasks:
       6. `php artisan test --compact`
 
       ## Completion Criteria
-      - [ ] `symfony/http-foundation` ≥ 8.1.7 in `composer.lock`
-      - [ ] `composer audit` reports no advisory
-      - [ ] Only the packages the update needs changed in the lock; `composer.json` untouched
-      - [ ] CHANGELOG Unreleased Security entry added
-      - [ ] Full suite passes
+      - [x] `symfony/http-foundation` ≥ 8.1.7 in `composer.lock`
+      - [x] `composer audit` reports no advisory
+      - [x] Only the packages the update needs changed in the lock; `composer.json` untouched
+      - [x] CHANGELOG Unreleased Security entry added
+      - [x] Full suite passes
 
       ## Test Data
       - N/A — no model/schema changes
@@ -111,11 +117,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 0.75
     dependencies:
       - TASK-00
+    commit:
+      sha: d22b8bdbfc43e312f252be851bdd212dc2f27f3b
+      short_sha: d22b8bd
+      subject: 'fix(deps): US-017 TASK-01 update symfony/http-foundation to 8.1.x fixed release (CVE-2026-108082)'
+      committed_at: '2026-10-18T18:09:59+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d22b8bdbfc43e312f252be851bdd212dc2f27f3b'
   -
     id: TASK-02
     title: 'Ship production-safe values in .env.example and align the README'
@@ -137,12 +149,12 @@ tasks:
       6. `php artisan test --compact` (the suite runs with `phpunit.xml` env, unaffected by `.env.example`)
 
       ## Completion Criteria
-      - [ ] `.env.example` ships `APP_ENV=production`, `APP_DEBUG=false`, an `https` `APP_URL`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`
-      - [ ] The `SESSION_SECURE_COOKIE` comment and README row no longer mention a remember-me cookie, and stay true once US-019 lands
-      - [ ] README "Local setup on Herd" names the development overrides (`APP_ENV=local`, `APP_DEBUG=true`, Herd `https://….test` `APP_URL`)
-      - [ ] README "Before putting this on a real host" lists the production keys as the example's own values
-      - [ ] CHANGELOG Unreleased Security entry added
-      - [ ] Full suite passes
+      - [x] `.env.example` ships `APP_ENV=production`, `APP_DEBUG=false`, an `https` `APP_URL`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`
+      - [x] The `SESSION_SECURE_COOKIE` comment and README row no longer mention a remember-me cookie, and stay true once US-019 lands
+      - [x] README "Local setup on Herd" names the development overrides (`APP_ENV=local`, `APP_DEBUG=true`, Herd `https://….test` `APP_URL`)
+      - [x] README "Before putting this on a real host" lists the production keys as the example's own values
+      - [x] CHANGELOG Unreleased Security entry added
+      - [x] Full suite passes
 
       ## Test Data
       - N/A — no model/schema changes
@@ -155,11 +167,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 1
     dependencies:
       - TASK-00
+    commit:
+      sha: d71840bb0c3be0d9315328d8b7d3d64e58ba7a15
+      short_sha: d71840b
+      subject: 'fix(config): US-017 TASK-02 ship production-safe values in .env.example'
+      committed_at: '2026-10-18T18:10:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d71840bb0c3be0d9315328d8b7d3d64e58ba7a15'
   -
     id: TASK-03
     title: 'Regression test: .env.example ships production-safe values'
@@ -179,9 +197,9 @@ tasks:
       6. Do **not** add Playwright, Dusk, or browser suites
 
       ## Completion Criteria
-      - [ ] Test fails on the pre-fix `.env.example` (all six cases) and passes on the fixed one
-      - [ ] Coverage matches the NORMAL bar
-      - [ ] `.env.example` restored to the fixed content before committing
+      - [x] Test fails on the pre-fix `.env.example` (all six cases) and passes on the fixed one
+      - [x] Coverage matches the NORMAL bar
+      - [x] `.env.example` restored to the fixed content before committing
 
       ## Test Data
       - N/A — reads a repository file, no factories
@@ -194,11 +212,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 0.75
     dependencies:
       - TASK-02
+    commit:
+      sha: facc3145b6f874335e8a1fec96c92b153646da66
+      short_sha: facc314
+      subject: 'test(US-017): TASK-03 guard .env.example against development defaults'
+      committed_at: '2026-10-18T18:10:42+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/facc3145b6f874335e8a1fec96c92b153646da66'
   -
     id: TASK-04
     title: 'Verification gate and security retest handoff'
@@ -217,11 +241,11 @@ tasks:
       5. Write the manual security handoff for review (Lars/Oliver): (a) `curl -H 'Cache-Control: <crafted>' https://sport-heatmap.test/up` returns promptly; (b) on a scratch copy whose `.env` is `.env.example` + `APP_KEY`, force a 500 → generic error page, no stack trace, no environment details; a dated `storage/logs/laravel-YYYY-MM-DD.log` is written. Never run this against the dev database (project memory: default SQLite holds real data)
 
       ## Completion Criteria
-      - [ ] Full suite passes
-      - [ ] `larapilot:quality` passes
-      - [ ] `composer audit` reports no advisory
-      - [ ] Branch diff limited to the files above
-      - [ ] Manual security retest steps recorded for review
+      - [x] Full suite passes
+      - [x] `larapilot:quality` passes
+      - [x] `composer audit` reports no advisory
+      - [x] Branch diff limited to the files above
+      - [x] Manual security retest steps recorded for review
 
       ## Test Data
       - N/A — verification only
@@ -234,10 +258,10 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize local PR body toward `release/2.0.2` with the gate results
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 0.5
     dependencies:
       - TASK-01
       - TASK-03
-updated_at: '2026-10-18T16:04:13+00:00'
+updated_at: '2026-10-18T16:10:57+00:00'
