@@ -58,7 +58,9 @@ restricted to an explicit allowlist of athlete ids.
    ```
 
    `composer run dev` is also available: it runs the PHP server, queue listener, log tail and
-   Vite together for people who prefer `php artisan serve` over Herd.
+   Vite together for people who prefer `php artisan serve` over Herd. That server answers on plain
+   HTTP, where browsers drop `Secure` cookies, so set `SESSION_SECURE_COOKIE=false` in `.env` for
+   that setup only.
 
 ## Registering the Strava application
 

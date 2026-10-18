@@ -11,7 +11,7 @@ use Tests\TestCase;
  * `composer setup` copies the file to `.env`, so every value in it is what a freshly built
  * host runs with: a debug page on any 500, one never-rotating debug log, cookies that also
  * travel over plain HTTP (v2.0.0 assessment, OWASP A05/A09). The file is read directly —
- * `env()` and `config()` are overridden by `phpunit.xml` and would prove nothing.
+ * the running suite takes its values from `phpunit.xml`, not from `.env.example`.
  */
 class EnvironmentExampleTest extends TestCase
 {
