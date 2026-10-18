@@ -93,7 +93,13 @@ class HeatmapGridCacheTest extends TestCase
 
     public function test_a_different_calendar_day_produces_a_different_cache_key(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        /*
+         * The token must outlive the jump to the next day: an expired one makes the
+         * dashboard refresh it over HTTP, the stray request is rejected, and the page
+         * becomes a 500. With APP_DEBUG on, that debug page happens to contain the
+         * asserted distance, so the failure stays hidden until debug is off.
+         */
+        $athlete = $this->allowlistedAthlete(['strava_token_expires_at' => now()->addDays(2)]);
         $this->actingAs($athlete);
         $this->getDashboard()->assertOk();
 

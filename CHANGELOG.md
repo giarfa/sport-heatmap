@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- A crafted `Cache-Control` header can no longer tie up the host: `symfony/http-foundation` is
+  updated to a release that fixes CVE-2026-108082 (US-017).
+- `.env.example` now ships production-safe values (`APP_ENV=production`, `APP_DEBUG=false`,
+  `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`, an `https` `APP_URL`), so a
+  host built from it shows no debug page and keeps rotated logs. Local development sets the
+  overrides listed in the README (US-017).
+
 ## [2.0.1] - 2026-10-18
 
 ### Security
