@@ -1,0 +1,329 @@
+code: US-019
+plan_body: |-
+  **Release:** 2.0.2
+
+  ## Technical Solution
+
+  One Low finding from the v2.0.0 assessment (OWASP A07, `.larapilot/docs/security/red-team-v2.0.0.md` → "There is no sign-out, and a remember-me cookie is always issued"), fixed as two separate changes on one branch. Traces to FR-001 and Technical Architecture › Security (Lars) › Sign-out.
+
+  **Root cause:** US-002 signed the owner in with `Auth::login($user, remember: true)` (`app/Http/Controllers/Strava/StravaCallbackController.php:124`) and added no route that ends a session. The `remember_web_*` recaller uses Laravel's default lifetime (about 400 days) and signs a device back in after the 120-minute session expires, so the session lifetime never bounded access.
+
+  ### 1. No remember-me cookie on sign-in
+  - `StravaCallbackController`: `Auth::login($user)`, with no `remember`. Add a block comment on why: the session lifetime (`SESSION_LIFETIME=120`) is the only bound; a recaller would outlive it by a year; the nightly sync needs no session. The existing fixation comment (`Auth::login` migrates the session id) and the literal `route('dashboard')` redirect (no `intended()`) stay as they are.
+  - `app/Http/Middleware/EnsureFreshStravaToken.php`: keep `endSession()` exactly as it is, but reword the two comments that say sign-in *mints* a remember-me cookie. After this fix the app never issues one; `Auth::logout()` still drops one a browser kept from before 2.0.2, which is why the teardown does not change.
+  - **Cookies issued before 2.0.2:** browsers that already hold a recaller keep signing in until it is revoked. `SessionGuard::logout()` cycles `users.remember_token` when it is set, so **one sign-out on any device revokes every older recaller**. This goes in the domain doc and in the Oliver re-test handoff ("after deploy, sign out once"). No migration and no forced token wipe: `remember_token` stays in the schema, unused (AC).
+
+  ### 2. Sign-out
+  - New single-action controller `app/Http/Controllers/SignOutController.php` (`php artisan make:controller SignOutController --invokable --no-interaction`). It sits flat beside `DashboardController` and not under `Strava/`, because the session belongs to the app, not to the integration (`.ai/rules/app.md`). `__invoke(Request $request): RedirectResponse` calls `Auth::logout()`, `$request->session()->invalidate()`, `$request->session()->regenerateToken()`, then `redirect()->route('dashboard')`. These are the same three teardown calls `EnsureFreshStravaToken::endSession()` makes; the controller doesn't share them through a helper, because two three-line call sites aren't worth a new class.
+  - `routes/web.php`: `Route::post('/logout', SignOutController::class)->name('logout');`, with a block comment on what each choice avoids:
+    - **POST only** (AC). A `GET /logout` answers 405, so a link, a prefetch, or an `<img>` on another site can't sign the owner out.
+    - **CSRF** comes from the `web` group, so a request with no token answers 419.
+    - **No `auth` middleware.** A guest would be redirected to `route('login')`, which doesn't exist, and the result is a 500. Signing out is idempotent instead, so a guest who posts gets a fresh session and the dashboard with no error (AC).
+    - **No `strava.fresh`.** Signing out must not refresh a Strava token or depend on Strava being reachable.
+    - **No throttle.** The route does no work beyond what any web request costs.
+  - **Strava tokens are kept.** `Auth::logout()` touches only the session and `remember_token`. `strava_access_token`, `strava_refresh_token` and `strava_token_expires_at` stay, so `strava:sync` (FR-002) still runs for the athlete (AC). Sign-out is not deauthorisation, which is FR-012.
+
+  ### 3. Sign-out control on the dashboard
+  - `resources/views/dashboard.blade.php`: in the `@else` (signed-in) branch of the "ways in" text line under the map, after "Import Garmin CSV", add ` · ` (`aria-hidden` separator, same as the guest branch) and `<form method="POST" action="{{ route('logout') }}" class="inline">@csrf<button type="submit" class="inline-flex min-h-11 items-center underline underline-offset-2" style="color: var(--accent);">Sign out</button></form>`. A native `<button>` is keyboard reachable and announced as a button; the 44 px target (`min-h-11`), the accent token, and both themes come from the existing link idiom. Guests don't get it. Update the Blade comment above the line.
+  - **Placement:** the text line, not the header. The layout comment already records that the 375 px header has no width for a second control and that there is no nav. Copy (Marika, terse register): "Sign out". The control ends the session, so the label is a verb. No confirmation dialog and no flash notice: the reloaded page shows "Owner? Connect with Strava", which tells the owner they are signed out.
+  - **Design:** this is no new screen, so there is no new mockup. The line mirrors the latest dashboard mockup `.larapilot/mockups/US-014/index.html` (ways-in line) and adds one control built from the same link idiom (Tailwind tokens, `heatmap-dashboard` design system). This addition is required by the AC; it is not a deviation.
+
+  ### Out of scope
+  - Strava deauthorisation (FR-012), token deletion, a "sign out of all devices" control, a custom session lifetime, and a header/nav redesign. No schema change, no new dependency.
+  - `.env.example`: US-017 (already merged into `release/2.0.2`) reworded the `SESSION_SECURE_COOKIE` comment to "the sign-in cookies", and the README env table already says the same. This spec **verifies** that no remember-me mention is left (TASK-05) and edits the file only if one is found.
+
+  ## Git & Branching
+  - Mode: GITFLOW (no automatic push)
+  - Release: 2.0.2. TASK-00 runs `php artisan larapilot:release-feature --semver=2.0.2 --spec=US-019 --slug=sign-out-no-remember-me`, which creates `feature/US-019-sign-out-no-remember-me` from `release/2.0.2`
+  - **Before TASK-00:** the working tree is on `feature/US-018-garmin-review-throttle-and-headers`, with uncommitted Larapilot artifacts (backlog, decisions, US-018 spec, usage ledger, the plan lock). Commit them on the US-018 branch first, or `release-feature` refuses to check out (`checked_out: false`)
+  - US-018 is in REVIEW and not yet merged into `release/2.0.2`. Both specs touch `routes/web.php` and `CHANGELOG.md` `[Unreleased] › Security`. Whichever merges second runs `php artisan larapilot:release-sync --semver=2.0.2` or resolves the conflict (Sarah). The two hunks are independent
+  - Per task: one Conventional Commit `type(US-019): TASK-NN …`; the fix commits (TASK-01, TASK-03) name the root cause in the body
+  - PR toward `release/2.0.2` (not `develop`), prepared locally; push and remote PR only if the user asks
+  - Merge into `release/2.0.2` after `larapilot-review` approval
+
+  ## Test Data Strategy
+  - No model, migration, or relationship change. `remember_token` stays unused, so `UserFactory`, `ActivityFactory`, `SyncRunFactory`, and the seeders are unchanged (AC: factory/seeder not applicable)
+  - Tests sign the owner in with `allowlistedAthlete()` from `Tests\TestCase` (`.ai/rules/tests.md`), never a bare factory user, so `strava.fresh` keeps exercising the allowlist
+  - Sync-after-sign-out uses the existing Strava HTTP fakes with `Http::preventStrayRequests()` in `setUp()`
+
+  ## Test Strategy
+  - Bar: NORMAL. PHPUnit feature tests, no browser/Dusk/E2E
+  - **Remember cookie (TASK-02):** in `StravaConnectFlowTest`, a successful callback response carries no cookie named `Auth::guard()->getRecallerName()` (`remember_web_*`), and the `users.remember_token` of the athlete stays null. This fails on the current code. The existing fixation (session id changes) and literal-dashboard-redirect tests stay green
+  - **Sign-out (TASK-04):** new `tests/Feature/Strava/SignOutTest.php` (`php artisan make:test --phpunit SignOutTest`, moved under `Strava/` beside the connect tests):
+    - `POST /logout` signed in ends the session (`assertGuest`), redirects to `dashboard`, changes the session id and the CSRF token, and the next `GET /` renders as a guest ("Connect with Strava" shown, "Sign out" not)
+    - `GET /logout` → 405
+    - with no CSRF token → 419. Tests skip CSRF (`PreventRequestForgery::runningUnitTests()`), so this test binds an anonymous subclass of `Illuminate\Foundation\Http\Middleware\PreventRequestForgery` that returns `false` there, and sends no `Sec-Fetch-Site` header (`hasValidOrigin` would let a same-origin request through)
+    - a guest posting → redirect to `dashboard`, no exception
+    - after sign-out the athlete's Strava token columns are unchanged and `strava:sync` completes a successful `SyncRun` for that athlete against the faked API
+    - a signed-in owner who held a pre-fix recaller has `remember_token` cycled by the sign-out
+  - **Control (TASK-04):** in `tests/Feature/Dashboard/PublicDashboardTest.php` (or `SignOutTest`): signed in, `GET /` renders a form with `action` = `route('logout')`, method POST, a `_token` field, and a "Sign out" button; as a guest, neither
+  - Regression: `tests/Feature/Strava`, `tests/Feature/Dashboard`, `tests/Feature/Routing` stay green, then the full suite
+  - **Manual test handoff (Oliver re-test):** sign in, copy the session cookie, sign out, replay the old cookie → guest. Sign in and check DevTools for no `remember_web_*` cookie. On a browser that holds a pre-2.0.2 recaller, sign out once and confirm it no longer signs back in. At 375 px the ways-in line wraps cleanly and "Sign out" stays a 44 px target in both themes
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch on release/2.0.2'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for this spec on release `2.0.2`: create `feature/US-019-sign-out-no-remember-me` from `release/2.0.2` and prepare the internal PR description toward `release/2.0.2`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. The tree must be clean: the uncommitted Larapilot artifacts on `feature/US-018-garmin-review-throttle-and-headers` (`.larapilot/backlog.yaml`, `decisions.yaml`, `specs/US-018.yaml`, `usage/ledger.jsonl`, `plans/US-018-plan.yaml.lock`) are committed on that branch first (`chore(US-018): …`)
+      2. `php artisan larapilot:release-feature --semver=2.0.2 --spec=US-019 --slug=sign-out-no-remember-me`
+      3. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`
+      4. Draft internal PR title/body toward `base` (`release/2.0.2`): `fix(US-019): sign-out and no remember-me cookie`, with a note that `routes/web.php` and `CHANGELOG.md` overlap US-018 (independent hunks)
+
+      ## Completion Criteria
+      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
+      - [ ] PR title/body drafted toward `release/2.0.2` (not `develop`)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — no behavior change
+
+      ## Git Deliverables
+      - Commit: `chore(US-019): TASK-00 bootstrap feature branch for release/2.0.2` (only if the command did not already leave you on the new branch with a commit — an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/2.0.2` — open remote only if user requests
+    type: Impl
+    status: TODO
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+  -
+    id: TASK-01
+    title: 'Sign in without a remember-me cookie'
+    body: |-
+      ## Description
+      Fix: the Strava callback stops issuing a ~400-day `remember_web_*` cookie, so a session ends with the session lifetime or on sign-out (AC 3).
+
+      ## Files Involved
+      - app/Http/Controllers/Strava/StravaCallbackController.php
+      - app/Http/Middleware/EnsureFreshStravaToken.php (comments only)
+      - .larapilot/docs/devs/strava-connection.md
+      - .larapilot/docs/devs/README.md
+      - CHANGELOG.md
+
+      ## Steps
+      1. `StravaCallbackController` line 124: `Auth::login($user)`. Add to the block comment above it why there is no `remember`: `SESSION_LIFETIME` is the only bound on a signed-in device, a recaller outlives it by about 400 days and signs a lost or shared device back in, and the nightly sync runs on the stored tokens and needs no session. Keep the fixation comment and the literal `route('dashboard')` redirect unchanged
+      2. `EnsureFreshStravaToken`: reword the allowlist comment ("the session plus the remember-me cookie it mints") and the `endSession()` PHPDoc. The app no longer mints a recaller; `Auth::logout()` still drops one a browser kept from before 2.0.2, so the teardown code stays as it is
+      3. `CHANGELOG.md` `[Unreleased] › Security`: "Signing in no longer sets a year-long remember-me cookie; a session now ends with the session lifetime (US-019)."
+      4. `php artisan test --compact tests/Feature/Strava` and `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] `Auth::login` is called without `remember`; no other change to the callback's gate order, fixation, or redirect
+      - [ ] Middleware comments describe the post-fix behavior; `endSession()` code unchanged
+      - [ ] CHANGELOG entry added
+      - [ ] Strava suite green
+
+      ## Test Data
+      - N/A — no model/schema change; `remember_token` stays in the schema, unused
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/strava-connection.md`: the functional flow step that says `Auth::login($user, remember: true)` becomes `Auth::login($user)`. The middleware step and the "Allowlist re-checked on every authenticated request" row no longer claim the app mints a remember-me cookie. Add an Architectural choices row "No remember-me cookie — session lifetime is the bound", with "`remember: true` (US-002)" as the rejected alternative and why. Add a gotcha: recallers issued before 2.0.2 stay valid until one sign-out cycles `remember_token`
+      - [ ] Folder `README.md` index row: last updated by US-019
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `fix(US-019): TASK-01 sign in without a remember-me cookie`. The body names the root cause: `Auth::login($user, remember: true)` from US-002 issued a recaller with Laravel's default ~400-day lifetime, which outlived the 120-minute session
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 1
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-02
+    title: 'Regression test: the callback sets no remember cookie'
+    body: |-
+      ## Description
+      Add PHPUnit coverage proving a successful Strava sign-in sets no `remember_web_*` cookie (AC 5, first bullet). The test must fail on the pre-fix code.
+
+      ## Files Involved
+      - tests/Feature/Strava/StravaConnectFlowTest.php
+
+      ## Steps
+      1. Reuse the existing successful-callback setup in `StravaConnectFlowTest` (faked token exchange, `Http::preventStrayRequests()`, allowlisted athlete id, minted state in the session). Don't duplicate factory definitions
+      2. New test, e.g. `test_a_successful_sign_in_sets_no_remember_me_cookie`: the response has no cookie named `Auth::guard()->getRecallerName()` (`assertCookieMissing`), and the athlete's `remember_token` is still null
+      3. Confirm it fails against `remember: true` by reverting TASK-01's call locally and restoring it, then confirm it passes
+      4. The existing session-fixation and literal-dashboard-redirect assertions stay green and unchanged
+      5. `php artisan test --compact tests/Feature/Strava/StravaConnectFlowTest.php`
+      6. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites
+
+      ## Completion Criteria
+      - [ ] Test passes on the fix and was seen failing on the old call
+      - [ ] Coverage matches the `NORMAL` bar
+
+      ## Test Data
+      - N/A — existing factories only
+
+      ## Domain Docs
+      - N/A — tests only
+
+      ## Git Deliverables
+      - Commit: `test(US-019): TASK-02 cover sign-in without a remember-me cookie`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 0.5
+    dependencies:
+      - TASK-01
+  -
+    id: TASK-03
+    title: 'POST /logout and the Sign out control on the dashboard'
+    body: |-
+      ## Description
+      Fix: add a CSRF-protected `POST /logout` (named `logout`) that ends the session and keeps the Strava tokens, and a "Sign out" control on the signed-in dashboard (AC 1, 2, 4).
+
+      ## Files Involved
+      - app/Http/Controllers/SignOutController.php (new)
+      - routes/web.php
+      - resources/views/dashboard.blade.php
+      - README.md
+      - CHANGELOG.md
+      - .larapilot/docs/devs/strava-connection.md
+      - .larapilot/docs/devs/heatmap-dashboard.md
+      - .larapilot/docs/devs/README.md
+
+      ## Mirrors
+      - `.larapilot/mockups/US-014/index.html`: the "ways in" text line under the map. The control is added with the same link idiom (Tailwind design system, `--accent` token, `min-h-11`). There is no new mockup and nothing deviates from it
+
+      ## Steps
+      1. `php artisan make:controller SignOutController --invokable --no-interaction`. `__invoke(Request $request): RedirectResponse` calls `Auth::logout()`, `$request->session()->invalidate()`, `$request->session()->regenerateToken()`, then `return redirect()->route('dashboard');`. Add a PHPDoc on why it is idempotent (a guest gets a fresh session and the dashboard) and why it never touches the Strava token columns (sign-out is not deauthorisation, FR-012; the nightly sync runs on them)
+      2. `routes/web.php`: `Route::post('/logout', SignOutController::class)->name('logout');` outside the Strava and Garmin groups. Add a block comment: POST only, so a cross-site link or prefetch can't sign the owner out; CSRF comes from the `web` group; no `auth` middleware, because no `login` route exists and a guest would get a 500; no `strava.fresh`, because signing out must not reach Strava; no throttle, because the route does no work
+      3. `dashboard.blade.php`: in the signed-in `@else` branch of the ways-in line, after the Import Garmin CSV link, add `<span aria-hidden="true">·</span>` and `<form method="POST" action="{{ route('logout') }}" class="inline">@csrf<button type="submit" class="inline-flex min-h-11 items-center underline underline-offset-2" style="color: var(--accent);">Sign out</button></form>`. Update the Blade comment above the line to say a signed-in owner also gets Sign out there, for the same header-width reason
+      4. Mobile-first smoke check at 375, 768, and 1280 px, light and dark: the line wraps without horizontal scroll, the button keeps its 44 px target and a visible focus ring, and Tab reaches it after Import Garmin CSV
+      5. `README.md` › "Signing in": add that a signed-in owner signs out with **Sign out** under the map, that no remember-me cookie is set so a session lasts `SESSION_LIFETIME` minutes, that signing out keeps the Strava connection and the nightly sync, and that after upgrading to 2.0.2 one sign-out revokes any older remember-me cookie. Fix the line near 263 ("from the discreet … line under the map") so it doesn't contradict this
+      6. `CHANGELOG.md` `[Unreleased] › Security`: "The owner can sign out from the dashboard; signing out keeps the Strava connection and the nightly sync (US-019)."
+      7. `php artisan test --compact tests/Feature/Strava tests/Feature/Dashboard tests/Feature/Routing` and `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] `POST /logout` (`route('logout')`) logs out, invalidates the session, regenerates the CSRF token, and redirects to `dashboard`; no `GET` route
+      - [ ] Guests posting to it get the dashboard with no error
+      - [ ] Strava token columns untouched by sign-out
+      - [ ] Sign out control rendered only for a signed-in owner, as a native form button, keyboard reachable, 44 px, both themes
+      - [ ] UI usable at mobile/tablet/desktop (manual smoke under NORMAL)
+      - [ ] README and CHANGELOG updated
+      - [ ] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema change
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/strava-connection.md`:
+        - Functional flow gets a sign-out step: POST, CSRF, idempotent for guests, tokens kept, sync unaffected.
+        - Technical design table gets a `SignOutController` + `logout` route row.
+        - Architectural choices gets rows for POST-only with no `auth` middleware (rejected: `auth` → missing `login` route) and no `strava.fresh` on sign-out (rejected: sign-out depending on Strava).
+        - Key decisions: sign-out ≠ deauthorisation (FR-012).
+      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md`: the ways-in line description (~line 156) gets "· Sign out" for a signed-in owner, as a form button with the reason; the matching Architectural choices row is updated
+      - [ ] Folder `README.md` index rows: last updated by US-019
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `fix(US-019): TASK-03 add POST /logout and the Sign out control`. The body names the root cause: US-002 added no route that ends a session, so nothing in the UI or the routes could sign a device out
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-01
+  -
+    id: TASK-04
+    title: 'Regression tests for sign-out and the Sign out control'
+    body: |-
+      ## Description
+      Add PHPUnit coverage for `POST /logout` and the dashboard control (AC 5, remaining bullets; AC 4).
+
+      ## Files Involved
+      - tests/Feature/Strava/SignOutTest.php (new — `php artisan make:test --phpunit SignOutTest`, then move under `Strava/` beside the connect tests)
+      - tests/Feature/Dashboard/PublicDashboardTest.php (control rendering — or keep it in SignOutTest if it reads better)
+
+      ## Steps
+      1. Sign the owner in with `allowlistedAthlete()` + `actingAs` (`.ai/rules/tests.md`). Use existing factories; set `Http::preventStrayRequests()` in `setUp()` for the sync case
+      2. Signed in, `POST /logout` with the CSRF token → redirect to `route('dashboard')`, `assertGuest()`, the session id and `csrf_token()` differ from before, and a follow-up `GET /` shows "Connect with Strava" and no "Sign out"
+      3. `GET /logout` → 405
+      4. No CSRF token → 419. Tests skip CSRF, so bind an anonymous subclass of `Illuminate\Foundation\Http\Middleware\PreventRequestForgery` whose `runningUnitTests()` returns `false`, and send no `Sec-Fetch-Site` header. Assert the owner is still authenticated afterwards
+      5. Guest `POST /logout` → redirect to `dashboard`, no exception (`withoutExceptionHandling` not needed; assert the redirect status)
+      6. Signed in, sign out, then the athlete's `strava_access_token`, `strava_refresh_token`, and `strava_token_expires_at` are unchanged, and `artisan strava:sync` against the faked Strava API records a successful `SyncRun` for that athlete
+      7. An owner with a non-null `remember_token` (a pre-fix recaller) has it changed by the sign-out
+      8. Dashboard: signed in, `GET /` contains a form posting to `route('logout')` with a `_token` input and a "Sign out" submit button; as a guest (with a displayed athlete), none of it
+      9. `php artisan test --compact tests/Feature/Strava/SignOutTest.php tests/Feature/Dashboard`
+      10. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites
+
+      ## Completion Criteria
+      - [ ] Every AC 5 bullet has a test; removing the route, the CSRF check, or the `@else` control makes one fail
+      - [ ] Tests pass locally
+      - [ ] Coverage matches the `NORMAL` bar
+
+      ## Test Data
+      - N/A — existing factories only
+
+      ## Domain Docs
+      - N/A — tests only
+
+      ## Git Deliverables
+      - Commit: `test(US-019): TASK-04 cover sign-out and the Sign out control`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-03
+  -
+    id: TASK-05
+    title: 'Verification: full suite, quality gate, .env.example check, Oliver re-test handoff'
+    body: |-
+      ## Description
+      Close the spec: the full suite and quality gate are green, no remember-me wording is left anywhere, and the Oliver re-test handoff is written (AC 6, 8).
+
+      ## Files Involved
+      - .env.example (only if a remember-me mention is found)
+      - README.md (only if a remember-me mention is found)
+
+      ## Steps
+      1. `grep -rni 'remember' .env.example README.md app routes resources .larapilot/docs/devs`. The only acceptable hits are `remember_token` in `User::$hidden`, the cache/plan "remember" helpers, and the doc text that describes the pre-2.0.2 recallers. Fix any other hit. The `SESSION_SECURE_COOKIE` comment should already say "the sign-in cookies" (US-017)
+      2. `php artisan test --compact` (full suite)
+      3. `php artisan larapilot:quality` (Pint + Larastan level 5). Fix findings in the file's own task scope
+      4. Write the manual test handoff for Oliver into the PR notes:
+         - Sign in, copy the session cookie, sign out, replay the cookie → guest.
+         - DevTools shows no `remember_web_*` cookie after sign-in.
+         - A browser holding a pre-2.0.2 recaller: sign out once, then confirm it doesn't sign back in.
+         - At 375 px, both themes: "Sign out" is reachable and 44 px.
+
+      ## Completion Criteria
+      - [ ] Full suite green
+      - [ ] Quality gate green
+      - [ ] No stale remember-me wording in `.env.example`, README, code comments, or domain docs
+      - [ ] Oliver re-test handoff in the PR notes
+
+      ## Test Data
+      - N/A — no model/schema change
+
+      ## Domain Docs
+      - [ ] N/A unless step 1 finds stale wording in `.larapilot/docs/devs/`; then that file is corrected in this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-019): TASK-05 verify suite, quality gate and remember-me wording` (only if step 1 or 3 changed a file; otherwise no commit)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local PR notes with the handoff
+    type: Impl
+    status: TODO
+    assignee: Anne
+    estimate_hours: 0.5
+    dependencies:
+      - TASK-02
+      - TASK-04
+updated_at: '2026-10-18T17:17:44+00:00'

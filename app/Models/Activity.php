@@ -104,6 +104,28 @@ class Activity extends Model
     }
 
     /**
+     * Restrict to runs on exactly the given days.
+     *
+     * @param  Builder<Activity>  $query
+     * @param  array<int, string>  $dates  Y-m-d
+     */
+    #[Scope]
+    protected function onDates(Builder $query, array $dates): void
+    {
+        /*
+         * The dates are bound as CarbonImmutable on purpose: the grammar writes them as
+         * "Y-m-d H:i:s", the very format the `date` cast stores activity_date in, so the
+         * equality matches. Binding the Y-m-d strings would compare "2026-10-11" with
+         * "2026-10-11 00:00:00" as TEXT and match nothing. A range belongs to
+         * onDaysBetween() instead.
+         */
+        $query->whereIn('activity_date', array_map(
+            static fn (string $date): CarbonImmutable => CarbonImmutable::parse($date, 'UTC'),
+            $dates,
+        ));
+    }
+
+    /**
      * Restrict to runs on the given days, both ends included.
      *
      * @param  Builder<Activity>  $query

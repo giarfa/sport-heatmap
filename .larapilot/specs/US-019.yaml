@@ -5,11 +5,11 @@ epic:
   title: Maintenance
 priority: LOW
 points: 2
-status: TODO
+status: PLANNED
 body: |
   #### US-019: Fix — the owner cannot sign out, and sign-in issues a 400-day remember-me cookie
 
-  **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** TODO
+  **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** PLANNED
   **Blocked by:** -
   **Type:** Fix
   **Severity:** Low
@@ -49,3 +49,8 @@ body: |
   - [ ] Root cause named in the fix commit
   - [ ] No security regression (Lars/Oliver): Oliver re-tests session reuse after sign-out and the absence of the remember cookie
   - [ ] Factory/seeder — not applicable (no schema change; `remember_token` stays unused)
+status_history:
+  -
+    status: PLANNED
+    at: '2026-10-18T17:17:44+00:00'
+rework: false
