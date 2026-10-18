@@ -37,13 +37,19 @@ restricted to an explicit allowlist of athlete ids.
    composer setup
    ```
 
-3. **Point `APP_URL` at the Herd domain.** In `.env`:
+3. **Set the development overrides.** `.env.example` ships production-safe values, so
+   `composer setup` leaves you with a production-style `.env`. For local work, change these in
+   `.env`:
 
    ```dotenv
+   APP_ENV=local
+   APP_DEBUG=true
    APP_URL=https://sport-heatmap.test
    ```
 
-   It must match the domain Herd serves, or the OAuth callback will not line up.
+   `APP_URL` must match the domain Herd serves, or the OAuth callback will not line up. Add
+   `LOG_LEVEL=debug` if you want the full log. Leave `SESSION_SECURE_COOKIE=true` — Herd serves
+   HTTPS.
 
 4. **Watch assets while developing:**
 
@@ -129,13 +135,17 @@ one `APP_ENV` value away from handing all of that to a stranger. `--no-dev` leav
 a plain `composer install` on a host puts them back. After installing, check that the dashboard is
 gone: `php artisan route:list --path=larapilot` must list no route.
 
-Three settings are not safe at their `.env.example` defaults:
+`.env.example` ships these values for a host. Keep them, and set `APP_URL` to the host's own
+`https` URL:
 
-| Key | Set it to | Why |
+| Key | Value | Why |
 | --- | --- | --- |
-| `APP_DEBUG` | `false` | Otherwise any unhandled error renders a stack trace, environment variables included, to whoever triggered it |
 | `APP_ENV` | `production` | Turns off the development affordances that assume a trusted visitor |
-| `SESSION_SECURE_COOKIE` | `true` | Sign-in issues a long-lived remember-me cookie; without this it is sent over plain HTTP too |
+| `APP_DEBUG` | `false` | Otherwise any unhandled error renders a stack trace, environment variables included, to whoever triggered it |
+| `APP_URL` | `https://…` | The host's own HTTPS URL; the OAuth callback and generated links are built from it |
+| `LOG_STACK` | `daily` | One file per day, old ones rotated out, instead of a single log that grows forever |
+| `LOG_LEVEL` | `warning` | `debug` writes request detail to disk that nobody on a real host needs |
+| `SESSION_SECURE_COOKIE` | `true` | Without it the sign-in cookies are also sent over plain HTTP |
 
 If the app sits behind a reverse proxy or CDN, also configure trusted proxies — the OAuth rate
 limiter keys on the client IP, and every request arriving from the proxy's address collapses that
