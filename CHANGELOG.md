@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- A crafted `Cache-Control` header can no longer tie up the host: `symfony/http-foundation` is
+  updated to a release that fixes CVE-2026-108082 (US-017).
+
 ## [2.0.1] - 2026-10-18
 
 ### Security
