@@ -266,8 +266,8 @@ totals, legend and sync status of the **first connected athlete of `STRAVA_ALLOW
 configured order** — the same content the signed-in owner sees, without a Strava sign-in. A guest
 request never refreshes a token, calls Strava, or writes a row. Signing in is only needed to connect
 Strava, from the discreet "Owner? Connect with Strava" line under the map (a signed-in owner gets
-**Sign out** there), and stays allowlist-only. While no allowlisted athlete has connected yet, the home page shows the stored
-athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
+**Sign out** there), and stays allowlist-only. While no allowlisted athlete has connected yet, the
+home page shows the stored athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
 appears only when no stored athlete has any activity. Removing an athlete from the allowlist
 therefore no longer hides their stored runs — deleting their user row does. The page keeps
 `noindex, nofollow`: reachable by link, not promoted.
