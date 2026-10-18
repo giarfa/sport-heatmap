@@ -1,0 +1,361 @@
+code: US-018
+plan_body: |-
+  **Release:** 2.0.2
+
+  ## Technical Solution
+
+  Two Low findings from the v2.0.0 assessment (OWASP A04, A05), fixed separately on one branch. Traces to FR-018 and Technical Architecture › Security (Lars).
+
+  ### 1. Security headers on every web response (A05 — UI redress)
+  - New `app/Http/Middleware/SetSecurityHeaders.php` (`php artisan make:middleware SetSecurityHeaders --no-interaction`), registered as **global** middleware with `$middleware->append(SetSecurityHeaders::class)` in `bootstrap/app.php`. Global, not on the `web` group: a 404 matches no route, so group or route middleware never sees it, and the AC asserts the headers on a 404. The global pipeline receives the rendered exception response, so 404 and 500 pages carry the headers too.
+  - Headers: `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`. Add `Strict-Transport-Security: max-age=31536000` only when `$request->isSecure()`. Leave out `includeSubDomains`, because this host can't vouch for sibling subdomains on a personal domain, and leave out `preload`.
+  - The CSP is **only** `frame-ancestors`. It has no `default-src` or `script-src`, so Vite assets and the inline `data-resolve-all` script behave as before.
+  - **Don't overwrite a header a route already set** (`$response->headers->has(...)` guard per header). Reason: the Larapilot dev dashboard (require-dev, never registered on a deployed host) uses its own route middleware `AddLarapilotSecurityHeaders` to send `X-Frame-Options: SAMEORIGIN` + `frame-ancestors 'self'` on purpose, so it can iframe its mockups. Overwriting that, or appending a second CSP (browsers enforce every CSP they get, so `'none'` would win), would break the dashboard's design viewer. No app route sets these headers, so every app response gets the strict values.
+  - Gotcha for later: behind a TLS-terminating proxy, `isSecure()` is false until trusted proxies are set up. Deployment isn't defined yet (PRD), so this goes in the domain doc and isn't built now.
+
+  ### 2. Throttle the Garmin import review (A04 — resource exhaustion)
+  - `routes/web.php`: `GET /import/garmin/review` gets `->middleware('throttle:garmin-import')`. That's the limiter upload and confirm already use (10/min per signed-in owner, else per IP; `AppServiceProvider::registerRateLimiters`). Update the route-group comment and the limiter PHPDoc to say review too. Cancel, form and summary do no matching work and stay unthrottled.
+
+  ### 3. Date-indexed matching in `PlanGarminImport`
+  - Replace the rows × stored-runs scans with per-date indexes built once. The identity pass looks up stored runs by `start_date_local` date (what `GarminCsvRow::isIdenticalTo` compares). The closest-pair pass looks them up by `activity_date` (what `StartTimeMatcher::difference` compares). Use the row's `startDateLocal->format('Y-m-d')` as the lookup key in both passes. A stored run claimed by identity is skipped from then on (a claimed-id set, or forgotten from both indexes). The results stay **identical**: identity before conflicts, closest pairs first, ties to the earlier row and then the lower stored id. The existing flow tests are the regression net.
+  - Move the date-binding quirk (bind `CarbonImmutable`, never `toDateString()`, see the existing comment) into a new `#[Scope] onDates(Builder $query, array $dates)` on `App\Models\Activity`, next to `onDaysBetween`. The planner and the new stamp then share one copy instead of two that could drift.
+
+  ### 4. Reuse the review's plan on reload
+  - New `app/Support/Garmin/RememberedGarminImportPlan.php` (`final readonly`, invokable: `__invoke(?User $athlete, ParsedGarminCsv $parsed): GarminImportPlan`). It's the review's way to get a plan; `ShowGarminImportReviewController` calls it instead of `PlanGarminImport`.
+  - **Stamp** = `sha256` of the plan's inputs from the database: `$athlete->activities()->onDates($dates)->toBase()->orderBy('id')->get(['id', 'source', 'start_date_local', 'activity_date', 'distance_meters', 'moving_time_seconds'])`. These are exactly the columns the planner reads, so the stamp changes if and only if a re-plan could give a different plan. It doesn't depend on `updated_at`, which has one-second resolution in SQLite and isn't bumped by query-builder writes.
+  - **Remembered entry** (session, inside the pending-upload entry): `{athlete: ?int, stamp: string, new: int[], conflicts: array<int,int> (row index => stored id), already_imported: array<int,int>}`. `PendingGarminImport` stays the only reader and writer of that session key. Add `rememberPlan(array $entry): void` and `rememberedPlan(): ?array` stored under `garmin_import.pending.plan`. `put()` already replaces the whole entry, so **a new upload drops the remembered plan**, and `forget()` drops it with the upload.
+  - **Reuse** when the entry exists, its `athlete` equals the resolved target's id, and its `stamp` equals the fresh stamp. Then rebuild the `GarminImportPlan` from `$parsed->rows` (by index) and one `Activity::whereKey($ids)->get()->keyBy('id')` for the conflict and already-imported ids, so the review still shows the stored side fresh. Any missing id or row index means re-plan instead. **Otherwise** call `PlanGarminImport` and remember the result.
+  - With no target athlete (a first guest import), the plan has no database work. Plan directly and remember nothing.
+  - **Confirm is unchanged**: it still plans fresh inside `Cache::lock('garmin-import:confirm')` and compares the fingerprint. Since the stamp covers every planner input, a reused plan's fingerprint equals a fresh plan's fingerprint whenever the review reused it. That keeps the stale-review guard exactly as it is.
+  - Why the session and not the cache: the plan is bound to the visitor's upload like the pending rows, so it's never visible to another visitor, and it goes away with the upload (the same reasons `pending_imports` was rejected for a table).
+
+  ### Out of scope
+  - The CSV parser, confirm/apply logic, guest masking, and the accepted risk of the open import stay as they are. No schema change, no new dependency.
+
+  ## Git & Branching
+  - Mode: GITFLOW (no automatic push)
+  - Release: 2.0.2. TASK-00 runs `php artisan larapilot:release-feature --semver=2.0.2 --spec=US-018 --slug=garmin-review-throttle-and-headers`, which creates `feature/US-018-garmin-review-throttle-and-headers` from `release/2.0.2`
+  - Per task: one Conventional Commit `type(US-018): TASK-NN …`; the commit that holds a fix names its root cause in the body
+  - PR toward `release/2.0.2` (not `develop`), prepared locally; push/remote PR only if the user asks
+  - Merge into `release/2.0.2` after `larapilot-review` approval
+
+  ## Test Data Strategy
+  - No model, migration, or relationship changes. The new `Activity::onDates` scope adds no column, so `ActivityFactory` and the seeders are unchanged (AC: factory/seeder not applicable)
+  - Tests build their state with the existing `Activity` and `User` factories and the `tests/Fixtures/Garmin/*.csv` fixtures. Signed-in cases use `allowlistedAthlete()` from `Tests\TestCase`
+
+  ## Test Strategy
+  - Bar: NORMAL. PHPUnit feature tests, no browser/Dusk/E2E
+  - Headers: `tests/Feature/Routing/SecurityHeadersTest.php` asserts all four headers on `GET /`, on `GET /import/garmin` and on an unknown URL (404). HSTS is absent on `http://` and present on `https://`. A header set by a route is kept. Removing the middleware makes it fail
+  - Throttle: `GarminImportAccessTest` changes the `review` row of `importRoutes()` to throttled and adds an eleventh-review-in-a-minute → 429 test. Removing the route middleware makes it fail
+  - Reuse: a second review render doesn't run the planner's `select *` over the upload's dates (seen through `DB::listen`), which fails without the reuse. A stored run added, changed (start moved out of tolerance), or removed on an upload date makes the reload re-plan and show the new conflict set. A new upload re-plans
+  - Regression: the whole Garmin suite (`tests/Feature/Garmin`, `tests/Unit/Support/Garmin`) stays green: conflict review, Overwrite/Skip, apply-to-all, summary counts, session binding, stale fingerprint
+  - Manual test handoff (Oliver re-test): framing `/import/garmin/review` from another origin is refused; a reload loop on the review hits 429
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch on release/2.0.2'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for this spec on release `2.0.2`: create `feature/US-018-*` from `release/2.0.2` and prepare the internal PR description toward `release/2.0.2`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `php artisan larapilot:release-feature --semver=2.0.2 --spec=US-018 --slug=garmin-review-throttle-and-headers`
+      2. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`.
+      3. Draft the internal PR title/body toward `base` (`release/2.0.2`)
+
+      ## Completion Criteria
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/2.0.2` (not `develop`)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — git only
+
+      ## Git Deliverables
+      - Commit: `chore(US-018): TASK-00 bootstrap feature branch for release/2.0.2` (only if the command did not already leave a commit; an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/2.0.2`; open remote only if the user requests
+    type: Impl
+    status: DONE
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+  -
+    id: TASK-01
+    title: 'Global SetSecurityHeaders middleware'
+    body: |-
+      ## Description
+      Every web response, 404 included, carries `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, and `Strict-Transport-Security` on secure requests only. This makes the Garmin review's Overwrite controls unclickable from a framing page (OWASP A05).
+
+      ## Files Involved
+      - app/Http/Middleware/SetSecurityHeaders.php (new: `php artisan make:middleware SetSecurityHeaders --no-interaction`)
+      - bootstrap/app.php (`$middleware->append(SetSecurityHeaders::class)`)
+      - .larapilot/docs/devs/heatmap-dashboard.md
+      - .larapilot/docs/devs/README.md
+      - CHANGELOG.md (Unreleased → Security)
+
+      ## Steps
+      1. Middleware `handle(Request $request, Closure $next): Response`. After `$next`, set each header **only when the response does not already have it** (`$response->headers->has()`). Add a `/* … */` block on why: the Larapilot dev dashboard's own route middleware sets `SAMEORIGIN` + `frame-ancestors 'self'` on purpose to iframe its mockups, and a second CSP would be enforced too, with `'none'` winning.
+      2. HSTS `max-age=31536000` only when `$request->isSecure()`. Comment why there's no `includeSubDomains`/`preload`, and that behind a TLS proxy `isSecure()` needs trusted proxies (deployment isn't defined yet).
+      3. Keep the CSP to `frame-ancestors` only. Comment that a `default-src` would block Vite assets and the inline review script.
+      4. Register it as **global** middleware in `bootstrap/app.php` with a short comment: a 404 matches no route, so group middleware would miss it.
+      5. Run the app tests (`php artisan test --compact`); the existing suite stays green. Open the dashboard and `/larapilot/design` in the browser: the dashboard renders, and the Larapilot mockup thumbnails still load in their iframes.
+      6. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [x] The four headers are on the dashboard, Garmin pages, and a 404; HSTS only on HTTPS
+      - [x] A header a route already set is left alone (the Larapilot design viewer still frames its mockups)
+      - [x] No asset or script blocked (CSP is `frame-ancestors` only)
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated: request handling now passes through the global `SetSecurityHeaders` (the header list, HSTS only on HTTPS, don't-overwrite rule and why, CSP limited to `frame-ancestors`, TLS-proxy gotcha), plus Architectural choices (global vs `web` group; strict values vs SAMEORIGIN)
+      - [x] Folder `README.md` index row updated (last touched by US-018)
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `fix(US-018): TASK-01 send security headers on every web response`. Body names the root cause: `bootstrap/app.php` registered no header middleware, so any page, the Garmin review included, could be framed
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local notes only
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-00
+    commit:
+      sha: 91c627b317095c33a72ea4b7854bdfcdfe222faf
+      short_sha: 91c627b
+      subject: 'fix(US-018): TASK-01 send security headers on every web response'
+      committed_at: '2026-10-18T18:49:04+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/91c627b317095c33a72ea4b7854bdfcdfe222faf'
+  -
+    id: TASK-02
+    title: 'Regression tests for the security headers'
+    body: |-
+      ## Description
+      Add PHPUnit coverage proving the headers are on every web response and that each assertion fails without the middleware.
+
+      ## Files Involved
+      - tests/Feature/Routing/SecurityHeadersTest.php (new: `php artisan make:test --phpunit SecurityHeadersTest --no-interaction`, then move under `Routing/`)
+
+      ## Steps
+      1. Read the `testing-best-practices` skill first.
+      2. One assertion helper used by a data provider over `GET /` (dashboard), `GET /import/garmin` (Garmin import form), and an unknown path (404): all four headers with their exact values.
+      3. HSTS: absent on an `http://` request, `max-age=31536000` on `https://` (e.g. `$this->get('https://…/')`).
+      4. Kept header: a test-only route (registered in the test) that sets `X-Frame-Options: SAMEORIGIN` comes back with `SAMEORIGIN`, not `DENY`.
+      5. Check it fails: temporarily remove the `append` from `bootstrap/app.php`, confirm the tests fail, then restore it.
+      6. `php artisan test --compact tests/Feature/Routing/SecurityHeadersTest.php`; do **not** add browser/Dusk/E2E
+
+      ## Completion Criteria
+      - [x] Headers asserted on the dashboard, a Garmin import page, and a 404
+      - [x] HSTS absent on HTTP, present on HTTPS
+      - [x] The don't-overwrite rule is covered
+      - [x] Tests fail without the middleware and pass with it
+
+      ## Git Deliverables
+      - Commit: `test(US-018): TASK-02 cover security headers on every web response`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local notes only
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 1
+    dependencies:
+      - TASK-01
+    commit:
+      sha: 29b1723abcaf34b999027c8408f5e4b7a4f1cb4e
+      short_sha: 29b1723
+      subject: 'test(US-018): TASK-02 cover security headers on every web response'
+      committed_at: '2026-10-18T18:49:44+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/29b1723abcaf34b999027c8408f5e4b7a4f1cb4e'
+  -
+    id: TASK-03
+    title: 'Throttle the review and index stored runs by date'
+    body: |-
+      ## Description
+      `GET /import/garmin/review` shares the `garmin-import` limiter with upload and confirm, and `PlanGarminImport` matches each row only against stored runs on its own date, not against every stored run on all the upload's dates (OWASP A04).
+
+      ## Files Involved
+      - routes/web.php
+      - app/Providers/AppServiceProvider.php (limiter PHPDoc/comment only)
+      - app/Models/Activity.php (new `#[Scope] onDates`)
+      - app/Support/Garmin/PlanGarminImport.php
+      - tests/Feature/Garmin/GarminImportAccessTest.php (`importRoutes()` review row → `true`)
+      - .larapilot/docs/devs/garmin-csv-import.md
+
+      ## Steps
+      1. `routes/web.php`: add `->middleware('throttle:garmin-import')` to the review route, and change the group comment from "on upload and confirm" to "on upload, review, and confirm" (review re-plans the upload against stored runs: work a guest could otherwise repeat without limit).
+      2. `AppServiceProvider`: update the PHPDoc above `registerRateLimiters()` to list review. The limiter definition stays the same.
+      3. `Activity`: add `protected function onDates(Builder $query, array $dates): void` with `#[Scope]` like `onDaysBetween`, moving the existing `CarbonImmutable`-binding comment from `PlanGarminImport` into it. PHPDoc `@param array<int, string> $dates` (Y-m-d).
+      4. `PlanGarminImport`: query through `->onDates($dates)`. Build two indexes once: by stored `start_date_local` date for the identity pass, and by `activity_date` for the closest-pair pass. Look rows up by `startDateLocal->format('Y-m-d')`, and skip runs already claimed by identity. Keep the ordering rules and their comments (identity first, closest pairs first, ties to the earlier row then the lower id). Add a `/* … */` block saying why: the per-row scan of every stored run was rows × runs work on each review reload.
+      5. `GarminImportAccessTest::importRoutes()`: set `'review' => ['garmin.import.review', true]`.
+      6. `php artisan test --compact tests/Feature/Garmin tests/Unit/Support/Garmin`; every existing case is green with no expectation changes.
+      7. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [x] Review route carries `throttle:garmin-import`
+      - [x] Matching uses per-date indexes; plans identical to before (existing Garmin tests unchanged and green)
+      - [x] Date binding lives once, in `Activity::onDates`
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A: a query scope only, no column or relationship change; `ActivityFactory` and the seeders are unchanged
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` updated: the route table marks review as throttled `garmin-import`; Technical design notes the per-date matching and `Activity::onDates`; the guarded-by list in Key decisions (CSRF, 5 MB, throttle, review) includes review in the throttle
+      - [x] Folder `README.md` index row updated
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `fix(US-018): TASK-03 throttle the Garmin import review and match stored runs by date`. Body names the root cause: the review route had no throttle, and each render compared every row with every stored run on the upload's dates
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local notes only
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-00
+    commit:
+      sha: ea5b10db8791b46a6892442f3fa66317883ae399
+      short_sha: ea5b10d
+      subject: 'fix(US-018): TASK-03 throttle the Garmin import review and match stored runs by date'
+      committed_at: '2026-10-18T18:50:54+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ea5b10db8791b46a6892442f3fa66317883ae399'
+  -
+    id: TASK-04
+    title: 'Reuse the review plan while upload and stored runs are unchanged'
+    body: |-
+      ## Description
+      Reloading `GET /import/garmin/review` reuses the plan already computed for the pending upload, as long as the target athlete and the planner's inputs from the database (the stored runs on the upload's dates) haven't changed. A stored run added, changed, or removed on one of those dates, a different target, or a new upload re-plans.
+
+      ## Files Involved
+      - app/Support/Garmin/RememberedGarminImportPlan.php (new: `php artisan make:class Support/Garmin/RememberedGarminImportPlan --no-interaction`, `final readonly`, invokable)
+      - app/Support/Garmin/PendingGarminImport.php (`rememberPlan()`, `rememberedPlan()`)
+      - app/Http/Controllers/Garmin/ShowGarminImportReviewController.php
+      - .larapilot/docs/devs/garmin-csv-import.md
+      - CHANGELOG.md (Unreleased → Security)
+
+      ## Steps
+      1. `PendingGarminImport`: `rememberPlan(array $entry): void` writes `garmin_import.pending.plan`, and `rememberedPlan(): ?array` reads it back (null when absent or not an array). Document the array shape in PHPDoc: `array{athlete: int, stamp: string, new: array<int, int>, conflicts: array<int, int>, already_imported: array<int, int>}`. `put()` and `forget()` already replace/drop the whole entry. Say in the class PHPDoc that this is how a new upload invalidates the remembered plan.
+      2. `RememberedGarminImportPlan::__invoke(?User $athlete, ParsedGarminCsv $parsed): GarminImportPlan`, with constructor-promoted `PlanGarminImport` and `PendingGarminImport`:
+         - `$athlete === null` → return the plan from `PlanGarminImport` and remember nothing (no database work to save).
+         - Stamp: `sha256` of `json_encode` of `$athlete->activities()->onDates($dates)->toBase()->orderBy('id')->get(['id', 'source', 'start_date_local', 'activity_date', 'distance_meters', 'moving_time_seconds'])`. Comment why these columns are exactly the planner's inputs, and why `updated_at` isn't used (one-second resolution, not touched by query-builder writes).
+         - Reuse when the remembered `athlete` and `stamp` match. Rebuild `GarminImportPlan` from `$parsed->rows` by index plus one `Activity::whereKey($ids)->get()->keyBy('id')`. If a row index or stored id is missing, fall through to a re-plan.
+         - Otherwise call `PlanGarminImport` and remember `{athlete, stamp, new, conflicts (index => stored id), already_imported (index => stored id)}`.
+      3. `ShowGarminImportReviewController`: inject `RememberedGarminImportPlan` instead of `PlanGarminImport`, and update its PHPDoc (plans once, reused on reload). `ConfirmGarminImportController` stays as it is: it plans fresh inside the lock. Add a one-line comment there on why it doesn't reuse (the fingerprint must compare against the database as it is at write time).
+      4. Run the whole Garmin suite (`php artisan test --compact tests/Feature/Garmin tests/Unit/Support/Garmin`); stale-fingerprint, token, and guest-masking tests stay green.
+      5. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [x] A second review render with nothing changed reuses the plan (no planner query)
+      - [x] Added, changed, or removed stored runs on an upload date, a changed target, or a new upload re-plan
+      - [x] The fingerprint the review renders still matches the confirm's fresh plan when nothing changed
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` updated: Functional flow (review reuses its plan; what invalidates it), Technical design (new class, session sub-key, stamp columns), Architectural choices (session over cache; stamp of planner inputs over `updated_at`/count aggregates; confirm still re-plans), Key decisions & invariants (*reuse only when every planner input is unchanged; breaks if the planner starts reading a column the stamp leaves out*)
+      - [x] Folder `README.md` index row updated
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `fix(US-018): TASK-04 reuse the Garmin review plan while nothing changed`. Body names the root cause: every review render re-planned the whole upload against the database
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local notes only
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-03
+    commit:
+      sha: f32a511d68085dae869b9875f45911d3a9429141
+      short_sha: f32a511
+      subject: 'fix(US-018): TASK-04 reuse the Garmin review plan while nothing changed'
+      committed_at: '2026-10-18T18:53:00+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/f32a511d68085dae869b9875f45911d3a9429141'
+  -
+    id: TASK-05
+    title: 'Regression tests for review throttle and plan reuse'
+    body: |-
+      ## Description
+      Add PHPUnit coverage: the eleventh review request in a minute answers 429; a second review render doesn't re-plan; stored-run changes on an upload date re-plan. Each test fails without its fix.
+
+      ## Files Involved
+      - tests/Feature/Garmin/GarminImportAccessTest.php
+      - tests/Feature/Garmin/GarminImportReviewReuseTest.php (new: `php artisan make:test --phpunit GarminImportReviewReuseTest --no-interaction`, moved under `Garmin/`)
+
+      ## Steps
+      1. Read the `testing-best-practices` skill first; follow the existing Garmin tests' fixture helpers and the `allowlistedAthlete()` helper for signed-in cases.
+      2. `GarminImportAccessTest`: `test_an_eleventh_guest_review_in_a_minute_is_throttled`. Upload once (one hit on the shared limiter), then make review requests until the limit is used up, then one more → `assertTooManyRequests()`. Count against the **shared** limit (upload + reviews = 10) and say so in the test.
+      3. Reuse test: upload a CSV that clashes with a stored run, render the review, then capture queries with `DB::listen` during a second render and assert that no `select *` over `activities` filtered on `activity_date` runs. Check it fails: point the controller back at `PlanGarminImport`, confirm the failure, then restore it.
+      4. Invalidation tests (one each): on an upload date, a stored run **added** inside tolerance → the reload shows the new conflict; **changed** (start moved beyond 2 minutes, via the model) → the conflict disappears; **removed** → the conflict disappears. A new upload re-plans (its conflicts are shown, not the previous upload's).
+      5. `php artisan test --compact tests/Feature/Garmin`; do **not** add browser/Dusk/E2E
+
+      ## Completion Criteria
+      - [x] Eleventh review in a minute → 429; fails without the route throttle
+      - [x] Second render doesn't re-plan; fails without the reuse
+      - [x] Added, changed, and removed stored runs re-plan
+      - [x] Existing Garmin tests green: conflict review, Overwrite/Skip, apply-to-all, summary counts, session binding
+
+      ## Git Deliverables
+      - Commit: `test(US-018): TASK-05 cover the review throttle and plan reuse`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local notes only
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 2
+    dependencies:
+      - TASK-04
+    commit:
+      sha: 5565129080ede6245cee0f6a5bef7fc8d853e1b1
+      short_sha: '5565129'
+      subject: 'test(US-018): TASK-05 cover the review throttle and plan reuse'
+      committed_at: '2026-10-18T18:54:23+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5565129080ede6245cee0f6a5bef7fc8d853e1b1'
+  -
+    id: TASK-06
+    title: 'Verification: full suite, quality gate, Oliver re-test handoff'
+    body: |-
+      ## Description
+      Run the whole spec's checks before review and record the manual re-test steps for Oliver.
+
+      ## Files Involved
+      - (none modified unless a check fails)
+
+      ## Steps
+      1. `php artisan test --compact`: the full suite is green.
+      2. `php artisan larapilot:quality`: Pint and Larastan (level ≥ 5) pass.
+      3. Confirm `CHANGELOG.md` Unreleased lists both security fixes (headers; review throttle and plan reuse).
+      4. Write the **manual test handoff** in the PR notes: (a) from a page on another origin (e.g. a local `file://` HTML page with `<iframe src="https://sport-heatmap.test/import/garmin/review">`), the browser refuses to frame it; (b) a reload loop on `/import/garmin/review` as a guest reaches 429 within the shared 10/min limit; (c) the Larapilot design viewer still shows mockup thumbnails.
+
+      ## Completion Criteria
+      - [x] Full suite green
+      - [x] `larapilot:quality` passes
+      - [x] Manual re-test steps recorded for Oliver
+
+      ## Git Deliverables
+      - Commit: none unless a check required a fix; then `fix(US-018): TASK-06 {short summary}`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update local notes only
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 1
+    dependencies:
+      - TASK-02
+      - TASK-05
+updated_at: '2026-10-18T16:54:37+00:00'
