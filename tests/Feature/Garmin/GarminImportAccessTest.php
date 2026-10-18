@@ -75,7 +75,7 @@ class GarminImportAccessTest extends TestCase
         return [
             'upload form' => ['garmin.import.create', false],
             'upload' => ['garmin.import.store', true],
-            'review' => ['garmin.import.review', false],
+            'review' => ['garmin.import.review', true],
             'confirm' => ['garmin.import.confirm', true],
             'cancel' => ['garmin.import.cancel', false],
             'summary' => ['garmin.import.summary', false],

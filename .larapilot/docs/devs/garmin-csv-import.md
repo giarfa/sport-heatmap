@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-008` |
-| **Last updated by** | `US-013` — 2026-10-13 |
+| **Last updated by** | `US-018` — 2026-10-18 |
 | **Owner persona** | 🔧 Alex |
 
 ## Purpose
@@ -145,8 +145,12 @@ target's stored activities. It reads only. With a **null target** every row is
 new and no query runs.
 
 1. **One query** loads the owner's activities on the dates the file contains
-   (`whereIn('activity_date', …)`, served by the `(user_id, activity_date)`
-   index) — never one query per row.
+   (`Activity::onDates()`, a `whereIn` on `activity_date` served by the
+   `(user_id, activity_date)` index) — never one query per row. The stored runs
+   are then **indexed by date once** (garmin-sourced runs by `start_date_local`
+   date for the identity pass, the unclaimed ones by `activity_date` for the
+   pairing pass), so a row is compared only with the runs of its own date, not
+   with every stored run on every date of the file (`US-018`).
 2. **Already imported** (first pass, whole file): a stored `garmin_csv` row with
    the identical start (to the second), distance and moving time. It is not
    asked about, and that stored row is claimed.
@@ -215,7 +219,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | --- | --- | --- |
 | `GET /import/garmin` | `create` | Upload form |
 | `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per signed-in owner, else per IP) |
-| `GET /import/garmin/review` | `review` | Resolves the target, re-plans the pending rows against the DB **as it is now**; renders conflicts, new rows, counts, `token`, `fingerprint` |
+| `GET /import/garmin/review` | `review` | Throttled `garmin-import`, the same limiter as upload and confirm (`US-018`). Resolves the target, re-plans the pending rows against the DB **as it is now**; renders conflicts, new rows, counts, `token`, `fingerprint` |
 | `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under the **instance-wide** `Cache::lock('garmin-import:confirm')`, resolves the target, re-plans; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
 | `POST /import/garmin/cancel` | `cancel` | Forgets the pending import → dashboard, "Import cancelled. Nothing was written." |
 | `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary`; without one → dashboard |
@@ -282,7 +286,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, future-dated count, invalid list; session round-trip (`fromSessionArray()` tolerates the pre-`US-013` `outside_window` key and reads the missing `future_dated` as 0, so an upload or summary in flight across the deploy still opens) |
 | Rejection | `app/Exceptions/Garmin/GarminCsvRejectedException.php` | Owner-facing messages; no file content beyond a column name |
 | Target | `app/Support/Garmin/ResolveGarminImportTarget.php` | Signed-in owner, else displayed athlete, else null |
-| Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query, claiming; all new with no target |
+| Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query through `Activity::onDates()`, per-date indexes, claiming; all new with no target |
 | CSV-only athlete | `app/Actions/Garmin/CreateCsvOnlyAthlete.php`, `User::isCsvOnly()`, `UserFactory::csvOnly()` | Placeholder identity (`NAME`, `EMAIL` constants), reused by `firstOrCreate` |
 | Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id — shared with the sync |
 | Plan DTOs | `app/Data/Garmin/GarminImportPlan.php`, `GarminImportConflict.php` | The plan and its `fingerprint()` |
@@ -324,6 +328,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | Create the CSV-only athlete inside the import transaction, only with rows | Create it on upload or on review | Upload and review write nothing; a failed insert must not leave an empty athlete, and an empty one would never be displayed |
 | Fingerprint carries the target id | Compare the conflicts only | A plan with no conflicts hashes the same for every athlete, so a target change between review and confirm would go unnoticed |
 | Masked stored side for guests (start + "Clashes with a stored run") | Accept the disclosure (rejected by the owner, decision journal); hide clashes from guests entirely | Hiding clashes would stop the visitor making an informed Overwrite / Skip choice; the start time is enough to recognise the run |
+| Throttle the review with the upload's and confirm's `garmin-import` limiter, and index stored runs by date (US-018) | A looser limit for the review; a cached plan alone; leave the scan | Each render re-plans every row against the stored runs, so an open (guest) route repeated in a loop was unbounded work: rows × stored runs per reload. One shared limiter means the three routes cannot be hammered in turn to get ten of each. Indexing makes the work rows × runs-of-that-date, and the plan keeps the same results because the matcher already required the same date |
 | Wall-clock dates built in UTC | Parse with the app timezone | Same contract as Strava's `start_date_local`; a conversion moves late-evening runs to the wrong day |
 
 ## Key decisions & invariants
@@ -366,8 +371,8 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
   anything but `showsStoredRunDetails`, or a new stored field is added outside
   the owner branch.
 - **Accepted risk — anyone can import.** Any visitor can add or overwrite runs
-  on the displayed athlete's map. Bounded by CSRF, 5 MB, the per-IP throttle,
-  and the review step; re-decide before deploying to a public URL that others
+  on the displayed athlete's map. Bounded by CSRF, 5 MB, the per-IP throttle
+  (upload, review and confirm share it), and the review step; re-decide before deploying to a public URL that others
   know (PRD Security).
 - **Invariant — the raw file is never persisted.** _Breaks if:_ the upload is
   `store()`d — an export carries heart rate, cadence and locations.
@@ -403,7 +408,7 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 
 ## Related
 
-- Specs: `US-008`, `US-011`, `US-012`, `US-013`
+- Specs: `US-008`, `US-011`, `US-012`, `US-013`, `US-018`
 - Plans: `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-011-plan.yaml`, `.larapilot/plans/US-013-plan.yaml`
 - Mockups: `.larapilot/mockups/US-008/`
 - Decisions: `7baf70c6656a936f` (late Strava twin links to the Garmin row), `56c5683061907ab8` (running type names; unknowns surfaced)

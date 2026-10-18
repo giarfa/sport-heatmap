@@ -5,9 +5,7 @@ namespace App\Support\Garmin;
 use App\Data\Garmin\GarminCsvRow;
 use App\Data\Garmin\GarminImportConflict;
 use App\Data\Garmin\GarminImportPlan;
-use App\Models\Activity;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 
 /**
  * Sorts parsed Garmin rows against the athlete's stored activities into new
@@ -36,23 +34,30 @@ final readonly class PlanGarminImport
          * One query for every row, served by the (user_id, activity_date)
          * index: a conflict or an identical run can only exist on a date the
          * file contains.
-         *
-         * The dates are bound as CarbonImmutable on purpose: the grammar writes them as
-         * "Y-m-d H:i:s", the very format the `date` cast stores activity_date in, so the
-         * equality matches. Binding toDateString() here would compare "2026-10-11" with
-         * "2026-10-11 00:00:00" as TEXT and match nothing. A range belongs to
-         * Activity::onDaysBetween instead.
          */
         $stored = $dates === [] ? collect() : $athlete->activities()
-            ->whereIn('activity_date', array_map(
-                static fn (string $date): CarbonImmutable => CarbonImmutable::parse($date, 'UTC'),
-                $dates,
-            ))
+            ->onDates($dates)
             ->get()
             ->keyBy('id');
 
+        /*
+         * Both passes below look a row's candidates up by date instead of
+         * scanning every stored run for every row. The review re-plans on each
+         * render, so rows × stored runs was work a visitor could repeat by
+         * reloading it. The lookups keep the order `$stored` has, which the tie
+         * rules below rely on.
+         */
+        $garminByStartDate = [];
+
+        foreach ($stored as $activity) {
+            if ($activity->isGarminSourced()) {
+                $garminByStartDate[$activity->start_date_local->format('Y-m-d')][] = $activity;
+            }
+        }
+
         $alreadyImported = [];
         $alreadyImportedActivities = [];
+        $identical = [];
 
         /*
          * Identity first, for the whole file, before any conflict is claimed.
@@ -61,14 +66,24 @@ final readonly class PlanGarminImport
          * fall through to "new" and be inserted a second time.
          */
         foreach ($rows as $index => $row) {
-            $identical = $stored->first(
-                fn (Activity $activity): bool => $activity->isGarminSourced() && $row->isIdenticalTo($activity),
-            );
+            foreach ($garminByStartDate[$row->startDateLocal->format('Y-m-d')] ?? [] as $activity) {
+                if (isset($identical[$activity->id]) || ! $row->isIdenticalTo($activity)) {
+                    continue;
+                }
 
-            if ($identical !== null) {
                 $alreadyImported[$index] = $row;
-                $alreadyImportedActivities[$index] = $identical;
-                $stored->forget($identical->id);
+                $alreadyImportedActivities[$index] = $activity;
+                $identical[$activity->id] = true;
+
+                break;
+            }
+        }
+
+        $unclaimedByActivityDate = [];
+
+        foreach ($stored as $activity) {
+            if (! isset($identical[$activity->id])) {
+                $unclaimedByActivityDate[$activity->activity_date->format('Y-m-d')][] = $activity;
             }
         }
 
@@ -88,7 +103,7 @@ final readonly class PlanGarminImport
                 continue;
             }
 
-            foreach ($stored as $activity) {
+            foreach ($unclaimedByActivityDate[$row->startDateLocal->format('Y-m-d')] ?? [] as $activity) {
                 $difference = $this->startTimeMatcher->difference($row->startDateLocal, $activity);
 
                 if ($difference !== null) {

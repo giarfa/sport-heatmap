@@ -30,7 +30,9 @@ Route::middleware('throttle:strava-oauth')->group(function (): void {
  * (PRD Security, accepted risk — US-011): a guest imports into the displayed
  * athlete, or creates the CSV-only athlete when none is displayed. What still
  * guards it: CSRF from the web group, the 5 MB rule in the Form Request, the
- * garmin-import throttle (per IP for guests) on upload and confirm, and the
+ * garmin-import throttle (per IP for guests) on upload, review, and confirm
+ * (the review re-plans the upload against the stored runs: work a guest could
+ * otherwise repeat without limit), and the
  * session binding — no route takes an import or an athlete id, so a request
  * only reaches the pending upload in its own session. strava.fresh stays: a
  * no-op for guests, it still re-checks a signed-in owner's allowlist and token.
@@ -41,7 +43,7 @@ Route::middleware(['strava.fresh'])
     ->group(function (): void {
         Route::get('/', ShowGarminImportFormController::class)->name('create');
         Route::post('/', UploadGarminCsvController::class)->middleware('throttle:garmin-import')->name('store');
-        Route::get('/review', ShowGarminImportReviewController::class)->name('review');
+        Route::get('/review', ShowGarminImportReviewController::class)->middleware('throttle:garmin-import')->name('review');
         Route::post('/confirm', ConfirmGarminImportController::class)->middleware('throttle:garmin-import')->name('confirm');
         Route::post('/cancel', CancelGarminImportController::class)->name('cancel');
         Route::get('/summary', ShowGarminImportSummaryController::class)->name('summary');
