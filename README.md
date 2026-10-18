@@ -119,6 +119,10 @@ A few things worth knowing before the first attempt:
   state rather than an error. Press the button again to reconnect.
 - **Removing yourself from the allowlist signs you out immediately.** It is re-checked on every
   request, not only at connect time, so an existing session does not outlive the edit.
+- **Sign out is under the map.** A signed-in owner presses **Sign out** in the line below the map.
+  No remember-me cookie is set, so a session lasts `SESSION_LIFETIME` minutes. Signing out keeps the
+  Strava connection and the nightly sync. After upgrading to 2.0.2, one sign-out revokes any older
+  remember-me cookie.
 
 ### Before putting this on a real host
 
@@ -261,8 +265,8 @@ The home page (`/`) is **public and read-only**. A signed-out visitor sees the h
 totals, legend and sync status of the **first connected athlete of `STRAVA_ALLOWED_ATHLETE_IDS`, in
 configured order** — the same content the signed-in owner sees, without a Strava sign-in. A guest
 request never refreshes a token, calls Strava, or writes a row. Signing in is only needed to connect
-Strava, from the discreet "Owner? Connect with Strava" line under the map, and stays
-allowlist-only. While no allowlisted athlete has connected yet, the home page shows the stored
+Strava, from the discreet "Owner? Connect with Strava" line under the map (a signed-in owner gets
+**Sign out** there), and stays allowlist-only. While no allowlisted athlete has connected yet, the home page shows the stored
 athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
 appears only when no stored athlete has any activity. Removing an athlete from the allowlist
 therefore no longer hides their stored runs — deleting their user row does. The page keeps

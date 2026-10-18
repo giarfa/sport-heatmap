@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-015` — 2026-10-17 |
+| **Last updated by** | `US-019` — 2026-10-18 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -147,9 +147,11 @@ reachable but not promoted (decision `4918d74ff18e8b0f`); the meta description
 no longer calls it private.
 
 **Owner UI.** A signed-in owner gets the same line without the Strava link:
-"Runs missing from Strava? Import Garmin CSV" (same 44 px target and
-`--accent` ink). Every visitor can import since US-011 (see
-`garmin-csv-import.md`).
+"Runs missing from Strava? Import Garmin CSV · Sign out" (same 44 px target and
+`--accent` ink). Sign out is a native `<form method="POST">` with `@csrf` and a
+submit button, so it is keyboard reachable without script and cannot be
+triggered by a link or prefetch (US-019, see `strava-connection.md`). Every
+visitor can import since US-011 (see `garmin-csv-import.md`).
 
 **Connect screen.** When no athlete can be displayed, `strava/connect.blade.php`
 says "Connect Strava or import a Garmin Connect CSV to build your 16-week
@@ -279,6 +281,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 | The Strava link in the detail opens in the same tab | `target="_blank" rel="noopener"` | The approved mockup and the US-008 review link do the same; the visible behaviour is the mockup's |
 | Guests and owner share the per-athlete grid cache | A separate guest cache | Same data, same key; a separate cache would double the rebuilds and could disagree with the owner's view |
 | Guests see the same sync warning, reason included | A reduced guest warning | Decision `f75e292def892fad`; the reason is already non-secret and HTML-escaped |
+| "Sign out" for the signed-in owner as a POST form button in the same line (US-019) | A header button; a `GET` link; a menu | Same header-width reasoning as the line itself; a `GET` link could be triggered cross-site or by a prefetch, so it has to be a form posting with a CSRF token |
 | "Import Garmin CSV" for every visitor as a text line under the map (US-011) | A header button; a menu; owner-only | The same reasoning as the guest line: discreet, no header budget at 375 px, one screen with no nav. Open to guests by the owner's choice so the map works with CSV imports only |
 | Connect screen: Garmin import as a secondary outline button below the Strava one | A second orange button; a text link | Strava's brand guidelines put orange on the connect button only; a full-width 44 px control reads as an equal way in on a phone |
 | Guest sign-in as a footer text link | Header button; Strava-orange button on the map | Discreet, fits the 375 px header budget, keeps orange reserved for the connect screen |
