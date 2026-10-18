@@ -154,9 +154,9 @@ tasks:
       4. Keep the README's existing voice (plain prose, reasons stated, no marketing)
 
       ## Completion Criteria
-      - [ ] README states every deployment runs `composer install --no-dev --optimize-autoloader`, with the reason
-      - [ ] README gives the `route:list --path=larapilot` check
-      - [ ] Host-key table unchanged
+      - [x] README states every deployment runs `composer install --no-dev --optimize-autoloader`, with the reason
+      - [x] README gives the `route:list --path=larapilot` check
+      - [x] Host-key table unchanged
 
       ## Test Data
       - N/A — documentation only
@@ -169,11 +169,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 0.5
     dependencies:
       - TASK-00
+    commit:
+      sha: 7ea318949858872d0e9d4c41b5d052150cf7f43e
+      short_sha: 7ea3189
+      subject: 'chore(US-016): TASK-02 document --no-dev deployments in the README'
+      committed_at: '2026-10-18T15:20:48+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/7ea318949858872d0e9d4c41b5d052150cf7f43e'
   -
     id: TASK-03
     title: 'Verify a --no-dev install: no /larapilot route, 404s, suite green after dev install'
@@ -222,4 +228,4 @@ tasks:
     dependencies:
       - TASK-01
       - TASK-02
-updated_at: '2026-10-18T13:20:12+00:00'
+updated_at: '2026-10-18T13:20:48+00:00'
