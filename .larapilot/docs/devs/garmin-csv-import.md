@@ -233,8 +233,8 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | Route | Name | Does |
 | --- | --- | --- |
 | `GET /import/garmin` | `create` | Upload form |
-| `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per signed-in owner, else per IP) |
-| `GET /import/garmin/review` | `review` | Throttled `garmin-import`, the same limiter as upload and confirm (`US-018`). Resolves the target, re-plans the pending rows against the DB **as it is now**; renders conflicts, new rows, counts, `token`, `fingerprint` |
+| `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per signed-in owner, else per IP; the review and the confirm draw on the same budget, and the redirect to the review is itself a hit, so an upload and its review cost two of the ten) |
+| `GET /import/garmin/review` | `review` | Throttled `garmin-import`, the same limiter as upload and confirm (`US-018`). Resolves the target and plans the pending rows against the DB **as it is now**, reusing the plan remembered from the previous render while the stored runs on the upload's dates are unchanged (see *The review reuses its plan*); renders conflicts, new rows, counts, `token`, `fingerprint` |
 | `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under the **instance-wide** `Cache::lock('garmin-import:confirm')`, resolves the target, re-plans; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
 | `POST /import/garmin/cancel` | `cancel` | Forgets the pending import → dashboard, "Import cancelled. Nothing was written." |
 | `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary`; without one → dashboard |
