@@ -1022,11 +1022,11 @@ specs:
       title: Maintenance
     priority: MEDIUM
     points: 2
-    status: TODO
+    status: DONE
     body: |
       #### US-017: Fix — a host built from the repository runs a vulnerable http-foundation and development defaults
 
-      **Epic:** EP-004 | **Priority:** MEDIUM | **Points:** 2 | **Status:** TODO
+      **Epic:** EP-004 | **Priority:** MEDIUM | **Points:** 2 | **Status:** DONE
       **Blocked by:** -
       **Type:** Fix
       **Severity:** Medium
@@ -1057,14 +1057,26 @@ specs:
       Expected: no advisory on the lock; production-safe example values. Actual: http-foundation 8.1.6; development values in `.env.example`; CI's `composer audit` step fails.
 
       **Acceptance Criteria**
-      - [ ] Bug fixed — the promise holds again: `symfony/http-foundation` is 8.1.7 or later in `composer.lock` and `composer audit` reports no advisory; only the packages the update needs change in the lock
-      - [ ] `.env.example` ships `APP_ENV=production`, `APP_DEBUG=false`, an `https` `APP_URL`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`; the comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie once US-019 removes it (whichever lands second updates it)
-      - [ ] README: "Local setup on Herd" names the development overrides to set after copying (`APP_ENV=local`, `APP_DEBUG=true`, the Herd `https://….test` `APP_URL`); "Before putting this on a real host" lists the production keys as the example's own values, so the host checklist and the file agree
-      - [ ] Regression test (Anne): reads `.env.example` and fails while `APP_DEBUG` is `true`, `APP_ENV` is `local`, `LOG_STACK` is `single`, `LOG_LEVEL` is `debug`, or `SESSION_SECURE_COOKIE` is `false`; it fails on the current file
-      - [ ] The full suite and `larapilot:quality` pass after the update; CI's `composer audit` step is green
-      - [ ] Root cause named in the fix commit (`fix(deps): …` / `fix(config): …`); no domain behavior changes, so no developer domain doc changes
-      - [ ] No security regression (Lars/Oliver): Oliver re-sends the crafted `Cache-Control` header to `/up` and forces a 500 on a host built from the example file — no stack trace, no environment details
-      - [ ] Factory/seeder — not applicable (no schema change)
+      - [x] Bug fixed — the promise holds again: `symfony/http-foundation` is 8.1.7 or later in `composer.lock` and `composer audit` reports no advisory; only the packages the update needs change in the lock
+      - [x] `.env.example` ships `APP_ENV=production`, `APP_DEBUG=false`, an `https` `APP_URL`, `LOG_STACK=daily`, `LOG_LEVEL=warning`, `SESSION_SECURE_COOKIE=true`; the comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie once US-019 removes it (whichever lands second updates it)
+      - [x] README: "Local setup on Herd" names the development overrides to set after copying (`APP_ENV=local`, `APP_DEBUG=true`, the Herd `https://….test` `APP_URL`); "Before putting this on a real host" lists the production keys as the example's own values, so the host checklist and the file agree
+      - [x] Regression test (Anne): reads `.env.example` and fails while `APP_DEBUG` is `true`, `APP_ENV` is `local`, `LOG_STACK` is `single`, `LOG_LEVEL` is `debug`, or `SESSION_SECURE_COOKIE` is `false`; it fails on the current file
+      - [x] The full suite and `larapilot:quality` pass after the update; CI's `composer audit` step is green
+      - [x] Root cause named in the fix commit (`fix(deps): …` / `fix(config): …`); no domain behavior changes, so no developer domain doc changes
+      - [x] No security regression (Lars/Oliver): Oliver re-sends the crafted `Cache-Control` header to `/up` and forces a 500 on a host built from the example file — no stack trace, no environment details
+      - [x] Factory/seeder — not applicable (no schema change)
+    status_history:
+      - { status: PLANNED, at: '2026-10-18T16:04:13+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-18T16:09:25+00:00' }
+      - { status: REVIEW, at: '2026-10-18T16:13:15+00:00' }
+      - { status: DONE, at: '2026-10-18T16:40:56+00:00' }
+    rework: false
+    merge_commit:
+      sha: fb1c2d222d6f9c952dd4d29e84e1aa552e85974e
+      short_sha: fb1c2d2
+      subject: 'chore(US-017): move spec to REVIEW'
+      committed_at: '2026-10-18T18:13:19+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/fb1c2d222d6f9c952dd4d29e84e1aa552e85974e'
   -
     code: US-018
     title: 'Fix: a guest can hammer the Garmin import review, and any page can be framed'
@@ -1073,11 +1085,11 @@ specs:
       title: Maintenance
     priority: LOW
     points: 3
-    status: TODO
+    status: DONE
     body: |
       #### US-018: Fix — a guest can hammer the Garmin import review, and any page can be framed
 
-      **Epic:** EP-004 | **Priority:** LOW | **Points:** 3 | **Status:** TODO
+      **Epic:** EP-004 | **Priority:** LOW | **Points:** 3 | **Status:** DONE
       **Blocked by:** -
       **Type:** Fix
       **Severity:** Low
@@ -1108,15 +1120,27 @@ specs:
       Expected: the review is throttled like upload and confirm, its plan is reused on reload, and no page can be framed. Actual: unthrottled review with rows × stored-runs work on every reload; no security headers.
 
       **Acceptance Criteria**
-      - [ ] Bug fixed — the promise holds again: `GET /import/garmin/review` carries `throttle:garmin-import`, the same limiter as upload and confirm (per user, else per IP)
-      - [ ] Reloading the review reuses the plan while the pending upload and the stored runs on its dates are unchanged; a stored run added, changed, or removed on one of those dates re-plans it. Matching indexes stored runs by date instead of scanning them per row
-      - [ ] Every web response carries `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`; `Strict-Transport-Security` only on secure requests. The CSP is limited to `frame-ancestors`, so no script, style, or Vite asset is blocked
-      - [ ] Regression tests (Anne): the eleventh review request in a minute answers 429 and fails without the throttle; the headers are asserted on the dashboard, a Garmin import page, and a 404, and fail without the middleware; HSTS is absent on HTTP and present on HTTPS; a second review render does not re-plan (fails without the reuse)
-      - [ ] The existing Garmin import tests stay green: conflict review, Overwrite/Skip, apply-to-all, summary counts, session binding
-      - [ ] Developer domain doc `garmin-import.md` updated (throttling on review, plan reuse and its invalidation); the security headers recorded where request handling is documented (`heatmap-dashboard.md` or the README, whichever already covers middleware)
-      - [ ] Root cause named in the fix commit
-      - [ ] No security regression (Lars/Oliver): Oliver re-tests framing of `/import/garmin/review` from another origin (refused) and the review reload loop (429)
-      - [ ] Factory/seeder — not applicable unless the plan reuse adds a column; then the factory covers it
+      - [x] Bug fixed — the promise holds again: `GET /import/garmin/review` carries `throttle:garmin-import`, the same limiter as upload and confirm (per user, else per IP)
+      - [x] Reloading the review reuses the plan while the pending upload and the stored runs on its dates are unchanged; a stored run added, changed, or removed on one of those dates re-plans it. Matching indexes stored runs by date instead of scanning them per row
+      - [x] Every web response carries `Content-Security-Policy: frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`; `Strict-Transport-Security` only on secure requests. The CSP is limited to `frame-ancestors`, so no script, style, or Vite asset is blocked
+      - [x] Regression tests (Anne): the eleventh review request in a minute answers 429 and fails without the throttle; the headers are asserted on the dashboard, a Garmin import page, and a 404, and fail without the middleware; HSTS is absent on HTTP and present on HTTPS; a second review render does not re-plan (fails without the reuse)
+      - [x] The existing Garmin import tests stay green: conflict review, Overwrite/Skip, apply-to-all, summary counts, session binding
+      - [x] Developer domain doc `garmin-import.md` updated (throttling on review, plan reuse and its invalidation); the security headers recorded where request handling is documented (`heatmap-dashboard.md` or the README, whichever already covers middleware)
+      - [x] Root cause named in the fix commit
+      - [x] No security regression (Lars/Oliver): Oliver re-tests framing of `/import/garmin/review` from another origin (refused) and the review reload loop (429)
+      - [x] Factory/seeder — not applicable unless the plan reuse adds a column; then the factory covers it
+    status_history:
+      - { status: PLANNED, at: '2026-10-18T16:46:27+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-18T16:47:26+00:00' }
+      - { status: REVIEW, at: '2026-10-18T16:57:05+00:00' }
+      - { status: DONE, at: '2026-10-18T17:08:49+00:00' }
+    rework: false
+    merge_commit:
+      sha: 3c884352fb2249c5f8a0cae8b7c984147bd5bfb2
+      short_sha: 3c88435
+      subject: 'chore(US-018): move spec to REVIEW, record the plan, review and usage'
+      committed_at: '2026-10-18T18:57:12+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/3c884352fb2249c5f8a0cae8b7c984147bd5bfb2'
   -
     code: US-019
     title: 'Fix: the owner cannot sign out, and sign-in issues a 400-day remember-me cookie'
@@ -1125,11 +1149,11 @@ specs:
       title: Maintenance
     priority: LOW
     points: 2
-    status: TODO
+    status: DONE
     body: |
       #### US-019: Fix — the owner cannot sign out, and sign-in issues a 400-day remember-me cookie
 
-      **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** TODO
+      **Epic:** EP-004 | **Priority:** LOW | **Points:** 2 | **Status:** DONE
       **Blocked by:** -
       **Type:** Fix
       **Severity:** Low
@@ -1160,12 +1184,24 @@ specs:
       Expected: a sign-out, and no long-lived cookie. Actual: no sign-out; a ~400-day remember-me cookie on every sign-in.
 
       **Acceptance Criteria**
-      - [ ] Bug fixed — the promise holds again: a CSRF-protected `POST /logout` (named route) logs out, invalidates the session, regenerates the CSRF token, and redirects to the dashboard; a `GET` is not routed; a request without a CSRF token answers 419
-      - [ ] The signed-in dashboard shows a "Sign out" control (a form posting to the route, keyboard reachable, Marika's terse register); guests do not see it
-      - [ ] Sign-in calls `Auth::login` without `remember`, so no `remember_web_*` cookie is set; the callback's existing fixation and open-redirect guarantees stay
-      - [ ] Signing out does not delete or revoke the stored Strava tokens: the nightly sync for that athlete still runs
-      - [ ] Regression tests (Anne): the callback response carries no remember cookie (fails on the current code); `POST /logout` ends the session and the next request is a guest; without a CSRF token it answers 419; a guest posting to it is redirected without error; the sign-out control renders only when signed in
-      - [ ] Developer domain doc `strava-connection.md` updated (sign-out, no remember-me, session lifetime as the bound); `.env.example` comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie (shared with US-017 — whichever lands second updates it); README "Signing in" mentions Sign out
-      - [ ] Root cause named in the fix commit
-      - [ ] No security regression (Lars/Oliver): Oliver re-tests session reuse after sign-out and the absence of the remember cookie
-      - [ ] Factory/seeder — not applicable (no schema change; `remember_token` stays unused)
+      - [x] Bug fixed — the promise holds again: a CSRF-protected `POST /logout` (named route) logs out, invalidates the session, regenerates the CSRF token, and redirects to the dashboard; a `GET` is not routed; a request without a CSRF token answers 419
+      - [x] The signed-in dashboard shows a "Sign out" control (a form posting to the route, keyboard reachable, Marika's terse register); guests do not see it
+      - [x] Sign-in calls `Auth::login` without `remember`, so no `remember_web_*` cookie is set; the callback's existing fixation and open-redirect guarantees stay
+      - [x] Signing out does not delete or revoke the stored Strava tokens: the nightly sync for that athlete still runs
+      - [x] Regression tests (Anne): the callback response carries no remember cookie (fails on the current code); `POST /logout` ends the session and the next request is a guest; without a CSRF token it answers 419; a guest posting to it is redirected without error; the sign-out control renders only when signed in
+      - [x] Developer domain doc `strava-connection.md` updated (sign-out, no remember-me, session lifetime as the bound); `.env.example` comment on `SESSION_SECURE_COOKIE` no longer mentions a remember-me cookie (shared with US-017 — whichever lands second updates it); README "Signing in" mentions Sign out
+      - [x] Root cause named in the fix commit
+      - [x] No security regression (Lars/Oliver): Oliver re-tests session reuse after sign-out and the absence of the remember cookie
+      - [x] Factory/seeder — not applicable (no schema change; `remember_token` stays unused)
+    status_history:
+      - { status: PLANNED, at: '2026-10-18T17:17:44+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-18T17:40:28+00:00' }
+      - { status: REVIEW, at: '2026-10-18T17:43:59+00:00' }
+      - { status: DONE, at: '2026-10-18T18:02:57+00:00' }
+    rework: false
+    merge_commit:
+      sha: 93f0a711e4562938080404548fa5b9bfb2212e16
+      short_sha: 93f0a71
+      subject: 'chore(US-019): move spec to REVIEW, record the plan and usage'
+      committed_at: '2026-10-18T19:44:03+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/93f0a711e4562938080404548fa5b9bfb2212e16'

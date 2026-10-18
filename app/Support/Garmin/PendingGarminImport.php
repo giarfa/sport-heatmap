@@ -16,6 +16,10 @@ use Throwable;
  * signed-out visitors apart. Nothing is stored in the database until the
  * visitor confirms, and an abandoned review leaves only this entry behind,
  * which the next upload replaces.
+ *
+ * The plan the review computed is remembered under the same entry, so a new
+ * upload — put() replaces the whole entry — and a cancel or confirm — forget()
+ * drops it — take the plan with them and it can never outlive its upload.
  */
 final readonly class PendingGarminImport
 {
@@ -63,6 +67,42 @@ final readonly class PendingGarminImport
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Keep the plan the review computed, with the stamp of the database state it
+     * was computed from. Scalars only, like the rest of the entry.
+     *
+     * @param  array{athlete: int, stamp: string, new: array<int, int>, conflicts: array<int, int>, already_imported: array<int, int>}  $plan  Row indexes, and for the last two the stored run's id by row index
+     */
+    public function rememberPlan(array $plan): void
+    {
+        $this->session->put(self::KEY.'.plan', $plan);
+    }
+
+    /**
+     * The remembered plan, or null when there is none or it is not the shape
+     * rememberPlan() writes — treated as absent rather than as a 500.
+     *
+     * @return array{athlete: int, stamp: string, new: array<int, int>, conflicts: array<int, int>, already_imported: array<int, int>}|null
+     */
+    public function rememberedPlan(): ?array
+    {
+        $plan = $this->session->get(self::KEY.'.plan');
+
+        if (
+            ! is_array($plan)
+            || ! is_int($plan['athlete'] ?? null)
+            || ! is_string($plan['stamp'] ?? null)
+            || ! is_array($plan['new'] ?? null)
+            || ! is_array($plan['conflicts'] ?? null)
+            || ! is_array($plan['already_imported'] ?? null)
+        ) {
+            return null;
+        }
+
+        /** @var array{athlete: int, stamp: string, new: array<int, int>, conflicts: array<int, int>, already_imported: array<int, int>} $plan */
+        return $plan;
     }
 
     public function forget(): void
