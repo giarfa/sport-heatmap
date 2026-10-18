@@ -106,6 +106,18 @@ class GarminImportAccessTest extends TestCase
         $this->post(route('garmin.import.store'), ['csv' => $this->fixture()])->assertTooManyRequests();
     }
 
+    public function test_an_eleventh_guest_review_in_a_minute_is_throttled(): void
+    {
+        // Upload and review share one limiter, so the upload takes one of the ten.
+        $this->post(route('garmin.import.store'), ['csv' => $this->fixture()])->assertRedirect();
+
+        for ($attempt = 1; $attempt <= 9; $attempt++) {
+            $this->get(route('garmin.import.review'))->assertOk();
+        }
+
+        $this->get(route('garmin.import.review'))->assertTooManyRequests();
+    }
+
     public function test_a_guest_upload_larger_than_5_mb_is_rejected_with_nothing_written(): void
     {
         $response = $this->post(route('garmin.import.store'), [
