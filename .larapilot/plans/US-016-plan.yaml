@@ -1,0 +1,237 @@
+code: US-016
+plan_body: |
+  **Release:** 2.0.1
+
+  ## Technical Solution
+
+  Root cause: `composer.json:13` lists `andreapollastri/larapilot` under `require`. `composer install --no-dev` therefore installs it, package discovery registers its service provider, and every `/larapilot/*` route (dashboard, `.env` reader, database dump, file writes) exists on a deployed host, gated only by `APP_ENV` (`AccessPolicy::mode()` returns `open` for `local`/`testing`). `laravel/boost` and `laravel/mcp` reach the app only through Larapilot (`composer why` confirms: `andreapollastri/larapilot 5.2.0 requires laravel/boost`, `laravel/boost requires laravel/mcp`), so they ride into production with it — today `composer.lock` lists all three under `packages` (production), not `packages-dev`.
+
+  Fix (John / Andrew):
+  1. Move `andreapollastri/larapilot: ^5.0` from `require` to `require-dev` — same constraint, no version bump.
+  2. Refresh `composer.lock` with the **minimal** change: the three packages (and any transitive dependency only they pull in) move from `packages` to `packages-dev`, `content-hash` changes, **no locked version changes**. Use `composer update --lock --minimal-changes` (Composer 2.10.2 is installed); if Composer insists on bumping a version, stop and use `composer update andreapollastri/larapilot --minimal-changes` instead, then confirm with `git diff composer.lock` that only section membership and the hash moved.
+  3. No application code references the package: `bootstrap/providers.php` lists only `AppServiceProvider`, and `app/`, `config/`, `routes/`, `bootstrap/`, `database/` carry no `Larapilot` or `Laravel\Boost` symbol. `bootstrap/cache/` is git-ignored, so no stale `packages.php` / `services.php` ships — `post-autoload-dump` regenerates them with `package:discover` on every install.
+  4. `tests/Feature/Routing/NoPublicSignupTest.php` keeps its `larapilot/` exclusion: it is still correct for the dev install and harmless under `--no-dev`.
+
+  Guard (Anne): a regression test reads `composer.json` and `composer.lock` and fails whenever a development-only package sits on the production side. It is written first and observed **red** against the current manifest before the move.
+
+  Deploy contract (Albert / Jack): README states that every deployment runs `composer install --no-dev --optimize-autoloader`. The PRD leaves the deploy platform open (deferred to `larapilot-ship`); this spec adds no deploy scaffolding. The `.env.example` hardening (`APP_DEBUG=false`, `BOOST_ENABLED=false`, …) and the remaining host-checklist keys belong to the separate v2.0.1 `.env.example` fix — **out of scope here**.
+
+  Out of scope: CI changes (`ci.yml` keeps `composer install` with dev dependencies — the test suite needs them); the Medium Boost finding's `.env.example` side; any Larapilot or Boost version change.
+
+  ## Git & Branching
+  - Mode: GITFLOW (no automatic push)
+  - Release: 2.0.1 (`planned`) — TASK-00 runs `php artisan larapilot:release-feature --semver=2.0.1 --spec=US-016 --slug=larapilot-dev-dependency`, which opens `release/2.0.1` and branches `feature/US-016-larapilot-dev-dependency` from it
+  - PR base: `release/2.0.1`, not `develop`
+  - Per task: one Conventional Commit carrying `US-016` and the task id; the fix commit uses the `fix(deps):` scope and names the root cause (acceptance criterion)
+  - No `git push`, no remote PR unless the user asks in-session
+  - Merge after `larapilot-review` approval (auto-approve is on)
+  - `CHANGELOG.md` `[Unreleased]` gets a `### Security` line — deploy-visible behavior changes (no developer dashboard on `--no-dev` hosts)
+
+  ## Test Data Strategy
+  - No schema, model, factory, or seeder change — Test Data is N/A for every task
+  - The `--no-dev` verification (TASK-03) runs in a throw-away git worktree under the session scratchpad with its own `.env` copied from `.env.example` and its own `database/database.sqlite`. **Never** run `migrate:fresh`, `--seed`, or `composer install --no-dev` in the main working copy: the dev database is the default SQLite file holding real data, and a `--no-dev` install there would remove Larapilot and Boost from the developer's own `vendor/`
+
+  ## Test Strategy
+  - Bar: NORMAL — PHPUnit (the project uses PHPUnit, not Pest); no Playwright, Dusk, or browser E2E
+  - Regression test (TASK-01): `tests/Unit/ComposerDependenciesTest.php` — a data provider of development-only packages; asserts none is under `composer.json` `require` (`andreapollastri/larapilot`, `laravel/boost`, `laravel/pail`) and none of `andreapollastri/larapilot`, `laravel/boost`, `laravel/mcp` is in `composer.lock` `packages`. Must be red on the current manifest, green after the move
+  - `--no-dev` evidence (TASK-03, Anne with Oliver): route list, HTTP status of `/larapilot`, `/larapilot/api/*` and the `.env`/dump endpoints through the HTTP kernel, `vendor/` contents, `package:discover`, then dev install + full suite — all in the scratch worktree
+  - Main working copy: `php artisan test --compact` and `php artisan larapilot:quality` green before every commit
+  - Lars re-runs the v2.0.1 security gate at `/larapilot-ship`, not in this spec
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch on release/2.0.1'
+    body: |
+      ## Description
+      Bootstrap Gitflow for this spec on release `2.0.1`: open `release/2.0.1` (still `planned`) and create `feature/US-016-larapilot-dev-dependency` from it, then prepare the internal PR description toward `release/2.0.1`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. The working tree is dirty with Larapilot artifacts (`.larapilot/backlog.yaml`, `PRD.md`, `releases.yaml`, `specs/US-016.yaml`, …). `release-feature` switches branches only on a clean tree: ask the user how to settle them (commit as a `chore` on `develop` as previous artifact commits were, or stash) before running the command
+      2. `php artisan larapilot:release-feature --semver=2.0.1 --spec=US-016 --slug=larapilot-dev-dependency`
+      3. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`
+      4. Draft the internal PR title/body toward `base` (`release/2.0.1`): title `fix(deps): ship Larapilot as a development dependency (US-016)`; body cites the v2.0.0 High finding (`.larapilot/docs/security/v2.0.0.md`) and leaves a placeholder for the TASK-03 evidence
+
+      ## Completion Criteria
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] Current branch is `feature/US-016-larapilot-dev-dependency`, based on `release/2.0.1`
+      - [x] PR title/body drafted toward `release/2.0.1` (not `develop`)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — git only
+
+      ## Git Deliverables
+      - Commit: `chore(US-016): TASK-00 bootstrap feature branch for release/2.0.1` (only if the command did not already leave a commit — an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/2.0.1` — open remote only if the user requests
+    type: Impl
+    status: DONE
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+    commit:
+      sha: d78d8721335480c9f44bb3fda8cfbc05fd999b9a
+      short_sha: d78d872
+      subject: 'chore(US-016): TASK-00 bootstrap feature branch for release/2.0.1'
+      committed_at: '2026-10-18T15:18:47+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d78d8721335480c9f44bb3fda8cfbc05fd999b9a'
+  -
+    id: TASK-01
+    title: 'Regression test, then move Larapilot to require-dev and refresh the lock'
+    body: |
+      ## Description
+      Fix: `andreapollastri/larapilot` ships as a production dependency. Write the regression test first and watch it fail, then move the package to `require-dev` and refresh `composer.lock` so Larapilot, Boost, and MCP become development-only.
+
+      ## Files Involved
+      - tests/Unit/ComposerDependenciesTest.php (new — `php artisan make:test --phpunit --unit ComposerDependenciesTest --no-interaction`)
+      - composer.json
+      - composer.lock
+      - CHANGELOG.md
+
+      ## Steps
+      1. **Test first (Anne).** `ComposerDependenciesTest` extends `Tests\TestCase` like its `tests/Unit` siblings and reads the manifests with `base_path('composer.json')` / `base_path('composer.lock')`:
+         - `test_development_only_packages_are_not_production_requirements` — `#[DataProvider]` over `andreapollastri/larapilot`, `laravel/boost`, `laravel/pail`; asserts the key is absent from `require`. Failure message names the package and says it would install on a `--no-dev` host
+         - `test_development_tooling_is_locked_as_a_development_package` — `#[DataProvider]` over `andreapollastri/larapilot`, `laravel/boost`, `laravel/mcp`; asserts the name is absent from `composer.lock` `packages` (the production section). This is what proves Boost and MCP leave deployed hosts (acceptance criterion on Boost)
+         - PHPDoc on the class: why the guard exists (v2.0.0 High finding, OWASP A05/A01) — no inline comments
+      2. `php artisan test --compact --filter=ComposerDependenciesTest` → **red** on the current manifest (larapilot in `require`, three packages in lock `packages`). Note the failing output for the PR body
+      3. Move `"andreapollastri/larapilot": "^5.0"` from `require` to `require-dev` (keep `sort-packages` order: it sorts first in `require-dev`)
+      4. `composer update --lock --minimal-changes`; if a locked version changes, revert and use `composer update andreapollastri/larapilot --minimal-changes`. `git diff composer.lock`: only `content-hash` and the `packages` → `packages-dev` moves, every `version` unchanged
+      5. `composer install` (dev — restores nothing, confirms the lock installs) and `php artisan package:discover` — Larapilot and Boost still discovered locally
+      6. Local setup unchanged: `php artisan larapilot:context plan` still runs; `php artisan route:list --path=larapilot` still lists the dashboard routes; `/larapilot` still opens on Herd (resolve the URL with Boost `get-absolute-url`)
+      7. `php artisan test --compact --filter=ComposerDependenciesTest` → green; then `php artisan test --compact` and `php artisan larapilot:quality` → green
+      8. `vendor/bin/pint --dirty --format agent`
+      9. `CHANGELOG.md` `[Unreleased]` → `### Security`: the developer dashboard and Boost are development-only dependencies; deployments with `composer install --no-dev` no longer register `/larapilot/*`
+
+      ## Completion Criteria
+      - [x] Regression test observed red on the pre-fix manifest, green after
+      - [x] `andreapollastri/larapilot` under `require-dev` with constraint `^5.0`; absent from `require`
+      - [x] `composer.lock`: `andreapollastri/larapilot`, `laravel/boost`, `laravel/mcp` in `packages-dev`, none in `packages`; no locked version changed
+      - [x] Local dev install still discovers Larapilot; `php artisan larapilot:*` runs; `/larapilot` opens on Herd
+      - [x] Full suite and `larapilot:quality` green
+      - [x] CHANGELOG `[Unreleased]` updated
+
+      ## Test Data
+      - N/A — no model or schema change
+
+      ## Domain Docs
+      - N/A — no domain behavior changes (activity-sync, garmin-csv-import, heatmap-dashboard, strava-connection are untouched); `.larapilot/docs/devs/` has no deploy/security note to amend. The deploy rule lands in the README (TASK-02)
+
+      ## Git Deliverables
+      - Commit: `fix(deps): US-016 TASK-01 move andreapollastri/larapilot to require-dev` — body: root cause (`composer.json:13` put Larapilot in `require`, so `--no-dev` installed it and package discovery registered `/larapilot/*`; Boost and MCP rode in through it), files touched, and the red→green test evidence
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Fix
+    status: DONE
+    assignee: Alex
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-00
+    commit:
+      sha: 29a8c965d6a18f5f13685f7640ceba4edff48b03
+      short_sha: 29a8c96
+      subject: 'fix(deps): US-016 TASK-01 move andreapollastri/larapilot to require-dev'
+      committed_at: '2026-10-18T15:20:12+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/29a8c965d6a18f5f13685f7640ceba4edff48b03'
+  -
+    id: TASK-02
+    title: 'README: deployments run composer install --no-dev'
+    body: |
+      ## Description
+      Document the deploy contract: every deployment runs `composer install --no-dev --optimize-autoloader`, and why — the developer dashboard and Boost are development-only and must never be installed on a host.
+
+      ## Files Involved
+      - README.md (section `### Before putting this on a real host`, around line 115)
+
+      ## Steps
+      1. In `### Before putting this on a real host`, before the settings table, add a short paragraph and code block: deployments install with `composer install --no-dev --optimize-autoloader`; this leaves out the Larapilot dashboard (`/larapilot/*`, which can read `.env` and dump the database) and Laravel Boost; a plain `composer install` on a host reinstalls them
+      2. Add the quick check a deployer can run: `php artisan route:list --path=larapilot` must list no route
+      3. Do **not** touch the `APP_DEBUG` / `APP_ENV` / `SESSION_SECURE_COOKIE` table or add `BOOST_ENABLED` and the other host keys — they belong to the `.env.example` fix of v2.0.1
+      4. Keep the README's existing voice (plain prose, reasons stated, no marketing)
+
+      ## Completion Criteria
+      - [x] README states every deployment runs `composer install --no-dev --optimize-autoloader`, with the reason
+      - [x] README gives the `route:list --path=larapilot` check
+      - [x] Host-key table unchanged
+
+      ## Test Data
+      - N/A — documentation only
+
+      ## Domain Docs
+      - N/A — no domain behavior changes; this is the project README (baseline docs, Albert)
+
+      ## Git Deliverables
+      - Commit: `chore(US-016): TASK-02 document --no-dev deployments in the README`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: DONE
+    assignee: Albert
+    estimate_hours: 0.5
+    dependencies:
+      - TASK-00
+    commit:
+      sha: 7ea318949858872d0e9d4c41b5d052150cf7f43e
+      short_sha: 7ea3189
+      subject: 'chore(US-016): TASK-02 document --no-dev deployments in the README'
+      committed_at: '2026-10-18T15:20:48+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/7ea318949858872d0e9d4c41b5d052150cf7f43e'
+  -
+    id: TASK-03
+    title: 'Verify a --no-dev install: no /larapilot route, 404s, suite green after dev install'
+    body: |
+      ## Description
+      Prove the fix on a real `--no-dev` install (Anne, with Oliver's unauthenticated re-test): no `/larapilot/*` route, 404 on the dashboard, its API and the `.env`/database-dump endpoints, no Boost or MCP in `vendor/`, `package:discover` clean; then a dev install on the same checkout passes the full suite. Runs in a throw-away worktree — never in the main working copy.
+
+      ## Files Involved
+      - (verification only — no repository files change; evidence goes into the local PR body)
+
+      ## Steps
+      1. Before step 2, list the exact dashboard paths to probe: `php artisan route:list --path=larapilot` in the **main** working copy — pick `/larapilot`, two `/larapilot/api/*` routes, the `.env` reader and the database-dump route
+      2. `git worktree add --detach {scratchpad}/us016-nodev feature/US-016-larapilot-dev-dependency`
+      3. In the worktree: `cp .env.example .env` (keeps `APP_ENV=local`, the worst case from the finding), `touch database/database.sqlite`, `composer install --no-dev --optimize-autoloader --no-interaction`, `php artisan key:generate`, `php artisan migrate --force` (the worktree's own SQLite file only)
+      4. Evidence on the `--no-dev` install:
+         - `composer install` output shows `package:discover` ran without error and did not list `andreapollastri/larapilot` or `laravel/boost`
+         - `ls vendor/andreapollastri vendor/laravel/boost vendor/laravel/mcp` → none exists
+         - `php artisan route:list --path=larapilot` → no matching route; `php artisan route:list | grep -i -E "boost|mcp"` → nothing
+         - Through the HTTP kernel, without serving: `php artisan tinker --execute '…'` handling `Illuminate\Http\Request::create($path)` for each path of step 1 → status `404` for every one (unauthenticated)
+         - `php artisan larapilot:context plan` → command not defined
+      5. Dev install on the same checkout: `composer install --no-interaction`, `php artisan package:discover`, `php artisan test --compact` → green
+      6. `git worktree remove --force {scratchpad}/us016-nodev`
+      7. Paste the evidence (commands and one-line results, not full output) into the local PR body under `## Verification (--no-dev)`
+
+      ## Completion Criteria
+      - [x] After `composer install --no-dev`: no `/larapilot*` route, no Boost/MCP route, Larapilot/Boost/MCP absent from `vendor/`
+      - [x] `/larapilot`, the probed `/larapilot/api/*` routes and the `.env`/dump endpoints return 404 unauthenticated (Oliver's re-test)
+      - [x] `package:discover` and the full suite pass after the subsequent dev install
+      - [x] Worktree removed; main working copy, its `vendor/` and its SQLite database untouched
+      - [x] Evidence recorded in the PR body
+
+      ## Test Data
+      - N/A — the worktree uses its own empty SQLite file; no factory or seeder change
+
+      ## Domain Docs
+      - N/A — verification only
+
+      ## Git Deliverables
+      - Commit: none — verification only; nothing in the repository changes
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR body with the evidence
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 1
+    dependencies:
+      - TASK-01
+      - TASK-02
+    commit:
+      sha: 20831a39a95c0043607195ee6098f4c942d59e84
+      short_sha: 20831a3
+      subject: 'chore(US-016): TASK-03 record --no-dev verification'
+      committed_at: '2026-10-18T15:23:39+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/20831a39a95c0043607195ee6098f4c942d59e84'
+updated_at: '2026-10-18T13:23:40+00:00'

@@ -1,0 +1,77 @@
+code: US-016
+title: 'Fix: the Larapilot dashboard ships as a production dependency'
+epic:
+  code: EP-004
+  title: Maintenance
+priority: HIGH
+points: 2
+status: DONE
+body: |
+  #### US-016: Fix — the Larapilot dashboard ships as a production dependency
+
+  **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** DONE
+  **Blocked by:** -
+  **Type:** Fix
+  **Severity:** High
+  **Security:** Lars/Oliver — yes (OWASP A05, A01; v2.0.0 assessment, High finding)
+  **Related:** US-001 (project foundation — introduced `composer.json`)
+  **Release:** 2.0.1
+  **Found in:** v2.0.0
+  **Traces to:** FR-001 · Technical Architecture › Security (Lars) — no journey (the PRD has no `## User Journeys`)
+  **Promise broken:** Security (Lars) "client credentials in `.env` only, never committed" and FR-001 "Access is restricted to an allowlist of Strava athlete ids" — clarified on 2026-10-18: "No developer tooling on a deployed host … no `/larapilot/*` route is registered and no request — signed in or not — can read `.env`, download the database, or write files through developer tooling, whatever `APP_ENV` says."
+  **Logged:** nothing logged — found by review (`.larapilot/docs/security/v2.0.0.md`), not by an exception
+
+  **User Story**
+  As the Committed Amateur Runner who owns the instance,
+  I want the deployed site to carry no developer dashboard,
+  so that nobody who reaches the host can read my Strava secret and `APP_KEY`, download my data, or write files on the server.
+
+  **Demonstrates**
+  `composer install --no-dev` on a clean checkout produces an application where `php artisan route:list --path=larapilot`
+  lists no route and `GET /larapilot` returns 404, while the local Herd setup (`composer install`) still serves the
+  dashboard. A regression test fails while `andreapollastri/larapilot` sits in `require`.
+
+  **Steps to Reproduce**
+  1. Deploy v2.0.0 with `composer install` (or `--no-dev`: the package is in `require`, so it installs either way).
+  2. Leave `APP_ENV=local` as `.env.example` ships it (`.env.example:2`).
+  3. `GET /larapilot` with no session — `AccessPolicy::mode()` (`vendor/andreapollastri/larapilot/src/Services/Auth/AccessPolicy.php:53-63`) returns `open` for `local`/`testing`.
+  4. The dashboard serves `.env` (APP_KEY, Strava client secret), a database dump, and file writes under `/larapilot/*` without sign-in. Under any other non-production `APP_ENV` it sits behind its own sign-in; under `production` it is hidden only until forced.
+
+  **Expected / Actual**
+  Expected: no `/larapilot/*` route on a deployed host. Actual: the package is a production dependency, so its routes register on every host and their exposure depends on `APP_ENV` alone.
+
+  **Root cause**
+  `composer.json:13` lists `andreapollastri/larapilot` under `require`, so `composer install --no-dev` installs it and
+  package discovery registers its service provider and routes. No app code references the package: it is product-workflow
+  tooling, used only on the developer's machine.
+
+  **Acceptance Criteria**
+  - [x] Bug fixed — the promise holds again: `andreapollastri/larapilot` is under `require-dev` (same constraint, `^5.0`), `composer.lock` is updated, and after `composer install --no-dev` `php artisan route:list --path=larapilot` lists no route and `GET /larapilot` returns 404
+  - [x] The local setup is unchanged: `composer install` still installs the package, `/larapilot` still opens on Herd, and `php artisan larapilot:*` still runs
+  - [x] Regression test (Anne): reads `composer.json` and fails when a development-only package — `andreapollastri/larapilot`, `laravel/boost`, `laravel/pail` — appears under `require`; the test fails on the current `composer.json`
+  - [x] Boost leaves deployed hosts with it: `laravel/boost` and `laravel/mcp` reach the app only through `andreapollastri/larapilot`, so after `composer install --no-dev` neither is in `vendor/` and no Boost route or MCP endpoint is registered, whatever `APP_DEBUG` says (closes the code side of the v2.0.0 Medium finding on Boost; the `.env.example` defaults stay in their own fix)
+  - [x] `php artisan package:discover` and the full test suite pass after `composer install --no-dev` followed by a dev install, so no production code path loads a Larapilot class
+  - [x] README states that every deployment runs `composer install --no-dev --optimize-autoloader`; the remaining host keys stay in the host checklist of the `.env.example` fix
+  - [x] Root cause named in the fix commit (`fix(deps): …`); no domain behavior changes, so no developer domain doc changes beyond a line in the deploy/security notes if one exists
+  - [x] No security regression (Lars/Oliver): Oliver re-tests `/larapilot`, `/larapilot/api/*` and the `.env`/database-dump endpoints as unauthenticated 404 on a `--no-dev` install; Lars re-runs the v2.0.1 gate before ship
+  - [x] Factory/seeder — not applicable (no schema change)
+status_history:
+  -
+    status: PLANNED
+    at: '2026-10-18T12:11:20+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-10-18T13:18:47+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-18T13:24:36+00:00'
+  -
+    status: DONE
+    at: '2026-10-18T13:40:41+00:00'
+rework: false
+merge_commit:
+  sha: 235cb6aa646ad498b2ad6e7c1f93bae51d15e854
+  short_sha: 235cb6a
+  subject: 'chore(US-016): move the spec to review and log the session'
+  committed_at: '2026-10-18T15:24:39+02:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/235cb6aa646ad498b2ad6e7c1f93bae51d15e854'
