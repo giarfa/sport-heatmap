@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-002` |
-| **Last updated by** | `US-011` — 2026-10-12 |
+| **Last updated by** | `US-019` — 2026-10-18 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
@@ -41,14 +41,14 @@ and the nightly sync can no longer read activities.
    8. Athlete id missing or not on the allowlist → `strava.rejected`
       (`reason=allowlist`), 403.
    9. `ConnectStravaAthlete` upserts the user (by `strava_athlete_id`) in a
-      transaction, then `Auth::login($user, remember: true)` and redirect to
+      transaction, then `Auth::login($user)` (no remember-me cookie) and redirect to
       the literal `dashboard` route.
 
 **Every authenticated request (`strava.fresh` middleware on `/`)**
 
 1. `EnsureFreshStravaToken` is a no-op for guests.
 2. For a signed-in user it re-checks the allowlist. A user no longer on it is
-   signed out (session invalidated, remember-me cookie dropped) and gets
+   signed out (session invalidated, any recaller cycled) and gets
    `strava.rejected` (`reason=allowlist`) with 403.
 3. It then calls `EnsureFreshAccessToken`. If that throws
    `StravaReconnectRequiredException` (refresh token rejected, no refresh token,
@@ -129,7 +129,8 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
 | --- | --- | --- |
 | OAuth hand-rolled on the HTTP client | Laravel Socialite | Strava is OAuth2 code flow only; Socialite's `league/oauth1-client` dependency would force Guzzle 8 down to Guzzle 7 |
 | Allowlist of Strava athlete ids as the only access control | Password login, registration, roles | One owner, one screen; Strava already authenticates — the app only has to decide *which* athlete |
-| Allowlist re-checked on every authenticated request | Checked once at connect | The session and remember-me cookie outlive a `.env` edit by weeks; removal must take effect immediately |
+| Allowlist re-checked on every authenticated request | Checked once at connect | A session lasts up to `SESSION_LIFETIME` and outlives a `.env` edit; removal must take effect immediately |
+| No remember-me cookie: `Auth::login($user)`, the session lifetime is the bound (US-019) | `Auth::login($user, remember: true)` (US-002) | The recaller lives about 400 days against a 120-minute session and signs a lost or shared device back in; the nightly sync runs on the stored tokens, so a session that ends costs nothing |
 | Scope and OAuth endpoints are config literals | `env()` lookups | Read-only is a product invariant (FR-001); pointing the token URL elsewhere would leak the client secret |
 | Displayed athlete = first **connected** id in allowlist order | Order by `users.id`; a separate `STRAVA_PUBLIC_ATHLETE_ID` | The allowlist is the one place the owner states who comes first; `users.id` order would display whoever connected first, and a second env var could name an athlete who is not allowed in |
 | No allowlisted athlete connected → the lowest `users.id` with at least one activity (US-009) | Connect screen (US-007 behaviour); the athlete with the most recent activity; a new `STRAVA_PUBLIC_ATHLETE_ID` env var | The connect screen showed nothing although data was stored; "most recent" would flip the displayed athlete every time someone runs; a new env var is one more thing to forget. The owner accepted that this can display an athlete removed from the allowlist (PRD `### Privacy & legal`, "Accepted risk — fallback display") |
@@ -181,6 +182,7 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
   private `queryString()` helper — `?state[]=x` arrives as an array and a plain
   `(string)` cast becomes a 500.
 - `Auth::login()` already migrates the session id; do not regenerate it again.
+- Recallers issued before 2.0.2 stay valid until a sign-out (or the allowlist/token teardown) cycles `remember_token`; the app no longer creates new ones.
 - Any new Strava API caller must obtain its token through `EnsureFreshAccessToken`,
   never by reading `strava_access_token` directly.
 - `<meta name="referrer" content="same-origin">` in the layout keeps the
@@ -188,7 +190,7 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
 
 ## Related
 
-- Specs: `US-002`, `US-003`, `US-007`, `US-009`, `US-011`
+- Specs: `US-002`, `US-003`, `US-007`, `US-009`, `US-011`, `US-019`
 - Plans: `.larapilot/plans/US-002-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`
 - Review: `.larapilot/docs/review/US-002.md`, `US-007.md`, `US-009.md`
 - Other domains: `activity-sync.md`, `heatmap-dashboard.md`

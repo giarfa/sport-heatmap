@@ -120,8 +120,14 @@ class StravaCallbackController extends Controller
          * redirect()->intended(): the intended URL is session data, and an
          * absolute one passes through the generator untouched — a post-login
          * open redirect waiting for the first middleware that writes it.
+         *
+         * No `remember`: SESSION_LIFETIME is the only bound on a signed-in
+         * device. A recaller cookie outlives it by about 400 days and signs a
+         * lost or shared device back in after the session has expired. The
+         * nightly sync runs on the stored tokens and needs no session, so
+         * nothing is lost by letting the session end.
          */
-        Auth::login($user, remember: true);
+        Auth::login($user);
 
         return redirect()->route('dashboard');
     }
