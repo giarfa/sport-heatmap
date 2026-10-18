@@ -55,9 +55,9 @@ tasks:
       4. Draft the internal PR title/body toward `base` (`release/2.0.1`): title `fix(deps): ship Larapilot as a development dependency (US-016)`; body cites the v2.0.0 High finding (`.larapilot/docs/security/v2.0.0.md`) and leaves a placeholder for the TASK-03 evidence
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] Current branch is `feature/US-016-larapilot-dev-dependency`, based on `release/2.0.1`
-      - [ ] PR title/body drafted toward `release/2.0.1` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] Current branch is `feature/US-016-larapilot-dev-dependency`, based on `release/2.0.1`
+      - [x] PR title/body drafted toward `release/2.0.1` (not `develop`)
 
       ## Test Data
       - N/A — git only
@@ -70,10 +70,16 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally toward `release/2.0.1` — open remote only if the user requests
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
+    commit:
+      sha: d78d8721335480c9f44bb3fda8cfbc05fd999b9a
+      short_sha: d78d872
+      subject: 'chore(US-016): TASK-00 bootstrap feature branch for release/2.0.1'
+      committed_at: '2026-10-18T15:18:47+02:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d78d8721335480c9f44bb3fda8cfbc05fd999b9a'
   -
     id: TASK-01
     title: 'Regression test, then move Larapilot to require-dev and refresh the lock'
@@ -210,4 +216,4 @@ tasks:
     dependencies:
       - TASK-01
       - TASK-02
-updated_at: '2026-10-18T12:11:20+00:00'
+updated_at: '2026-10-18T13:18:50+00:00'

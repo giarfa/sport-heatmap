@@ -952,11 +952,11 @@ specs:
       title: Maintenance
     priority: HIGH
     points: 2
-    status: PLANNED
+    status: 'IN PROGRESS'
     body: |
       #### US-016: Fix — the Larapilot dashboard ships as a production dependency
 
-      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** PLANNED
+      **Epic:** EP-004 | **Priority:** HIGH | **Points:** 2 | **Status:** IN PROGRESS
       **Blocked by:** -
       **Type:** Fix
       **Severity:** High
@@ -1004,4 +1004,5 @@ specs:
       - [ ] Factory/seeder — not applicable (no schema change)
     status_history:
       - { status: PLANNED, at: '2026-10-18T12:11:20+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-10-18T13:18:47+00:00' }
     rework: false
