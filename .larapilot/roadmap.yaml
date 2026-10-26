@@ -17,4 +17,11 @@ versions:
         title: 'Import review protected from overload; pages cannot be framed'
       US-019:
         title: 'Sign out, and no year-long sign-in cookie'
-updated_at: '2026-10-18T18:06:18+00:00'
+  3.0.0:
+    summary: 'A private instance: your own sign-in, and runs only from the Garmin export.'
+    items:
+      US-020:
+        title: 'Private sign-in for the owner'
+      US-021:
+        title: 'Strava removed: runs come only from the Garmin export'
+updated_at: '2026-10-26T21:17:50+00:00'
