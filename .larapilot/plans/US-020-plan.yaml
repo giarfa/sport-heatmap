@@ -261,7 +261,7 @@ tasks:
     id: TASK-04
     title: 'Gate every route behind the session; owner-only dashboard and Garmin import'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 6
     dependencies:
@@ -292,29 +292,35 @@ tasks:
       9. `php artisan test --compact` (full suite), `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] Every route but `/login` and `/up` redirects a signed-out request to `/login`
-      - [ ] Dashboard, windows, day detail, and trend show the signed-in owner's runs of either source; displayed-athlete selection gone
-      - [ ] Owner with no activity sees the existing empty screen
-      - [ ] Garmin upload, review, confirm, cancel, and summary require the session and import into `giarfa`; guest paths removed; throttle, 5 MB, session binding still hold
-      - [ ] No Strava route signs anyone in; no route creates or lists users
-      - [ ] Existing dashboard and import feature tests pass, signed in as `giarfa`
-      - [ ] Tests pass
+      - [x] Every route but `/login` and `/up` redirects a signed-out request to `/login`
+      - [x] Dashboard, windows, day detail, and trend show the signed-in owner's runs of either source; displayed-athlete selection gone
+      - [x] Owner with no activity sees the existing empty screen
+      - [x] Garmin upload, review, confirm, cancel, and summary require the session and import into `giarfa`; guest paths removed; throttle, 5 MB, session binding still hold
+      - [x] No Strava route signs anyone in; no route creates or lists users
+      - [x] Existing dashboard and import feature tests pass, signed in as `giarfa`
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no schema change; tests use `UserFactory::owner()` / `ownerWithPassword()` from TASK-01
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — the private `/` screen for the signed-in owner; displayed-athlete selection and guest access removed; `strava.fresh` no longer on the route
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — import target is the signed-in owner; CSV-only athlete creation and the masked guest review removed; limiter per user
-      - [ ] `.larapilot/docs/devs/strava-connection.md` — the callback no longer signs in and binds tokens to the signed-in owner; the publicly displayed athlete is gone (file is retired by US-021)
-      - [ ] `.larapilot/docs/devs/owner-authentication.md` — the route-group layout of the gate
-      - [ ] Folder `README.md` index rows refreshed
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — the private `/` screen for the signed-in owner; displayed-athlete selection and guest access removed; `strava.fresh` no longer on the route
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — import target is the signed-in owner; CSV-only athlete creation and the masked guest review removed; limiter per user
+      - [x] `.larapilot/docs/devs/strava-connection.md` — the callback no longer signs in and binds tokens to the signed-in owner; the publicly displayed athlete is gone (file is retired by US-021)
+      - [x] `.larapilot/docs/devs/owner-authentication.md` — the route-group layout of the gate
+      - [x] Folder `README.md` index rows refreshed
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-020): TASK-04 gate every route and make the dashboard and import owner-only`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: c5b96930535b70e2983fe75ea79716e5ee3310de
+      short_sha: c5b9693
+      subject: 'feat(US-020): TASK-04 gate every route and make the dashboard and import owner-only'
+      committed_at: '2026-10-26T21:30:27+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c5b96930535b70e2983fe75ea79716e5ee3310de'
   -
     id: TASK-05
     title: 'Route access matrix and sign-in page contract tests'
@@ -390,4 +396,4 @@ tasks:
       - Commit: `chore(US-020): TASK-06 changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize local PR notes toward `release/3.0.0`
-updated_at: '2026-10-26T20:22:43+00:00'
+updated_at: '2026-10-26T20:30:27+00:00'
