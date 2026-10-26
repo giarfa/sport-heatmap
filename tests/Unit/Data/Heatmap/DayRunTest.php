@@ -33,25 +33,6 @@ class DayRunTest extends TestCase
         $this->assertSame('0 m', $this->dayRun(totalAscentMeters: 0)->ascent());
     }
 
-    public function test_a_strava_run_links_to_strava_and_names_its_source(): void
-    {
-        $run = DayRun::fromActivity(Activity::factory()->make(['user_id' => 1, 'strava_activity_id' => 4_242]));
-
-        $this->assertSame('https://www.strava.com/activities/4242', $run->stravaUrl);
-        $this->assertSame('Strava', $run->sourceLabel());
-    }
-
-    public function test_a_garmin_run_has_no_link_even_when_it_keeps_a_strava_id(): void
-    {
-        $imported = DayRun::fromActivity(Activity::factory()->garminImported()->make(['user_id' => 1]));
-        $twin = DayRun::fromActivity(Activity::factory()->garminOverwritten()->make(['user_id' => 1, 'strava_activity_id' => 4_242]));
-
-        $this->assertNull($imported->stravaUrl);
-        $this->assertNull($twin->stravaUrl);
-        $this->assertSame('Garmin import', $imported->sourceLabel());
-        $this->assertSame('Garmin import', $twin->sourceLabel());
-    }
-
     public function test_it_carries_the_activitys_values_and_no_model(): void
     {
         $run = DayRun::fromActivity(Activity::factory()->withoutHeartRate()->make([
@@ -83,7 +64,6 @@ class DayRunTest extends TestCase
             averagePaceSecondsPerKm: $averagePaceSecondsPerKm,
             totalAscentMeters: $totalAscentMeters,
             averageHeartRate: $averageHeartRate,
-            stravaUrl: null,
         );
     }
 }

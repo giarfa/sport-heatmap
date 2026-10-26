@@ -73,7 +73,7 @@ tasks:
     id: TASK-00
     title: 'Bootstrap feature branch for release/3.0.0 (merge US-020 first)'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 1
     dependencies: {}
@@ -92,9 +92,9 @@ tasks:
       5. Draft the internal PR title and body toward `base` (`release/3.0.0`): "US-021 Remove Strava: Garmin CSV is the only data source". Call out the irreversible data migration in it.
 
       ## Completion Criteria
-      - [ ] `feature/US-020-private-login` merged into `release/3.0.0` locally, suite green on the merge
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true` on `feature/US-021-remove-strava`
-      - [ ] PR title/body drafted toward `release/3.0.0` (not `develop`)
+      - [x] `feature/US-020-private-login` merged into `release/3.0.0` locally, suite green on the merge
+      - [x] `release-feature` returned `ok: true` and `checked_out: true` on `feature/US-021-remove-strava`
+      - [x] PR title/body drafted toward `release/3.0.0` (not `develop`)
 
       ## Test Data
       - N/A — git only
@@ -106,11 +106,17 @@ tasks:
       - Commit: `chore(US-021): TASK-00 bootstrap feature branch for release/3.0.0` (empty commit optional)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: 147a3825a379b046c722ce8b6b4c470442b08dde
+      short_sha: 147a382
+      subject: 'chore(US-021): TASK-00 bootstrap feature branch for release/3.0.0'
+      committed_at: '2026-10-26T21:50:23+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/147a3825a379b046c722ce8b6b4c470442b08dde'
   -
     id: TASK-01
     title: 'Garmin-only status line, import detail, and empty state on the dashboard'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
@@ -176,30 +182,36 @@ tasks:
       10. `php artisan test`, `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] Status line reads "last import N ago" from the newest imported run; "No runs imported yet" with none; a no-op re-import does not move it
-      - [ ] No stale / failed / reconnect / first-sync state exists in code or views
-      - [ ] Owner with no runs sees the Garmin-only empty state; the dashboard keeps the "Import Garmin CSV" entry point
-      - [ ] UI usable at 375 / 768 / 1280 px, light and dark (manual smoke OK under NORMAL)
-      - [ ] Mockup deviation logged and listed in the mockup README
-      - [ ] Tests pass
+      - [x] Status line reads "last import N ago" from the newest imported run; "No runs imported yet" with none; a no-op re-import does not move it
+      - [x] No stale / failed / reconnect / first-sync state exists in code or views
+      - [x] Owner with no runs sees the Garmin-only empty state; the dashboard keeps the "Import Garmin CSV" entry point
+      - [x] UI usable at 375 / 768 / 1280 px, light and dark (manual smoke OK under NORMAL)
+      - [x] Mockup deviation logged and listed in the mockup README
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes in this task (factories already have `garminImported()` runs)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` rewritten for the import status, the empty state, and `display_timezone`. Under Architectural choices, record why there is no warning state (nothing runs in the background) and why `updated_at` is read rather than an import log.
-      - [ ] Folder `README.md` index row updated
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` rewritten for the import status, the empty state, and `display_timezone`. Under Architectural choices, record why there is no warning state (nothing runs in the background) and why `updated_at` is read rather than an import log.
+      - [x] Folder `README.md` index row updated
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-021): TASK-01 Garmin-only import status and empty state`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: cd03e75c0ebd04e4d2915816745ff1e85e75e5d3
+      short_sha: cd03e75
+      subject: 'feat(US-021): TASK-01 Garmin-only import status and empty state'
+      committed_at: '2026-10-26T21:55:37+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cd03e75c0ebd04e4d2915816745ff1e85e75e5d3'
   -
     id: TASK-02
     title: 'Remove the Strava integration: routes, OAuth, client, sync command, schedule, config, and Strava UI'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
@@ -265,31 +277,37 @@ tasks:
       9. `php artisan route:list --except-vendor | grep -i strava` prints nothing. `php artisan schedule:list` prints no task. `php artisan test`, `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] No route under `strava/`; the redirect and callback controllers, `StravaClient`, `StravaOAuth`, the fresh-token middleware, the allowlist, Strava exceptions and data objects, and `config/strava.php` are deleted
-      - [ ] `.env.example` carries no `STRAVA_*` key
-      - [ ] `php artisan schedule:list` lists no task; `strava:sync` is not a command
-      - [ ] No page renders "Powered by Strava", "Connect with Strava", a Strava link, a reconnect notice, or the rejection page
-      - [ ] Day detail and import review carry no external link
-      - [ ] The Strava tests and helpers are deleted; the remaining suite passes
+      - [x] No route under `strava/`; the redirect and callback controllers, `StravaClient`, `StravaOAuth`, the fresh-token middleware, the allowlist, Strava exceptions and data objects, and `config/strava.php` are deleted
+      - [x] `.env.example` carries no `STRAVA_*` key
+      - [x] `php artisan schedule:list` lists no task; `strava:sync` is not a command
+      - [x] No page renders "Powered by Strava", "Connect with Strava", a Strava link, a reconnect notice, or the rejection page
+      - [x] Day detail and import review carry no external link
+      - [x] The Strava tests and helpers are deleted; the remaining suite passes
 
       ## Test Data
       - N/A — no model/schema changes in this task (factory and seeder Strava states leave with the columns in TASK-03)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/strava-connection.md` deleted, and its index row removed from `README.md`
-      - [ ] `.larapilot/docs/devs/activity-sync.md`: the nightly sync, `sync_runs`, and the OAuth/token sections removed. Only the `activities` data-model and metric-column sections remain, until TASK-03 folds them into `garmin-csv-import.md`.
-      - [ ] `heatmap-dashboard.md` (footer, day detail) and `owner-authentication.md` (sign-out no longer mentions tokens) corrected
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/strava-connection.md` deleted, and its index row removed from `README.md`
+      - [x] `.larapilot/docs/devs/activity-sync.md`: the nightly sync, `sync_runs`, and the OAuth/token sections removed. Only the `activities` data-model and metric-column sections remain, until TASK-03 folds them into `garmin-csv-import.md`.
+      - [x] `heatmap-dashboard.md` (footer, day detail) and `owner-authentication.md` (sign-out no longer mentions tokens) corrected
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-021): TASK-02 remove the Strava integration and its UI`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: eb21baaee80c0cebf124f542d26e49eea89597d4
+      short_sha: eb21baa
+      subject: 'feat(US-021): TASK-02 remove the Strava integration and its UI'
+      committed_at: '2026-10-26T22:00:23+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/eb21baaee80c0cebf124f542d26e49eea89597d4'
   -
     id: TASK-03
     title: 'Irreversible migration: delete Strava runs, drop Strava columns and sync_runs; Garmin-only models, factories, seeder'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 5
     dependencies:
@@ -361,34 +379,40 @@ tasks:
       10. `php artisan test`, `vendor/bin/pint --dirty --format agent`, then `grep -rni strava app database/factories database/seeders config routes resources`. Hits are allowed only in the old migrations, which stay untouched.
 
       ## Completion Criteria
-      - [ ] The migration deletes every `strava` activity and keeps every `garmin_csv` activity with all its values
-      - [ ] `users` has no Strava column; `sync_runs` and `activities.strava_activity_id` are gone; `activities.source` no longer exists, so no `strava` value is possible
-      - [ ] `down()` restores the schema only, never the deleted rows
-      - [ ] After the migration the cached grid is flushed; no window shows a deleted run
-      - [ ] Conflicts are matched against every stored run on the same date within ±2 minutes; re-import stays idempotent
-      - [ ] `migrate:fresh --seed` succeeds on a throwaway SQLite file
-      - [ ] Tests pass
+      - [x] The migration deletes every `strava` activity and keeps every `garmin_csv` activity with all its values
+      - [x] `users` has no Strava column; `sync_runs` and `activities.strava_activity_id` are gone; `activities.source` no longer exists, so no `strava` value is possible
+      - [x] `down()` restores the schema only, never the deleted rows
+      - [x] After the migration the cached grid is flushed; no window shows a deleted run
+      - [x] Conflicts are matched against every stored run on the same date within ±2 minutes; re-import stays idempotent
+      - [x] `migrate:fresh --seed` succeeds on a throwaway SQLite file
+      - [x] Tests pass
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` and `UserFactory.php` Garmin-only; `SyncRunFactory.php` deleted
-      - [ ] `TrainingBlockSeeder` produces Garmin-sourced runs only, with no `SyncRun`
-      - [ ] Factories and seeder updated in **this same task** as the migration
+      - [x] `database/factories/ActivityFactory.php` and `UserFactory.php` Garmin-only; `SyncRunFactory.php` deleted
+      - [x] `TrainingBlockSeeder` produces Garmin-sourced runs only, with no `SyncRun`
+      - [x] Factories and seeder updated in **this same task** as the migration
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` gains the `activities` data model and the metric columns from `activity-sync.md`, plus the "every stored run is a candidate" rule, and records the dropped `source` column (and why it was dropped rather than narrowed) under Architectural choices
-      - [ ] `.larapilot/docs/devs/activity-sync.md` deleted, and its index row removed from `README.md`
-      - [ ] `heatmap-dashboard.md`: cache key `v6` and the post-migration flush; `owner-authentication.md`: `users` columns
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` gains the `activities` data model and the metric columns from `activity-sync.md`, plus the "every stored run is a candidate" rule, and records the dropped `source` column (and why it was dropped rather than narrowed) under Architectural choices
+      - [x] `.larapilot/docs/devs/activity-sync.md` deleted, and its index row removed from `README.md`
+      - [x] `heatmap-dashboard.md`: cache key `v6` and the post-migration flush; `owner-authentication.md`: `users` columns
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-021): TASK-03 delete Strava runs and drop the Strava schema`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: c127f5d1acc650b586f5b640d498dde19c64ed79
+      short_sha: c127f5d
+      subject: 'feat(US-021): TASK-03 delete Strava runs and drop the Strava schema'
+      committed_at: '2026-10-26T22:05:07+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c127f5d1acc650b586f5b640d498dde19c64ed79'
   -
     id: TASK-04
     title: 'Cover the Strava-removed acceptance matrix'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
@@ -415,19 +439,25 @@ tasks:
       4. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites.
 
       ## Completion Criteria
-      - [ ] Every "Strava removed" and "Garmin-only behaviour" criterion of US-021 has a passing assertion
-      - [ ] Full suite passes
-      - [ ] Coverage matches the NORMAL bar
+      - [x] Every "Strava removed" and "Garmin-only behaviour" criterion of US-021 has a passing assertion
+      - [x] Full suite passes
+      - [x] Coverage matches the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-021): TASK-04 cover the Strava-removed acceptance matrix`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: ef267e664bca6fa69a02323c3d1a5a05b7afee06
+      short_sha: ef267e6
+      subject: 'test(US-021): TASK-04 cover the Strava-removed acceptance matrix'
+      committed_at: '2026-10-26T22:05:54+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ef267e664bca6fa69a02323c3d1a5a05b7afee06'
   -
     id: TASK-05
     title: 'README, CHANGELOG, and quality gate'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 2
     dependencies:
@@ -456,19 +486,25 @@ tasks:
       4. `grep -rni strava README.md CHANGELOG.md .env.example`: only the revocation step and the changelog entries remain.
 
       ## Completion Criteria
-      - [ ] README has no Strava setup, key, command, or cron; it has the revocation step and `HEATMAP_DISPLAY_TIMEZONE`
-      - [ ] CHANGELOG Unreleased lists Removed / Changed / Security with the backup warning
-      - [ ] `larapilot:quality` passes; `php artisan test` green
+      - [x] README has no Strava setup, key, command, or cron; it has the revocation step and `HEATMAP_DISPLAY_TIMEZONE`
+      - [x] CHANGELOG Unreleased lists Removed / Changed / Security with the backup warning
+      - [x] `larapilot:quality` passes; `php artisan test` green
 
       ## Test Data
       - N/A — documentation only
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/README.md` index lists exactly `garmin-csv-import`, `heatmap-dashboard`, and `owner-authentication`, each with `US-021` as last touched
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/README.md` index lists exactly `garmin-csv-import`, `heatmap-dashboard`, and `owner-authentication`, each with `US-021` as last touched
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `chore(US-021): TASK-05 README, changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
-updated_at: '2026-10-26T20:48:02+00:00'
+    commit:
+      sha: 046cdabf849438cad43c906c2fb18cc6d7eadba9
+      short_sha: 046cdab
+      subject: 'chore(US-021): TASK-05 README, changelog and quality gate'
+      committed_at: '2026-10-26T22:06:36+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/046cdabf849438cad43c906c2fb18cc6d7eadba9'
+updated_at: '2026-10-26T21:06:36+00:00'

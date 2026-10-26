@@ -1182,4 +1182,17 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-26T20:07:59+00:00'
+  -
+    id: c022654e858f07e5
+    ts: '2026-10-26T20:54:34+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-implement
+    topic: 'mockup deviation'
+    label: 'mockup deviation'
+    value: 'heatmap-dashboard: the not-connected, athlete-rejected, sync stale/failed and loading states are retired; the empty state offers only the Garmin CSV import'
+    question: null
+    rationale: 'Strava is removed (US-021): nothing runs in the background, so no state can warn or load'
+    source: chat
+    spec: US-021
+    supersedes: null
+updated_at: '2026-10-26T20:54:34+00:00'

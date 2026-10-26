@@ -3,10 +3,10 @@
 namespace App\Enums;
 
 /**
- * The Strava sport types this product stores.
+ * The sport types this product stores.
  *
- * Everything else Strava returns is discarded at sync time (FR-003): the heatmap
- * is a running heatmap, so rides, swims and walks never reach the database.
+ * Everything else a Garmin export lists is ignored at import time (FR-003): the
+ * heatmap is a running heatmap, so rides, swims and walks never reach the database.
  */
 enum SportType: string
 {
@@ -15,7 +15,7 @@ enum SportType: string
     case VirtualRun = 'VirtualRun';
 
     /**
-     * The backing values, for filtering a Strava activity payload at sync time.
+     * The backing values.
      *
      * @return array<int, string>
      */

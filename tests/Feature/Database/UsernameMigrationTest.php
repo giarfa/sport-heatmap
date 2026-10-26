@@ -17,12 +17,19 @@ class UsernameMigrationTest extends TestCase
 
     private const MIGRATION = 'database/migrations/2026_10_26_201636_add_username_to_users_table.php';
 
+    /**
+     * Applied after this one and dropping the Strava columns it still reads, so it is
+     * rolled back first: the migration under test belongs to the schema that had them.
+     */
+    private const REMOVE_STRAVA_MIGRATION = 'database/migrations/2026_10_26_210040_remove_strava_from_schema.php';
+
     protected function setUp(): void
     {
         parent::setUp();
 
         // Start from the schema as it was before this migration, with the users
         // each test arranges; migrateUp() is what the test then runs.
+        Artisan::call('migrate:rollback', ['--path' => self::REMOVE_STRAVA_MIGRATION, '--force' => true]);
         $this->migrateDown();
     }
 

@@ -7,26 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Upgrade warning: the migration that ships with this release permanently deletes every run that
+came from Strava, and drops the Strava tokens. Back up the database first.** A run you overwrote from
+a Garmin CSV is kept with all its values.
+
 ### Added
 
 - A sign-in page for the single `giarfa` account. The first sign-in uses an empty password and
   then asks you to set one of at least 12 characters; after that only that password signs in.
+- `HEATMAP_DISPLAY_TIMEZONE` (default `Europe/Rome`): the timezone the import card prints its
+  absolute "Last import" time in.
 
 ### Changed
 
 - Every page now requires you to be signed in; a signed-out browser is sent to the sign-in page.
-- The dashboard shows only the signed-in owner's runs, from Strava or Garmin.
-- The Garmin CSV import requires a session and imports into your account.
+- The Garmin Connect CSV export is the only way a run enters. The Garmin CSV import requires a session
+  and imports into your account; a row is a conflict against any stored run on the same date within
+  two minutes.
+- The status line reads "Last import N ago" from your newest import, or "No runs imported yet".
+- An owner with no runs sees an empty screen that offers only the Garmin CSV import.
+- The day detail lists name, distance, moving time, pace, ascent and heart rate, with no link.
 - Signing out returns to the sign-in page.
-- Connecting Strava attaches it to your account instead of signing you in.
 
 ### Removed
 
-- The public read-only dashboard, the Garmin import for signed-out visitors, and signing in
-  through Strava.
+- The Strava connection, the nightly sync and its command, the schedule, and every sync warning
+  (stale, failed, reconnect, first sync).
+- "Powered by Strava", the "Connect with Strava" screen, and every Strava link.
+- The public read-only dashboard and the Garmin import for signed-out visitors.
 
 ### Security
 
+- The instance stores no third-party token and makes no outbound request. Revoke the former app at
+  strava.com/settings/apps.
 - Sign-in attempts are limited to five a minute per username and IP address, and a refused
   attempt says how many seconds to wait.
 

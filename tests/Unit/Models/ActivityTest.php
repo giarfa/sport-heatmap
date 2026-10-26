@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Models;
 
-use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
@@ -134,43 +133,12 @@ class ActivityTest extends TestCase
         $this->assertSame('2026-03-14', $activity->start_date_local->toDateString());
     }
 
-    public function test_a_default_activity_is_strava_sourced_and_links_to_strava(): void
+    public function test_an_activity_has_no_strava_attribute_and_no_source(): void
     {
-        $activity = Activity::factory()->create(['strava_activity_id' => 1234567890]);
+        $activity = Activity::factory()->create()->fresh();
 
-        $this->assertSame(ActivitySource::Strava, $activity->fresh()->source);
-        $this->assertFalse($activity->isGarminSourced());
-        $this->assertSame('https://www.strava.com/activities/1234567890', $activity->stravaUrl());
-    }
-
-    public function test_a_garmin_imported_activity_has_no_strava_id_and_no_strava_link(): void
-    {
-        $activity = Activity::factory()->garminImported()->create()->fresh();
-
-        $this->assertSame(ActivitySource::GarminCsv, $activity->source);
-        $this->assertNull($activity->strava_activity_id);
-        $this->assertTrue($activity->isGarminSourced());
-        $this->assertNull($activity->stravaUrl());
-    }
-
-    /**
-     * The twin keeps its Strava id only so the sync can recognise it; the Strava page
-     * shows values that are no longer the stored ones, so it is not linked (FR-008).
-     */
-    public function test_a_garmin_overwritten_twin_keeps_its_strava_id_but_has_no_strava_link(): void
-    {
-        $activity = Activity::factory()->garminOverwritten()->create()->fresh();
-
-        $this->assertSame(ActivitySource::GarminCsv, $activity->source);
-        $this->assertNotNull($activity->strava_activity_id);
-        $this->assertNull($activity->stravaUrl());
-    }
-
-    public function test_many_garmin_imported_activities_coexist_under_the_unique_strava_id(): void
-    {
-        Activity::factory()->count(3)->garminImported()->create();
-
-        $this->assertSame(3, Activity::whereNull('strava_activity_id')->count());
+        $this->assertArrayNotHasKey('strava_activity_id', $activity->getAttributes());
+        $this->assertArrayNotHasKey('source', $activity->getAttributes());
     }
 
     public function test_the_sport_type_enum_exposes_exactly_the_three_running_types(): void

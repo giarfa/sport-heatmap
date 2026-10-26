@@ -196,3 +196,11 @@ that data** (p25 = 7.2, p50 = 9.9, p75 = 14.1), not typed in, so the swatches an
 
 Window shown: **Mon 18 May – Sun 6 Sep 2026**, with "today" as Saturday 5 Sep 2026 so the final Sunday renders
 as a future cell.
+
+## Deviations
+
+Differences between the shipped screens and these mockups that were discussed and agreed. Silent deviations are not allowed.
+
+| Date | Screen | What | Why | Decision |
+| --- | --- | --- | --- | --- |
+| 2026-10-26 | `states.html` | The "not connected", "athlete rejected", "sync stale/failed" and "loading" states are retired; the "empty" state offers only the Garmin CSV import; the rail's detail card reads "Import / Last import / Runs in window" and the header chip "Last import N ago"; the bottom line loses "Runs missing from Strava?"; the footer loses the "Powered by Strava" link | Strava is removed (US-021): nothing runs in the background, so no state can warn, load or reconnect | Accepted with the spec; decision `c022654e858f07e5` |

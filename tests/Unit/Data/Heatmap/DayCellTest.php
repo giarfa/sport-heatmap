@@ -128,6 +128,6 @@ class DayCellTest extends TestCase
 
     private function dayRun(): DayRun
     {
-        return new DayRun('Morning run', 8_200, 2_650, 323, 45, 152, null);
+        return new DayRun('Morning run', 8_200, 2_650, 323, 45, 152);
     }
 }

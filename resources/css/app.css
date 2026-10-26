@@ -29,7 +29,6 @@
     --warn-border: #fcd34d; /* amber-300 */
     --warn-ink: #92400e; /* amber-800 */
     --ok-dot: #0ca30c;
-    --skeleton: #e2e8f0;
     --lv-0: #e2e8f0;
     --lv-1: #86b6ef;
     --lv-2: #3987e5;
@@ -57,7 +56,6 @@ html.dark {
     --warn-border: #854d0e;
     --warn-ink: #fcd34d;
     --ok-dot: #22c55e;
-    --skeleton: #1e293b;
     --lv-0: #1e293b;
     --lv-1: #184f95;
     --lv-2: #2a78d6;
@@ -80,8 +78,7 @@ html.dark {
         --warn-border: #854d0e;
         --warn-ink: #fcd34d;
         --ok-dot: #22c55e;
-        --skeleton: #1e293b;
-        --lv-0: #1e293b;
+            --lv-0: #1e293b;
         --lv-1: #184f95;
         --lv-2: #2a78d6;
         --lv-3: #5598e7;
@@ -545,20 +542,6 @@ html.dark {
     font-weight: 600;
 }
 
-.run-src {
-    margin: 0.125rem 0 0;
-    font-size: 0.75rem;
-    color: var(--ink-muted);
-}
-
-.run-src a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.75rem;
-    margin-block: -0.5rem -0.75rem;
-    color: var(--accent);
-}
-
 .run-stats {
     margin: 0.5rem 0 0;
     display: grid;
@@ -901,27 +884,15 @@ html.dark {
     color: var(--ink-muted);
 }
 
-.trend-plot--skeleton {
-    display: flex;
-    align-items: flex-end;
-    gap: 4px;
-}
-
-.trend-plot--skeleton span {
-    display: block;
-    flex: 1;
-}
-
 @media (min-width: 1024px) {
     .trend-chart {
         grid-template-rows: 10rem auto;
     }
 }
 
-/* ---- Sync status ------------------------------------------------------------
-   The header chip, the amber warning banner and the rail's sync detail card,
-   plus the skeleton the grid card shows while a first sync is in flight. */
-.sync-chip {
+/* ---- Import status ----------------------------------------------------------
+   The header chip and the rail's import detail card. */
+.import-chip {
     display: none;
     align-items: center;
     gap: 0.375rem;
@@ -933,56 +904,21 @@ html.dark {
 }
 
 @media (min-width: 640px) {
-    .sync-chip {
+    .import-chip {
         display: inline-flex;
     }
 }
 
-.sync-dot {
+.import-dot {
     display: inline-block;
     width: 0.375rem;
     height: 0.375rem;
     border-radius: 9999px;
     flex: none;
-}
-
-.sync-dot--ok {
     background: var(--ok-dot);
 }
 
-.sync-dot--warn {
-    background: var(--warn-ink);
-}
-
-.sync-alert {
-    display: flex;
-    gap: 0.625rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--warn-border);
-    background: var(--warn-bg);
-    color: var(--warn-ink);
-    padding: 0.625rem 0.75rem;
-    font-size: 0.875rem;
-}
-
-.sync-alert-title {
-    font-weight: 600;
-}
-
-.sync-alert-action {
-    display: inline-flex;
-    align-items: center;
-    height: 2.75rem;
-    margin-top: 0.5rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--warn-border);
-    padding: 0 0.75rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--warn-ink);
-}
-
-.sync-detail dl {
+.import-detail dl {
     margin-top: 0.5rem;
     display: grid;
     gap: 0.375rem;
@@ -990,48 +926,17 @@ html.dark {
     color: var(--ink-muted);
 }
 
-.sync-detail-row {
+.import-detail-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
 }
 
-.sync-detail-value {
+.import-detail-value {
     text-align: right;
     color: var(--ink);
     font-variant-numeric: tabular-nums;
-}
-
-.sync-detail-outcome {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-}
-
-/* The pulse is added inside the reduced-motion query, never added then
-   disabled — a skeleton with the animation declared unconditionally would
-   ignore an OS "reduce motion" setting instead of respecting it. */
-.skeleton {
-    background: var(--skeleton);
-    border-radius: 0.1875rem;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-    .skeleton {
-        animation: sync-skeleton-pulse 1.6s ease-in-out infinite;
-    }
-
-    @keyframes sync-skeleton-pulse {
-        0%,
-        100% {
-            opacity: 1;
-        }
-
-        50% {
-            opacity: 0.55;
-        }
-    }
 }
 
 /* ---- Garmin import ------------------------------------------------------------
@@ -1260,13 +1165,6 @@ html.dark {
     margin-top: 0.25rem;
     font-size: 0.75rem;
     color: var(--ink-muted);
-}
-
-.side-source a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.75rem;
-    color: var(--accent);
 }
 
 @media (max-width: 639.98px) {

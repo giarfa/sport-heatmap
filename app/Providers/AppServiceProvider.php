@@ -26,14 +26,10 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * The OAuth entry points are limited per IP: ten attempts a minute is far
-     * more than a real athlete ever needs. The Garmin upload, review and confirm
-     * are limited per signed-in owner.
+     * The Garmin upload, review and confirm are limited per signed-in owner.
      */
     private function registerRateLimiters(): void
     {
-        RateLimiter::for('strava-oauth', fn (Request $request): Limit => Limit::perMinute(10)->by($request->ip()));
-
         /*
          * Each upload parses up to 5 MB in the request, and each review plans
          * the pending rows against the stored runs; ten a minute is far beyond

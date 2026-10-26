@@ -12,8 +12,11 @@
  *     window_weeks: int,
  *     navigation_step_weeks: int,
  *     grid_cache_ttl: int,
+ *     display_timezone: string,
  * } $config
  */
+$displayTimezone = env('HEATMAP_DISPLAY_TIMEZONE');
+
 $config = [
 
     /*
@@ -50,7 +53,7 @@ $config = [
     |--------------------------------------------------------------------------
     |
     | The cache key already carries the calendar day (HeatmapGridCache), so this
-    | TTL only bounds how long a stale entry can outlive an interrupted sync; it
+    | TTL only bounds how long a stale entry can outlive a failed cache flush; it
     | is a literal rather than an env() lookup for the same reason window_weeks
     | is — a deployment file must not be able to widen how long a stale grid can
     | be served.
@@ -58,6 +61,24 @@ $config = [
     */
 
     'grid_cache_ttl' => 86_400,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Display timezone
+    |--------------------------------------------------------------------------
+    |
+    | The timezone the import detail card prints its absolute "Last import"
+    | stamp in (FR-007). Timestamps are stored in UTC; this is a deployment
+    | choice (the owner's wall clock), so unlike the window constants above it
+    | is read from the environment. A blank or unknown value falls back to
+    | Europe/Rome rather than reaching the page, where it would be a 500 for
+    | every owner with a run.
+    |
+    */
+
+    'display_timezone' => is_string($displayTimezone) && in_array($displayTimezone, DateTimeZone::listIdentifiers(), true)
+        ? $displayTimezone
+        : 'Europe/Rome',
 
 ];
 

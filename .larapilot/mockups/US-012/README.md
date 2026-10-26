@@ -98,7 +98,7 @@ rule as name, distance, moving time and the Strava link; **assumption to confirm
 
 | Date | Screen | What | Why | Decision |
 | --- | --- | --- | --- | --- |
-| — | — | none yet | — | — |
+| 2026-10-26 | `day-detail.html` | The run rows lose the source label and the "View on Strava" link: the detail lists name, distance, moving time, pace, ascent and heart rate and nothing else | Strava is removed (US-021): the only source is the import, so a label says nothing and there is nowhere to link to | Accepted with the spec; decision `c022654e858f07e5` |
 
 ## Approval
 

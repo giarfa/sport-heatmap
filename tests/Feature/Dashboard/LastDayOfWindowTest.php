@@ -28,7 +28,7 @@ class LastDayOfWindowTest extends TestCase
 
         Http::preventStrayRequests();
 
-        $this->athlete = $this->allowlistedAthlete();
+        $this->athlete = $this->signInOwner();
     }
 
     private function runOn(string $date, int $distanceMeters): Activity

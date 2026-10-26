@@ -202,8 +202,8 @@ class HeatmapBuilderTest extends TestCase
         $today = CarbonImmutable::parse('2026-09-05'); // Saturday
         $window = HeatmapWindow::current($today);
         $ranDay = $today->subDays(2)->toDateString();
-        $first = new DayRun('Morning run', 5_000, 1_650, 330, 20, 140, null);
-        $second = new DayRun('Evening run', 3_000, 1_100, 366, null, null, null);
+        $first = new DayRun('Morning run', 5_000, 1_650, 330, 20, 140);
+        $second = new DayRun('Evening run', 3_000, 1_100, 366, null, null);
 
         $grid = $this->builder()(
             $window,

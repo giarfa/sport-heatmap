@@ -67,9 +67,9 @@
             </a>
             <div class="flex items-center gap-1">
                 {{--
-                    A yield, not a view composer or a shared variable: strava/connect
-                    and strava/rejected extend this same layout and must render with
-                    no chip at all, which a composer could not express as cleanly.
+                    A yield, not a view composer or a shared variable: a screen that
+                    extends this layout may render with no chip at all, which a
+                    composer could not express as cleanly.
                 --}}
                 @yield('header-status')
                 <button type="button" data-theme-toggle aria-pressed="false"
@@ -89,9 +89,7 @@
 
     <footer class="mx-auto max-w-5xl px-3 pb-8 sm:px-6">
         <p class="text-xs" style="color: var(--ink-muted);">
-            {{-- Contractual under the Strava API Agreement (FR-008), not decoration — it stays in the layout so no view change can drop it. --}}
-            <a href="https://www.strava.com" class="underline underline-offset-2" style="color: var(--accent);">Powered by Strava</a>
-            · runs only · distances in kilometres
+            runs only · distances in kilometres
             <span class="sm:hidden">@yield('footer-status')</span>
         </p>
     </footer>
