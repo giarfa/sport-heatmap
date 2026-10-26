@@ -5,11 +5,11 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 8
-status: REVIEW
+status: DONE
 body: |
   #### US-021: Remove Strava: the Garmin CSV import is the only way runs enter
 
-  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** REVIEW
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** DONE
   **Blocked by:** US-020
   **Type:** Change request
   **Release:** 3.0.0
@@ -29,25 +29,25 @@ body: |
   **Acceptance Criteria**
 
   _Strava removed_
-  - [ ] No route under `strava/` is registered; the Strava redirect and callback controllers, `StravaClient`, `StravaOAuth`, the fresh-token middleware, the athlete allowlist, the Strava exceptions and data objects, and `config/strava.php` are deleted; `.env.example` carries no `STRAVA_*` key
-  - [ ] `php artisan schedule:list` lists no task and `strava:sync` is no longer an Artisan command
-  - [ ] No page renders "Powered by Strava", "Connect with Strava", a Strava link, a reconnect notice, or the Strava rejection page
+  - [x] No route under `strava/` is registered; the Strava redirect and callback controllers, `StravaClient`, `StravaOAuth`, the fresh-token middleware, the athlete allowlist, the Strava exceptions and data objects, and `config/strava.php` are deleted; `.env.example` carries no `STRAVA_*` key
+  - [x] `php artisan schedule:list` lists no task and `strava:sync` is no longer an Artisan command
+  - [x] No page renders "Powered by Strava", "Connect with Strava", a Strava link, a reconnect notice, or the Strava rejection page
 
   _Data (irreversible migration — accepted by the owner on 2026-10-26)_
-  - [ ] A migration deletes every activity whose `source` is `strava`; an activity the owner overwrote from a Garmin CSV (already `garmin_csv`) is kept with all its values
-  - [ ] The same change drops `strava_athlete_id`, `strava_access_token`, `strava_refresh_token`, and `strava_token_expires_at` from `users`, the `sync_runs` table, and `activities.strava_activity_id`; no `strava` value remains possible in `activities.source`; the migration's `down()` restores the schema only, never the deleted rows
-  - [ ] After the migration runs, the cached heatmap grid is flushed: no window shows a deleted run
+  - [x] A migration deletes every activity whose `source` is `strava`; an activity the owner overwrote from a Garmin CSV (already `garmin_csv`) is kept with all its values
+  - [x] The same change drops `strava_athlete_id`, `strava_access_token`, `strava_refresh_token`, and `strava_token_expires_at` from `users`, the `sync_runs` table, and `activities.strava_activity_id`; no `strava` value remains possible in `activities.source`; the migration's `down()` restores the schema only, never the deleted rows
+  - [x] After the migration runs, the cached heatmap grid is flushed: no window shows a deleted run
 
   _Garmin-only behaviour (FR-007, FR-017, FR-018, FR-011)_
-  - [ ] The status line reads "last import N ago" from the newest confirmed import (the newest imported row's `updated_at`); with no imported run it says no runs are imported yet; a re-import that writes nothing does not move it; no stale, failed, or reconnect warning exists in any state
-  - [ ] An owner with no runs sees an empty state offering only the Garmin CSV import; the "Import Garmin CSV" entry point stays on the dashboard
-  - [ ] A CSV row is a conflict only against a stored run on the same date within ±2 minutes; Overwrite, Skip, apply-to-all, re-import idempotence, the summary counts, the `garmin-import` throttle, the 5 MB limit, and the session binding behave as before
-  - [ ] The day cell detail lists name, distance, moving time, pace, ascent, and heart rate (`—` when missing) and carries no external link
-  - [ ] The heatmap, legend, window navigation, and weekly trend render unchanged from imported runs; the intensity scale and every cached window refresh after each confirmed import; viewing any page writes nothing
+  - [x] The status line reads "last import N ago" from the newest confirmed import (the newest imported row's `updated_at`); with no imported run it says no runs are imported yet; a re-import that writes nothing does not move it; no stale, failed, or reconnect warning exists in any state
+  - [x] An owner with no runs sees an empty state offering only the Garmin CSV import; the "Import Garmin CSV" entry point stays on the dashboard
+  - [x] A CSV row is a conflict only against a stored run on the same date within ±2 minutes; Overwrite, Skip, apply-to-all, re-import idempotence, the summary counts, the `garmin-import` throttle, the 5 MB limit, and the session binding behave as before
+  - [x] The day cell detail lists name, distance, moving time, pace, ascent, and heart rate (`—` when missing) and carries no external link
+  - [x] The heatmap, legend, window navigation, and weekly trend render unchanged from imported runs; the intensity scale and every cached window refresh after each confirmed import; viewing any page writes nothing
 
   _Docs and tests_
-  - [ ] `README.md` drops the Strava application registration, the `STRAVA_*` keys, the sync command, and the cron entry, and adds one step: revoke the former app at strava.com/settings/apps; `.larapilot/docs/devs/strava-connection.md` and `activity-sync.md` are removed or rewritten for the Garmin-only flow, and the devs README index follows
-  - [ ] The Strava tests are deleted; factories and `TrainingBlockSeeder` produce Garmin-sourced runs only, with no `SyncRun` factory; the remaining suite, Pint, and Larastan pass
+  - [x] `README.md` drops the Strava application registration, the `STRAVA_*` keys, the sync command, and the cron entry, and adds one step: revoke the former app at strava.com/settings/apps; `.larapilot/docs/devs/strava-connection.md` and `activity-sync.md` are removed or rewritten for the Garmin-only flow, and the devs README index follows
+  - [x] The Strava tests are deleted; factories and `TrainingBlockSeeder` produce Garmin-sourced runs only, with no `SyncRun` factory; the remaining suite, Pint, and Larastan pass
 status_history:
   -
     status: PLANNED
@@ -58,4 +58,13 @@ status_history:
   -
     status: REVIEW
     at: '2026-10-26T21:08:11+00:00'
+  -
+    status: DONE
+    at: '2026-10-26T21:13:46+00:00'
 rework: false
+merge_commit:
+  sha: efb88de8d008b30cca08eafcd1b24c43de9374b1
+  short_sha: efb88de
+  subject: 'chore(US-021): log usage'
+  committed_at: '2026-10-26T22:08:15+01:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/efb88de8d008b30cca08eafcd1b24c43de9374b1'
