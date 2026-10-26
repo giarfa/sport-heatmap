@@ -6,8 +6,8 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
- * The 112-day window every heatmap concern reads: US-003 reconciles the current
- * one, US-004 renders it, US-005 calibrates percentiles over it, and US-013 lets
+ * The 112-day window every heatmap concern reads: US-004 renders the current
+ * one, US-005 calibrates percentiles over it, and US-013 lets
  * the reader step back and forward through earlier ones.
  */
 final readonly class HeatmapWindow

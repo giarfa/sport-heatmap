@@ -457,7 +457,7 @@ tasks:
     id: TASK-05
     title: 'README, CHANGELOG, and quality gate'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 2
     dependencies:
@@ -486,19 +486,25 @@ tasks:
       4. `grep -rni strava README.md CHANGELOG.md .env.example`: only the revocation step and the changelog entries remain.
 
       ## Completion Criteria
-      - [ ] README has no Strava setup, key, command, or cron; it has the revocation step and `HEATMAP_DISPLAY_TIMEZONE`
-      - [ ] CHANGELOG Unreleased lists Removed / Changed / Security with the backup warning
-      - [ ] `larapilot:quality` passes; `php artisan test` green
+      - [x] README has no Strava setup, key, command, or cron; it has the revocation step and `HEATMAP_DISPLAY_TIMEZONE`
+      - [x] CHANGELOG Unreleased lists Removed / Changed / Security with the backup warning
+      - [x] `larapilot:quality` passes; `php artisan test` green
 
       ## Test Data
       - N/A — documentation only
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/README.md` index lists exactly `garmin-csv-import`, `heatmap-dashboard`, and `owner-authentication`, each with `US-021` as last touched
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/README.md` index lists exactly `garmin-csv-import`, `heatmap-dashboard`, and `owner-authentication`, each with `US-021` as last touched
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `chore(US-021): TASK-05 README, changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
-updated_at: '2026-10-26T21:05:54+00:00'
+    commit:
+      sha: 046cdabf849438cad43c906c2fb18cc6d7eadba9
+      short_sha: 046cdab
+      subject: 'chore(US-021): TASK-05 README, changelog and quality gate'
+      committed_at: '2026-10-26T22:06:36+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/046cdabf849438cad43c906c2fb18cc6d7eadba9'
+updated_at: '2026-10-26T21:06:36+00:00'

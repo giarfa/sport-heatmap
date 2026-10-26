@@ -53,7 +53,8 @@ return new class extends Migration
          * The deleted runs are inside every cached grid window, and a remembered
          * Garmin import plan can still name one of them as a conflict. The store
          * holds nothing that cannot be rebuilt on the next request, so everything
-         * is dropped rather than guessing which keys carried a Strava run.
+         * is dropped rather than guessing which keys carried a Strava run. That includes the throttle
+         * counters of the database cache, which simply start from zero.
          */
         Cache::flush();
     }
@@ -63,6 +64,10 @@ return new class extends Migration
      *
      * Restores the schema only. The deleted Strava runs, the tokens and the sync
      * history cannot come back: there is no copy of them to restore from.
+     *
+     * Roll back this one step only. `strava_activity_id` returns as NULL on every
+     * surviving row, so rolling back further runs the older `add_source_to_activities`
+     * down(), which deletes every row with no Strava id: all the Garmin runs.
      */
     public function down(): void
     {

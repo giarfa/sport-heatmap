@@ -15,6 +15,8 @@
  *     display_timezone: string,
  * } $config
  */
+$displayTimezone = env('HEATMAP_DISPLAY_TIMEZONE');
+
 $config = [
 
     /*
@@ -68,11 +70,15 @@ $config = [
     | The timezone the import detail card prints its absolute "Last import"
     | stamp in (FR-007). Timestamps are stored in UTC; this is a deployment
     | choice (the owner's wall clock), so unlike the window constants above it
-    | is read from the environment.
+    | is read from the environment. A blank or unknown value falls back to
+    | Europe/Rome rather than reaching the page, where it would be a 500 for
+    | every owner with a run.
     |
     */
 
-    'display_timezone' => env('HEATMAP_DISPLAY_TIMEZONE', 'Europe/Rome'),
+    'display_timezone' => is_string($displayTimezone) && in_array($displayTimezone, DateTimeZone::listIdentifiers(), true)
+        ? $displayTimezone
+        : 'Europe/Rome',
 
 ];
 
