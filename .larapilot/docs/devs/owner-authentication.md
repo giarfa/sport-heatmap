@@ -19,7 +19,7 @@ This instance is private: one owner, one account, one password. Every page sits 
 2. `POST /login` validates through `SignInRequest` (username required, password nullable), then calls `SignInOwner`.
 3. `SignInOwner` checks the throttle first, then the credentials. Success: `Auth::login($owner, remember: false)`, session id regenerated, redirect to the intended URL (same-host only) or the dashboard. Failure: back to `/login` with the one message "These credentials do not match our records." on the `username` field; only the username is flashed back.
 4. After 5 failures for the same username + IP within 60 seconds the next attempt is refused with "Too many sign-in attempts. Try again in N seconds." and no credential check runs.
-5. `POST /logout` ends the session, regenerates the CSRF token and redirects to `/login`. It never touches the Strava token columns.
+5. `POST /logout` ends the session, regenerates the CSRF token and redirects to `/login`.
 
 ### Forced first password change
 
@@ -35,14 +35,14 @@ group:
 
 1. `guest` — `GET /login`, `POST /login`.
 2. `auth` — `GET|PUT /password/change`, `POST /logout`.
-3. `auth` + `password.set` — everything else: `/` (the dashboard), every
-   `import/garmin/*` route, and the two Strava OAuth routes.
+3. `auth` + `password.set` — everything else: `/` (the dashboard), and every
+   `import/garmin/*` route.
 
 `bootstrap/app.php` sends guests to `route('login')` and signed-in users who open a
 guest route to the dashboard. The `auth` middleware stores the intended URL for
 GET requests, so the owner lands on the page first requested after signing in.
 No route creates or lists users. What each protected area does for the owner is
-in `heatmap-dashboard.md`, `garmin-csv-import.md` and `strava-connection.md`.
+in `heatmap-dashboard.md` and `garmin-csv-import.md`.
 
 ## Technical design
 
@@ -91,7 +91,7 @@ That row gets `username = giarfa` and `password = null`; nothing else changes (r
 | The 12-character rule alone, not `Password::defaults()` | Mixed case, symbols, `uncompromised()` | The PRD fixes the rule at 12 characters; `uncompromised()` is an outbound call the PRD rules out |
 | The change page closes after the first password | A voluntary change form | A later change is out of scope for FR-021; the recovery path is clearing `users.password` |
 | `redirect()->route('login')` on failure | `back()` | `back()` depends on the Referer header |
-| One `auth` + `password.set` group for every owner route; `strava.fresh` off every route | Per-route middleware; keep `strava.fresh` | A single group makes a forgotten route visible in review; `strava.fresh`'s allowlist check would 403 `giarfa` when no Strava id is stored, and neither the dashboard nor the import calls Strava |
+| One `auth` + `password.set` group for every owner route | Per-route middleware | A single group makes a forgotten route visible in review |
 | First-change cleanup deletes the owner's other `sessions` rows | `AuthenticateSession` + `logoutOtherDevices` | The session table already holds `user_id`; one delete needs no extra middleware on every route |
 | Test databases clear the migration-created `giarfa` in `Tests\TestCase::setUp()` | Skip the insert under `testing` | The empty-database insert is part of the contract; tests arrange their own users and the unique username would otherwise collide with `owner()` |
 
@@ -116,6 +116,6 @@ That row gets `username = giarfa` and `password = null`; nothing else changes (r
 
 ## Related
 
-- Specs: `US-020` (`US-021` removes Strava next)
+- Specs: `US-020`, `US-021` (removed Strava)
 - Plans: `.larapilot/plans/US-020-plan.yaml`
-- Other domains: `strava-connection.md`, `heatmap-dashboard.md`, `garmin-csv-import.md`
+- Other domains: `heatmap-dashboard.md`, `garmin-csv-import.md`

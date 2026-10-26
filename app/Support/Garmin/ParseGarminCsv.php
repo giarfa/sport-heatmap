@@ -151,7 +151,7 @@ final readonly class ParseGarminCsv
             );
 
             /*
-             * An export can list the same activity twice (a re-sync on the
+             * An export can list the same activity twice (a double sync on the
              * watch, a manual duplicate). Keeping both would plan two inserts of
              * one run and double that day on the map.
              */
@@ -199,8 +199,7 @@ final readonly class ParseGarminCsv
 
     /**
      * Built with createFromFormat(..., 'UTC') and no timezone conversion, the
-     * same contract as StravaActivity's start_date_local: Garmin exports the
-     * runner's local wall-clock time, and letting the app timezone touch it is
+     * Garmin exports the runner's local wall-clock time, and letting the app timezone touch it is
      * how a 22:30 run lands on the wrong day. The round-trip check rejects
      * dates PHP would silently overflow (2026-02-30 → 2 March).
      */

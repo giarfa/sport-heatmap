@@ -35,7 +35,7 @@ class GarminImportReviewReuseTest extends TestCase
         Http::preventStrayRequests();
         Carbon::setTestNow('2026-10-11 12:00:00');
 
-        $this->owner = $this->allowlistedAthlete();
+        $this->owner = $this->signInOwner();
     }
 
     public function test_a_reload_serves_the_remembered_plan_instead_of_planning_again(): void
@@ -65,7 +65,7 @@ class GarminImportReviewReuseTest extends TestCase
         $review = $this->review();
 
         $this->assertTally($review, new: 0, clashes: 1);
-        $review->assertSee($stored->stravaUrl());
+        $review->assertSee($stored->name);
     }
 
     public function test_a_stored_run_moved_out_of_tolerance_drops_its_clash_on_reload(): void

@@ -59,8 +59,8 @@ class DashboardController extends Controller
         /*
          * The weekly trend is built with the grid and cached inside it, so its one extra
          * query — the lead-in weeks the first 4-week averages reach back into — runs only
-         * on a cache miss, inside this closure. A hit costs the chart nothing, and a sync
-         * or import that forgets the grid forgets the chart with it: there is no second
+         * on a cache miss, inside this closure. A hit costs the chart nothing, and an
+         * import that forgets the grid forgets the chart with it: there is no second
          * cache that could outlive a write.
          */
         $build = fn () => $buildGrid(

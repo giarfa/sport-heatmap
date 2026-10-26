@@ -9,15 +9,13 @@
 
 ## Purpose
 
-Lets the owner add runs that Strava is missing, or that Garmin recorded better,
-by uploading the "Activities" CSV exported from the Garmin Connect website
+Lets the owner load their runs, the only way a run enters the app, by uploading the "Activities" CSV exported from the Garmin Connect website
 (FR-018). Since `US-020` the import requires the owner's session and always
 imports into the signed-in owner (`giarfa`): there is no guest import and no
-CSV-only athlete creation, and the heatmap still works with CSV imports only. The file is parsed into running rows of any age (dated today or earlier, so the
+CSV-only athlete creation, and the heatmap works from imports alone. The file is parsed into running rows of any age (dated today or earlier, so the
 heatmap can be navigated back to them — `US-013`), and
 every row that clashes with a stored run is reviewed before anything is
-written. If it stops working, Garmin-only runs never reach the heatmap; the
-Strava sync is unaffected.
+written. If it stops working, no run reaches the heatmap.
 
 ## Functional flow
 
@@ -214,8 +212,7 @@ authorize (`.ai/rules/actions.md`); the caller has.
 
 All routes sit under `import/garmin`, named `garmin.import.*`, in the `auth` +
 `password.set` route group (`US-020`): a signed-out request goes to `/login`,
-an owner with no password yet to the first-password page. `strava.fresh` is not
-on them — the import never calls Strava. CSRF comes from the `web` group.
+an owner with no password yet to the first-password page. CSRF comes from the `web` group.
 
 | Route | Name | Does |
 | --- | --- | --- |
@@ -254,8 +251,8 @@ on them — the import never calls Strava. CSRF comes from the `web` group.
   real `<table>`s with captions and scoped headers that reflow into stacked
   cards below 640 px (`td[data-label]`); a fieldset per conflict with Skip
   pre-checked; "Overwrite all" / "Skip all" rendered `hidden` and revealed by
-  `resources/js/app.js` (`data-resolve-all`); "View on Strava" only where
-  `Activity::stravaUrl()` is not null (FR-008). Formats come from
+  `resources/js/app.js` (`data-resolve-all`); the stored side of a conflict shows its
+  values and the run's name, with no link and no source label. Formats come from
   `GarminImportFormat` (km to one decimal, `H:MM:SS`, `HH:MM:SS` start, and
   `pace()` `5:23 /km`, `ascent()` `45 m`, `heartRate()` `152 bpm` — each null
   when not recorded, which `<x-run-metric>` prints as an em dash read aloud as

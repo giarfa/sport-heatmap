@@ -116,7 +116,7 @@ tasks:
     id: TASK-01
     title: 'Garmin-only status line, import detail, and empty state on the dashboard'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
@@ -182,25 +182,31 @@ tasks:
       10. `php artisan test`, `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] Status line reads "last import N ago" from the newest imported run; "No runs imported yet" with none; a no-op re-import does not move it
-      - [ ] No stale / failed / reconnect / first-sync state exists in code or views
-      - [ ] Owner with no runs sees the Garmin-only empty state; the dashboard keeps the "Import Garmin CSV" entry point
-      - [ ] UI usable at 375 / 768 / 1280 px, light and dark (manual smoke OK under NORMAL)
-      - [ ] Mockup deviation logged and listed in the mockup README
-      - [ ] Tests pass
+      - [x] Status line reads "last import N ago" from the newest imported run; "No runs imported yet" with none; a no-op re-import does not move it
+      - [x] No stale / failed / reconnect / first-sync state exists in code or views
+      - [x] Owner with no runs sees the Garmin-only empty state; the dashboard keeps the "Import Garmin CSV" entry point
+      - [x] UI usable at 375 / 768 / 1280 px, light and dark (manual smoke OK under NORMAL)
+      - [x] Mockup deviation logged and listed in the mockup README
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes in this task (factories already have `garminImported()` runs)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` rewritten for the import status, the empty state, and `display_timezone`. Under Architectural choices, record why there is no warning state (nothing runs in the background) and why `updated_at` is read rather than an import log.
-      - [ ] Folder `README.md` index row updated
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` rewritten for the import status, the empty state, and `display_timezone`. Under Architectural choices, record why there is no warning state (nothing runs in the background) and why `updated_at` is read rather than an import log.
+      - [x] Folder `README.md` index row updated
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-021): TASK-01 Garmin-only import status and empty state`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: cd03e75c0ebd04e4d2915816745ff1e85e75e5d3
+      short_sha: cd03e75
+      subject: 'feat(US-021): TASK-01 Garmin-only import status and empty state'
+      committed_at: '2026-10-26T21:55:37+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cd03e75c0ebd04e4d2915816745ff1e85e75e5d3'
   -
     id: TASK-02
     title: 'Remove the Strava integration: routes, OAuth, client, sync command, schedule, config, and Strava UI'
@@ -477,4 +483,4 @@ tasks:
       - Commit: `chore(US-021): TASK-05 README, changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
-updated_at: '2026-10-26T20:50:23+00:00'
+updated_at: '2026-10-26T20:55:37+00:00'

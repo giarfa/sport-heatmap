@@ -80,3 +80,9 @@ dates as `Sat 10 Oct 2026`.
   existing component rules, using the same variables). Layout utilities in Blade stay Tailwind 4.
 - The stacked-table rule is a `max-width: 639.98px` query so it never overlaps Tailwind's `sm` (640 px).
 - One JS addition only (the `data-resolve-all` handler, delegated on `document` like the theme toggle). No framework.
+
+## Deviations
+
+| Date | Screen | What | Why | Decision |
+| --- | --- | --- | --- | --- |
+| 2026-10-26 | `review.html` | The stored side of a conflict shows the run's name only: the "Strava · View on Strava" link and the "Garmin import" source label are gone | Strava is removed (US-021): every stored run is an imported one and there is nowhere to link to | Accepted with the spec; decision `c022654e858f07e5` |

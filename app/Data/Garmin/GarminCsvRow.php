@@ -145,8 +145,8 @@ final readonly class GarminCsvRow
     }
 
     /**
-     * Built in UTC with no conversion: like Strava's start_date_local, the value
-     * is already the runner's wall-clock time.
+     * Built in UTC with no conversion: the value is already the runner's
+     * wall-clock time.
      */
     private static function wallClock(string $value): CarbonImmutable
     {

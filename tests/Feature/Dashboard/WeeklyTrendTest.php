@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 /**
  * The weekly-mileage chart on the real dashboard request: it follows the grid it sits
- * beside, never writes, never calls Strava, and is retired with the grid.
+ * beside, never writes, never calls out, and is retired with the grid.
  */
 class WeeklyTrendTest extends TestCase
 {
@@ -46,7 +46,7 @@ class WeeklyTrendTest extends TestCase
 
     public function test_the_card_sits_in_the_rail_between_the_legend_and_the_import_card_with_sixteen_named_bars(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-09-03', 12_345); // Thursday of the current week
         $this->runOn($athlete, '2026-08-26', 21_000); // the week before
 
@@ -74,7 +74,7 @@ class WeeklyTrendTest extends TestCase
 
     public function test_a_zero_kilometre_week_is_a_stub_and_the_key_names_it(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-09-03', 12_345);
 
         $card = $this->trendCard();
@@ -87,7 +87,7 @@ class WeeklyTrendTest extends TestCase
 
     public function test_the_current_window_has_a_partial_bar_with_no_average_and_the_line_stops_before_it(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-31', 10_000); // oldest run: the week of 30 Mar
         $this->runOn($athlete, '2026-09-03', 12_345);
 
@@ -102,7 +102,7 @@ class WeeklyTrendTest extends TestCase
 
     public function test_a_past_window_has_no_partial_bar_and_an_average_on_every_week(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-31', 10_000);
         $this->runOn($athlete, '2026-06-10', 15_000);
 
@@ -117,7 +117,7 @@ class WeeklyTrendTest extends TestCase
 
     public function test_a_window_with_no_stored_run_says_so_and_draws_no_chart(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-09-01', 8_000);
 
         $card = $this->trendCard('/?to=2026-06-07'); // ends before the oldest run
@@ -130,7 +130,7 @@ class WeeklyTrendTest extends TestCase
 
     public function test_the_weekly_figures_table_has_one_row_per_bar(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-09-03', 12_345);
 
         $card = $this->trendCard();
@@ -142,7 +142,7 @@ class WeeklyTrendTest extends TestCase
 
     public function test_the_request_writes_nothing_and_calls_nobody(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-31', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_345);
 
@@ -158,7 +158,7 @@ class WeeklyTrendTest extends TestCase
 
     public function test_a_write_that_retires_the_grid_retires_the_chart_with_it(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-09-03', 12_345);
 
         $this->assertStringContainsString('12.3 km so far, partial week', $this->trendCard());
@@ -177,7 +177,7 @@ class WeeklyTrendTest extends TestCase
 
     public function test_the_chart_adds_one_query_on_a_cold_cache_and_none_on_a_warm_one(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-09-03', 12_345);
 
         $cold = $this->queriesOfRequest();

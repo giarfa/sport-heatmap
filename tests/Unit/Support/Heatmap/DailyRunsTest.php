@@ -4,6 +4,7 @@ namespace Tests\Unit\Support\Heatmap;
 
 use App\Data\Heatmap\DayRun;
 use App\Models\Activity;
+use App\Models\User;
 use App\Support\Heatmap\DailyRuns;
 use App\Support\Heatmap\HeatmapWindow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,7 +25,7 @@ class DailyRunsTest extends TestCase
 
     public function test_runs_are_grouped_by_day_in_start_order(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
 
         Activity::factory()->for($athlete)->create([
             'name' => 'Evening shakeout',
@@ -50,10 +51,10 @@ class DailyRunsTest extends TestCase
 
     public function test_it_ignores_other_athletes_and_days_outside_the_window(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $window = HeatmapWindow::current();
 
-        Activity::factory()->for($this->allowlistedAthlete(['strava_athlete_id' => '10000002']))->onDate(Carbon::parse('2026-10-10'))->create();
+        Activity::factory()->for(User::factory()->create())->onDate(Carbon::parse('2026-10-10'))->create();
         Activity::factory()->for($athlete)->onDate($window->startsOn->subDay())->create();
 
         $this->assertSame([], (new DailyRuns)($athlete, $window));
@@ -61,7 +62,7 @@ class DailyRunsTest extends TestCase
 
     public function test_it_reads_the_whole_window_in_one_query_whatever_the_number_of_days(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
 
         foreach (range(0, 20) as $daysAgo) {
             Activity::factory()->for($athlete)->onDate(Carbon::parse('2026-10-12')->subDays($daysAgo))->create();
@@ -76,7 +77,7 @@ class DailyRunsTest extends TestCase
 
     public function test_a_run_carries_its_metrics_and_only_strava_runs_link_out(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
 
         Activity::factory()->for($athlete)->onDate(Carbon::parse('2026-10-10'))->create([
             'strava_activity_id' => 4_242,
@@ -100,7 +101,7 @@ class DailyRunsTest extends TestCase
 
     public function test_the_windows_first_and_last_day_are_read_and_the_days_around_them_are_not(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $window = HeatmapWindow::current(Carbon::parse('2026-10-11')); // Monday 22 Jun to Sunday 11 Oct
 
         Activity::factory()->for($athlete)->onDate($window->startsOn->subDay())->create(['name' => 'Sunday before']);

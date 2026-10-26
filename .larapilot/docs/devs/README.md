@@ -34,11 +34,10 @@ Keep the table below current — it is the entry point for a new developer.
 
 | Domain | What it covers | Last touched by |
 | --- | --- | --- |
-| [activity-sync](activity-sync.md) | Nightly `strava:sync`: fetch the 112-day window, reconcile `activities`, record `sync_runs`; activity sources; per-run metric columns; owners with no Strava identity (CSV-only) skipped | `US-020` |
+| [activity-sync](activity-sync.md) | Deprecated by `US-021`: the nightly Strava sync is gone; only the `activities` data model (per-run metric columns, NULL for "not recorded") remains until TASK-03 folds it into garmin-csv-import | `US-021` |
 | [garmin-csv-import](garmin-csv-import.md) | Garmin Connect CSV upload for the signed-in owner: parsing, conflict review, Overwrite / Skip; optional pace / ascent / heart-rate columns; runs of any age kept, future-dated rows skipped; the review shares the upload's throttle and matches by date; no guest import | `US-020` |
 | [heatmap-dashboard](heatmap-dashboard.md) | The private `/` screen of the signed-in owner: 16-week grid, intensity scale, grid cache, fresh import status ("last import N ago", no warning state), the Garmin-only empty state and import entry point; the day cell detail; Previous / Next window navigation by a `to` date; the weekly-mileage trend builder; how `activity_date` is stored and how window ranges compare it; the security headers every web response carries | `US-021` |
 | [owner-authentication](owner-authentication.md) | The single private account: `users.username` (`giarfa`), the null password that arms the first sign-in, the owner backfill migration, the sign-in page, its throttle and the intended-URL guard, sign-out, the forced first password change, recovery | `US-020` |
-| [strava-connection](strava-connection.md) | OAuth connect attaching tokens to the signed-in owner (no longer a sign-in), athlete allowlist, encrypted tokens, refresh; the `strava.fresh` guard is on no route (removed with Strava by `US-021`) | `US-020` |
 
 ## Who writes them
 

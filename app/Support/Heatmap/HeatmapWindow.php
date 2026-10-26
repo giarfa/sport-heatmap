@@ -23,7 +23,7 @@ final readonly class HeatmapWindow
      * The window is anchored to the ISO week rather than to "today minus 112
      * days", because the grid's bottom row must always be the current,
      * in-progress week — a rolling day-count anchor would make that row's start
-     * drift across the day of the week the sync happens to run on.
+     * drift across the day of the week the page happens to be opened on.
      */
     public static function current(?CarbonInterface $today = null): self
     {
@@ -124,14 +124,6 @@ final readonly class HeatmapWindow
         $date = CarbonImmutable::instance($date)->startOfDay();
 
         return $date->greaterThanOrEqualTo($this->startsOn) && $date->lessThanOrEqualTo($this->endsOn);
-    }
-
-    /**
-     * The window start as a UTC epoch, for the Strava `after` query parameter.
-     */
-    public function afterTimestamp(): int
-    {
-        return $this->startsOn->getTimestamp();
     }
 
     /**

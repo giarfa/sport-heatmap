@@ -10,12 +10,10 @@ use App\Models\User;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
-use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -24,7 +22,7 @@ use Tests\TestCase;
 
 /**
  * The owner's upload → review → confirm → summary flow, end to end over HTTP,
- * and how its result holds up against the nightly Strava sync.
+ * and how its result holds up on a re-import.
  */
 class GarminImportFlowTest extends TestCase
 {
@@ -43,10 +41,9 @@ class GarminImportFlowTest extends TestCase
         parent::setUp();
 
         Http::preventStrayRequests();
-        Config::set('strava.retry_backoff_ms', [0, 0, 0]);
         Carbon::setTestNow('2026-10-11 12:00:00');
 
-        $this->owner = $this->allowlistedAthlete();
+        $this->owner = $this->signInOwner();
     }
 
     public function test_the_italian_sample_on_an_empty_database_imports_37_runs_and_ignores_the_hikes(): void
@@ -152,7 +149,7 @@ class GarminImportFlowTest extends TestCase
 
         $review->assertSee('<div><dt>Clashes to decide</dt><dd>1</dd></div>', escape: false);
         $review->assertSee('<div><dt>New runs</dt><dd>0</dd></div>', escape: false);
-        $review->assertSee($stored->stravaUrl());
+        $review->assertSee($stored->name);
     }
 
     public function test_a_stored_run_121_seconds_away_is_not_a_conflict(): void
@@ -726,55 +723,6 @@ class GarminImportFlowTest extends TestCase
 
         $this->assertSame([], Storage::disk('local')->allFiles());
         $this->assertSame([], Storage::disk('public')->allFiles());
-    }
-
-    public function test_a_garmin_won_twin_survives_a_sync_in_which_strava_still_returns_it(): void
-    {
-        $stored = $this->storedStravaRun('2026-10-10 09:34:10', [
-            'strava_activity_id' => 4_242,
-            'name' => 'Morning Run',
-            'distance_meters' => 8_150,
-        ]);
-
-        $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
-        $this->confirm($this->review(), [0 => 'overwrite']);
-
-        Http::fake([
-            'www.strava.com/api/v3/athlete/activities*' => Http::response([[
-                'id' => 4_242,
-                'sport_type' => 'Run',
-                'name' => 'Morning Run',
-                'distance' => 8_150.0,
-                'moving_time' => 3_238,
-                'start_date_local' => '2026-10-10T09:34:10Z',
-            ]]),
-        ]);
-
-        $this->artisan('strava:sync')->assertExitCode(Command::SUCCESS);
-
-        $this->assertSame(1, Activity::count());
-        $twin = $stored->fresh();
-        $this->assertSame(ActivitySource::GarminCsv, $twin->source);
-        $this->assertSame('Paese Corsa', $twin->name);
-        $this->assertSame(8_290, $twin->distance_meters);
-        $this->assertSame('2026-10-10 09:33:27', $twin->start_date_local->format('Y-m-d H:i:s'));
-    }
-
-    public function test_the_review_links_stored_strava_runs_to_strava_and_garmin_runs_nowhere(): void
-    {
-        $this->storedStravaRun('2026-10-10 09:34:10', ['strava_activity_id' => 4_242]);
-        Activity::factory()->for($this->owner)->garminImported()->create([
-            'start_date_local' => '2026-10-08 06:54:00',
-            'activity_date' => '2026-10-08',
-        ]);
-
-        $this->upload($this->fixture('activities-it.csv'));
-        $review = $this->review();
-
-        $review->assertSee('<div><dt>Clashes to decide</dt><dd>2</dd></div>', escape: false);
-        $review->assertSee('href="https://www.strava.com/activities/4242"', escape: false);
-        $this->assertSame(1, substr_count($review->getContent(), 'https://www.strava.com/activities/'));
-        $review->assertSee('Garmin import');
     }
 
     /**

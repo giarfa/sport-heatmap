@@ -51,7 +51,7 @@ $config = [
     |--------------------------------------------------------------------------
     |
     | The cache key already carries the calendar day (HeatmapGridCache), so this
-    | TTL only bounds how long a stale entry can outlive an interrupted sync; it
+    | TTL only bounds how long a stale entry can outlive a failed cache flush; it
     | is a literal rather than an env() lookup for the same reason window_weeks
     | is — a deployment file must not be able to widen how long a stale grid can
     | be served.

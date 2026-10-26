@@ -11,8 +11,8 @@ use Illuminate\Contracts\Cache\Repository;
 use Throwable;
 
 /**
- * Owns the cached grid's key and TTL, so the dashboard controller and the sync
- * command cannot drift apart on the format.
+ * Owns the cached grid's key and TTL, so the dashboard controller and the import
+ * cannot drift apart on the format.
  */
 final readonly class HeatmapGridCache
 {
@@ -66,7 +66,7 @@ final readonly class HeatmapGridCache
     }
 
     /**
-     * Retire every cached window of this athlete, so a sync or an import is
+     * Retire every cached window of this athlete, so an import is
      * visible on every window the next time it is opened.
      *
      * The cache has no tags (`cache.default` is `database`), and the windows an
@@ -82,7 +82,7 @@ final readonly class HeatmapGridCache
         /*
          * The counter is created before it is bumped: on a missing key the database
          * store's increment() answers false, and writing 1 in that branch would let two
-         * overlapping writes (an import during the nightly sync) both land on 1, so a grid
+         * overlapping writes (two imports in two tabs) both land on 1, so a grid
          * built between them would survive the second write. add() is a no-op once the key
          * exists, and increment() is atomic.
          *
@@ -118,7 +118,7 @@ final readonly class HeatmapGridCache
     }
 
     /**
-     * The grid changes at the calendar-day rollover, not only when a sync runs.
+     * The grid changes at the calendar-day rollover, not only when an import runs.
      * Keying on the window alone would let yesterday's cached grid survive
      * midnight and render today as a future cell — stale data presented as
      * current, the one failure mode the PRD names as fatal. Including $today

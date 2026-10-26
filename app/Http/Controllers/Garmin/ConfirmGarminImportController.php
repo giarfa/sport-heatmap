@@ -48,7 +48,7 @@ class ConfirmGarminImportController extends Controller
                  * has to compare against the database at write time, inside this lock.
                  *
                  * The plan is recomputed from the session rows against the database
-                 * as it is now, never taken from the form. A sync or a second tab
+                 * as it is now, never taken from the form. A second tab
                  * may have changed the stored runs since the review rendered; if
                  * the conflicts no longer pair the same rows with the same stored
                  * runs, the owner's answers could land on runs they never saw, so

@@ -71,14 +71,7 @@
                                             <div><dt>Ascent</dt><x-run-metric :value="GarminImportFormat::ascent($conflict->stored->total_ascent_meters)" /></div>
                                             <div><dt>Heart rate</dt><x-run-metric :value="GarminImportFormat::heartRate($conflict->stored->average_heart_rate)" /></div>
                                         </dl>
-                                        <p class="side-source">
-                                            {{ $conflict->stored->name }} ·
-                                            @if ($conflict->stored->stravaUrl() !== null)
-                                                Strava · <a href="{{ $conflict->stored->stravaUrl() }}">View on Strava</a>
-                                            @else
-                                                Garmin import
-                                            @endif
-                                        </p>
+                                        <p class="side-source">{{ $conflict->stored->name }}</p>
                                     </td>
                                     <td data-label="Garmin file" class="cmp-pair">
                                         <dl class="side">

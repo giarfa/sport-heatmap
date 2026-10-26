@@ -17,7 +17,7 @@ use Tests\TestCase;
 
 /**
  * Previous / Next through HTTP (US-013, FR-019): which window `?to=` names, which controls are
- * links, what the page says about the window, and that none of it writes or calls Strava.
+ * links, what the page says about the window, and that none of it writes or calls out.
  *
  * "Today" is Saturday 5 Sep 2026, so the current window is 18 May – 6 Sep 2026 and one
  * Previous step back is 20 Apr – 9 Aug 2026.
@@ -36,7 +36,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_the_home_page_opens_on_the_current_window_with_next_disabled(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
 
@@ -53,7 +53,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_a_past_window_shows_that_periods_runs_totals_and_range(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
 
@@ -71,7 +71,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_next_steps_four_weeks_forward_and_lands_on_the_plain_home_url_at_the_current_window(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-02', 10_000);
 
         $eightWeeksBack = $this->controls($this->actingAs($athlete)->get('/?to=2026-07-12'));
@@ -84,7 +84,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_previous_is_a_link_only_while_an_older_run_is_stored(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-05-18', 10_000); // the first day of the current window
 
         $this->assertSame('disabled button', $this->controls($this->actingAs($athlete)->get('/'))['Previous 4 weeks'][0]);
@@ -96,7 +96,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_previous_is_disabled_on_the_window_that_holds_the_oldest_run(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
 
@@ -108,7 +108,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_both_controls_are_disabled_when_the_only_run_is_in_the_current_window(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-09-03', 12_000);
 
         $controls = $this->controls($this->actingAs($athlete)->get('/'));
@@ -119,7 +119,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_an_empty_past_window_says_nothing_is_stored_there(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-02-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
 
@@ -134,7 +134,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_each_window_gets_its_own_legend_computed_from_its_own_days(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         foreach (['2026-06-02' => 5_000, '2026-06-09' => 8_000, '2026-06-16' => 12_000, '2026-06-23' => 20_000] as $date => $meters) {
             $this->runOn($athlete, $date, $meters);
         }
@@ -151,7 +151,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_the_import_status_is_the_same_on_every_window(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
         Activity::query()->update(['source' => ActivitySource::GarminCsv, 'updated_at' => now()->subHours(6)]);
@@ -170,7 +170,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_windows_are_cached_separately(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-05-12', 10_000); // only in the earlier window
         $this->runOn($athlete, '2026-09-03', 12_000); // only in the current one
 
@@ -183,7 +183,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_only_windows_that_can_hold_a_run_are_cached(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
         $keyOf = fn (string $to): string => "heatmap:grid:v5:{$athlete->id}:g0:"
             .HeatmapWindow::fromRequestedEnd($to, now())->startsOn->toDateString().':2026-09-05';
@@ -217,7 +217,7 @@ class WindowNavigationTest extends TestCase
     #[DataProvider('windowRequestProvider')]
     public function test_a_requested_end_names_its_window_and_a_bad_one_renders_the_current_window(string $query, string $heading, string $range): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-09-03', 12_000);
 
         $this->actingAs($athlete)->get('/'.$query)
@@ -228,7 +228,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_navigating_back_writes_nothing_and_sends_nothing_even_with_an_expired_token(): void
     {
-        $athlete = $this->allowlistedAthlete(factoryState: 'stravaTokenExpired');
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-02', 10_000);
         $this->runOn($athlete, '2026-07-02', 11_000);
 

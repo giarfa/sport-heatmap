@@ -35,7 +35,7 @@ class HeatmapGridTest extends TestCase
 
     public function test_a_known_days_distance_renders_in_kilometres_to_one_decimal(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         Activity::factory()->for($athlete)->onDate(HeatmapWindow::current()->endsOn->subDay())->create([
             'distance_meters' => 8_200,
         ]);
@@ -77,18 +77,17 @@ class HeatmapGridTest extends TestCase
         $this->assertSame(16, substr_count($grid[0] ?? '', 'scope="row"'));
     }
 
-    public function test_the_skip_link_and_strava_attribution_are_present(): void
+    public function test_the_skip_link_is_present_and_no_third_party_mark_is(): void
     {
-        $html = $this->dashboardHtml($this->allowlistedAthlete());
+        $html = $this->dashboardHtml($this->athleteWithARun());
 
         $this->assertStringContainsString('href="#main"', $html);
-        $this->assertStringContainsString('Powered by Strava', $html);
-        $this->assertStringContainsString('https://www.strava.com', $html);
+        $this->assertStringNotContainsStringIgnoringCase('strava', $html);
     }
 
     public function test_neither_mi_nor_miles_appears_anywhere(): void
     {
-        $html = $this->dashboardHtml($this->allowlistedAthlete());
+        $html = $this->dashboardHtml($this->signInOwner());
 
         $this->assertDoesNotMatchRegularExpression('/\bmi\b/', $html);
         $this->assertStringNotContainsString('miles', $html);
@@ -96,8 +95,8 @@ class HeatmapGridTest extends TestCase
 
     public function test_another_athletes_activities_do_not_appear_in_this_athletes_grid(): void
     {
-        $athlete = $this->allowlistedAthlete();
-        $otherAthlete = User::factory()->stravaConnected()->create();
+        $athlete = $this->signInOwner();
+        $otherAthlete = User::factory()->create();
 
         Activity::factory()->for($otherAthlete)->onDate(HeatmapWindow::current()->endsOn->subDay())->create([
             'distance_meters' => 30_000,
@@ -110,7 +109,7 @@ class HeatmapGridTest extends TestCase
 
     public function test_an_owner_with_no_run_in_the_window_renders_the_full_grid_not_a_blank_page(): void
     {
-        $owner = $this->allowlistedAthlete();
+        $owner = $this->signInOwner();
         Activity::factory()->garminImported()->for($owner)->onDate(HeatmapWindow::current()->startsOn->subMonths(3))->create();
 
         $response = $this->actingAs($owner)->get('/');
@@ -128,7 +127,7 @@ class HeatmapGridTest extends TestCase
      */
     private function athleteWithARun(): User
     {
-        $owner = $this->allowlistedAthlete();
+        $owner = $this->signInOwner();
         Activity::factory()->garminImported()->for($owner)->onDate(HeatmapWindow::current()->endsOn->subDays(3))->create();
 
         return $owner;
