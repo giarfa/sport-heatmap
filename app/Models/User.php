@@ -16,22 +16,13 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $name
+ * @property string|null $username
  * @property string $email
  * @property Carbon|null $email_verified_at
  * @property string|null $password
- * @property string|null $strava_athlete_id
- * @property string|null $strava_access_token
- * @property string|null $strava_refresh_token
- * @property Carbon|null $strava_token_expires_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Collection<int, Activity> $activities
- */
-/*
- * The Strava identity and token columns are deliberately NOT mass-assignable:
- * strava_athlete_id is the key the access allowlist is checked against, so a
- * request body must never be able to rewrite it or plant OAuth tokens. The
- * OAuth callback assigns them explicitly.
  */
 #[Fillable([
     'name',
@@ -41,31 +32,25 @@ use Illuminate\Support\Carbon;
 #[Hidden([
     'password',
     'remember_token',
-    'strava_access_token',
-    'strava_refresh_token',
 ])]
 class User extends Authenticatable
 {
+    /**
+     * The one sign-in identity of this instance.
+     */
+    public const OWNER_USERNAME = 'giarfa';
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     /**
-     * The activities synced from this athlete's Strava account.
+     * The runs imported from this athlete's Garmin Connect CSV exports.
      *
      * @return HasMany<Activity, $this>
      */
     public function activities(): HasMany
     {
         return $this->hasMany(Activity::class);
-    }
-
-    /**
-     * Whether this athlete exists only to own Garmin CSV imports: no Strava
-     * identity, so no token, no sync, and no sign-in.
-     */
-    public function isCsvOnly(): bool
-    {
-        return $this->strava_athlete_id === null;
     }
 
     /**
@@ -78,9 +63,6 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'strava_access_token' => 'encrypted',
-            'strava_refresh_token' => 'encrypted',
-            'strava_token_expires_at' => 'datetime',
         ];
     }
 }

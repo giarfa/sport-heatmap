@@ -42,7 +42,7 @@ class CalibrateIntensityScaleTest extends TestCase
         ]);
 
         $this->assertTrue($scale->isCalibrated());
-        $this->assertSame('Calibrated to your 4 running days in this window — recomputed after every sync.', $scale->note());
+        $this->assertSame('Calibrated to your 4 running days in this window — recomputed after every import.', $scale->note());
     }
 
     public function test_zero_distance_days_are_excluded_from_the_distribution_not_counted_as_low_mileage(): void
@@ -57,7 +57,7 @@ class CalibrateIntensityScaleTest extends TestCase
         ]);
 
         $this->assertTrue($scale->isCalibrated());
-        $this->assertSame('Calibrated to your 4 running days in this window — recomputed after every sync.', $scale->note());
+        $this->assertSame('Calibrated to your 4 running days in this window — recomputed after every import.', $scale->note());
     }
 
     public function test_all_distances_identical_falls_back_to_fixed_bands_with_the_degenerate_note(): void

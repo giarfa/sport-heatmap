@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
  * Plans the pending upload for the review, and reuses that plan on a reload.
  *
  * Planning matches every row against the stored runs of the upload's dates, and
- * the review is a GET a visitor can reload at will. The plan is therefore
+ * the review is a GET the owner can reload at will. The plan is therefore
  * remembered in the session next to the upload, with a stamp of everything the
  * planner read from the database, and handed back while the stamp still holds.
  * A new upload replaces the whole pending entry (PendingGarminImport::put()), so
@@ -28,12 +28,8 @@ final readonly class RememberedGarminImportPlan
         private PendingGarminImport $pendingImport,
     ) {}
 
-    public function __invoke(?User $athlete, ParsedGarminCsv $parsed): GarminImportPlan
+    public function __invoke(User $athlete, ParsedGarminCsv $parsed): GarminImportPlan
     {
-        if ($athlete === null) {
-            return ($this->planGarminImport)($athlete, $parsed->rows);
-        }
-
         /*
          * Loaded once for the whole render: the stamp is made from it, the
          * planner takes it, and a reused plan names its stored runs from it, so
@@ -68,8 +64,7 @@ final readonly class RememberedGarminImportPlan
 
     /**
      * A hash of what the planner reads from the stored runs: for each, by id, the
-     * columns it compares — the source (which runs can be "already imported"),
-     * the dates and start, the distance and the moving time. Any run added,
+     * columns it compares — the dates and start, the distance and the moving time. Any run added,
      * removed or changed on the upload's dates moves it.
      *
      * Not `updated_at`: it has one-second resolution and a query-builder write
@@ -81,7 +76,7 @@ final readonly class RememberedGarminImportPlan
      */
     private function stampOf(Collection $stored): string
     {
-        $columns = ['source', 'start_date_local', 'activity_date', 'distance_meters', 'moving_time_seconds'];
+        $columns = ['start_date_local', 'activity_date', 'distance_meters', 'moving_time_seconds'];
 
         return hash('sha256', (string) json_encode(
             $stored->sortKeys()->map(

@@ -27,8 +27,6 @@ final readonly class DailyRuns
                 'activity_date',
                 'start_date_local',
                 'name',
-                'source',
-                'strava_activity_id',
                 'distance_meters',
                 'moving_time_seconds',
                 'average_pace_seconds_per_km',

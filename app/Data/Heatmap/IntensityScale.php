@@ -74,7 +74,7 @@ final readonly class IntensityScale
         $day = $this->runningDayCount === 1 ? 'day' : 'days';
 
         return match (true) {
-            $this->calibrated => "Calibrated to your {$this->runningDayCount} running days in this window — recomputed after every sync.",
+            $this->calibrated => "Calibrated to your {$this->runningDayCount} running days in this window — recomputed after every import.",
             $this->degenerate => 'The runs in this window are too alike to calibrate a scale — fixed bands are shown instead.',
             default => "Only {$this->runningDayCount} running {$day} in this window — too few to calibrate, so fixed bands are shown instead.",
         };

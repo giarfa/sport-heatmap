@@ -32,7 +32,7 @@ class PlanGarminImportTest extends TestCase
 
     public function test_a_row_identical_to_a_stored_garmin_run_is_already_imported_and_does_not_leave_it_as_a_clash_for_a_nearby_row(): void
     {
-        $stored = $this->storedRun('2026-10-10 09:33:27', garmin: true);
+        $stored = $this->storedRun('2026-10-10 09:33:27');
 
         $plan = $this->plan([
             $this->row('2026-10-10 09:32:30', distance: 5000),
@@ -47,7 +47,7 @@ class PlanGarminImportTest extends TestCase
 
     public function test_a_stored_run_is_claimed_by_one_identical_row_only(): void
     {
-        $this->storedRun('2026-10-10 09:33:27', garmin: true);
+        $this->storedRun('2026-10-10 09:33:27');
 
         $plan = $this->plan([$this->row('2026-10-10 09:33:27'), $this->row('2026-10-10 09:33:27')]);
 
@@ -55,13 +55,14 @@ class PlanGarminImportTest extends TestCase
         $this->assertSame([1], array_keys($plan->newRows));
     }
 
-    public function test_an_identical_strava_run_is_a_clash_not_already_imported(): void
+    public function test_a_run_imported_in_an_earlier_session_is_a_clash_for_a_nearby_row_that_differs(): void
     {
         $stored = $this->storedRun('2026-10-10 09:33:27');
 
-        $plan = $this->plan([$this->row('2026-10-10 09:33:27')]);
+        $plan = $this->plan([$this->row('2026-10-10 09:34:10', distance: 8150)]);
 
         $this->assertSame([], $plan->alreadyImported);
+        $this->assertSame([], $plan->newRows);
         $this->assertSame($stored->id, $plan->conflicts[0]->stored->id);
     }
 
@@ -109,16 +110,6 @@ class PlanGarminImportTest extends TestCase
         $this->assertSame([0, 1], array_keys($plan->newRows));
     }
 
-    public function test_with_no_target_every_row_is_new(): void
-    {
-        $rows = [$this->row('2026-10-10 09:33:27')];
-
-        $plan = $this->app->make(PlanGarminImport::class)(null, $rows);
-
-        $this->assertSame($rows, $plan->newRows);
-        $this->assertNull($plan->athleteId);
-    }
-
     /**
      * @param  array<int, GarminCsvRow>  $rows
      */
@@ -134,11 +125,9 @@ class PlanGarminImportTest extends TestCase
         return new GarminCsvRow(SportType::Run, 'Paese Corsa', $distance, 3263, $startDateLocal, $startDateLocal->startOfDay());
     }
 
-    private function storedRun(string $start, bool $garmin = false): Activity
+    private function storedRun(string $start): Activity
     {
-        $factory = Activity::factory()->for($this->athlete);
-
-        return ($garmin ? $factory->garminImported() : $factory)->create([
+        return Activity::factory()->for($this->athlete)->create([
             'start_date_local' => $start,
             'activity_date' => substr($start, 0, 10),
             'distance_meters' => 8290,

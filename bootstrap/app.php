@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Middleware\EnsureFreshStravaToken;
+use App\Http\Middleware\EnsureOwnerPasswordIsSet;
 use App\Http\Middleware\SetSecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,7 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'strava.fresh' => EnsureFreshStravaToken::class,
+            'password.set' => EnsureOwnerPasswordIsSet::class,
         ]);
 
         // Global, not in the web group: a URL that matches no route is a 404
@@ -25,10 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // passes through it as well.
         $middleware->prepend(SetSecurityHeaders::class);
 
-        // No route uses auth today (the Garmin import opened to guests in
-        // US-011). Kept so a future auth route cannot throw on the missing
-        // login route: the owner signs in through Strava from the home page.
-        $middleware->redirectGuestsTo(fn (): string => route('dashboard'));
+        // A signed-out request goes to the sign-in page; a signed-in owner who
+        // opens it (or any guest-only route) goes to the dashboard.
+        $middleware->redirectGuestsTo(fn (): string => route('login'));
+        $middleware->redirectUsersTo(fn (): string => route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

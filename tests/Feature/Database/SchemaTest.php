@@ -10,7 +10,7 @@ class SchemaTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_users_table_has_the_strava_identity_and_token_columns(): void
+    public function test_users_table_has_no_strava_column(): void
     {
         foreach ([
             'strava_athlete_id',
@@ -18,20 +18,9 @@ class SchemaTest extends TestCase
             'strava_refresh_token',
             'strava_token_expires_at',
         ] as $column) {
-            $this->assertTrue(
+            $this->assertFalse(
                 Schema::hasColumn('users', $column),
-                "users.{$column} is missing.",
-            );
-        }
-    }
-
-    public function test_strava_token_columns_are_text_so_ciphertext_is_never_truncated(): void
-    {
-        foreach (['strava_access_token', 'strava_refresh_token'] as $column) {
-            $this->assertSame(
-                'text',
-                $this->columnTypeName('users', $column),
-                "users.{$column} must be TEXT: the encrypted cast produces ciphertext of unpredictable length.",
+                "users.{$column} must be gone.",
             );
         }
     }
@@ -41,18 +30,18 @@ class SchemaTest extends TestCase
         $this->assertTrue($this->columnIsNullable('users', 'password'));
     }
 
-    public function test_strava_athlete_id_is_unique(): void
+    public function test_users_username_is_nullable_and_unique(): void
     {
+        $this->assertTrue($this->columnIsNullable('users', 'username'));
         $this->assertTrue(
-            $this->hasIndexOn('users', ['strava_athlete_id'], unique: true),
-            'users.strava_athlete_id must carry a unique index.',
+            $this->hasIndexOn('users', ['username'], unique: true),
+            'users.username must carry a unique index.',
         );
     }
 
     public function test_activities_table_has_every_required_column_with_the_expected_type(): void
     {
         $expected = [
-            'strava_activity_id' => 'integer',
             'user_id' => 'integer',
             'sport_type' => 'varchar',
             'name' => 'varchar',
@@ -76,26 +65,14 @@ class SchemaTest extends TestCase
         );
     }
 
-    public function test_activities_strava_activity_id_is_unique(): void
-    {
-        $this->assertTrue($this->hasIndexOn('activities', ['strava_activity_id'], unique: true));
-    }
-
-    public function test_activities_source_is_a_string_defaulting_to_strava(): void
-    {
-        $this->assertSame('varchar', $this->columnTypeName('activities', 'source'));
-        $this->assertFalse($this->columnIsNullable('activities', 'source'));
-        $this->assertSame("'strava'", $this->columnDefault('activities', 'source'));
-    }
-
     /**
-     * Garmin-imported runs have no Strava id, but an overwritten twin keeps its id,
-     * so the column is nullable and the unique index must survive the change.
+     * Strava is removed: no identifier of an outside activity and no source column
+     * remain, so no `strava` value is possible in activities.
      */
-    public function test_activities_strava_activity_id_is_nullable_and_still_unique(): void
+    public function test_activities_has_no_strava_id_and_no_source(): void
     {
-        $this->assertTrue($this->columnIsNullable('activities', 'strava_activity_id'));
-        $this->assertTrue($this->hasIndexOn('activities', ['strava_activity_id'], unique: true));
+        $this->assertFalse(Schema::hasColumn('activities', 'strava_activity_id'));
+        $this->assertFalse(Schema::hasColumn('activities', 'source'));
     }
 
     /**
@@ -115,23 +92,9 @@ class SchemaTest extends TestCase
         }
     }
 
-    public function test_sync_runs_table_has_every_required_column(): void
+    public function test_there_is_no_sync_runs_table(): void
     {
-        foreach ([
-            'started_at',
-            'finished_at',
-            'status',
-            'activities_upserted',
-            'activities_deleted',
-            'error_message',
-        ] as $column) {
-            $this->assertTrue(Schema::hasColumn('sync_runs', $column), "sync_runs.{$column} is missing.");
-        }
-    }
-
-    public function test_sync_runs_finished_at_is_nullable_for_runs_in_flight(): void
-    {
-        $this->assertTrue($this->columnIsNullable('sync_runs', 'finished_at'));
+        $this->assertFalse(Schema::hasTable('sync_runs'));
     }
 
     /**

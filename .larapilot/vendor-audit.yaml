@@ -42,3 +42,11 @@ history:
     medium: 0
     low: 0
     unknown: 0
+  -
+    checked_at: '2026-10-18T18:12:56+00:00'
+    components: 231
+    critical: 0
+    high: 0
+    medium: 0
+    low: 0
+    unknown: 0

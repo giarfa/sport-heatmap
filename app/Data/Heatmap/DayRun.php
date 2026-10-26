@@ -22,13 +22,8 @@ final readonly class DayRun
         public ?int $averagePaceSecondsPerKm,
         public ?int $totalAscentMeters,
         public ?int $averageHeartRate,
-        public ?string $stravaUrl,
     ) {}
 
-    /**
-     * The Strava link follows Activity::stravaUrl(), so a Garmin-sourced run never
-     * links to a Strava page that shows other values (FR-008).
-     */
     public static function fromActivity(Activity $activity): self
     {
         return new self(
@@ -38,7 +33,6 @@ final readonly class DayRun
             averagePaceSecondsPerKm: $activity->average_pace_seconds_per_km,
             totalAscentMeters: $activity->total_ascent_meters,
             averageHeartRate: $activity->average_heart_rate,
-            stravaUrl: $activity->stravaUrl(),
         );
     }
 
@@ -80,13 +74,5 @@ final readonly class DayRun
     public function heartRate(): ?string
     {
         return GarminImportFormat::heartRate($this->averageHeartRate);
-    }
-
-    /**
-     * "Strava" for a run linked to its Strava page, "Garmin import" otherwise.
-     */
-    public function sourceLabel(): string
-    {
-        return $this->stravaUrl === null ? 'Garmin import' : 'Strava';
     }
 }

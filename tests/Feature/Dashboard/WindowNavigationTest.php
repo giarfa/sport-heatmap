@@ -3,7 +3,6 @@
 namespace Tests\Feature\Dashboard;
 
 use App\Models\Activity;
-use App\Models\SyncRun;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapWindow;
 use Carbon\CarbonImmutable;
@@ -17,7 +16,7 @@ use Tests\TestCase;
 
 /**
  * Previous / Next through HTTP (US-013, FR-019): which window `?to=` names, which controls are
- * links, what the page says about the window, and that none of it writes or calls Strava.
+ * links, what the page says about the window, and that none of it writes or calls out.
  *
  * "Today" is Saturday 5 Sep 2026, so the current window is 18 May – 6 Sep 2026 and one
  * Previous step back is 20 Apr – 9 Aug 2026.
@@ -36,7 +35,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_the_home_page_opens_on_the_current_window_with_next_disabled(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
 
@@ -53,7 +52,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_a_past_window_shows_that_periods_runs_totals_and_range(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
 
@@ -71,7 +70,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_next_steps_four_weeks_forward_and_lands_on_the_plain_home_url_at_the_current_window(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-02', 10_000);
 
         $eightWeeksBack = $this->controls($this->actingAs($athlete)->get('/?to=2026-07-12'));
@@ -84,7 +83,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_previous_is_a_link_only_while_an_older_run_is_stored(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-05-18', 10_000); // the first day of the current window
 
         $this->assertSame('disabled button', $this->controls($this->actingAs($athlete)->get('/'))['Previous 4 weeks'][0]);
@@ -96,7 +95,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_previous_is_disabled_on_the_window_that_holds_the_oldest_run(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
 
@@ -106,9 +105,10 @@ class WindowNavigationTest extends TestCase
         $this->assertSame('link', $controls['Next 4 weeks'][0]);
     }
 
-    public function test_both_controls_are_disabled_when_no_run_is_stored(): void
+    public function test_both_controls_are_disabled_when_the_only_run_is_in_the_current_window(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
+        $this->runOn($athlete, '2026-09-03', 12_000);
 
         $controls = $this->controls($this->actingAs($athlete)->get('/'));
 
@@ -118,7 +118,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_an_empty_past_window_says_nothing_is_stored_there(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-02-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
 
@@ -133,7 +133,7 @@ class WindowNavigationTest extends TestCase
 
     public function test_each_window_gets_its_own_legend_computed_from_its_own_days(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         foreach (['2026-06-02' => 5_000, '2026-06-09' => 8_000, '2026-06-16' => 12_000, '2026-06-23' => 20_000] as $date => $meters) {
             $this->runOn($athlete, $date, $meters);
         }
@@ -148,31 +148,28 @@ class WindowNavigationTest extends TestCase
         $this->assertNotSame($past, $current);
     }
 
-    public function test_the_sync_status_is_the_same_on_every_window(): void
+    public function test_the_import_status_is_the_same_on_every_window(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
-        SyncRun::factory()->create([
-            'started_at' => now()->subHours(6)->subMinute(),
-            'finished_at' => now()->subHours(6),
-        ]);
+        Activity::query()->update(['updated_at' => now()->subHours(6)]);
 
         $current = $this->actingAs($athlete)->get('/');
         $past = $this->actingAs($athlete)->get('/?to=2026-08-09');
 
         $currentChip = $this->chip($current);
-        $this->assertStringContainsString('Synced 6 hours ago', $currentChip);
+        $this->assertStringContainsString('Last import 6 hours ago', $currentChip);
         $this->assertSame($currentChip, $this->chip($past));
         $this->assertSame(
-            $this->between($current, '<div class="sync-detail">', '</dl>'),
-            $this->between($past, '<div class="sync-detail">', '</dl>'),
+            $this->between($current, '<div class="import-detail">', '</dl>'),
+            $this->between($past, '<div class="import-detail">', '</dl>'),
         );
     }
 
     public function test_windows_are_cached_separately(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-05-12', 10_000); // only in the earlier window
         $this->runOn($athlete, '2026-09-03', 12_000); // only in the current one
 
@@ -185,9 +182,9 @@ class WindowNavigationTest extends TestCase
 
     public function test_only_windows_that_can_hold_a_run_are_cached(): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
-        $keyOf = fn (string $to): string => "heatmap:grid:v5:{$athlete->id}:g0:"
+        $keyOf = fn (string $to): string => "heatmap:grid:v6:{$athlete->id}:g0:"
             .HeatmapWindow::fromRequestedEnd($to, now())->startsOn->toDateString().':2026-09-05';
 
         $this->actingAs($athlete)->get('/?to=2026-08-09')->assertOk();
@@ -219,7 +216,7 @@ class WindowNavigationTest extends TestCase
     #[DataProvider('windowRequestProvider')]
     public function test_a_requested_end_names_its_window_and_a_bad_one_renders_the_current_window(string $query, string $heading, string $range): void
     {
-        $athlete = $this->allowlistedAthlete();
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-09-03', 12_000);
 
         $this->actingAs($athlete)->get('/'.$query)
@@ -228,18 +225,16 @@ class WindowNavigationTest extends TestCase
             ->assertSee($range);
     }
 
-    public function test_a_signed_out_visitor_navigates_the_same_way_and_nothing_is_written_or_sent(): void
+    public function test_navigating_back_writes_nothing_and_sends_nothing(): void
     {
-        $athlete = $this->allowlistedAthlete(factoryState: 'stravaTokenExpired');
+        $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-02', 10_000);
         $this->runOn($athlete, '2026-07-02', 11_000);
-        SyncRun::factory()->create();
 
         $before = $this->databaseSnapshot($athlete);
 
         $response = $this->get('/?to=2026-08-09')->assertOk()->assertViewIs('dashboard');
 
-        $this->assertGuest();
         $response->assertSee('20 Apr – 9 Aug 2026');
         $response->assertSee('Thursday 2 Jul 2026: 11.0 km');
         $controls = $this->controls($response);
@@ -289,8 +284,8 @@ class WindowNavigationTest extends TestCase
 
     private function chip(TestResponse $response): string
     {
-        preg_match('/<span class="sync-chip".*?<\/span>\s*[^<]+<\/span>/s', (string) $response->getContent(), $chip);
-        $this->assertNotEmpty($chip, 'The page carries the sync chip.');
+        preg_match('/<span class="import-chip".*?<\/span>\s*[^<]+<\/span>/s', (string) $response->getContent(), $chip);
+        $this->assertNotEmpty($chip, 'The page carries the import chip.');
 
         return $chip[0];
     }
@@ -319,8 +314,7 @@ class WindowNavigationTest extends TestCase
     }
 
     /**
-     * Row counts of every table a request could write to, plus the athlete's raw token
-     * columns, read through the query builder so the encrypted values are compared as stored.
+     * Row counts of every table a request could write to, plus the athlete's row as stored.
      *
      * @return array<string, mixed>
      */
@@ -329,10 +323,9 @@ class WindowNavigationTest extends TestCase
         return [
             'users' => DB::table('users')->count(),
             'activities' => DB::table('activities')->count(),
-            'sync_runs' => DB::table('sync_runs')->count(),
             'athlete' => (array) DB::table('users')
                 ->where('id', $athlete->id)
-                ->first(['updated_at', 'strava_access_token', 'strava_refresh_token', 'strava_token_expires_at']),
+                ->first(['updated_at']),
         ];
     }
 }
