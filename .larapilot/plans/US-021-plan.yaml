@@ -412,7 +412,7 @@ tasks:
     id: TASK-04
     title: 'Cover the Strava-removed acceptance matrix'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
@@ -439,14 +439,20 @@ tasks:
       4. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites.
 
       ## Completion Criteria
-      - [ ] Every "Strava removed" and "Garmin-only behaviour" criterion of US-021 has a passing assertion
-      - [ ] Full suite passes
-      - [ ] Coverage matches the NORMAL bar
+      - [x] Every "Strava removed" and "Garmin-only behaviour" criterion of US-021 has a passing assertion
+      - [x] Full suite passes
+      - [x] Coverage matches the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-021): TASK-04 cover the Strava-removed acceptance matrix`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: ef267e664bca6fa69a02323c3d1a5a05b7afee06
+      short_sha: ef267e6
+      subject: 'test(US-021): TASK-04 cover the Strava-removed acceptance matrix'
+      committed_at: '2026-10-26T22:05:54+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ef267e664bca6fa69a02323c3d1a5a05b7afee06'
   -
     id: TASK-05
     title: 'README, CHANGELOG, and quality gate'
@@ -495,4 +501,4 @@ tasks:
       - Commit: `chore(US-021): TASK-05 README, changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
-updated_at: '2026-10-26T21:05:07+00:00'
+updated_at: '2026-10-26T21:05:54+00:00'
