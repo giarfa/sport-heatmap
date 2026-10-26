@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Auth\ShowSignInFormController;
+use App\Http\Controllers\Auth\SignInController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Garmin\CancelGarminImportController;
 use App\Http\Controllers\Garmin\ConfirmGarminImportController;
@@ -12,15 +14,23 @@ use App\Http\Controllers\Strava\StravaCallbackController;
 use App\Http\Controllers\Strava\StravaRedirectController;
 use Illuminate\Support\Facades\Route;
 
+/*
+ * Sign-in is POSTed to a throttle that lives in the SignInOwner action, not a
+ * route limiter: the key is username + IP, which a route limiter cannot see.
+ * The gate that puts every other route behind the session is wired separately.
+ */
+Route::middleware('guest')->group(function (): void {
+    Route::get('/login', ShowSignInFormController::class)->name('login');
+    Route::post('/login', SignInController::class)->name('login.store');
+});
+
 Route::get('/', DashboardController::class)
     ->middleware('strava.fresh')
     ->name('dashboard');
 
 /*
  * Sign out is POST only, so a cross-site link or a prefetch cannot sign the
- * owner out; CSRF comes from the web group. No `auth` middleware: no `login`
- * route exists, so a guest would get a 500 instead of the dashboard. No
- * `strava.fresh`: signing out must never reach Strava, or depend on it. No
+ * owner out; CSRF comes from the web group. No `strava.fresh`: signing out must never reach Strava, or depend on it. No
  * throttle: the route does no work worth limiting.
  */
 Route::post('/logout', SignOutController::class)->name('logout');

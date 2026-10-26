@@ -81,7 +81,7 @@ tasks:
     id: TASK-01
     title: 'Add users.username with the giarfa owner backfill, factory states and seeder'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 3
     dependencies:
@@ -109,27 +109,33 @@ tasks:
       8. `php artisan test --compact tests/Feature/Database` then the full suite (still green: no route changes yet).
 
       ## Completion Criteria
-      - [ ] `users.username` is nullable and unique; `down()` drops it
-      - [ ] Backfill picks allowlisted-connected → lowest-id with activities → lowest-id, and creates `giarfa` on an empty table
-      - [ ] The owner's runs and every other column are untouched by the migration
-      - [ ] `UserFactory` has `owner()` and `ownerWithPassword()`; `csvOnly()` no longer depends on `CreateCsvOnlyAthlete`
-      - [ ] Seeder produces `giarfa` with a null password and the unchanged training block
-      - [ ] Tests pass
+      - [x] `users.username` is nullable and unique; `down()` drops it
+      - [x] Backfill picks allowlisted-connected → lowest-id with activities → lowest-id, and creates `giarfa` on an empty table
+      - [x] The owner's runs and every other column are untouched by the migration
+      - [x] `UserFactory` has `owner()` and `ownerWithPassword()`; `csvOnly()` no longer depends on `CreateCsvOnlyAthlete`
+      - [x] Seeder produces `giarfa` with a null password and the unchanged training block
+      - [x] Tests pass
 
       ## Test Data
-      - [ ] `database/factories/UserFactory.php` updated in this same task (`owner()`, `ownerWithPassword()`, `username` default)
-      - [ ] `TrainingBlockSeeder` seeds `giarfa` with a null password
-      - [ ] Verified through `TrainingBlockSeederTest` on the test database — never `migrate:fresh --seed` on the dev SQLite file
+      - [x] `database/factories/UserFactory.php` updated in this same task (`owner()`, `ownerWithPassword()`, `username` default)
+      - [x] `TrainingBlockSeeder` seeds `giarfa` with a null password
+      - [x] Verified through `TrainingBlockSeederTest` on the test database — never `migrate:fresh --seed` on the dev SQLite file
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/owner-authentication.md` created from `TEMPLATE.md` — data model section: `username`, nullable password as the "first sign-in armed" state, the owner-selection order and why, the empty-database insert, other user rows left undisplayed (accepted trade-off), recovery by clearing `users.password`
-      - [ ] Folder `README.md` index row added for `owner-authentication`
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/owner-authentication.md` created from `TEMPLATE.md` — data model section: `username`, nullable password as the "first sign-in armed" state, the owner-selection order and why, the empty-database insert, other user rows left undisplayed (accepted trade-off), recovery by clearing `users.password`
+      - [x] Folder `README.md` index row added for `owner-authentication`
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-020): TASK-01 add users.username with the giarfa owner backfill`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: 919734c9a1c82940e66305dc88fe3cdef980aff5
+      short_sha: 919734c
+      subject: 'feat(US-020): TASK-01 add users.username with the giarfa owner backfill'
+      committed_at: '2026-10-26T21:18:50+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/919734c9a1c82940e66305dc88fe3cdef980aff5'
   -
     id: TASK-02
     title: 'Sign-in page, throttled credential check, and sign-out to /login'
@@ -372,4 +378,4 @@ tasks:
       - Commit: `chore(US-020): TASK-06 changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize local PR notes toward `release/3.0.0`
-updated_at: '2026-10-26T20:16:29+00:00'
+updated_at: '2026-10-26T20:18:50+00:00'
