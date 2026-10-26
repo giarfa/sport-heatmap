@@ -111,6 +111,8 @@ class StravaConnectFlowTest extends TestCase
 
         $response->assertForbidden();
         $response->assertViewIs('strava.rejected');
+        $response->assertViewHas('reason', 'taken');
+        $response->assertSee('already in use');
         $this->assertSame(2, User::query()->count());
         $this->assertNull($this->owner->fresh()->strava_athlete_id);
         $this->assertNull($this->owner->fresh()->strava_access_token);

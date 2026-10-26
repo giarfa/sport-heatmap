@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 class SignInRequest extends FormRequest
 {
     /**
-     * The sign-in form is for signed-out visitors; the guest route middleware
+     * The sign-in form is for signed-out requests; the guest route middleware
      * is the access decision.
      */
     public function authorize(): bool

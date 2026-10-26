@@ -25,7 +25,7 @@ This instance is private: one owner, one account, one password. Every page sits 
 
 1. While `users.password` is null, signing in as `giarfa` with an empty password succeeds (and any non-empty password is refused).
 2. The `password.set` middleware (`EnsureOwnerPasswordIsSet`) redirects every signed-in route that carries it to `GET /password/change`. Only the change routes and `POST /logout` sit behind `auth` alone, so they stay reachable.
-3. `PUT /password/change` validates through `ChangePasswordRequest` (`required|string|min:12|confirmed`, a message per rule); a refused value stores nothing. A valid one is assigned to the `hashed` cast, saved, the session id regenerated, and the owner goes to the dashboard.
+3. `PUT /password/change` validates through `ChangePasswordRequest` (`required|string|min:12|max:72|confirmed`, a message per rule; 72 is bcrypt's input limit); a refused value stores nothing. A valid one is assigned to the `hashed` cast, saved, every other stored session of the owner deleted (database session driver; two clients may have signed in with the empty password during the first-change window), the session id regenerated, and the owner goes to the dashboard.
 4. Once a password exists, the change page and the update route redirect to the dashboard: a voluntary change is out of scope (FR-021), so the page is the one-time first change only. Signing in with an empty password is refused from then on and no route forces the change.
 
 ### The route gate
@@ -92,6 +92,7 @@ That row gets `username = giarfa` and `password = null`; nothing else changes (r
 | The change page closes after the first password | A voluntary change form | A later change is out of scope for FR-021; the recovery path is clearing `users.password` |
 | `redirect()->route('login')` on failure | `back()` | `back()` depends on the Referer header |
 | One `auth` + `password.set` group for every owner route; `strava.fresh` off every route | Per-route middleware; keep `strava.fresh` | A single group makes a forgotten route visible in review; `strava.fresh`'s allowlist check would 403 `giarfa` when no Strava id is stored, and neither the dashboard nor the import calls Strava |
+| First-change cleanup deletes the owner's other `sessions` rows | `AuthenticateSession` + `logoutOtherDevices` | The session table already holds `user_id`; one delete needs no extra middleware on every route |
 | Test databases clear the migration-created `giarfa` in `Tests\TestCase::setUp()` | Skip the insert under `testing` | The empty-database insert is part of the contract; tests arrange their own users and the unique username would otherwise collide with `owner()` |
 
 ## Key decisions & invariants
@@ -107,6 +108,8 @@ That row gets `username = giarfa` and `password = null`; nothing else changes (r
 - **Accepted risk —** between the migration and the first password change, whoever knows the username can set the password first. Mitigation: set it right after the deploy (README, "First sign-in and recovery").
 
 ## Extension points & gotchas
+
+- **Behind a reverse proxy the throttle needs `trustProxies`.** `SignInOwner` keys on `$request->ip()`. With no trusted proxy configured (none is today; deployment is not defined in the app), every visitor shares the proxy's address, so anyone can burn the five attempts a minute of the `giarfa|{ip}` key and lock the owner out until the minute passes. Configure `$middleware->trustProxies(at: …)` for the production proxy before shipping (open review finding, `.larapilot/docs/review/US-020.md`).
 
 - Never run `migrate:fresh` / `db:seed` against the dev SQLite file to check the seeder; `TrainingBlockSeederTest` covers it on the in-memory test database.
 - The seeded demo athlete is the owner, so a seeded local database starts at the first sign-in.

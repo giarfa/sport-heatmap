@@ -119,8 +119,7 @@ class StravaCallbackController extends Controller
          */
         if (User::query()->where('strava_athlete_id', (string) $tokens->athleteId)->whereKeyNot($owner->id)->exists()) {
             return response()->view('strava.rejected', [
-                'reason' => 'allowlist',
-                'athleteId' => $tokens->athleteId,
+                'reason' => 'taken',
             ], Response::HTTP_FORBIDDEN);
         }
 

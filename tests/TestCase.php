@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
+    /**
+     * Whether a RefreshDatabase test starts with no user. Set it to false to meet
+     * the owner the username migration creates on an empty database.
+     */
+    protected bool $clearsMigrationOwner = true;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -21,7 +27,7 @@ abstract class TestCase extends BaseTestCase
          * the owner() factory states), so clear the row inside the test's
          * transaction. UsernameMigrationTest covers the migration itself.
          */
-        if (in_array(RefreshDatabase::class, class_uses_recursive($this), true)) {
+        if ($this->clearsMigrationOwner && in_array(RefreshDatabase::class, class_uses_recursive($this), true)) {
             DB::table('users')->delete();
         }
     }

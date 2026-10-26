@@ -1,10 +1,10 @@
 # Sport Heatmap
 
-A single-athlete training heatmap, public and read-only. It syncs your own runs from Strava once a day and
-renders them as a GitHub-style contribution grid, so a training block is readable at a glance.
+A private single-athlete training heatmap. It syncs your own runs from Strava once a day (or imports a
+Garmin CSV) and renders them as a GitHub-style contribution grid, so a training block is readable at a glance.
 
-One athlete, one screen, no public signup: identity comes from Strava OAuth and access is
-restricted to an explicit allowlist of athlete ids.
+One athlete, one screen, no public signup: every page sits behind a single password-protected account
+(see "First sign-in and recovery" below).
 
 ## Requirements
 
@@ -283,19 +283,11 @@ stored: it is read during the request and discarded. Imported runs carry no Stra
 
 ## The dashboard
 
-The home page (`/`) is **public and read-only**. A signed-out visitor sees the heatmap, weekly
-totals, legend and sync status of the **first connected athlete of `STRAVA_ALLOWED_ATHLETE_IDS`, in
-configured order** — the same content the signed-in owner sees, without a Strava sign-in. A guest
-request never refreshes a token, calls Strava, or writes a row. Signing in is only needed to connect
-Strava, from the discreet "Owner? Connect with Strava" line under the map (a signed-in owner gets
-**Sign out** there), and stays allowlist-only. While no allowlisted athlete has connected yet, the
-home page shows the stored athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
-appears only when no stored athlete has any activity. Removing an athlete from the allowlist
-therefore no longer hides their stored runs — deleting their user row does. The page keeps
-`noindex, nofollow`: reachable by link, not promoted.
-
-If the owner's Strava token can no longer be refreshed, they are signed out and land on the public
-map with a one-off "Your Strava connection expired" banner.
+The home page (`/`) is **private**: a signed-out browser is sent to `/login`. The signed-in owner sees
+the heatmap, weekly totals, legend and sync status built from their own runs, from Strava or Garmin.
+Opening it never refreshes a token, calls Strava, or writes a row. Under the map, a discreet line
+offers **Import Garmin CSV** and **Sign out**. An owner with no runs and no Strava connection sees
+the connect screen. The page keeps `noindex, nofollow`.
 
 The heatmap grid is cached per athlete, per 16-week window and per calendar day
 (`App\Support\Heatmap\HeatmapGridCache`), so a second request the same day skips the aggregate

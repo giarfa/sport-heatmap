@@ -51,7 +51,7 @@ final readonly class PlanGarminImport
         /*
          * Both passes below look a row's candidates up by date instead of
          * scanning every stored run for every row. The review re-plans on each
-         * render, so rows × stored runs was work a visitor could repeat by
+         * render, so rows × stored runs was work that could be repeated by
          * reloading it. The lookups keep the order `$stored` has, which the tie
          * rules below rely on.
          */

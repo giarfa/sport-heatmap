@@ -4,6 +4,8 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -95,6 +97,38 @@ class ForcedPasswordChangeTest extends TestCase
         $this->assertNotSame(self::NEW_PASSWORD, $stored);
         $this->assertTrue(Hash::check(self::NEW_PASSWORD, $stored));
         $this->assertNotSame($before, session()->getId());
+    }
+
+    public function test_setting_the_password_ends_every_other_session_of_the_owner(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $other = User::factory()->create();
+        Config::set('session.driver', 'database');
+        foreach (['stale-session-a', 'stale-session-b'] as $id) {
+            DB::table('sessions')->insert(['id' => $id, 'user_id' => $owner->id, 'payload' => '', 'last_activity' => time()]);
+        }
+        DB::table('sessions')->insert(['id' => 'someone-else', 'user_id' => $other->id, 'payload' => '', 'last_activity' => time()]);
+
+        $this->actingAs($owner)
+            ->put(route('password.update'), ['password' => self::NEW_PASSWORD, 'password_confirmation' => self::NEW_PASSWORD])
+            ->assertRedirect(route('dashboard'));
+
+        $remaining = DB::table('sessions')->pluck('id')->all();
+        $this->assertNotContains('stale-session-a', $remaining);
+        $this->assertNotContains('stale-session-b', $remaining);
+        $this->assertContains('someone-else', $remaining);
+    }
+
+    public function test_a_password_longer_than_bcrypt_reads_is_refused(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $tooLong = str_repeat('a', 73);
+
+        $this->actingAs($owner)->from(route('password.change'))
+            ->put(route('password.update'), ['password' => $tooLong, 'password_confirmation' => $tooLong])
+            ->assertSessionHasErrors(['password' => 'Use at most 72 characters.']);
+
+        $this->assertNull($owner->fresh()->password);
     }
 
     public function test_once_a_password_is_set_an_empty_password_is_refused_and_nothing_is_forced(): void

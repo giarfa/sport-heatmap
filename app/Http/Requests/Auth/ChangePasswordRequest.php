@@ -24,10 +24,12 @@ class ChangePasswordRequest extends FormRequest
         /*
          * The PRD fixes the rule at 12 characters, so Password::defaults() (mixed
          * case, symbols, uncompromised) is not applied: its uncompromised() check
-         * is an outbound call, which the PRD rules out for this instance.
+         * is an outbound call, which the PRD rules out for this instance. The 72
+         * cap is bcrypt's input limit: beyond it extra characters would be
+         * silently ignored.
          */
         return [
-            'password' => ['required', 'string', 'min:12', 'confirmed'],
+            'password' => ['required', 'string', 'min:12', 'max:72', 'confirmed'],
         ];
     }
 
@@ -40,6 +42,7 @@ class ChangePasswordRequest extends FormRequest
             'password.required' => 'Enter a new password.',
             'password.string' => 'Enter a new password.',
             'password.min' => 'Use at least 12 characters.',
+            'password.max' => 'Use at most 72 characters.',
             'password.confirmed' => 'The two passwords do not match.',
         ];
     }

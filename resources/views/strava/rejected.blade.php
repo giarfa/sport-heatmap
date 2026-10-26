@@ -35,6 +35,12 @@
                 Strava did not complete the authorization. Nothing was created and nothing was
                 stored — try again in a moment.
             </p>
+        @elseif (($reason ?? 'allowlist') === 'taken')
+            <h1 class="mt-3 text-base font-semibold">That Strava account is already in use</h1>
+            <p class="mt-1.5 text-sm" style="color: var(--ink-muted);">
+                This Strava athlete is already attached to another account on this instance,
+                so nothing was stored.
+            </p>
         @else
             <h1 class="mt-3 text-base font-semibold">This instance is private</h1>
             <p class="mt-1.5 text-sm" style="color: var(--ink-muted);">

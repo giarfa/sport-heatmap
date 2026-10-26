@@ -71,13 +71,21 @@ class TrainingBlockSeeder extends Seeder
             return;
         }
 
-        $athlete = User::factory()->stravaConnected()->create([
+        /*
+         * The username migration already creates the owner on an empty database,
+         * and `username` is unique: a second `giarfa` would throw. The demo athlete
+         * becomes that row when it exists.
+         */
+        $athlete = User::query()->where('username', User::OWNER_USERNAME)->first()
+            ?? User::factory()->owner()->make();
+
+        $athlete->forceFill(User::factory()->stravaConnected()->raw([
             'name' => 'Demo Athlete',
             'email' => 'athlete@sport-heatmap.test',
             'strava_athlete_id' => '10000001',
             'username' => User::OWNER_USERNAME,
             'password' => null,
-        ]);
+        ]))->save();
 
         $block = $this->trainingBlock();
         $garminRuns = $this->garminRuns($block);

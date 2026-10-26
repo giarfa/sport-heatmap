@@ -184,10 +184,6 @@ already-imported row indexes — what the owner was shown.
 `ApplyGarminImport::__invoke(User, plan, resolutions, parsed)` runs inside
 **one** `DB::transaction`:
 
-- **null target with new rows** → `CreateCsvOnlyAthlete` first, inside the
-  transaction: `firstOrCreate` on `email = csv-athlete@garmin.invalid`,
-  `name = Garmin CSV athlete`, no password, no Strava id, no tokens. A null
-  target with nothing to add writes nothing and creates no athlete;
 - each new row → `$user->activities()->create()` with `source = garmin_csv`
   and no Strava id;
 - **Overwrite** → the stored row takes the CSV's name, distance, moving time,

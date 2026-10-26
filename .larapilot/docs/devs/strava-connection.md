@@ -44,7 +44,7 @@ owner. If it stops working, the nightly sync can no longer read activities.
    8. Athlete id missing or not on the allowlist → `strava.rejected`
       (`reason=allowlist`), 403.
    9. The returned athlete id already belongs to another `users` row →
-      `strava.rejected` (`reason=allowlist`), 403, nothing written (it would break
+      `strava.rejected` (`reason=taken`), 403, nothing written (it would break
       the unique index and hand the owner someone else's identity).
    10. `ConnectStravaAthlete($owner, $tokens)` writes the athlete id and the
       encrypted tokens onto the **signed-in owner** and redirects to the literal

@@ -367,7 +367,7 @@ tasks:
     id: TASK-06
     title: 'CHANGELOG, quality gate, and manual test handoff'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 1
     dependencies:
@@ -387,10 +387,10 @@ tasks:
       4. Manual test handoff in the PR notes: sign in at 375 px and 1280 px in light and dark; tab order username → password → button; a screen reader announces the error; after 5 wrong passwords the 6th shows the seconds to wait; first sign-in with an empty password lands on "Set your password"; after setting it, `/` loads the heatmap and the Garmin import works.
 
       ## Completion Criteria
-      - [ ] CHANGELOG Unreleased describes the change in product words
-      - [ ] Pint clean, Larastan level 5 clean, full suite green
-      - [ ] Manual test steps written in the PR notes
-      - [ ] Tests pass
+      - [x] CHANGELOG Unreleased describes the change in product words
+      - [x] Pint clean, Larastan level 5 clean, full suite green
+      - [x] Manual test steps written in the PR notes
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes in this task
@@ -402,4 +402,10 @@ tasks:
       - Commit: `chore(US-020): TASK-06 changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize local PR notes toward `release/3.0.0`
-updated_at: '2026-10-26T20:31:27+00:00'
+    commit:
+      sha: 69243bc7125fc36ddb16cd737b23d53db3715fdb
+      short_sha: 69243bc
+      subject: 'chore(US-020): TASK-06 changelog and quality gate'
+      committed_at: '2026-10-26T21:31:48+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/69243bc7125fc36ddb16cd737b23d53db3715fdb'
+updated_at: '2026-10-26T20:31:49+00:00'

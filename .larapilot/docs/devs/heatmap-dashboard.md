@@ -123,7 +123,7 @@ button fills the whole `<td>` (padding 2 / 3 / 4 px by breakpoint, the gap the
 `<td>` had) so the target is the full column width — 25.8 px at 320 px — while
 the visible square, the `<colgroup>` widths and the ramp are untouched.
 
-The page is **read-only by structure**: nothing on the path calls
+The page is **read-only**: nothing on the path calls
 `EnsureFreshAccessToken` or `StravaClient`. A request writes no row to `users`,
 `activities`, or `sync_runs`, sends no HTTP request, and never refreshes a token.
 The session store and, on a grid-cache miss, the cache store still write.
