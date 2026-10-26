@@ -5,11 +5,11 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 8
-status: PLANNED
+status: 'IN PROGRESS'
 body: |
   #### US-021: Remove Strava: the Garmin CSV import is the only way runs enter
 
-  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** PLANNED
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** IN PROGRESS
   **Blocked by:** US-020
   **Type:** Change request
   **Release:** 3.0.0
@@ -52,4 +52,7 @@ status_history:
   -
     status: PLANNED
     at: '2026-10-26T20:48:02+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-10-26T20:50:23+00:00'
 rework: false
