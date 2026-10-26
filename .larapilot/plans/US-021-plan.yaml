@@ -307,7 +307,7 @@ tasks:
     id: TASK-03
     title: 'Irreversible migration: delete Strava runs, drop Strava columns and sync_runs; Garmin-only models, factories, seeder'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 5
     dependencies:
@@ -379,29 +379,35 @@ tasks:
       10. `php artisan test`, `vendor/bin/pint --dirty --format agent`, then `grep -rni strava app database/factories database/seeders config routes resources`. Hits are allowed only in the old migrations, which stay untouched.
 
       ## Completion Criteria
-      - [ ] The migration deletes every `strava` activity and keeps every `garmin_csv` activity with all its values
-      - [ ] `users` has no Strava column; `sync_runs` and `activities.strava_activity_id` are gone; `activities.source` no longer exists, so no `strava` value is possible
-      - [ ] `down()` restores the schema only, never the deleted rows
-      - [ ] After the migration the cached grid is flushed; no window shows a deleted run
-      - [ ] Conflicts are matched against every stored run on the same date within ±2 minutes; re-import stays idempotent
-      - [ ] `migrate:fresh --seed` succeeds on a throwaway SQLite file
-      - [ ] Tests pass
+      - [x] The migration deletes every `strava` activity and keeps every `garmin_csv` activity with all its values
+      - [x] `users` has no Strava column; `sync_runs` and `activities.strava_activity_id` are gone; `activities.source` no longer exists, so no `strava` value is possible
+      - [x] `down()` restores the schema only, never the deleted rows
+      - [x] After the migration the cached grid is flushed; no window shows a deleted run
+      - [x] Conflicts are matched against every stored run on the same date within ±2 minutes; re-import stays idempotent
+      - [x] `migrate:fresh --seed` succeeds on a throwaway SQLite file
+      - [x] Tests pass
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` and `UserFactory.php` Garmin-only; `SyncRunFactory.php` deleted
-      - [ ] `TrainingBlockSeeder` produces Garmin-sourced runs only, with no `SyncRun`
-      - [ ] Factories and seeder updated in **this same task** as the migration
+      - [x] `database/factories/ActivityFactory.php` and `UserFactory.php` Garmin-only; `SyncRunFactory.php` deleted
+      - [x] `TrainingBlockSeeder` produces Garmin-sourced runs only, with no `SyncRun`
+      - [x] Factories and seeder updated in **this same task** as the migration
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` gains the `activities` data model and the metric columns from `activity-sync.md`, plus the "every stored run is a candidate" rule, and records the dropped `source` column (and why it was dropped rather than narrowed) under Architectural choices
-      - [ ] `.larapilot/docs/devs/activity-sync.md` deleted, and its index row removed from `README.md`
-      - [ ] `heatmap-dashboard.md`: cache key `v6` and the post-migration flush; `owner-authentication.md`: `users` columns
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` gains the `activities` data model and the metric columns from `activity-sync.md`, plus the "every stored run is a candidate" rule, and records the dropped `source` column (and why it was dropped rather than narrowed) under Architectural choices
+      - [x] `.larapilot/docs/devs/activity-sync.md` deleted, and its index row removed from `README.md`
+      - [x] `heatmap-dashboard.md`: cache key `v6` and the post-migration flush; `owner-authentication.md`: `users` columns
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-021): TASK-03 delete Strava runs and drop the Strava schema`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: c127f5d1acc650b586f5b640d498dde19c64ed79
+      short_sha: c127f5d
+      subject: 'feat(US-021): TASK-03 delete Strava runs and drop the Strava schema'
+      committed_at: '2026-10-26T22:05:07+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c127f5d1acc650b586f5b640d498dde19c64ed79'
   -
     id: TASK-04
     title: 'Cover the Strava-removed acceptance matrix'
@@ -489,4 +495,4 @@ tasks:
       - Commit: `chore(US-021): TASK-05 README, changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
-updated_at: '2026-10-26T21:00:23+00:00'
+updated_at: '2026-10-26T21:05:07+00:00'
