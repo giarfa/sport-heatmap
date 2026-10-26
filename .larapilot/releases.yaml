@@ -61,11 +61,11 @@ releases:
   -
     version: 3.0.0
     title: 'Private login'
-    status: planned
+    status: in_progress
     branch: release/3.0.0
     specs:
       - US-020
       - US-021
     created_at: '2026-10-18T19:32:05+00:00'
     shipped_at: null
-updated_at: '2026-10-26T20:07:51+00:00'
+updated_at: '2026-10-26T20:16:20+00:00'
