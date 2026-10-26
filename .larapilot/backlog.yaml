@@ -1276,11 +1276,11 @@ specs:
       title: 'Activity sync'
     priority: HIGH
     points: 8
-    status: 'IN PROGRESS'
+    status: REVIEW
     body: |
       #### US-021: Remove Strava: the Garmin CSV import is the only way runs enter
 
-      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** IN PROGRESS
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** REVIEW
       **Blocked by:** US-020
       **Type:** Change request
       **Release:** 3.0.0
@@ -1322,4 +1322,5 @@ specs:
     status_history:
       - { status: PLANNED, at: '2026-10-26T20:48:02+00:00' }
       - { status: 'IN PROGRESS', at: '2026-10-26T20:50:23+00:00' }
+      - { status: REVIEW, at: '2026-10-26T21:08:11+00:00' }
     rework: false
