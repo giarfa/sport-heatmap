@@ -5,11 +5,11 @@ epic:
   title: 'Foundation & Strava connection'
 priority: HIGH
 points: 8
-status: 'IN PROGRESS'
+status: REVIEW
 body: |
   #### US-020: Private instance: single-owner password login with forced first change
 
-  **Epic:** EP-001 | **Priority:** HIGH | **Points:** 8 | **Status:** IN PROGRESS
+  **Epic:** EP-001 | **Priority:** HIGH | **Points:** 8 | **Status:** REVIEW
   **Blocked by:** -
   **Type:** Change request
   **Release:** 3.0.0
@@ -55,4 +55,7 @@ status_history:
   -
     status: 'IN PROGRESS'
     at: '2026-10-26T20:16:17+00:00'
+  -
+    status: REVIEW
+    at: '2026-10-26T20:34:10+00:00'
 rework: false
