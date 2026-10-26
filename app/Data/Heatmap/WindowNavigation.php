@@ -2,7 +2,7 @@
 
 namespace App\Data\Heatmap;
 
-use App\Data\SyncStatus;
+use App\Data\ImportStatus;
 use App\Support\Heatmap\HeatmapWindow;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -58,10 +58,10 @@ final readonly class WindowNavigation
 
     /**
      * The line above an empty grid. The current window explains how the map fills in (the
-     * sync status knows how this athlete's runs arrive); an earlier window only says that
-     * nothing is stored there, since no sync or import will add to it.
+     * import status says how the runs arrive); an earlier window only says that
+     * nothing is stored there, since no import will add to it.
      */
-    public function emptyWindowNote(HeatmapGrid $grid, SyncStatus $status): ?string
+    public function emptyWindowNote(HeatmapGrid $grid, ImportStatus $status): ?string
     {
         if ($this->isCurrent) {
             return $status->runsInWindow === 0 ? $status->emptyWindowNote() : null;

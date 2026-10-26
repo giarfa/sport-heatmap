@@ -47,9 +47,10 @@ class HeatmapGridCacheTest extends TestCase
     {
         $athlete = $this->allowlistedAthlete();
         $this->actingAs($athlete);
+        Activity::factory()->garminImported()->for($athlete)->onDate(HeatmapWindow::current()->endsOn->subDays(10))->create();
         $this->getDashboard()->assertOk();
 
-        Activity::factory()->for($athlete)->onDate(HeatmapWindow::current()->endsOn->subDays(2))->create([
+        Activity::factory()->garminImported()->for($athlete)->onDate(HeatmapWindow::current()->endsOn->subDays(2))->create([
             'distance_meters' => 9_000,
         ]);
 

@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Dashboard;
 
+use App\Enums\ActivitySource;
 use App\Models\Activity;
-use App\Models\SyncRun;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapWindow;
 use Carbon\CarbonImmutable;
@@ -106,9 +106,10 @@ class WindowNavigationTest extends TestCase
         $this->assertSame('link', $controls['Next 4 weeks'][0]);
     }
 
-    public function test_both_controls_are_disabled_when_no_run_is_stored(): void
+    public function test_both_controls_are_disabled_when_the_only_run_is_in_the_current_window(): void
     {
         $athlete = $this->allowlistedAthlete();
+        $this->runOn($athlete, '2026-09-03', 12_000);
 
         $controls = $this->controls($this->actingAs($athlete)->get('/'));
 
@@ -148,25 +149,22 @@ class WindowNavigationTest extends TestCase
         $this->assertNotSame($past, $current);
     }
 
-    public function test_the_sync_status_is_the_same_on_every_window(): void
+    public function test_the_import_status_is_the_same_on_every_window(): void
     {
         $athlete = $this->allowlistedAthlete();
         $this->runOn($athlete, '2026-07-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
-        SyncRun::factory()->create([
-            'started_at' => now()->subHours(6)->subMinute(),
-            'finished_at' => now()->subHours(6),
-        ]);
+        Activity::query()->update(['source' => ActivitySource::GarminCsv, 'updated_at' => now()->subHours(6)]);
 
         $current = $this->actingAs($athlete)->get('/');
         $past = $this->actingAs($athlete)->get('/?to=2026-08-09');
 
         $currentChip = $this->chip($current);
-        $this->assertStringContainsString('Synced 6 hours ago', $currentChip);
+        $this->assertStringContainsString('Last import 6 hours ago', $currentChip);
         $this->assertSame($currentChip, $this->chip($past));
         $this->assertSame(
-            $this->between($current, '<div class="sync-detail">', '</dl>'),
-            $this->between($past, '<div class="sync-detail">', '</dl>'),
+            $this->between($current, '<div class="import-detail">', '</dl>'),
+            $this->between($past, '<div class="import-detail">', '</dl>'),
         );
     }
 
@@ -233,7 +231,6 @@ class WindowNavigationTest extends TestCase
         $athlete = $this->allowlistedAthlete(factoryState: 'stravaTokenExpired');
         $this->runOn($athlete, '2026-03-02', 10_000);
         $this->runOn($athlete, '2026-07-02', 11_000);
-        SyncRun::factory()->create();
 
         $before = $this->databaseSnapshot($athlete);
 
@@ -288,8 +285,8 @@ class WindowNavigationTest extends TestCase
 
     private function chip(TestResponse $response): string
     {
-        preg_match('/<span class="sync-chip".*?<\/span>\s*[^<]+<\/span>/s', (string) $response->getContent(), $chip);
-        $this->assertNotEmpty($chip, 'The page carries the sync chip.');
+        preg_match('/<span class="import-chip".*?<\/span>\s*[^<]+<\/span>/s', (string) $response->getContent(), $chip);
+        $this->assertNotEmpty($chip, 'The page carries the import chip.');
 
         return $chip[0];
     }

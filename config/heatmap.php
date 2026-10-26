@@ -12,6 +12,7 @@
  *     window_weeks: int,
  *     navigation_step_weeks: int,
  *     grid_cache_ttl: int,
+ *     display_timezone: string,
  * } $config
  */
 $config = [
@@ -58,6 +59,20 @@ $config = [
     */
 
     'grid_cache_ttl' => 86_400,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Display timezone
+    |--------------------------------------------------------------------------
+    |
+    | The timezone the import detail card prints its absolute "Last import"
+    | stamp in (FR-007). Timestamps are stored in UTC; this is a deployment
+    | choice (the owner's wall clock), so unlike the window constants above it
+    | is read from the environment.
+    |
+    */
+
+    'display_timezone' => env('HEATMAP_DISPLAY_TIMEZONE', 'Europe/Rome'),
 
 ];
 

@@ -73,7 +73,7 @@ tasks:
     id: TASK-00
     title: 'Bootstrap feature branch for release/3.0.0 (merge US-020 first)'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 1
     dependencies: {}
@@ -92,9 +92,9 @@ tasks:
       5. Draft the internal PR title and body toward `base` (`release/3.0.0`): "US-021 Remove Strava: Garmin CSV is the only data source". Call out the irreversible data migration in it.
 
       ## Completion Criteria
-      - [ ] `feature/US-020-private-login` merged into `release/3.0.0` locally, suite green on the merge
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true` on `feature/US-021-remove-strava`
-      - [ ] PR title/body drafted toward `release/3.0.0` (not `develop`)
+      - [x] `feature/US-020-private-login` merged into `release/3.0.0` locally, suite green on the merge
+      - [x] `release-feature` returned `ok: true` and `checked_out: true` on `feature/US-021-remove-strava`
+      - [x] PR title/body drafted toward `release/3.0.0` (not `develop`)
 
       ## Test Data
       - N/A — git only
@@ -106,6 +106,12 @@ tasks:
       - Commit: `chore(US-021): TASK-00 bootstrap feature branch for release/3.0.0` (empty commit optional)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: 147a3825a379b046c722ce8b6b4c470442b08dde
+      short_sha: 147a382
+      subject: 'chore(US-021): TASK-00 bootstrap feature branch for release/3.0.0'
+      committed_at: '2026-10-26T21:50:23+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/147a3825a379b046c722ce8b6b4c470442b08dde'
   -
     id: TASK-01
     title: 'Garmin-only status line, import detail, and empty state on the dashboard'
@@ -471,4 +477,4 @@ tasks:
       - Commit: `chore(US-021): TASK-05 README, changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
-updated_at: '2026-10-26T20:48:02+00:00'
+updated_at: '2026-10-26T20:50:23+00:00'

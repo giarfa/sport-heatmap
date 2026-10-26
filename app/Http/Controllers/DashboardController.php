@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Data\Heatmap\WindowNavigation;
 use App\Models\User;
+use App\Support\Garmin\ResolveImportStatus;
 use App\Support\Heatmap\DailyRunningDistance;
 use App\Support\Heatmap\DailyRuns;
 use App\Support\Heatmap\HeatmapBuilder;
@@ -11,7 +12,6 @@ use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
 use App\Support\Heatmap\LeadInDistance;
 use App\Support\Heatmap\OldestRunDate;
-use App\Support\Sync\ResolveSyncStatus;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -20,10 +20,9 @@ class DashboardController extends Controller
     /**
      * The single screen of this product, private to the signed-in owner.
      *
-     * It shows the owner's runs of either source. An owner with no run and no
-     * Strava connection gets the connect screen, which renders rather than
-     * redirects: the dashboard is where a redirect would loop. An owner who has
-     * connected Strava keeps the dashboard, so the first sync shows its skeleton.
+     * An owner with no run gets the empty screen, which renders rather than
+     * redirects: the dashboard is where a redirect would loop. It offers the
+     * Garmin CSV import, the only way a run enters.
      */
     public function __invoke(
         Request $request,
@@ -33,7 +32,7 @@ class DashboardController extends Controller
         HeatmapBuilder $buildGrid,
         HeatmapGridCache $gridCache,
         OldestRunDate $oldestRunDate,
-        ResolveSyncStatus $resolveSyncStatus,
+        ResolveImportStatus $resolveImportStatus,
     ): View {
         // Behind the `auth` route middleware, so the user is never null here.
         /** @var User $athlete */
@@ -41,17 +40,20 @@ class DashboardController extends Controller
 
         $oldestRun = $oldestRunDate($athlete);
 
-        if ($oldestRun === null && $athlete->strava_athlete_id === null) {
-            return view('strava.connect');
+        $today = now();
+
+        if ($oldestRun === null) {
+            return view('dashboard-empty', [
+                'status' => $resolveImportStatus($athlete, HeatmapWindow::current($today)),
+            ]);
         }
 
-        $today = now();
         $window = HeatmapWindow::fromRequestedEnd($this->requestedEnd($request), $today);
 
         /*
          * The cache key is per athlete. The day detail's runs are part of the same
-         * cached grid, so a sync or an import that forgets the grid forgets the
-         * detail with it — they cannot disagree.
+         * cached grid, so an import that forgets the grid forgets the detail with
+         * it — they cannot disagree.
          */
 
         /*
@@ -77,23 +79,23 @@ class DashboardController extends Controller
          * that ends before the oldest run is empty by construction, costs two small queries,
          * and is never linked to by Previous.
          */
-        $canHoldRuns = $window->isCurrent($today)
-            || ($oldestRun !== null && $window->endsOn->greaterThanOrEqualTo($oldestRun));
+        $canHoldRuns = $window->isCurrent($today) || $window->endsOn->greaterThanOrEqualTo($oldestRun);
 
         $grid = $canHoldRuns ? $gridCache->remember($athlete, $window, $today, $build) : $build();
 
         /*
          * Resolved outside the grid cache, deliberately: a cached grid is
-         * legitimate (US-004), but a cached "synced 6 hours ago" is the
-         * failure mode FR-007 exists to prevent — the sync status has to be
-         * read fresh on every request regardless of whether the grid was.
+         * legitimate (US-004), but a cached "last import 6 hours ago" would
+         * quietly lie — the import status is read fresh on every request
+         * regardless of whether the grid was.
          *
          * It always reads the CURRENT window, never the one shown: the status
-         * describes the sync, not the period on screen, so the chip, the warning,
-         * the sync card and the first-sync skeleton must be the same whichever
-         * window the reader has navigated to.
+         * describes the data, not the period on screen, so the chip and the
+         * import card are the same whichever window the reader has navigated to.
+         * There is no warning state: nothing runs in the background, so nothing
+         * can fall behind.
          */
-        $status = $resolveSyncStatus($athlete, HeatmapWindow::current($today), $today);
+        $status = $resolveImportStatus($athlete, HeatmapWindow::current($today));
 
         $navigation = WindowNavigation::for($window, $today, $oldestRun);
 

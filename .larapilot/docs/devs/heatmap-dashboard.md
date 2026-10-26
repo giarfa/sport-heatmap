@@ -4,15 +4,15 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-020` — 2026-10-26 |
+| **Last updated by** | `US-021` — 2026-10-26 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
 
 The single screen of the product, served at `/` and **private to the signed-in
 owner** (`US-020`): a 16-week × 7-day grid of daily running distance with weekly
-totals, a self-calibrating intensity legend, a sync status (header chip, warning
-banner, detail card), and a day detail that lists each run of a tapped day with
+totals, a self-calibrating intensity legend, an import status ("last import N
+ago": header chip, footer line, detail card), and a day detail that lists each run of a tapped day with
 its pace, ascent and heart rate. A signed-out browser is redirected to `/login`
 (see `owner-authentication.md`); there is no public view and no displayed-athlete
 selection. It must never present stale data as current. If it stops working, the
@@ -30,12 +30,11 @@ owner loses the only view of their training.
    to `/login`, an owner with no password yet to the first-password page), then
    `DashboardController`. `strava.fresh` is no longer on the route: neither the
    dashboard nor the import calls Strava.
-2. The athlete to render is the signed-in owner (`$request->user()`): their runs
-   of either source. Other `users` rows are never displayed. An owner with no
-   stored run **and** no Strava connection gets the `strava.connect` view, 200 —
-   the dashboard is where a redirect would loop. An owner who has connected
-   Strava keeps the dashboard even with no run, so the first sync shows its
-   skeleton.
+2. The athlete to render is the signed-in owner (`$request->user()`): their
+   imported runs. Other `users` rows are never displayed. An owner with no stored
+   run gets the `dashboard-empty` view, 200 — the dashboard is where a redirect
+   would loop. It offers one thing, the "Import Garmin CSV" button, and still
+   carries the import chip ("No runs imported yet") and the footer line.
 3. For that owner:
    1. The window: `HeatmapWindow::fromRequestedEnd($to, $today)` (`US-013`) —
       the 112 days (Monday of the week 15 weeks before, through Sunday) of the
@@ -53,14 +52,12 @@ owner loses the only view of their training.
       week, each Ran day's runs) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7) and
       `BuildWeeklyTrend` (the weekly-mileage chart, from the same `WeekRow`s) — all of it
       cached as the one `HeatmapGrid`, so the chart has no cache of its own.
-   3. `ResolveSyncStatus` reads `sync_runs` and the activity count of the
-      **current** window — never the shown one — **outside** the cache and
-      returns a `SyncStatus`, so the chip, warning, sync card and skeleton are the
-      same on every window (`US-013`). For a **CSV-only
-      athlete** (`User::isCsvOnly()`, no Strava id — US-011) it reads no
-      `sync_runs` at all: the latest import is the newest `updated_at` among
-      the athlete's `garmin_csv` activities, and the status is
-      `SyncStatus::forCsvOnly()`.
+   3. `ResolveImportStatus` reads the newest `updated_at` among the owner's
+      imported activities and the activity count of the **current** window —
+      never the shown one — **outside** the cache and returns an `ImportStatus`,
+      so the chip, the footer line and the import card are the same on every
+      window (`US-013`). There is no warning state: nothing runs in the
+      background, so nothing can fall behind (`US-021`).
    4. `OldestRunDate` (one `MIN(activity_date)`, read fresh) and the window feed
       `WindowNavigation::for()`: the heading ("Last 16 weeks" on the current
       window, "16 weeks to 6 Sep" on an earlier one), the page title, the empty
@@ -68,10 +65,11 @@ owner loses the only view of their training.
       shown window starts after the oldest stored run (none stored → none);
       Next is a link only on an earlier window, and points at plain `/` when it
       reaches the current one, so the current window has one address.
-   5. `dashboard.blade.php` renders the chip, an optional warning, the grid (or
-      the skeleton during a first sync), `<x-day-detail>`, and the rail: legend →
-      weekly trend → sync detail card (`US-014`). An empty current window keeps the sync-specific note; an
-      empty earlier window says "No runs stored in these 16 weeks." (`$grid->hasRuns()`).
+   5. `dashboard.blade.php` renders the chip, the grid, `<x-day-detail>`, and the
+      rail: legend → weekly trend → import detail card (`US-014`). An empty
+      current window says "No runs found in the last 16 weeks. The map fills in
+      after your next import."; an empty earlier window says "No runs stored in
+      these 16 weeks." (`$grid->hasRuns()`).
 
 ### Window navigation (`US-013`, FR-019)
 
@@ -134,46 +132,38 @@ connect screen: the OAuth cancellation flash (`status`) and the
 cancel path redirects to `dashboard`, which the owner sees as the map once there
 is a run or a Strava connection, and as the connect screen otherwise.
 
-**Owner UI.** One line under the map: "Runs missing from Strava? Import Garmin CSV ·
-Sign out" — text links (44 px tap targets; `--accent` ink, global `focus-visible`
-ring; the `·` separator is `aria-hidden`). It is not a header button: the 375 px
-header has no room for a second control, the line must stay discreet on a page
-whose job is the map, and Strava orange stays reserved for the connect screen.
+**Owner UI.** One line under the map: "Import Garmin CSV · Sign out" — text links
+(44 px tap targets; `--accent` ink, global `focus-visible` ring; the `·` separator
+is `aria-hidden`). It is not a header button: the 375 px header has no room for a
+second control and the line must stay discreet on a page whose job is the map.
 Sign out is a native `<form method="POST">` with `@csrf` and a submit button, so
 it is keyboard reachable without script and cannot be triggered by a link or
-prefetch (US-019, see `owner-authentication.md`). The Strava sign-in link the
-signed-out page used to carry is gone with the public page. SEO contract:
+prefetch (US-019, see `owner-authentication.md`). SEO contract:
 `<meta name="robots" content="noindex, nofollow">` only (decision
 `4918d74ff18e8b0f`).
 
-**Connect screen.** When the owner has no run and no Strava connection, `strava/connect.blade.php`
-says "Connect Strava or import a Garmin Connect CSV to build your 16-week
-heatmap." and offers, under the Strava-orange button, a full-width secondary
-"Import Garmin CSV" control (`btn btn--secondary`, 44 px, the neutral outline
-of the import screens). Strava orange stays on the Strava button only. The
-owner's first confirmed import gives them a run, and the next visit to `/` shows
-the map instead of this screen. (`US-021` reduces this screen to the CSV import.)
+**Empty state (`US-021`).** When the owner has no run, `dashboard-empty.blade.php`
+shows the logo mark, "See your training at a glance", "Import a Garmin Connect CSV
+export to build your 16-week heatmap.", one full-width primary "Import Garmin CSV"
+button (44 px) and a secondary "Sign out" form button. The owner's first confirmed
+import gives them a run, and the next visit to `/` shows the map instead.
 
 A confirmed import retires every cached window grid of the written athlete (`HeatmapGridCache::forgetAthlete()`), so the map shows the imported runs on
 the next request in whichever window is opened, and "Import cancelled. Nothing was written." arrives through
 `<x-session-notices />`. Garmin-imported runs are ordinary rows to the grid:
-`DailyRunningDistance` sums every source alike.
+`DailyRunningDistance` sums every run alike.
 
-**Sync health precedence (`SyncStatus::from`)**: no run → `NeverSynced`; last run
-failed → `Failed`; no successful run → `NeverSynced`; last success finished more
-than `strava.stale_after_hours` (48) ago → `Stale`; else `Healthy`. Every
-non-healthy state shows the banner (title, HTML-escaped reason, "Reconnect
-Strava" link to `strava.redirect`) and hides the redundant chip from screen
-readers.
-
-**CSV-only status (`SyncStatus::forCsvOnly`, `SyncHealth::CsvOnly`)**: never
-warns, never shows the skeleton. The chip reads "Imported {relative}" ("Never
-imported" without a stamp), the detail card "Import / Last import / Outcome:
-Garmin CSV / Runs in window", and the empty-window line "…after your next
-import." instead of "…after your next activity syncs.". Headings and that line
-come from `SyncStatus` (`detailHeading()`, `lastRunHeading()`,
-`emptyWindowNote()`), so Blade stays markup-only and the Strava copy is
-unchanged.
+**Import status (`ImportStatus`, `US-021`, FR-007)**: the chip reads "Last import
+{relative}" from the newest imported row's `updated_at`, or "No runs imported yet"
+with none; the footer prints the same text in lower case below 640 px, where the
+chip is hidden. The detail card is "Import / Last import / Runs in window": the
+absolute stamp is printed in `config('heatmap.display_timezone')`
+(`HEATMAP_DISPLAY_TIMEZONE`, default `Europe/Rome`) with the relative time under
+it, "Never" without one. Headings and every string come from `ImportStatus`
+(`chipLabel()`, `footerLabel()`, `detailHeading()`, `lastImportLabel()`,
+`lastImportRelative()`, `emptyWindowNote()`), so Blade stays markup-only. There is
+no stale, failed, reconnect or first-sync state, and no outcome row: one source,
+nothing to report.
 
 **Intensity scale**: fewer than 4 running days → fixed bands (5 / 10 / 20 km)
 with a "too few" note; p25 = p75 → fixed bands with a "too alike" note; otherwise
@@ -184,7 +174,7 @@ calibrated bands, upper-inclusive.
 | Piece | Where | Role |
 | --- | --- | --- |
 | Route | `routes/web.php` → `dashboard` (`/`, in the `auth` + `password.set` group) | The only screen |
-| Controller | `app/Http/Controllers/DashboardController.php` | The signed-in owner → grid + status; no run and no Strava → connect screen |
+| Controller | `app/Http/Controllers/DashboardController.php` | The signed-in owner → grid + status; no run → the empty state |
 | Window | `app/Support/Heatmap/HeatmapWindow.php` | ISO-week anchored 112-day window: `current()`, `endingInWeekOf()`, strict `fromRequestedEnd()`, `previous()`, `next()` (clamped to the current window), `isCurrent()` |
 | Daily totals | `app/Support/Heatmap/DailyRunningDistance.php` | One grouped aggregate query, ranged by `Activity::onDaysBetween()` |
 | Day runs | `app/Support/Heatmap/DailyRuns.php`, `app/Data/Heatmap/DayRun.php` | One query per cache miss for the window's runs, grouped by day in start order; `DayRun` is a scalars-only run with its formatting (`kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()` — null when not recorded — and the Strava link from `Activity::stravaUrl()`) |
@@ -195,15 +185,15 @@ calibrated bands, upper-inclusive.
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
 | Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v5:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
-| Sync status | `app/Support/Sync/ResolveSyncStatus.php`, `app/Data/SyncStatus.php`, `app/Enums/SyncHealth.php` | Fresh on every request; every user-facing sync string; the CSV-only branch (`forCsvOnly()`, `SyncHealth::CsvOnly`) |
-| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `weekly-trend`, `weekly-trend-skeleton`, `heatmap-skeleton`, `sync-chip`, `sync-warning`, `sync-detail`, `session-notices` | Markup only |
+| Import status | `app/Support/Garmin/ResolveImportStatus.php`, `app/Data/ImportStatus.php` | Fresh on every request; every user-facing import string |
+| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `dashboard-empty.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `weekly-trend`, `import-chip`, `import-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Security headers | `app/Http/Middleware/SetSecurityHeaders.php`, registered with `$middleware->prepend()` in `bootstrap/app.php` (`US-018`) | Global: the four headers on every response, HSTS when `isSecure()`; a header already on the response is left alone |
-| Config | `config/heatmap.php` | Literals `window_weeks` (16), `navigation_step_weeks` (4) and `grid_cache_ttl` (86 400) |
-| Tests | `tests/Feature/Dashboard/*`, `tests/Feature/Routing/SecurityHeadersTest.php`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/SyncStatusTest.php`, `tests/Unit/Support/Sync/ResolveSyncStatusTest.php` | |
+| Config | `config/heatmap.php` | Literals `window_weeks` (16), `navigation_step_weeks` (4) and `grid_cache_ttl` (86 400); `display_timezone` from `HEATMAP_DISPLAY_TIMEZONE` (a deployment choice) |
+| Tests | `tests/Feature/Dashboard/*`, `tests/Feature/Routing/SecurityHeadersTest.php`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/ImportStatusTest.php`, `tests/Unit/Support/Garmin/ResolveImportStatusTest.php` | |
 
 A dashboard request costs one grouped query, one run query and one lead-in query on a cache miss, zero on a hit, plus
-three small indexed queries for the sync status and one `MIN()` for the oldest run (`US-013`).
+two small indexed queries for the import status and one `MIN()` for the oldest run (`US-013`).
 
 ### Weekly trend (`US-014`, FR-020)
 
@@ -223,9 +213,8 @@ the grid's date-range label, and returns a `WeeklyTrend` of numbers and strings 
 - **Empty window**: no run → no bars, ticks, or line, and `isEmpty()` is true.
 
 The card (`components/weekly-trend.blade.php`, markup only) is the third rail card, beside the grid from `lg` and stacked
-under the legend below it. It has four states: the chart; the empty window ("No runs in this window, so there is
-nothing to chart.", heading kept, no axis); the first-sync skeleton (`weekly-trend-skeleton`, 16 `aria-hidden` bars,
-shown whenever the grid shows its own); and absent, because the connect screen renders no dashboard.
+under the legend below it. It has three states: the chart; the empty window ("No runs in this window, so there is
+nothing to chart.", heading kept, no axis); and absent, because the empty state renders no dashboard.
 
 Accessibility contract the markup must keep: the `<section>` is named by its `h3`; the SVG is a `role="group"` named by its
 `<title>`; each bar is a `<g role="img" aria-label="…">` carrying its accessible name, with the same text in a `<title>` for the pointer tooltip (a `<title>` alone is exposed inconsistently); gridlines,
@@ -246,7 +235,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 | Server-rendered Blade, no SPA, no starter kit, no Filament | Livewire, Inertia, Filament | One screen, one user; any of them ships more scaffolding than the product |
 | Grid as a real `<table>` with an accessible name per cell | `<div>` grid / canvas / SVG chart | FR-009: table semantics, screen-reader names, 375 px without page scroll |
 | Today's date in the cache key | Key on window only | Yesterday's grid would survive midnight and render today as a future cell — stale data shown as current (decision `4a7f0fb3e9bb61ac`) |
-| Sync status resolved outside the cache | Cache it with the grid | A cached "synced 6 hours ago" is exactly what FR-007 forbids |
+| Import status resolved outside the cache | Cache it with the grid | A cached "last import 6 hours ago" would quietly lie (FR-007) |
 | Cache the grid DTOs, with `cache.serializable_classes` listing exactly the classes the grid is made of (US-010) | `serializable_classes => true`; caching a plain array through `toArray()` / `fromArray()` mappers | Laravel 13 defaults the list to `false`, so a serializing store (`database`, `file`, `redis`) restored the grid as `__PHP_Incomplete_Class` and every cache hit answered 500. `true` reopens the gadget-chain risk the default closes; mappers on five DTOs add code for no gain over the framework's allowlist |
 | A cached entry that cannot be restored is reported, rebuilt and overwritten (US-010) | Return it as is; `Cache::remember()`; `cache:clear` in the deploy notes | An entry written by an older shape of the grid — a class not yet allowlisted, a renamed `DayCellState` case, a changed property type — would otherwise fail every request until midnight. `unserialize` throws for nested failures, so the read catches `Throwable`, not only `__PHP_Incomplete_Class` |
 | The day's runs live inside the cached grid (`DayCell::$runs`, US-012) | A JSON endpoint fetched when a day is opened; a second cache entry for the detail | The detail then shares the grid's one key and its one invalidation — the sync's and the import's `forgetAthlete()` covers it with no new call site, and the two can never disagree. Opening a day costs no request, so a signed-out visitor still triggers no write and no Strava call (FR-017). The price is ~19 runs' worth of scalars per week in the entry, a few tens of KB for a 112-day window |
@@ -259,7 +248,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 | `previous()` is not clamped to the oldest run; `next()` is clamped to the current window | Clamp both inside `HeatmapWindow` | The window is a value object that never sees the data, so how far back Previous may go is the controller's question (it disables the control); a window past the current one would hold only future cells |
 | The unavailable Previous / Next control is a disabled `<button>` (US-013) | The mockup's `<span>`; an `<a>` without `href`; `aria-disabled` on a link | A span is announced as text and an `<a>` with no `href` is neither focusable nor announced as a control; `aria-disabled` on a link still looks and tabs like one. A native disabled button is announced as disabled, is not a link, and is skipped by Tab — the acceptance criterion exactly. The look is the mockup's |
 | Previous is disabled from the athlete's oldest stored run, not from a fixed horizon (US-013) | A fixed number of windows; clamping inside `HeatmapWindow`; never disabling it | The reader should never page into a run of empty windows, and the value object cannot know the data. The cost is one `MIN()` per request, which the `(user_id, activity_date)` index serves, read outside the cache because the oldest run belongs to the athlete, not to any cached window |
-| The sync status always reads the current window (US-013) | Read the shown window | The status describes the sync, not the period on screen; a past window would otherwise show a different "Runs in window", a different empty note, and could flip the skeleton |
+| The import status always reads the current window (US-013) | Read the shown window | The status describes the data, not the period on screen; a past window would otherwise show a different "Runs in window" and a different empty note |
 | The lead-in weeks come from their own query, `LeadInDistance` (US-014) | Widen `DailyRunningDistance` by 21 days | The intensity scale is calibrated over the shown window's daily totals only (FR-006); widening that query would let weeks the reader cannot see move the legend and every cell's level. One more grouped aggregate keeps the two concerns apart |
 | Rolling average in integer metres, half-up (US-014) | Float mean and `round()` | A float mean of exact half-way values depends on summation order: the US-014 mockup README prints 24.5, 33.0 and 39.0 for weeks whose exact means are 24.55, 33.05 and 39.05 km (its generator rounded `98.19999999999999 / 4` down). Integer math reads 24.6, 33.1 and 39.1 and cannot drift; `BuildWeeklyTrendTest` pins this |
 | The chart is server-rendered inline SVG in a Blade component (US-014) | Chart.js / ApexCharts; a client-rendered canvas | A charting library is a new frontend dependency the Technical Architecture rules out, would need its own accessible text alternative, and would draw nothing for a guest with scripts off. One SVG of about 20 elements costs no script, no font, no service |
@@ -269,27 +258,27 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 | CSP limited to `frame-ancestors` (US-018) | A full `default-src` / `script-src` policy | The layout carries an inline theme script and Vite serves the assets; a wider policy would block them. The finding was framing, and `frame-ancestors` alone closes it |
 | HSTS only on secure requests, without `includeSubDomains` or `preload` (US-018) | Always send it; add both directives | Browsers ignore HSTS over HTTP, but a header sent where TLS is not guaranteed misleads. The other subdomains of the host are unknown and both directives are close to irreversible once cached |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
-| CSV-only athlete: latest import = newest `updated_at` of its `garmin_csv` activities (US-011) | A `users.garmin_imported_at` column | No migration for one stamp; the cost is that a re-import that changes nothing does not move it |
-| CSV-only athlete ignores `sync_runs` | Show the instance-wide sync state | `sync_runs` describe the Strava sync, which never selects this athlete — a failed or stale sync of someone else would put a false warning over a map only imports change |
-| All copy and arithmetic in DTOs / `SyncStatus` | Logic in Blade | Testable without rendering; components stay markup-only |
-| `@yield('header-status')` in the layout | View composer / shared variable | The connect and rejected screens extend the same layout and must render no chip |
+| Last import = newest `updated_at` of the owner's imported activities (US-011, kept by US-021) | A `users.garmin_imported_at` column; an import log table | No migration and no extra write for one stamp; the cost is that a re-import that changes nothing does not move it — the label means "data last changed by an import" |
+| No warning state of any kind (US-021) | Warn when the last import is old | Nothing runs in the background, so the data cannot fall behind; an old import is the owner's own pace, not a fault. The Strava stale / failed / reconnect / first-sync states were retired with the sync (accepted mockup deviation, decision `c022654e858f07e5`) |
+| The absolute import stamp is printed in `display_timezone` (US-021) | The app timezone (UTC); the browser's zone | Timestamps are stored in UTC and an evening import is the owner's next morning in UTC; a server-rendered page has no browser zone, so the owner's wall clock is a deployment setting (`HEATMAP_DISPLAY_TIMEZONE`) |
+| All copy and arithmetic in DTOs / `ImportStatus` | Logic in Blade | Testable without rendering; components stay markup-only |
+| `@yield('header-status')` in the layout | View composer / shared variable | Screens that extend the same layout may render no chip |
 | Private home page: every route behind the session, the dashboard shows the signed-in owner only (`US-020`, FR-017 superseded) | The public read-only page with a displayed-athlete rule | The instance is the owner's alone; runs and heart rate are visible only after sign-in. The displayed-athlete selection (allowlist order, lowest-id fallback) was deleted with the public page |
 | One shared `<dialog>` filled from a `<template>` per day (US-012) | One `<dialog>` per ran day; a bottom-sheet library; `<details>` | Same markup weight as the per-day dialogs but a single focus-return path; native `showModal()` gives the trap, Esc and inert page for free, where a library is a new dependency the app, which has no Alpine or Livewire, does not carry. `<details>` cannot be a modal sheet |
 | The Strava link in the detail opens in the same tab | `target="_blank" rel="noopener"` | The approved mockup and the US-008 review link do the same; the visible behaviour is the mockup's |
 | The grid cache is per athlete (`users.id`) | One global key | The key stays per user id; with one account it is one key, and it keeps working unchanged |
-| The sync warning shows its reason | A reduced warning | Decision `f75e292def892fad`; the reason is already non-secret and HTML-escaped |
 | "Sign out" for the signed-in owner as a POST form button in the same line (US-019) | A header button; a `GET` link; a menu | Same header-width reasoning as the line itself; a `GET` link could be triggered cross-site or by a prefetch, so it has to be a form posting with a CSRF token |
 | "Import Garmin CSV" as a text line under the map (US-011) | A header button; a menu | Discreet, no header budget at 375 px, one screen with no nav. It lets the map work with CSV imports only |
-| Connect screen: Garmin import as a secondary outline button below the Strava one | A second orange button; a text link | Strava's brand guidelines put orange on the connect button only; a full-width 44 px control reads as an equal way in on a phone |
+| Empty state: one primary "Import Garmin CSV" button (US-021) | Keep a secondary control beside a Strava one; a text link | With one data source the import is the only action, so it is the primary control; a full-width 44 px button reads as the way in on a phone |
 | Shared `session-notices` component | Duplicate the notices in both views | One copy of the cancellation and expiry copy; the caller only decides the width |
 | Two-letter weekday `<abbr>` | Single letters from the PRD prose | Matches the mockup (decision log) |
 
 ## Key decisions & invariants
 
-- **Invariant — a CSV-only athlete never gets a sync warning.** _Breaks if:_
-  `ResolveSyncStatus` reads `sync_runs` for it, or `needsWarning()` stops
-  excluding `CsvOnly`. Its "Imported …" stamp means "data last changed by an
-  import": a re-import that changes nothing does not move it.
+- **Invariant — no state of the dashboard warns.** _Breaks if:_ a stale, failed
+  or reconnect state is reintroduced without a background job that can fail. The
+  "Last import …" stamp means "data last changed by an import": a re-import that
+  changes nothing does not move it.
 
 - **Invariant — a view of `/` is strictly read-only.** Only a confirmed Garmin
   import writes (US-011), never the page itself. _Breaks if:_ anything on the
@@ -300,10 +289,10 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   if:_ a displayed-athlete selection returns — a second `users` row (a CSV-only
   athlete left by the pre-3.0 import) would then surface on the owner's map.
 
-- **Invariant — the sync status is never cached, and never reads the shown window.**
-  _Breaks if:_ it moves into the `remember()` closure, or `ResolveSyncStatus` is
+- **Invariant — the import status is never cached, and never reads the shown window.**
+  _Breaks if:_ it moves into the `remember()` closure, or `ResolveImportStatus` is
   called with `$window` instead of `HeatmapWindow::current($today)` — the chip and
-  the sync card would then change as the reader navigates.
+  the import card would then change as the reader navigates.
 - **Invariant — every class serialized inside a `HeatmapGrid` is listed in
   `cache.serializable_classes`.** _Breaks if:_ a DTO, enum, or value object is
   nested into the grid without joining the list — the grid then fails to
@@ -312,7 +301,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   `LegendRow` is not: `IntensityScale` holds scalars and derives legend rows on
   render. The list never becomes `true`.
 - **Invariant — every write that changes an athlete's runs calls
-  `HeatmapGridCache::forgetAthlete()`.** _Breaks if:_ a new write path (a sync, an
+  `HeatmapGridCache::forgetAthlete()`.** _Breaks if:_ a new write path (an
   import, an edit) skips it — every window already cached keeps the old data until
   midnight or the TTL.
 - **Invariant — the grid cache key carries today's date.** _Breaks if:_ the key
@@ -333,7 +322,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   day and `<` the day after the last, both as plain `Y-m-d` strings. That holds for a
   row stored as `Y-m-d` and as `Y-m-d 00:00:00` alike, so the comparison does not
   depend on the write format. `DailyRunningDistance`, `DailyRuns`, `LeadInDistance`,
-  `ResolveSyncStatus::runsInWindow()` and `ReconcileStravaWindow` all use it; the
+  `ResolveImportStatus` and `ReconcileStravaWindow` all use it; the
   lead-in ends on the Sunday before the window, so a run lands on exactly one side of
   the boundary. _Breaks if:_ a range is written as `whereBetween('activity_date',
   [toDateString(), toDateString()])` — `'2026-10-11 00:00:00' <= '2026-10-11'` is false,
@@ -357,8 +346,6 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   a cache hit costs the chart no query.
 - **Invariant — the scale is calibrated once per grid build**, so cells and legend
   cannot disagree.
-- **Invariant — the failure reason is escaped** (`{{ }}`), never `{!! !!}`: it can
-  carry a raw Strava error string.
 - **Invariant — `noindex, nofollow` and the "Powered by Strava" footer link stay
   in the layout** (FR-008), so no view change can drop them.
 
@@ -379,9 +366,8 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   window's last Sunday, because the bug only shows for rows written through the cast.
 - `HeatmapBuilder` takes `$today` as an argument: test date rules by naming a
   date, not by travelling time.
-- The first-sync skeleton shows only while the first run is in flight and no
-  success exists (`SyncStatus::showsSkeleton()`).
-- `sync_runs` is instance-wide; the status is the same for every athlete.
+- The empty state is a rendered view, never a redirect: a redirect from `/` to the
+  import form would loop through any page that sends the owner home.
 - Other `users` rows (for instance a pre-3.0 CSV-only athlete next to the Strava
   one) are left in the database and are no longer displayed anywhere; merging
   them into the owner is not part of `US-020`. On a fresh `migrate:fresh --seed`
@@ -396,8 +382,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   the 0 km week gives the trend a rest week to show. The block itself is untouched and
   the legend over the current window does not change. Do not run `migrate:fresh --seed` on a
   database that holds real imports — point `DB_DATABASE` at a scratch file.
-- Strava orange (`#fc4c02`) is reserved for the connect button and never used as
-  a data colour.
+
 
 ## Related
 

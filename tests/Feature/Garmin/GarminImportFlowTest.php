@@ -562,6 +562,9 @@ class GarminImportFlowTest extends TestCase
         $cacheKey = "heatmap:grid:v5:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
         $generationKey = "heatmap:grid:generation:{$this->owner->id}";
 
+        // An owner with no run gets the empty state, which builds no grid to cache.
+        Activity::factory()->garminImported()->for($this->owner)->onDate(now()->subDays(100))->create();
+
         $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
         $this->assertTrue(Cache::has($cacheKey));
 
