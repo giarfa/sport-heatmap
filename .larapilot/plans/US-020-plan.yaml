@@ -200,7 +200,7 @@ tasks:
     id: TASK-03
     title: 'Forced first password change: middleware and change-password page'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
@@ -230,27 +230,33 @@ tasks:
       8. `php artisan test --compact tests/Feature/Auth`, then the full suite.
 
       ## Completion Criteria
-      - [ ] Empty-password first sign-in works only while no password is stored
-      - [ ] Every route but the change page and sign-out redirects to the change page while no password is stored
-      - [ ] Empty, <12, or mismatched value refused at the field, nothing stored
-      - [ ] Valid value stored hashed, session regenerated, owner lands on the dashboard
-      - [ ] Once set: empty password refused, no forced redirect, change page redirects to the dashboard
-      - [ ] README documents the first sign-in and the recovery
-      - [ ] UI usable at mobile/tablet/desktop (manual smoke)
-      - [ ] Tests pass
+      - [x] Empty-password first sign-in works only while no password is stored
+      - [x] Every route but the change page and sign-out redirects to the change page while no password is stored
+      - [x] Empty, <12, or mismatched value refused at the field, nothing stored
+      - [x] Valid value stored hashed, session regenerated, owner lands on the dashboard
+      - [x] Once set: empty password refused, no forced redirect, change page redirects to the dashboard
+      - [x] README documents the first sign-in and the recovery
+      - [x] UI usable at mobile/tablet/desktop (manual smoke)
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/owner-authentication.md` — forced-change flow, the `password.set` middleware, why the page closes after the first change, the 12-character rule vs `Password::defaults()`, the accepted empty-password risk and its mitigation, recovery
-      - [ ] Folder `README.md` index row refreshed
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/owner-authentication.md` — forced-change flow, the `password.set` middleware, why the page closes after the first change, the 12-character rule vs `Password::defaults()`, the accepted empty-password risk and its mitigation, recovery
+      - [x] Folder `README.md` index row refreshed
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-020): TASK-03 force the first password change`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: e330b61ba8015b4954d9b9d4fcd4d7bf72533768
+      short_sha: e330b61
+      subject: 'feat(US-020): TASK-03 force the first password change'
+      committed_at: '2026-10-26T21:22:43+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e330b61ba8015b4954d9b9d4fcd4d7bf72533768'
   -
     id: TASK-04
     title: 'Gate every route behind the session; owner-only dashboard and Garmin import'
@@ -384,4 +390,4 @@ tasks:
       - Commit: `chore(US-020): TASK-06 changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize local PR notes toward `release/3.0.0`
-updated_at: '2026-10-26T20:20:51+00:00'
+updated_at: '2026-10-26T20:22:43+00:00'

@@ -9,7 +9,7 @@
 
 ## Purpose
 
-This instance is private: one owner, one account, one password. Every page sits behind a session sign-in, and the owner's runs and heart rate are readable and writable only after it. This file describes the account (data model, first-sign-in state, recovery) and the sign-in flow. The forced first password change is described below; the route-group gate is added by the last code task of `US-020`.
+This instance is private: one owner, one account, one password. Every page sits behind a session sign-in, and the owner's runs and heart rate are readable and writable only after it. This file describes the account (data model, first-sign-in state, recovery) and the sign-in flow. The forced first password change and the route-group gate are described below.
 
 ## Functional flow
 
@@ -28,7 +28,21 @@ This instance is private: one owner, one account, one password. Every page sits 
 3. `PUT /password/change` validates through `ChangePasswordRequest` (`required|string|min:12|confirmed`, a message per rule); a refused value stores nothing. A valid one is assigned to the `hashed` cast, saved, the session id regenerated, and the owner goes to the dashboard.
 4. Once a password exists, the change page and the update route redirect to the dashboard: a voluntary change is out of scope (FR-021), so the page is the one-time first change only. Signing in with an empty password is refused from then on and no route forces the change.
 
-The route-group gate (every other route behind the session): documented with the task that builds it.
+### The route gate
+
+`routes/web.php` has three groups; `/up` (the health route) lives outside the web
+group:
+
+1. `guest` — `GET /login`, `POST /login`.
+2. `auth` — `GET|PUT /password/change`, `POST /logout`.
+3. `auth` + `password.set` — everything else: `/` (the dashboard), every
+   `import/garmin/*` route, and the two Strava OAuth routes.
+
+`bootstrap/app.php` sends guests to `route('login')` and signed-in users who open a
+guest route to the dashboard. The `auth` middleware stores the intended URL for
+GET requests, so the owner lands on the page first requested after signing in.
+No route creates or lists users. What each protected area does for the owner is
+in `heatmap-dashboard.md`, `garmin-csv-import.md` and `strava-connection.md`.
 
 ## Technical design
 
@@ -38,14 +52,14 @@ The route-group gate (every other route behind the session): documented with the
 | Migration | `database/migrations/2026_10_26_201636_add_username_to_users_table.php` | Adds `users.username` and backfills the owner |
 | Factory states | `database/factories/UserFactory.php` | `owner()` (null password), `ownerWithPassword()` |
 | Seeder | `database/seeders/TrainingBlockSeeder.php` | The demo athlete is `giarfa` with a null password |
-| Routes | `routes/web.php` (`login`, `login.store`, `logout`), `bootstrap/app.php` (`redirectGuestsTo`, `redirectUsersTo`) | Sign-in routes; guests go to `/login`, signed-in users to the dashboard |
+| Routes | `routes/web.php` (the three groups above), `bootstrap/app.php` (`redirectGuestsTo`, `redirectUsersTo`, the `password.set` alias) | The gate; guests go to `/login`, signed-in users who open a guest route to the dashboard |
 | Controllers | `app/Http/Controllers/Auth/ShowSignInFormController.php`, `SignInController.php`, `app/Http/Controllers/SignOutController.php` | Thin, single action |
 | Action | `app/Actions/Auth/SignInOwner.php` | The one decision: throttle → credential check → hit/clear the limiter |
 | Middleware | `app/Http/Middleware/EnsureOwnerPasswordIsSet.php` (alias `password.set`) | Forces the first password change while `password` is null |
 | Controllers (change) | `app/Http/Controllers/Auth/ShowChangePasswordFormController.php`, `ChangePasswordController.php` | The one-time first-password page and its handler |
 | Form Requests | `app/Http/Requests/Auth/SignInRequest.php`, `ChangePasswordRequest.php` | Edge validation of both forms |
 | Views | `resources/views/auth/login.blade.php`, `change-password.blade.php` | Mirrors the Garmin upload form idiom; `.text-input` in `resources/css/app.css` |
-| Tests | `tests/Feature/Database/UsernameMigrationTest.php`, `SchemaTest.php`, `tests/Feature/Auth/SignInTest.php`, `SignOutTest.php`, `ForcedPasswordChangeTest.php` | Backfill branches, untouched columns, `down()`; sign-in, throttle, intended URL, sign-out |
+| Tests | `tests/Feature/Database/UsernameMigrationTest.php`, `SchemaTest.php`, `tests/Feature/Auth/SignInTest.php`, `SignOutTest.php`, `ForcedPasswordChangeTest.php`, `tests/Feature/Garmin/GarminImportAccessTest.php`, `tests/Feature/Routing/NoPublicSignupTest.php` | Backfill branches, untouched columns, `down()`; sign-in, throttle, intended URL, sign-out |
 
 ### Data model
 
@@ -77,6 +91,7 @@ That row gets `username = giarfa` and `password = null`; nothing else changes (r
 | The 12-character rule alone, not `Password::defaults()` | Mixed case, symbols, `uncompromised()` | The PRD fixes the rule at 12 characters; `uncompromised()` is an outbound call the PRD rules out |
 | The change page closes after the first password | A voluntary change form | A later change is out of scope for FR-021; the recovery path is clearing `users.password` |
 | `redirect()->route('login')` on failure | `back()` | `back()` depends on the Referer header |
+| One `auth` + `password.set` group for every owner route; `strava.fresh` off every route | Per-route middleware; keep `strava.fresh` | A single group makes a forgotten route visible in review; `strava.fresh`'s allowlist check would 403 `giarfa` when no Strava id is stored, and neither the dashboard nor the import calls Strava |
 | Test databases clear the migration-created `giarfa` in `Tests\TestCase::setUp()` | Skip the insert under `testing` | The empty-database insert is part of the contract; tests arrange their own users and the unique username would otherwise collide with `owner()` |
 
 ## Key decisions & invariants
@@ -98,6 +113,6 @@ That row gets `username = giarfa` and `password = null`; nothing else changes (r
 
 ## Related
 
-- Specs: `US-020`
+- Specs: `US-020` (`US-021` removes Strava next)
 - Plans: `.larapilot/plans/US-020-plan.yaml`
 - Other domains: `strava-connection.md`, `heatmap-dashboard.md`, `garmin-csv-import.md`

@@ -158,8 +158,10 @@ class SyncStatusTest extends TestCase
         $this->assertStringNotContainsString('No runs found in the last 16 weeks.', $html);
     }
 
-    public function test_the_signed_out_connect_screen_renders_with_no_chip_and_no_banner(): void
+    public function test_the_connect_screen_renders_with_no_chip_and_no_banner(): void
     {
+        $this->signInOwner();
+
         $response = $this->getDashboard();
         $html = $response->getContent() ?: '';
 
@@ -173,16 +175,15 @@ class SyncStatusTest extends TestCase
         return $this->get('/');
     }
 
-    public function test_a_displayed_csv_only_athlete_renders_the_map_and_the_import_status_with_no_alert(): void
+    public function test_a_csv_only_owner_renders_the_map_and_the_import_status_with_no_alert(): void
     {
-        $athlete = User::factory()->csvOnly()->create();
+        $athlete = $this->signInOwner();
         Activity::factory()->garminImported()->for($athlete)->create([
             'activity_date' => now()->subDay()->toDateString(),
             'distance_meters' => 12_345,
             'updated_at' => now()->subHours(3),
         ]);
         SyncRun::factory()->failed()->create();
-        $this->allowlistAthletes();
         $counts = [User::count(), Activity::count(), SyncRun::count()];
 
         $response = $this->getDashboard();

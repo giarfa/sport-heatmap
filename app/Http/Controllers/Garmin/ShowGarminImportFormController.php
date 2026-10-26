@@ -8,7 +8,7 @@ use Illuminate\View\View;
 class ShowGarminImportFormController extends Controller
 {
     /**
-     * The upload form, open to every visitor (US-011).
+     * The upload form, for the signed-in owner.
      */
     public function __invoke(): View
     {

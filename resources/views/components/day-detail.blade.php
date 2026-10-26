@@ -4,8 +4,7 @@
     The detail a ran day's button opens (FR-011), mirroring .larapilot/mockups/US-012/day-detail.html.
 
     One shared <dialog> and one inert <template> per ran day, filled by resources/js/app.js:
-    the runs are part of the cached grid, so opening a day makes no request — a signed-out
-    visitor writes nothing and reaches nothing (FR-017) — and a sync or an import that forgets
+    the runs are part of the cached grid, so opening a day makes no request, and a sync or an import that forgets
     the grid forgets the detail with it. Every string comes from DayCell / DayRun; a missing
     metric is an em dash read aloud as "not recorded", never a 0. Run names are Strava's or
     Garmin's text, so they are escaped.

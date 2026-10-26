@@ -66,8 +66,8 @@ class User extends Authenticatable
     }
 
     /**
-     * Whether this athlete exists only to own Garmin CSV imports: no Strava
-     * identity, so no token, no sync, and no sign-in.
+     * Whether this user has no Strava identity: no token and no sync, so its runs
+     * come from Garmin CSV imports only.
      */
     public function isCsvOnly(): bool
     {

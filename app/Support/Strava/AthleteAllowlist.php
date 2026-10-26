@@ -21,9 +21,9 @@ class AthleteAllowlist
     /**
      * The allowlisted athlete ids, in the order they are configured.
      *
-     * The order is meaningful: among connected allowlisted athletes, the first
-     * is the one the public home page displays. With none connected, the home
-     * page falls back to a stored athlete (ResolveDisplayedAthlete).
+     * The allowlist decides which Strava athlete may be attached to the owner and
+     * which connected athletes the nightly sync reads. The order carries no
+     * meaning any more: no screen picks a displayed athlete from it.
      *
      * @return array<int, string>
      */

@@ -4,19 +4,20 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-002` |
-| **Last updated by** | `US-019` — 2026-10-18 |
+| **Last updated by** | `US-020` — 2026-10-26 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
 
 Connects the owner's Strava account to this instance and keeps that connection
-usable. It authenticates *a* Strava athlete through OAuth2 (authorization code),
-decides whether it is *the* athlete through an allowlist of Strava athlete ids,
-stores a read-only token pair encrypted at rest, and refreshes the access token
-before any Strava call needs it. The allowlist's order also decides which
-athlete the public home page displays; with no allowlisted athlete connected, it
-falls back to a stored athlete with activities. If it stops working, nobody can sign in
-and the nightly sync can no longer read activities.
+usable. Since `US-020` it is **no longer a sign-in**: the signed-in owner (see
+`owner-authentication.md`) authorizes Strava through OAuth2 (authorization code),
+an allowlist of Strava athlete ids decides whether the returned athlete is
+allowed, and a read-only token pair is stored encrypted on the owner's row. The
+access token is refreshed before any Strava call needs it. There is no
+displayed-athlete selection any more: the dashboard always shows the signed-in
+owner. If it stops working, the nightly sync can no longer read activities.
+(`US-021` removes this domain.)
 
 ## Functional flow
 
@@ -25,6 +26,8 @@ and the nightly sync can no longer read activities.
 1. `StravaRedirectController` mints a 40-character `state`, stores it in the
    session under `strava.oauth_state`, and redirects to Strava's authorize URL
    with the literal `activity:read_all` scope.
+   Both routes sit behind `auth` + `password.set`, so a signed-out request goes to
+   `/login` before reaching Strava.
 2. `StravaCallbackController` runs a fixed sequence of gates, and **nothing is
    written until the last one passes**:
    1. The expected state is pulled (consumed) from the session first, on every
@@ -40,61 +43,26 @@ and the nightly sync can no longer read activities.
       `strava.rejected` (`reason=exchange`), 503, logged without token data.
    8. Athlete id missing or not on the allowlist → `strava.rejected`
       (`reason=allowlist`), 403.
-   9. `ConnectStravaAthlete` upserts the user (by `strava_athlete_id`) in a
-      transaction, then `Auth::login($user)` (no remember-me cookie) and redirect to
-      the literal `dashboard` route.
+   9. The returned athlete id already belongs to another `users` row →
+      `strava.rejected` (`reason=allowlist`), 403, nothing written (it would break
+      the unique index and hand the owner someone else's identity).
+   10. `ConnectStravaAthlete($owner, $tokens)` writes the athlete id and the
+      encrypted tokens onto the **signed-in owner** and redirects to the literal
+      `dashboard` route. It creates no user, starts no session and sets no
+      remember-me cookie.
 
-**Sign out (`POST /logout`, US-019)**
+**Sign out** moved to `owner-authentication.md` (`POST /logout`, redirects to
+`/login`); it still never touches the Strava token columns — signing out is not
+deauthorisation (FR-012), and the nightly `strava:sync` runs on the stored tokens
+without a session.
 
-1. `SignOutController` calls `Auth::logout()`, invalidates the session, and
-   regenerates the CSRF token, then redirects to the literal `dashboard` route.
-2. POST only; CSRF comes from the `web` group (no token → 419). There is no
-   `GET` route.
-3. Idempotent: a guest posting to it gets a fresh session and the dashboard.
-4. The Strava token columns are never touched — signing out is not
-   deauthorisation (FR-012), and the nightly `strava:sync` runs on the stored
-   tokens without a session.
-
-**Every authenticated request (`strava.fresh` middleware on `/`)**
-
-1. `EnsureFreshStravaToken` is a no-op for guests.
-2. For a signed-in user it re-checks the allowlist. A user no longer on it is
-   signed out (session invalidated, any recaller cycled) and gets
-   `strava.rejected` (`reason=allowlist`) with 403.
-3. It then calls `EnsureFreshAccessToken`. If that throws
-   `StravaReconnectRequiredException` (refresh token rejected, no refresh token,
-   undecryptable tokens, lock timeout), the session is ended and the response is
-   a redirect to `dashboard` with the flash `strava.reconnect`. The follow-up
-   request is a guest one: the public map of the displayed athlete (normally
-   the owner themselves) with the "Your Strava connection expired" banner, once
-   — a reload no longer shows it.
-
-**Displayed athlete (`ResolveDisplayedAthlete`, signed-out visitors)**
-
-1. Empty allowlist → skip to the fallback (step 4).
-2. One query: `select id, strava_athlete_id from users where
-   strava_athlete_id in (…allowlist…)`.
-3. Walk the allowlist **in configured order** and return the first id that has a
-   user row — a connected allowlisted athlete always wins.
-4. Fallback (US-009, FR-017): `select id, strava_athlete_id from users where
-   exists (activities) order by id limit 1` — the stored athlete with the
-   lowest `users.id` who has at least one activity, Strava or Garmin. None →
-   `null` (the dashboard then renders the connect screen).
-5. Token state is ignored and token columns are never loaded: an owner with a
-   dead refresh token is still displayed, and so is a fallback athlete.
-6. The displayed athlete is also the **target of a signed-out Garmin import**
-   (US-011, `ResolveGarminImportTarget`, see `garmin-csv-import.md`), and the
-   fallback may return the **CSV-only athlete** (`User::isCsvOnly()`: no Strava
-   id, no tokens) that a guest's first import created. A connected allowlisted
-   athlete still wins over it.
-
-**Guests and `auth`.** No route uses the `auth` middleware since US-011 opened
-the Garmin import to guests. `bootstrap/app.php` keeps
-`redirectGuestsTo(route('dashboard'))` only as a safety net, so a future `auth`
-route cannot throw on the missing login route.
-
-Query cost: allowlist hit → 1; empty allowlist → 1; non-empty allowlist with
-nobody connected → 2.
+**The `strava.fresh` guard (`EnsureFreshStravaToken`) is on no route since
+`US-020`.** Its allowlist check would 403 the owner `giarfa` when no Strava id is
+stored, and neither the dashboard nor the Garmin import calls Strava. The class
+and the alias stay in place for `US-021` to delete; the behaviour it implemented
+(allowlist re-check on every request, dead-token sign-out with the
+`strava.reconnect` banner) no longer exists, and its feature test was removed.
+`EnsureFreshAccessToken` (below) is still used by the sync.
 
 **Token refresh (`EnsureFreshAccessToken`)**
 
@@ -111,52 +79,40 @@ nobody connected → 2.
 
 | Piece | Where | Role |
 | --- | --- | --- |
-| Routes | `routes/web.php` | `strava.redirect`, `strava.callback` (both `throttle:strava-oauth`); `dashboard` carries `strava.fresh`; `logout` (POST, no extra middleware) |
-| Sign-out controller | `app/Http/Controllers/SignOutController.php` | Ends the session, keeps the tokens; the dashboard's "Sign out" form posts here |
+| Routes | `routes/web.php` | `strava.redirect`, `strava.callback` (both `throttle:strava-oauth`, in the `auth` + `password.set` group) |
 | Rate limiter | `app/Providers/AppServiceProvider.php` | `strava-oauth`: 10 / minute per IP |
 | Redirect controller | `app/Http/Controllers/Strava/StravaRedirectController.php` | Mints and stores the state nonce |
-| Callback controller | `app/Http/Controllers/Strava/StravaCallbackController.php` | The gate sequence above; the only place a session is created |
+| Callback controller | `app/Http/Controllers/Strava/StravaCallbackController.php` | The gate sequence above; attaches tokens to the signed-in owner, creates no session |
 | OAuth service | `app/Services/Strava/StravaOAuth.php` | Authorize URL, code exchange, refresh; 5 s connect / 10 s total timeouts |
 | Token DTO | `app/Data/StravaTokens.php` | `fromExchangeResponse()` / `fromRefreshResponse()` |
 | Allowlist | `app/Support/Strava/AthleteAllowlist.php` | `athleteIds()` in configured order; `allows(string $athleteId)`, strict compare |
-| Displayed athlete | `app/Support/Strava/ResolveDisplayedAthlete.php` | Read-only: first connected allowlisted athlete, else lowest-id stored athlete with an activity; ≤ 2 queries, selects `id` and `strava_athlete_id` only |
-| Connect action | `app/Actions/Strava/ConnectStravaAthlete.php` | The only write path of the OAuth flow |
+| Connect action | `app/Actions/Strava/ConnectStravaAthlete.php` | The only write path of the OAuth flow: tokens onto the signed-in owner |
 | Refresh action | `app/Actions/Strava/EnsureFreshAccessToken.php` | Margin, lock, rotation, undecryptable tokens |
-| Guard middleware | `app/Http/Middleware/EnsureFreshStravaToken.php` (alias `strava.fresh`) | Allowlist re-check + token freshness |
+| Guard middleware | `app/Http/Middleware/EnsureFreshStravaToken.php` (alias `strava.fresh`) | On no route since `US-020`; deleted by `US-021` |
 | Exceptions | `app/Exceptions/Strava/StravaOAuthException.php`, `StravaReconnectRequiredException.php` | Non-secret messages only |
 | Model | `app/Models/User.php`, `…_add_strava_columns_to_users_table` migration | `strava_athlete_id` (unique), encrypted `strava_access_token` / `strava_refresh_token`, `strava_token_expires_at` |
 | Views | `resources/views/strava/connect.blade.php`, `strava/rejected.blade.php` | Connect card (and reconnect banner), rejection screens |
 | Config | `config/strava.php` | `client_id`, `client_secret`, `redirect_uri`, literal `scope`, literal endpoints, `token_refresh_margin_seconds`, `allowed_athlete_ids` |
 | Env vars | `.env` | `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REDIRECT_URI`, `STRAVA_ALLOWED_ATHLETE_IDS`, `STRAVA_TOKEN_REFRESH_MARGIN` |
-| Tests | `tests/Feature/Strava/StravaConnectFlowTest.php`, `StravaOAuthTest.php`, `ConnectStravaAthleteTest.php`, `EnsureFreshAccessTokenTest.php`, `ReconnectStateTest.php`, `ResolveDisplayedAthleteTest.php`, `SignOutTest.php`, `tests/Unit/Support/Strava/AthleteAllowlistTest.php`, `tests/Feature/Config/StravaConfigTest.php` | |
+| Tests | `tests/Feature/Strava/StravaConnectFlowTest.php`, `StravaOAuthTest.php`, `ConnectStravaAthleteTest.php`, `EnsureFreshAccessTokenTest.php`, `tests/Unit/Support/Strava/AthleteAllowlistTest.php`, `tests/Feature/Config/StravaConfigTest.php` | |
 
 `User` keeps the Strava columns out of `$fillable` and hides both tokens. The
-email column is `NOT NULL UNIQUE` but Strava exposes no email under
-`activity:read_all`, so a new athlete gets `athlete-{id}@strava.invalid`
-(RFC 2606 reserved TLD — nothing can ever be sent there).
+owner's own `name` and `email` are never overwritten by Strava's.
 
 ## Architectural choices
 
 | Choice | Alternatives considered | Why this one |
 | --- | --- | --- |
 | OAuth hand-rolled on the HTTP client | Laravel Socialite | Strava is OAuth2 code flow only; Socialite's `league/oauth1-client` dependency would force Guzzle 8 down to Guzzle 7 |
-| Allowlist of Strava athlete ids as the only access control | Password login, registration, roles | One owner, one screen; Strava already authenticates — the app only has to decide *which* athlete |
-| Allowlist re-checked on every authenticated request | Checked once at connect | A session lasts up to `SESSION_LIFETIME` and outlives a `.env` edit; removal must take effect immediately |
-| No remember-me cookie: `Auth::login($user)`, the session lifetime is the bound (US-019) | `Auth::login($user, remember: true)` (US-002) | The recaller lives about 400 days against a 120-minute session and signs a lost or shared device back in; the nightly sync runs on the stored tokens, so a session that ends costs nothing |
+| The callback attaches tokens to the signed-in owner instead of signing a Strava athlete in (`US-020`) | Keep Strava as the way in next to the password; create a user per athlete | The password form is the only way to get a session; no route creates users. The allowlist still gates which Strava athlete may attach to the owner, until `US-021` removes Strava |
+| An athlete id held by another row is rejected, not merged | Move the id to the owner; delete the other row | Merging users is out of scope for `US-020`; the unique index forbids two holders |
 | Scope and OAuth endpoints are config literals | `env()` lookups | Read-only is a product invariant (FR-001); pointing the token URL elsewhere would leak the client secret |
-| Displayed athlete = first **connected** id in allowlist order | Order by `users.id`; a separate `STRAVA_PUBLIC_ATHLETE_ID` | The allowlist is the one place the owner states who comes first; `users.id` order would display whoever connected first, and a second env var could name an athlete who is not allowed in |
-| No allowlisted athlete connected → the lowest `users.id` with at least one activity (US-009) | Connect screen (US-007 behaviour); the athlete with the most recent activity; a new `STRAVA_PUBLIC_ATHLETE_ID` env var | The connect screen showed nothing although data was stored; "most recent" would flip the displayed athlete every time someone runs; a new env var is one more thing to forget. The owner accepted that this can display an athlete removed from the allowlist (PRD `### Privacy & legal`, "Accepted risk — fallback display") |
-| Resolver selects `id, strava_athlete_id` only | Load the full model | No guest request can decrypt, refresh, or leak a token, and undecryptable tokens cannot 500 the public page |
 | Write scopes refused on the callback | Trust the requested scope | The response scope is attacker-controlled (hand-edited consent URL); read-only must be a property of what is stored |
 | State consumed first on every path | Consume only on success | An early return would leave a live, replayable nonce |
-| Separate `ConnectStravaAthlete` action, unaware of the allowlist | One long callback method | "Allowlist first, persistence second" is structural, and the "nothing persisted on rejection" criterion is assertable by counting rows |
-| Sign-out is `POST /logout` with no `auth` middleware (US-019) | `auth` on the route; a `GET` link | `auth` would redirect a guest to a `login` route that does not exist (500); a `GET` could be fired by a cross-site link or a prefetch |
-| No `strava.fresh` on sign-out | Same middleware as `/` | Signing out must not reach Strava or fail because Strava does |
-| Literal `dashboard` redirect after login | `redirect()->intended()` | The intended URL is session data; an absolute one is an open redirect |
+| Separate `ConnectStravaAthlete` action, unaware of the allowlist | One long callback method | "Allowlist first, persistence second" is structural, and the "nothing persisted on rejection" criterion is assertable on the owner's Strava columns |
+| Literal `dashboard` redirect after the callback | `redirect()->intended()` | The intended URL is session data; an absolute one is an open redirect |
 | Cache lock around refresh | No lock | Strava retires the old refresh token on refresh; a lost race persists a dead token and forces a full re-authorization |
 | `rejectedToken` argument for forced refresh | `bool $force` | A plain force would re-refresh after the lock and retire the token the race winner just stored |
-| Session teardown in the middleware | `render()` on the exception | Rendering a reconnect screen while signed in with a dead token loops; teardown belongs where the request is |
-| Dead token → redirect to `/` + flash (Post/Redirect/Get) | Continue with `$next` as a guest; render the connect-only screen | Continuing couples the middleware to a route that happens to serve guests; the connect-only screen hid the owner's own public map (US-007). The flash lands in the freshly regenerated session and does not repeat on reload |
 
 ## Key decisions & invariants
 
@@ -164,7 +120,10 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
   token column (FR-012). _Breaks if:_ sign-out revokes or deletes tokens — the
   nightly sync then stops until the owner reconnects.
 - **Invariant — nothing is written before the allowlist passes.** _Breaks if:_ a
-  rejected athlete leaves a `users` row or tokens behind.
+  rejected athlete leaves tokens on the owner's row (or any row).
+- **Invariant — the callback creates no user and no session.** _Breaks if:_ it
+  calls `Auth::login` or creates a `users` row — the password form would no
+  longer be the only way in.
 - **Invariant — the allowlist fails closed.** `config/strava.php` keeps only
   all-digit, non-empty entries; `allows()` compares strictly. _Breaks if:_ a loose
   compare or a coerced `env()` value (`true` → `"1"`) authorises someone.
@@ -174,32 +133,16 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
   carry an HTTP status, a missing key name, or an athlete id only.
 - **Invariant — undecryptable tokens are a reconnect, not a 500.** Rotating
   `APP_KEY` must lead to the reconnect path.
-- **Invariant — a connected allowlisted athlete is always displayed ahead of the
-  fallback, and the fallback selects no token column.** An athlete removed from
-  the allowlist can be displayed only while no allowlisted athlete has connected
-  (accepted risk, US-009). _Breaks if:_ the fallback runs before the allowlist
-  walk, or its `select` is widened.
-- **Invariant — the allowlist-removal branch never redirects.** It ends the
-  session and answers 403 with `strava.rejected` in the same response; only the
-  dead-token branch redirects. _Breaks if:_ both branches are merged — a removed
-  athlete would land on a public map instead of the rejection.
-- **Invariant — guests never reach `EnsureFreshAccessToken`.** The resolver loads
-  no token column, so a guest request cannot trigger a refresh or an HTTP call.
-- **Invariant — the OAuth routes are throttled.** Since US-007 they are no longer
-  the only unauthenticated routes that do work: the public `/` runs the
-  displayed-athlete queries, the sync-status queries, possibly a grid rebuild, and
-  a session write per cookieless visit. `/` is deliberately left unthrottled — a
-  rate limiter would add a cache write to every request on the `database` cache
-  driver — and is an accepted trade-off for a single-owner instance; revisit it
-  (throttle, or a non-database session driver) if the link is shared widely.
+- **Invariant — the OAuth routes are throttled.** They are behind the session,
+  but the redirect route is the cheaper one to hammer and neither is ever hit
+  more than a handful of times by a legitimate owner.
 
 ## Extension points & gotchas
 
 - Query parameters on the callback are attacker-supplied: read them with the
   private `queryString()` helper — `?state[]=x` arrives as an array and a plain
   `(string)` cast becomes a 500.
-- `Auth::login()` already migrates the session id; do not regenerate it again.
-- Recallers issued before 2.0.2 stay valid until a sign-out (or the allowlist/token teardown) cycles `remember_token`; the app no longer creates new ones.
+- Recallers issued before 2.0.2 stay valid until a sign-out cycles `remember_token`; the app no longer creates new ones.
 - Any new Strava API caller must obtain its token through `EnsureFreshAccessToken`,
   never by reading `strava_access_token` directly.
 - `<meta name="referrer" content="same-origin">` in the layout keeps the
@@ -207,7 +150,7 @@ email column is `NOT NULL UNIQUE` but Strava exposes no email under
 
 ## Related
 
-- Specs: `US-002`, `US-003`, `US-007`, `US-009`, `US-011`, `US-019`
-- Plans: `.larapilot/plans/US-002-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`
+- Specs: `US-002`, `US-003`, `US-007`, `US-009`, `US-011`, `US-019`, `US-020`
+- Plans: `.larapilot/plans/US-002-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`, `US-020-plan.yaml`
 - Review: `.larapilot/docs/review/US-002.md`, `US-007.md`, `US-009.md`
-- Other domains: `activity-sync.md`, `heatmap-dashboard.md`
+- Other domains: `owner-authentication.md`, `activity-sync.md`, `heatmap-dashboard.md`

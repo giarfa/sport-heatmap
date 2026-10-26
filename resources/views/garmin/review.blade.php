@@ -63,30 +63,22 @@
                                         <span class="run-date">{{ GarminImportFormat::date($conflict->row->startDateLocal) }}</span>{{ $conflict->row->name }}
                                     </th>
                                     <td data-label="Stored" class="cmp-pair">
-                                        @if ($showsStoredRunDetails)
-                                            <dl class="side">
-                                                <div><dt>Start</dt><dd>{{ GarminImportFormat::start($conflict->stored->start_date_local) }}</dd></div>
-                                                <div><dt>Distance</dt><dd>{{ GarminImportFormat::distance($conflict->stored->distance_meters) }}</dd></div>
-                                                <div><dt>Moving</dt><dd>{{ GarminImportFormat::duration($conflict->stored->moving_time_seconds) }}</dd></div>
-                                                <div><dt>Avg pace</dt><x-run-metric :value="GarminImportFormat::pace($conflict->stored->average_pace_seconds_per_km)" /></div>
-                                                <div><dt>Ascent</dt><x-run-metric :value="GarminImportFormat::ascent($conflict->stored->total_ascent_meters)" /></div>
-                                                <div><dt>Heart rate</dt><x-run-metric :value="GarminImportFormat::heartRate($conflict->stored->average_heart_rate)" /></div>
-                                            </dl>
-                                            <p class="side-source">
-                                                {{ $conflict->stored->name }} ·
-                                                @if ($conflict->stored->stravaUrl() !== null)
-                                                    Strava · <a href="{{ $conflict->stored->stravaUrl() }}">View on Strava</a>
-                                                @else
-                                                    Garmin import
-                                                @endif
-                                            </p>
-                                        @else
-                                            {{-- A guest sees the start only: no pace, ascent or heart rate either (same rule as name, distance and time). --}}
-                                            <dl class="side">
-                                                <div><dt>Start</dt><dd>{{ GarminImportFormat::start($conflict->stored->start_date_local) }}</dd></div>
-                                            </dl>
-                                            <p class="side-source">Clashes with a stored run</p>
-                                        @endif
+                                        <dl class="side">
+                                            <div><dt>Start</dt><dd>{{ GarminImportFormat::start($conflict->stored->start_date_local) }}</dd></div>
+                                            <div><dt>Distance</dt><dd>{{ GarminImportFormat::distance($conflict->stored->distance_meters) }}</dd></div>
+                                            <div><dt>Moving</dt><dd>{{ GarminImportFormat::duration($conflict->stored->moving_time_seconds) }}</dd></div>
+                                            <div><dt>Avg pace</dt><x-run-metric :value="GarminImportFormat::pace($conflict->stored->average_pace_seconds_per_km)" /></div>
+                                            <div><dt>Ascent</dt><x-run-metric :value="GarminImportFormat::ascent($conflict->stored->total_ascent_meters)" /></div>
+                                            <div><dt>Heart rate</dt><x-run-metric :value="GarminImportFormat::heartRate($conflict->stored->average_heart_rate)" /></div>
+                                        </dl>
+                                        <p class="side-source">
+                                            {{ $conflict->stored->name }} ·
+                                            @if ($conflict->stored->stravaUrl() !== null)
+                                                Strava · <a href="{{ $conflict->stored->stravaUrl() }}">View on Strava</a>
+                                            @else
+                                                Garmin import
+                                            @endif
+                                        </p>
                                     </td>
                                     <td data-label="Garmin file" class="cmp-pair">
                                         <dl class="side">

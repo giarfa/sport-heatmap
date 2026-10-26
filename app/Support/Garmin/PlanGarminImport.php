@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Collection;
 /**
  * Sorts parsed Garmin rows against the athlete's stored activities into new
  * rows, conflicts, and rows already imported. Reads only; nothing is written
- * until the visitor confirms the review. With no athlete yet, every row is new.
+ * until the owner confirms the review.
  */
 final readonly class PlanGarminImport
 {
@@ -44,12 +44,8 @@ final readonly class PlanGarminImport
      * @param  array<int, GarminCsvRow>  $rows
      * @param  Collection<int, Activity>|null  $stored  The runs storedRuns() returned, when the caller already loaded them
      */
-    public function __invoke(?User $athlete, array $rows, ?Collection $stored = null): GarminImportPlan
+    public function __invoke(User $athlete, array $rows, ?Collection $stored = null): GarminImportPlan
     {
-        if ($athlete === null) {
-            return new GarminImportPlan($rows, [], [], null);
-        }
-
         $stored ??= $this->storedRuns($athlete, $rows);
 
         /*
@@ -145,7 +141,7 @@ final readonly class PlanGarminImport
         /*
          * The matched stored run rides along so the apply step can fill its empty
          * metrics without a second lookup. The fingerprint still hashes only the row
-         * indexes: which runs are already imported is what the visitor was shown.
+         * indexes: which runs are already imported is what the owner was shown.
          */
         return new GarminImportPlan($newRows, $conflicts, $alreadyImported, $athlete->id, $alreadyImportedActivities);
     }

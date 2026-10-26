@@ -131,6 +131,8 @@ class WeeklyTrendTest extends TestCase
 
     public function test_the_connect_screen_has_no_trend_card(): void
     {
+        $this->signInOwner();
+
         $response = $this->get('/');
 
         $response->assertViewIs('strava.connect');
@@ -163,7 +165,7 @@ class WeeklyTrendTest extends TestCase
         $this->assertSame(1, substr_count($card, 'trend-table-partial'));
     }
 
-    public function test_a_signed_out_visitor_sees_the_same_card_and_the_request_writes_nothing_and_calls_nobody(): void
+    public function test_the_request_writes_nothing_and_calls_nobody(): void
     {
         $athlete = $this->allowlistedAthlete();
         $this->runOn($athlete, '2026-03-31', 10_000);
@@ -171,16 +173,12 @@ class WeeklyTrendTest extends TestCase
 
         $before = [Activity::count(), User::count(), SyncRun::count()];
 
-        $guestCard = $this->trendCard();
-        $this->assertGuest();
+        $card = $this->trendCard();
 
         $this->assertSame($before, [Activity::count(), User::count(), SyncRun::count()]);
         Http::assertNothingSent();
 
-        $this->assertNotSame('', $guestCard);
-
-        $this->actingAs($athlete);
-        $this->assertSame($guestCard, $this->trendCard());
+        $this->assertNotSame('', $card);
     }
 
     public function test_a_write_that_retires_the_grid_retires_the_chart_with_it(): void

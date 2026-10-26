@@ -53,35 +53,22 @@
     </div>
 
     {{--
-        The ways in are one text line under the map, not header buttons: it has
-        to stay discreet on a page whose job is to show the map, the 375 px
-        header has no width left for a second control, and Strava orange is
-        reserved for the connect screen's button. Every visitor can import a
-        Garmin CSV (US-011); a guest also gets the Strava sign-in, a signed-in
-        owner — already connected — gets Sign out instead, in the same line for
-        the same header-width reason (US-019).
+        The ways out of the map are one text line under it, not header buttons: it
+        has to stay discreet on a page whose job is to show the map, and the
+        375 px header has no width left for a second control. The owner is always
+        signed in here (the route sits behind `auth`).
     --}}
     <p class="mt-6 text-xs" style="color: var(--ink-muted);">
-        @guest
-            Owner?
-            <a href="{{ route('strava.redirect') }}"
-               class="inline-flex min-h-11 items-center underline underline-offset-2"
-               style="color: var(--accent);">Connect with Strava</a>
-            <span aria-hidden="true">·</span>
-        @else
-            Runs missing from Strava?
-        @endguest
+        Runs missing from Strava?
         <a href="{{ route('garmin.import.create') }}"
            class="inline-flex min-h-11 items-center underline underline-offset-2"
            style="color: var(--accent);">Import Garmin CSV</a>
-        @auth
-            <span aria-hidden="true">·</span>
-            <form method="POST" action="{{ route('logout') }}" class="inline">
-                @csrf
-                <button type="submit"
-                        class="inline-flex min-h-11 items-center underline underline-offset-2"
-                        style="color: var(--accent);">Sign out</button>
-            </form>
-        @endauth
+        <span aria-hidden="true">·</span>
+        <form method="POST" action="{{ route('logout') }}" class="inline">
+            @csrf
+            <button type="submit"
+                    class="inline-flex min-h-11 items-center underline underline-offset-2"
+                    style="color: var(--accent);">Sign out</button>
+        </form>
     </p>
 @endsection

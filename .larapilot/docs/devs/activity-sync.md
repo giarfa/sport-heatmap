@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-003` |
-| **Last updated by** | `US-015` — 2026-10-17 |
+| **Last updated by** | `US-020` — 2026-10-26 |
 | **Owner persona** | 🔗 Matt |
 
 ## Purpose
@@ -21,9 +21,9 @@ working, the map freezes at the last good sync and the dashboard warns about it.
 1. The scheduler runs `strava:sync` daily at `strava.sync_hour`:00 in
    `strava.sync_timezone` (defaults 3 and `Europe/Rome`), `withoutOverlapping()`.
 2. The command selects **connected, allowlisted** athletes: Strava id and both
-   tokens present, and `AthleteAllowlist::allows()` true. The **CSV-only
-   athlete** a guest's Garmin import creates (US-011, no Strava id, no tokens)
-   is never selected: nothing is fetched, nothing is logged, and its runs are
+   tokens present, and `AthleteAllowlist::allows()` true. An owner
+   with no Strava identity (CSV-only: no Strava id, no tokens — the Garmin
+   import writes into the signed-in owner, `US-020`) is never selected: nothing is fetched, nothing is logged, and its runs are
    never reconciled or deleted. With only that athlete stored, step 3 applies.
 3. No eligible athlete → prints an info line and exits successfully **without**
    writing a `sync_runs` row.

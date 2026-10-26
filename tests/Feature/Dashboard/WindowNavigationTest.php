@@ -228,7 +228,7 @@ class WindowNavigationTest extends TestCase
             ->assertSee($range);
     }
 
-    public function test_a_signed_out_visitor_navigates_the_same_way_and_nothing_is_written_or_sent(): void
+    public function test_navigating_back_writes_nothing_and_sends_nothing_even_with_an_expired_token(): void
     {
         $athlete = $this->allowlistedAthlete(factoryState: 'stravaTokenExpired');
         $this->runOn($athlete, '2026-03-02', 10_000);
@@ -239,7 +239,6 @@ class WindowNavigationTest extends TestCase
 
         $response = $this->get('/?to=2026-08-09')->assertOk()->assertViewIs('dashboard');
 
-        $this->assertGuest();
         $response->assertSee('20 Apr – 9 Aug 2026');
         $response->assertSee('Thursday 2 Jul 2026: 11.0 km');
         $controls = $this->controls($response);

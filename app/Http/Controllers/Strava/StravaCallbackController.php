@@ -5,21 +5,21 @@ namespace App\Http\Controllers\Strava;
 use App\Actions\Strava\ConnectStravaAthlete;
 use App\Exceptions\Strava\StravaOAuthException;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\Strava\StravaOAuth;
 use App\Support\Strava\AthleteAllowlist;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The single place a session can be created, and therefore the single place the
- * access decision is made.
+ * Attaches Strava tokens to the signed-in owner. It signs nobody in: the
+ * password form is the only way to get a session (US-020).
  *
  * The gates below run in a fixed order and **nothing is written until the last
- * one passes**. That ordering is what makes the spec's "no session exists, no
- * tokens are stored, and no user record is written" assertable by counting rows
- * after a rejected attempt rather than by inspecting intent.
+ * one passes**. That ordering is what makes "no tokens are stored" assertable
+ * by inspecting the owner's columns after a rejected attempt rather than by
+ * inspecting intent.
  */
 class StravaCallbackController extends Controller
 {
@@ -109,25 +109,29 @@ class StravaCallbackController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // 7. Only now: persist, then log in on a fresh session id.
-        $user = $connectStravaAthlete($tokens);
+        /** @var User $owner */
+        $owner = $request->user();
 
         /*
-         * Auth::login already migrates the session id, which is the fixation
-         * boundary; regenerating again would only churn it a second time.
-         *
-         * The destination is the literal dashboard route, never
-         * redirect()->intended(): the intended URL is session data, and an
-         * absolute one passes through the generator untouched — a post-login
-         * open redirect waiting for the first middleware that writes it.
-         *
-         * No `remember`: SESSION_LIFETIME is the only bound on a signed-in
-         * device. A recaller cookie outlives it by about 400 days and signs a
-         * lost or shared device back in after the session has expired. The
-         * nightly sync runs on the stored tokens and needs no session, so
-         * nothing is lost by letting the session end.
+         * A Strava id another row already holds would break the unique index and
+         * hand this owner somebody else's identity. No route creates users, so
+         * the rejected screen is the whole answer and nothing is written.
          */
-        Auth::login($user);
+        if (User::query()->where('strava_athlete_id', (string) $tokens->athleteId)->whereKeyNot($owner->id)->exists()) {
+            return response()->view('strava.rejected', [
+                'reason' => 'allowlist',
+                'athleteId' => $tokens->athleteId,
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        /*
+         * 7. Only now: persist onto the signed-in owner. This callback is no
+         * longer a sign-in: it neither creates a session nor regenerates one,
+         * and the destination is the literal dashboard route, never
+         * redirect()->intended(), because an absolute intended URL passes
+         * through the generator untouched.
+         */
+        $connectStravaAthlete($owner, $tokens);
 
         return redirect()->route('dashboard');
     }
