@@ -52,7 +52,7 @@ tasks:
     id: TASK-00
     title: 'Bootstrap feature branch on release/3.0.0'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
@@ -70,8 +70,8 @@ tasks:
       4. Draft internal PR title/body toward `base` (`release/3.0.0`)
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] PR title/body drafted toward `release/3.0.0` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/3.0.0` (not `develop`)
 
       ## Git Deliverables
       - Commit: `chore(US-020): TASK-00 bootstrap feature branch for release/3.0.0` (only if the command did not already leave you on the new branch with a commit — an empty commit is optional)
@@ -372,4 +372,4 @@ tasks:
       - Commit: `chore(US-020): TASK-06 changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize local PR notes toward `release/3.0.0`
-updated_at: '2026-10-26T20:14:09+00:00'
+updated_at: '2026-10-26T20:16:29+00:00'

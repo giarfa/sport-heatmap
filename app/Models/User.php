@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $name
+ * @property string|null $username
  * @property string $email
  * @property Carbon|null $email_verified_at
  * @property string|null $password
@@ -46,6 +47,11 @@ use Illuminate\Support\Carbon;
 ])]
 class User extends Authenticatable
 {
+    /**
+     * The one sign-in identity of this instance.
+     */
+    public const OWNER_USERNAME = 'giarfa';
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 

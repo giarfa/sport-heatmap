@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Actions\Garmin\CreateCsvOnlyAthlete;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -15,8 +14,8 @@ class UserFactory extends Factory
     /**
      * Define the model's default state.
      *
-     * There is no password login in this product — identity comes from Strava —
-     * so the default state leaves both the password and the Strava columns null.
+     * The default state is not the owner: it has no username, no password, and no
+     * Strava identity. Use owner() or ownerWithPassword() for the sign-in account.
      *
      * @return array<string, mixed>
      */
@@ -24,6 +23,7 @@ class UserFactory extends Factory
     {
         return [
             'name' => fake()->name(),
+            'username' => null,
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => null,
@@ -46,14 +46,36 @@ class UserFactory extends Factory
     }
 
     /**
-     * Indicate that the athlete is the local CSV-only athlete a signed-out
-     * Garmin import creates: the placeholder identity, no Strava id, no tokens.
+     * Indicate that the user is the owner in the first-sign-in state: the
+     * username is set and the password is still null.
+     */
+    public function owner(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'username' => User::OWNER_USERNAME,
+            'password' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the owner has already set a password.
+     */
+    public function ownerWithPassword(string $plain = 'correct horse battery'): static
+    {
+        return $this->owner()->state(fn (array $attributes): array => [
+            'password' => $plain,
+        ]);
+    }
+
+    /**
+     * Indicate that the athlete has no Strava identity and no tokens — the
+     * placeholder row a CSV-only import used to create.
      */
     public function csvOnly(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'name' => CreateCsvOnlyAthlete::NAME,
-            'email' => CreateCsvOnlyAthlete::EMAIL,
+            'name' => 'Garmin CSV athlete',
+            'email' => 'csv-athlete@garmin.invalid',
             'email_verified_at' => null,
             'password' => null,
             'strava_athlete_id' => null,

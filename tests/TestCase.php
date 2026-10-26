@@ -3,11 +3,29 @@
 namespace Tests;
 
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        /*
+         * The username migration creates the giarfa owner on an empty database,
+         * so every freshly migrated test database starts with one user. Tests
+         * arrange their own users (and the unique username would collide with
+         * the owner() factory states), so clear the row inside the test's
+         * transaction. UsernameMigrationTest covers the migration itself.
+         */
+        if (in_array(RefreshDatabase::class, class_uses_recursive($this), true)) {
+            DB::table('users')->delete();
+        }
+    }
+
     /**
      * Put athletes on the allowlist for the duration of one test.
      *

@@ -12,8 +12,8 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      *
-     * There is deliberately no generic test user: an account without a Strava athlete
-     * id would surface on the dashboard as a second, empty athlete.
+     * There is deliberately no generic test user: the demo athlete is the one account
+     * of the instance (the owner, `giarfa`, with no password until the first sign-in).
      */
     public function run(): void
     {
