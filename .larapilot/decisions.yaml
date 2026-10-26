@@ -1013,4 +1013,173 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-10-18T18:14:40+00:00'
+  -
+    id: 2c577653e4bbe247
+    ts: '2026-10-18T18:53:36+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'dashboard guest access'
+    label: 'dashboard guest access'
+    value: 'Whole app requires login; guests see only the login page'
+    question: null
+    rationale: 'Single-user password login added; public dashboard withdrawn'
+    source: askquestion
+    spec: null
+    supersedes: f71daaa7e976c188
+  -
+    id: 3ab19d8dd70c0866
+    ts: '2026-10-18T18:53:36+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin csv import access'
+    label: 'garmin csv import access'
+    value: 'Requires login — no guest import'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: 3c27d164b7479dea
+  -
+    id: a0dca3040914ff86
+    ts: '2026-10-18T18:53:36+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'login user identity'
+    label: 'login user identity'
+    value: "Migration turns the existing athlete row into 'giarfa' (or creates it on an empty DB); one user owns login, runs and Strava tokens"
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 3a7c9c084ea7d064
+    ts: '2026-10-18T18:53:36+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'strava oauth role'
+    label: 'strava oauth role'
+    value: 'Connect only — Strava OAuth links Strava to the logged-in user, no longer a sign-in; allowlist still applies'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: c5416e0646151087
+    ts: '2026-10-18T18:53:37+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'login method'
+    label: 'login method'
+    value: "Username + password form in the app's look and feel; no HTTP basic auth, no user management"
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 4baad31e0f233ec6
+    ts: '2026-10-18T18:53:37+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'first login empty password risk'
+    label: 'first login empty password risk'
+    value: 'Accept: giarfa seeded with no password, forced change at first login; owner logs in right after any deploy'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 2ddea25055413313
+    ts: '2026-10-18T18:53:37+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'password login release version'
+    label: 'password login release version'
+    value: '3.0.0 — dashboard turning private treated as breaking for visitors'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: e9fc21cbb3452dca
+    ts: '2026-10-26T20:07:58+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: 'larapilot-feature --spec=US-021'
+    topic: 'strava oauth role'
+    label: 'strava oauth role'
+    value: 'Removed — no Strava connection, sync, or attribution; the Garmin CSV import is the only way runs enter'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: 3a7c9c084ea7d064
+  -
+    id: d7efa6b25df4afae
+    ts: '2026-10-26T20:07:59+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: 'larapilot-feature --spec=US-021'
+    topic: 'existing strava-sourced runs'
+    label: 'existing strava-sourced runs'
+    value: 'Deleted by migration; Garmin-overwritten runs kept'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 5ff0e2c7fde3d8fd
+    ts: '2026-10-26T20:07:59+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: 'larapilot-feature --spec=US-021'
+    topic: 'dashboard freshness status line'
+    label: 'dashboard freshness status line'
+    value: 'Last import N ago from the newest confirmed import; no warning state'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 4dcd0fc8f161d71e
+    ts: '2026-10-26T20:07:59+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: 'larapilot-feature --spec=US-021'
+    topic: 'strava removal spec placement'
+    label: 'strava removal spec placement'
+    value: 'New spec US-021 in 3.0.0, blocked by US-020; US-020 re-issued without Strava criteria'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: c7d14d6e8af9c074
+    ts: '2026-10-26T20:07:59+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: 'larapilot-feature --spec=US-021'
+    topic: 'strava schema cleanup'
+    label: 'strava schema cleanup'
+    value: 'Drop users Strava columns, sync_runs, activities.strava_activity_id, config/strava.php and STRAVA_* env keys'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 6680da744ee08e34
+    ts: '2026-10-26T20:07:59+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: 'larapilot-feature --spec=US-021'
+    topic: 'strava access revocation'
+    label: 'strava access revocation'
+    value: 'Owner revokes by hand at strava.com/settings/apps (README step); no deauthorize call'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-10-26T20:07:59+00:00'

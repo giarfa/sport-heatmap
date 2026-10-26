@@ -1,0 +1,375 @@
+code: US-020
+plan_body: |
+  **Release:** 3.0.0
+
+  ## Technical Solution
+
+  US-020 puts a single-owner sign-in in front of every route, on Laravel's built-in session guard — no Fortify, no starter kit, no HTTP basic auth (PRD Technical Architecture → Auth). It is the first of the two 3.0.0 stories; US-021 removes Strava afterwards, so this spec changes Strava code only where the gate forces it.
+
+  **Gate shape (John).** `routes/web.php` becomes three groups:
+  1. `guest` — `GET /login`, `POST /login` (throttled inside the sign-in action, not by a route limiter, because the key is username + IP).
+  2. `auth` only — `GET /password/change`, `PUT /password/change`, `POST /logout`.
+  3. `auth` + `password.set` — everything else: `/`, every `import/garmin/*` route, and the two Strava OAuth routes while they still exist.
+  `/up` stays outside the web group (health route). `bootstrap/app.php`: `redirectGuestsTo(fn () => route('login'))` and `redirectUsersTo(fn () => route('dashboard'))`. The `auth` middleware stores the intended URL for GET requests (`redirect()->guest()`), so the owner lands on the page first requested.
+
+  **Open-redirect guard.** The Strava callback deliberately avoided `redirect()->intended()` because an absolute intended URL passes the generator untouched. The sign-in controller pulls `url.intended` itself and accepts it only when it is a same-host URL (`Str::startsWith($intended, url('/'))` after normalisation); anything else falls back to `route('dashboard')`. A `/* */` block records why.
+
+  **Sign-in (Alex, Lars).** `App\Actions\Auth\SignInOwner` is the one decision: throttle check → credential check → hit/clear limiter. Key `Str::transliterate(Str::lower($username)).'|'.$ip`, 5 attempts per 60 s; when `RateLimiter::tooManyAttempts` is true it throws a validation error with `availableIn()` seconds **before** any user lookup. The credential check is hand-written, not `Auth::attempt`: the Eloquent provider rejects a null hash, and `ConvertEmptyStringsToNull` turns an empty password into `null`. Rules: only `User::OWNER_USERNAME` (`'giarfa'`) is ever looked up; a stored null password accepts only an empty input; a stored hash accepts only a non-empty input that `Hash::check`s. An unknown username still runs one `Hash::check` against a fixed dummy hash so response time does not reveal the username (Lars). Success: `Auth::login($user, remember: false)`, `$request->session()->regenerate()`, limiter cleared. Failure: one generic message — "These credentials do not match our records." — on the `username` field, `withInput($request->only('username'))` so the password is never flashed back.
+
+  **Forced first change.** `App\Http\Middleware\EnsureOwnerPasswordIsSet` (alias `password.set`) redirects a signed-in user whose `password` is null to `password.change`. The change routes carry the inverse check inside their controllers: once a password exists they redirect to the dashboard — the PRD lists a voluntary change after the first one as out of scope (FR-021). `ChangePasswordRequest`: `required|string|min:12|confirmed`, an explicit message per rule. The new value is assigned to the `hashed` cast, saved, the session regenerated, then redirect to the dashboard. **Lars note:** the PRD fixes the rule at 12 characters, so `Password::defaults()` (mixed case, symbols, uncompromised) is not applied — `uncompromised()` would also make an outbound call, which the PRD forbids after US-021. The hashing driver stays the framework default already in use; switching it is not in this spec.
+
+  **One account (Mike).** A migration adds `users.username` (string, nullable, unique) and backfills the owner with the query builder (no model events, no `updated_at` bump, no other column touched): the first id of `config('strava.allowed_athlete_ids', [])` that matches a stored `strava_athlete_id`, else the lowest-id user with activities, else the lowest-id user; on an empty table it inserts `giarfa` (`name` `giarfa`, `email` `giarfa@heatmap.invalid`, null password, timestamps). The migration is self-contained — no app class — and reads the config with a `[]` default, so it still runs on a fresh database once US-021 deletes `config/strava.php`. Other user rows (a CSV-only athlete next to the Strava one, for instance) are left untouched and are no longer displayed; merging them is not in scope (accepted trade-off, documented in the domain doc). `down()` drops the unique index, then the column.
+
+  **Owner-only dashboard and import (change requests FR-017, FR-018, FR-011, FR-019, FR-020).** `DashboardController` reads `$request->user()` (non-null behind `auth`); `ResolveDisplayedAthlete` and its allowlist ordering go. The empty screen for an owner with no activity stays as it is (US-021 reduces it). The Garmin import resolves its target as the signed-in owner: `ResolveGarminImportTarget` and `CreateCsvOnlyAthlete` are deleted, `PlanGarminImport` / `RememberedGarminImportPlan` / `ApplyGarminImport` take a non-null `User`, the review always shows stored run details (the guest masking `showsStoredRunDetails` goes). The `garmin-import` limiter keys by user id only. Throttle, 5 MB rule, CSRF, session binding, and the confirm lock stay.
+
+  **Strava while it still exists.** `strava.fresh` is removed from every route: its allowlist check would 403 a `giarfa` with no Strava id, and the dashboard and import never call Strava. The class and alias stay for US-021 to delete. The OAuth routes move behind `auth` + `password.set`; the callback no longer calls `Auth::login`, and `ConnectStravaAthlete` writes the tokens onto the signed-in owner instead of finding or creating a user — so no route creates users. If the returned athlete id already belongs to another row, the callback renders the existing `strava.rejected` view and writes nothing. No other Strava behaviour changes here.
+
+  **UI (Elise, Joe).** No new mockup: both pages mirror the existing Garmin upload form (`.larapilot/mockups/US-008/upload.html`, built in `resources/views/garmin/create.blade.php`) — the project's own Nordic token set in `resources/css/app.css` (`.card`, `.field-label`, `.field-hint`, `.field-error`, `.btn--primary`, `.btn-row`), inside `layouts/app.blade.php`, mobile-first at 375 px, light + dark. Labelled inputs, `aria-invalid` + `aria-describedby` on error, error paragraphs with `role="alert"`, one `h1`, `autocomplete="username"` / `current-password` / `new-password`. The layout header shows no status chip on these pages (they do not `@section('header-status')`). Copy (Marika): terse, factual, English.
+
+  **Query shape.** No list endpoint changes; the owner lookup is one indexed `where username = ?` per sign-in. The dashboard keeps its per-athlete grid cache key.
+
+  ## Git & Branching
+  - Mode: GITFLOW — no automatic push, no remote PR unless the user asks in-session
+  - Release mode on: the spec carries `**Release:** 3.0.0`; TASK-00 runs `php artisan larapilot:release-feature --semver=3.0.0 --spec=US-020 --slug=private-login`, which opens `release/3.0.0` (still `planned`) and branches `feature/US-020-private-login` from it
+  - PR base: `release/3.0.0`, not `develop`; prepared locally
+  - Per task: one Conventional Commit `type(US-020): TASK-NN …`; code, tests, and domain docs in the same commit
+  - Merge after `larapilot-review` approval (auto-approve is on, still through review)
+
+  ## Test Data Strategy
+  - Alex maintains `UserFactory` and the seeders in the same task as the `username` migration (TASK-01)
+  - `UserFactory`: new `owner()` state (`username` `giarfa`, null password — the first-sign-in state) and `ownerWithPassword(string $plain = 'correct horse battery')` state; the `csvOnly()` state keeps "no Strava identity" without depending on the deleted `CreateCsvOnlyAthlete` constants
+  - Demo dataset: `TrainingBlockSeeder`'s fixed demo athlete becomes the owner — `username` `giarfa`, null password — so a fresh local database walks the first sign-in; the 16-week block plus 7 history weeks are unchanged
+  - Never run `migrate:fresh --seed` against the dev database through artisan (it is the real default SQLite file); verify the seeder through `TrainingBlockSeederTest` on the test database
+
+  ## Test Strategy
+  - Bar: NORMAL — PHPUnit feature and unit tests, no browser, Dusk, Playwright, or viewport suite
+  - New: `UsernameMigrationTest` (backfill for each owner-selection branch, empty database, untouched runs and columns, `down()`); `SignInTest` (form, generic error, retained username, throttle with seconds and no credential check, session regeneration, no remember cookie, intended redirect and the off-host rejection, guest-only `/login`, sign-out); `ForcedPasswordChangeTest` (empty-password first sign-in, every route redirected, 12-character/confirmation validation, hashed storage, empty password refused afterwards, other usernames refused); `RouteAccessTest` (iterates `Route::getRoutes()` so a route added later is covered automatically)
+  - Updated: every dashboard, Garmin, and Strava feature test signs in through a new `Tests\TestCase::signInOwner()` helper; guest-path tests (`GuestGarminImportTest`, `CsvOnlyAthleteImportTest`, `ResolveGarminImportTargetTest`, `ResolveDisplayedAthleteTest`, the guest cases in `PublicDashboardTest`) are deleted or rewritten as redirect-to-`/login` assertions
+  - Manual test handoff (UI): sign in at 375 px and 1280 px in light and dark, tab order and screen-reader announcement of the error, the throttle message after 5 wrong passwords
+  - Gate: `php artisan test --compact`, `vendor/bin/pint --dirty --format agent`, `php artisan larapilot:quality`
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch on release/3.0.0'
+    type: Impl
+    status: TODO
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+    body: |-
+      ## Description
+      Bootstrap Gitflow for this spec on release `3.0.0`: create `feature/US-020-private-login` from `release/3.0.0` and prepare the internal PR description toward `release/3.0.0`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. The working tree currently carries uncommitted `.larapilot/` artifacts (backlog, PRD, specs US-020/US-021, releases, decisions). Commit them on `develop` first (`chore(release): plan 3.0.0 — US-020 and US-021`) or the command refuses to switch branches.
+      2. `php artisan larapilot:release-feature --semver=3.0.0 --spec=US-020 --slug=private-login`
+      3. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason`.
+      4. Draft internal PR title/body toward `base` (`release/3.0.0`)
+
+      ## Completion Criteria
+      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
+      - [ ] PR title/body drafted toward `release/3.0.0` (not `develop`)
+
+      ## Git Deliverables
+      - Commit: `chore(US-020): TASK-00 bootstrap feature branch for release/3.0.0` (only if the command did not already leave you on the new branch with a commit — an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/3.0.0` — open remote only if user requests
+  -
+    id: TASK-01
+    title: 'Add users.username with the giarfa owner backfill, factory states and seeder'
+    type: Impl
+    status: TODO
+    assignee: Mike
+    estimate_hours: 3
+    dependencies:
+      - TASK-00
+    body: |-
+      ## Description
+      Give the owner's record the sign-in identity `giarfa` (FR-021): a unique nullable `username` column, a migration that backfills the existing owner or creates the record on an empty database, the model docblock, and factory/seeder states so tests and the demo dataset walk the first sign-in.
+
+      ## Files Involved
+      - database/migrations/2026_10_26_xxxxxx_add_username_to_users_table.php (`php artisan make:migration add_username_to_users_table --table=users --no-interaction`)
+      - app/Models/User.php
+      - database/factories/UserFactory.php
+      - database/seeders/TrainingBlockSeeder.php, database/seeders/DatabaseSeeder.php (docblock)
+      - tests/Feature/Database/UsernameMigrationTest.php (new)
+      - tests/Feature/Database/SchemaTest.php, tests/Feature/Database/TrainingBlockSeederTest.php
+
+      ## Steps
+      1. Migration `up()`: `$table->string('username')->nullable()->unique()->after('name')`. Then, with `DB::table('users')` only (no Eloquent, no model events, no `updated_at`), pick the owner: (a) iterate `config('strava.allowed_athlete_ids', [])` in order and take the first row whose `strava_athlete_id` matches; (b) else the lowest `id` with a row in `activities`; (c) else the lowest `id`. Update only `username = 'giarfa'` and `password = null`. When `users` is empty, insert `name` `giarfa`, `email` `giarfa@heatmap.invalid` (RFC 2606 reserved TLD, same convention as the existing `.invalid` placeholders), `password` null, `created_at`/`updated_at` now. A `/* */` block states why the migration uses no app class and why the config read has a `[]` default (US-021 deletes `config/strava.php`; the migration must still run on a fresh database).
+      2. Migration `down()`: `dropUnique(['username'])`, then `dropColumn('username')` — schema only.
+      3. `User`: `public const OWNER_USERNAME = 'giarfa';`, `@property string|null $username` in the class docblock. `username` stays **out** of `#[Fillable]` (identity column — `.ai/rules/models.md`); the migration and the factory assign it explicitly.
+      4. `UserFactory`: `username` defaults to `null`; new `owner()` state (`username` = `User::OWNER_USERNAME`, `password` null) and `ownerWithPassword(string $plain = 'correct horse battery')` state (`password` = `$plain`, hashed by the cast). `csvOnly()` stops importing `CreateCsvOnlyAthlete` (deleted in TASK-04): keep it as "no Strava identity, no tokens" with literal placeholder name/email.
+      5. `TrainingBlockSeeder`: the fixed demo athlete gets `username` `giarfa` and a null password, so a seeded database starts at the first sign-in. Update the `DatabaseSeeder` docblock (the demo athlete is the one account).
+      6. `UsernameMigrationTest`: load the migration file (`$migration = require database_path('migrations/…')`), call `down()`, arrange each case, call `up()`, assert. Cases: allowlisted connected athlete chosen over a lower-id athlete with activities (`Config::set('strava.allowed_athlete_ids', …)`); no allowlist match → lowest-id with activities; no activities → lowest-id user; empty table → `giarfa` created with null password; the chosen row's activities count, `name`, `email`, Strava columns, and `updated_at` unchanged; only one row carries a username; `down()` removes the column.
+      7. `SchemaTest`: assert `users.username` exists, is nullable, and is unique. `TrainingBlockSeederTest`: the seeded athlete is `giarfa` with a null password.
+      8. `php artisan test --compact tests/Feature/Database` then the full suite (still green: no route changes yet).
+
+      ## Completion Criteria
+      - [ ] `users.username` is nullable and unique; `down()` drops it
+      - [ ] Backfill picks allowlisted-connected → lowest-id with activities → lowest-id, and creates `giarfa` on an empty table
+      - [ ] The owner's runs and every other column are untouched by the migration
+      - [ ] `UserFactory` has `owner()` and `ownerWithPassword()`; `csvOnly()` no longer depends on `CreateCsvOnlyAthlete`
+      - [ ] Seeder produces `giarfa` with a null password and the unchanged training block
+      - [ ] Tests pass
+
+      ## Test Data
+      - [ ] `database/factories/UserFactory.php` updated in this same task (`owner()`, `ownerWithPassword()`, `username` default)
+      - [ ] `TrainingBlockSeeder` seeds `giarfa` with a null password
+      - [ ] Verified through `TrainingBlockSeederTest` on the test database — never `migrate:fresh --seed` on the dev SQLite file
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/owner-authentication.md` created from `TEMPLATE.md` — data model section: `username`, nullable password as the "first sign-in armed" state, the owner-selection order and why, the empty-database insert, other user rows left undisplayed (accepted trade-off), recovery by clearing `users.password`
+      - [ ] Folder `README.md` index row added for `owner-authentication`
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-020): TASK-01 add users.username with the giarfa owner backfill`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update local notes
+  -
+    id: TASK-02
+    title: 'Sign-in page, throttled credential check, and sign-out to /login'
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 4
+    dependencies:
+      - TASK-01
+    body: |-
+      ## Description
+      Add the `/login` page and its POST handler on the session guard (FR-021): one generic error, the username kept, 5 attempts per username + IP per minute, session regenerated, no remember-me cookie, same-host intended redirect; sign-out returns to `/login`. The global gate is wired in TASK-04 — this task registers the routes and the guest/user redirects.
+
+      ## Files Involved
+      - app/Http/Controllers/Auth/ShowSignInFormController.php (new, invokable)
+      - app/Http/Controllers/Auth/SignInController.php (new, invokable)
+      - app/Http/Requests/Auth/SignInRequest.php (new)
+      - app/Actions/Auth/SignInOwner.php (new)
+      - app/Http/Controllers/SignOutController.php
+      - resources/views/auth/login.blade.php (new)
+      - routes/web.php, bootstrap/app.php
+      - tests/Feature/Auth/SignInTest.php (new); tests/Feature/Strava/SignOutTest.php → moved to tests/Feature/Auth/SignOutTest.php
+
+      ## Steps
+      1. Routes: `Route::middleware('guest')->group(…)` with `GET /login` → `ShowSignInFormController` (name `login`) and `POST /login` → `SignInController` (name `login.store`). `bootstrap/app.php`: `redirectGuestsTo(fn (): string => route('login'))` (replacing the dashboard fallback and its outdated comment) and `redirectUsersTo(fn (): string => route('dashboard'))`.
+      2. `SignInRequest`: `username` `required|string|max:255`, `password` `nullable|string|max:1024` (nullable on purpose: `ConvertEmptyStringsToNull` turns the first-sign-in empty password into `null`), explicit messages, `authorize()` returns true.
+      3. `SignInOwner` (`__invoke(string $username, ?string $password, string $ip): ?User`, final readonly): throttle key `Str::transliterate(Str::lower($username)).'|'.$ip`; if `RateLimiter::tooManyAttempts($key, 5)` throw `ValidationException::withMessages(['username' => "Too many sign-in attempts. Try again in {$seconds} seconds."])` **before** any query. Look up only `User::OWNER_USERNAME` (`where('username', …)` with the input compared via `hash_equals` to the constant first — any other username is a failure). Stored null password → succeed only when the input is null or ''. Stored hash → succeed only for a non-empty input that `Hash::check`s. Unknown username → one `Hash::check` against a fixed dummy hash (timing). Failure: `RateLimiter::hit($key, 60)`, return null. Success: `RateLimiter::clear($key)`, return the user. `/* */` blocks record: why not `Auth::attempt` (null hash, empty-string conversion), why the throttle runs first, why the dummy hash.
+      4. `SignInController`: call the action; null → `back()->withErrors(['username' => 'These credentials do not match our records.'])->withInput($request->only('username'))`. User → `Auth::login($user, remember: false)`, `$request->session()->regenerate()`, then the intended redirect: pull `url.intended`, accept it only if it is a string starting with `url('/').'/'` or equal to `url('/')`, else `route('dashboard')`. `/* */` block on the open-redirect reason (the Strava callback's earlier rationale).
+      5. `SignOutController`: redirect to `route('login')`; refresh its docblock (no Strava wording about tokens beyond what still holds).
+      6. `resources/views/auth/login.blade.php` — **Mirrors:** `.larapilot/mockups/US-008/upload.html` (form idiom; no dedicated US-020 mockup). Design system: the project's own tokens in `resources/css/app.css`. `@extends('layouts.app')`, title "Sign in — Sport Heatmap", one `h1` "Sign in", `.card` form with `@csrf`, `<label for>` + `.field-label` per input, `autocomplete="username"` / `current-password`, `value="{{ old('username') }}"`, password input never prefilled, errors in `.field-error` with `role="alert"` linked by `aria-describedby` + `aria-invalid="true"`, `.btn--primary` "Sign in" (≥44 px). Mobile-first: full-width card at 375 px, `max-w-sm` from `sm:`. No `header-status` section.
+      7. `SignInTest` (`php artisan make:test --phpunit Auth/SignInTest` then move under `tests/Feature/Auth/`): form renders in the layout with `noindex, nofollow`, CSRF token field, labelled inputs, and no `WWW-Authenticate` header; correct password signs in and lands on the dashboard; wrong password and wrong username give the same message, keep `username` in old input, and never flash the password; 5 failures then the 6th is refused with the seconds message and `Hash::check` not called (spy the hasher or assert via `RateLimiter::attempts`); the limiter is per username + IP (another IP is not blocked); session id changes on sign-in; no `remember_web_*` cookie; intended URL honoured for an in-app URL and ignored for an off-host one; a signed-in owner on `/login` is redirected to the dashboard. `SignOutTest`: POST `/logout` ends the session and redirects to `/login`.
+      8. `php artisan test --compact tests/Feature/Auth`, then the full suite.
+
+      ## Completion Criteria
+      - [ ] `/login` renders inside `layouts/app.blade.php` with labelled fields, announced errors, light/dark, no horizontal scroll at 375 px
+      - [ ] Wrong username or password → "These credentials do not match our records.", username kept, password empty
+      - [ ] 6th attempt within a minute for the same username + IP refused with the seconds to wait, no credential check
+      - [ ] Session regenerated, no remember-me cookie, intended same-host URL honoured, off-host ignored
+      - [ ] Signed-in owner on `/login` → dashboard; `POST /logout` → `/login`
+      - [ ] UI usable at mobile/tablet/desktop (manual smoke)
+      - [ ] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes in this task (uses `UserFactory::owner()` / `ownerWithPassword()` from TASK-01)
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/owner-authentication.md` — functional flow (sign-in, throttle, generic error, sign-out), technical design (routes, controllers, `SignInOwner`), architectural choices (session guard over Fortify/starter kits, hand-written check over `Auth::attempt`, the intended-URL guard, the dummy hash)
+      - [ ] Folder `README.md` index row refreshed
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-020): TASK-02 add the owner sign-in page and sign-out to /login`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update local notes
+  -
+    id: TASK-03
+    title: 'Forced first password change: middleware and change-password page'
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-02
+    body: |-
+      ## Description
+      While `giarfa` has no password, every signed-in route except the change-password page and sign-out leads to the change-password page (FR-021). A valid new password (≥12 characters, confirmed) is stored hashed, the session regenerated, and the owner lands on the dashboard. Once set, the change is no longer forced and the page itself redirects to the dashboard (no voluntary change — out of the FR).
+
+      ## Files Involved
+      - app/Http/Middleware/EnsureOwnerPasswordIsSet.php (new) + alias `password.set` in bootstrap/app.php
+      - app/Http/Controllers/Auth/ShowChangePasswordFormController.php (new)
+      - app/Http/Controllers/Auth/ChangePasswordController.php (new)
+      - app/Http/Requests/Auth/ChangePasswordRequest.php (new)
+      - resources/views/auth/change-password.blade.php (new)
+      - routes/web.php
+      - README.md (first sign-in + recovery section)
+      - tests/Feature/Auth/ForcedPasswordChangeTest.php (new)
+
+      ## Steps
+      1. `EnsureOwnerPasswordIsSet::handle`: a signed-in `User` whose `password` is null → `redirect()->route('password.change')`; otherwise `$next`. No-op for guests (the `auth` middleware runs first in every group that uses it).
+      2. Routes inside `Route::middleware('auth')`: `GET /password/change` (name `password.change`), `PUT /password/change` (name `password.update`). `POST /logout` moves into the same `auth` group. Add `password.set` to the existing dashboard and `import/garmin` routes now — it is a no-op for guests, so those still-open routes keep working until TASK-04 regroups them under `auth`.
+      3. `ShowChangePasswordFormController`: password already set → redirect to dashboard; else render the view. `ChangePasswordController`: same guard first; then `$user->password = $request->validated('password')` (hashed cast), `save()`, `$request->session()->regenerate()`, redirect to `route('dashboard')`.
+      4. `ChangePasswordRequest`: `password` `required|string|min:12|confirmed`, messages: "Enter a new password.", "Use at least 12 characters.", "The two passwords do not match."; `authorize()` returns true. `/* */` block: the PRD fixes 12 characters; `Password::defaults()` is not applied (its `uncompromised()` is an outbound call the PRD rules out).
+      5. `resources/views/auth/change-password.blade.php` — **Mirrors:** `.larapilot/mockups/US-008/upload.html` (same form idiom as TASK-02). `h1` "Set your password", one line of copy ("This instance has no password yet. Choose one with at least 12 characters."), two labelled inputs (`autocomplete="new-password"`), `.field-hint` with the 12-character rule linked by `aria-describedby`, `role="alert"` errors on the field, `.btn--primary` "Save password", plus a sign-out form button (the only other route allowed). `@method('PUT')`, `@csrf`. Mobile-first, light/dark.
+      6. `README.md`: "First sign-in" (open the site, user `giarfa`, empty password, set a password of 12+ characters — do it right after every deploy that runs the migration, PRD accepted risk) and "Recovery" (`UPDATE users SET password = NULL WHERE username = 'giarfa'` on the SQLite file re-arms the first sign-in).
+      7. `ForcedPasswordChangeTest`: `giarfa` with a null password signs in with an empty password; afterwards `/`, a window URL, and `import/garmin` redirect to `password.change`, while `password.change` and `POST /logout` do not; empty, 11-character, and mismatched values are refused with the message at the field and the column stays null; a valid value is stored as a hash (`Hash::check` true, not the plain text), the session id changes, and the response lands on the dashboard; after that, signing in with an empty password fails with the generic error and `/` no longer redirects; `GET /password/change` with a password set redirects to the dashboard; a non-empty password while none is stored is refused; username `admin` (or `GIARFA` if the lookup is exact) is refused with the generic error.
+      8. `php artisan test --compact tests/Feature/Auth`, then the full suite.
+
+      ## Completion Criteria
+      - [ ] Empty-password first sign-in works only while no password is stored
+      - [ ] Every route but the change page and sign-out redirects to the change page while no password is stored
+      - [ ] Empty, <12, or mismatched value refused at the field, nothing stored
+      - [ ] Valid value stored hashed, session regenerated, owner lands on the dashboard
+      - [ ] Once set: empty password refused, no forced redirect, change page redirects to the dashboard
+      - [ ] README documents the first sign-in and the recovery
+      - [ ] UI usable at mobile/tablet/desktop (manual smoke)
+      - [ ] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/owner-authentication.md` — forced-change flow, the `password.set` middleware, why the page closes after the first change, the 12-character rule vs `Password::defaults()`, the accepted empty-password risk and its mitigation, recovery
+      - [ ] Folder `README.md` index row refreshed
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-020): TASK-03 force the first password change`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update local notes
+  -
+    id: TASK-04
+    title: 'Gate every route behind the session; owner-only dashboard and Garmin import'
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 6
+    dependencies:
+      - TASK-03
+    body: |-
+      ## Description
+      Apply the session gate to every route other than `/login` and `/up`, and carry the change requests: the dashboard, windows, day detail, and trend show the signed-in owner's runs (FR-017, FR-011, FR-019, FR-020); the Garmin import requires the session and imports into `giarfa` with the guest paths removed (FR-018); no Strava route signs anyone in. Update the existing suite to sign in as `giarfa`.
+
+      ## Files Involved
+      - routes/web.php, bootstrap/app.php, app/Providers/AppServiceProvider.php
+      - app/Http/Controllers/DashboardController.php, resources/views/dashboard.blade.php
+      - app/Support/Strava/ResolveDisplayedAthlete.php (delete), app/Support/Garmin/ResolveGarminImportTarget.php (delete), app/Actions/Garmin/CreateCsvOnlyAthlete.php (delete)
+      - app/Support/Garmin/PlanGarminImport.php, app/Support/Garmin/RememberedGarminImportPlan.php, app/Actions/Garmin/ApplyGarminImport.php
+      - app/Http/Controllers/Garmin/ShowGarminImportReviewController.php, ConfirmGarminImportController.php, resources/views/garmin/review.blade.php
+      - app/Http/Controllers/Strava/StravaCallbackController.php, app/Actions/Strava/ConnectStravaAthlete.php
+      - tests/TestCase.php and the Dashboard, Garmin, Strava, Routing feature tests; tests/Unit/Support/Garmin/ResolveGarminImportTargetTest.php (delete)
+      - .ai/rules/http.md, .ai/rules/tests.md
+
+      ## Steps
+      1. `routes/web.php`: guest group (TASK-02); `auth` group with `password.change`, `password.update`, `logout`; `auth` + `password.set` group with `/`, the `import/garmin` group, and the Strava OAuth routes (keep `throttle:strava-oauth` and `throttle:garmin-import`). Drop `strava.fresh` from every route — its allowlist check would 403 a `giarfa` with no Strava id, and neither the dashboard nor the import calls Strava; leave the class and alias for US-021. Rewrite the route comments (guest import, "no login route") to the new truth.
+      2. `DashboardController`: `/** @var User $athlete */ $athlete = $request->user();` — remove `ResolveDisplayedAthlete` and the guest/displayed-athlete comments; the empty screen for an owner with no activity stays (`strava.connect` view; US-021 replaces it). Delete `ResolveDisplayedAthlete`.
+      3. `dashboard.blade.php`: remove the `@guest` branch (the "Owner? Connect with Strava" link) and the `@auth` wrappers — the owner is always signed in; keep "Import Garmin CSV" and "Sign out" in the same line; refresh the Blade comment.
+      4. Garmin import: delete `ResolveGarminImportTarget` and `CreateCsvOnlyAthlete`; `PlanGarminImport`, `RememberedGarminImportPlan`, `ApplyGarminImport` take `User $athlete` (non-null) and lose the "create the CSV-only athlete" branch; the review and confirm controllers pass `$request->user()`; `review.blade.php` always shows stored run details (drop `showsStoredRunDetails`). Keep the confirm lock, the token/fingerprint checks, the 5 MB rule, and the session binding; refresh comments that mention guests.
+      5. `AppServiceProvider`: `garmin-import` limiter keyed by the user id only; drop the guest/IP rationale from the docblock.
+      6. Strava (minimal, US-021 deletes it): `StravaCallbackController` no longer calls `Auth::login`; `ConnectStravaAthlete::__invoke(User $owner, StravaTokens $tokens)` writes the tokens onto the signed-in owner and never creates a user. If another row already holds the returned `strava_athlete_id`, the callback renders `strava.rejected` (`reason` `allowlist`) and writes nothing. `/* */` block: why the callback stops being a sign-in.
+      7. `tests/TestCase.php`: add `signInOwner(array $state = []): User` — creates `User::factory()->ownerWithPassword()->create($state)` and `actingAs` it; keep `allowlistedAthlete()` only for the remaining Strava tests (US-021 deletes them). Rewrite every dashboard/window/day-detail/trend/import test to call `signInOwner()` (with `stravaConnected` state where a test needs Strava columns). Delete `GuestGarminImportTest`, `CsvOnlyAthleteImportTest`, `ResolveGarminImportTargetTest`, `ResolveDisplayedAthleteTest`, and the guest cases of `PublicDashboardTest` (rename the file `OwnerDashboardTest`); convert `GarminImportAccessTest` and `NoPublicSignupTest` to "signed-out → `/login`, nothing written" plus "no route creates or lists users". Update the Strava connect-flow tests: the callback persists tokens on the signed-in owner and creates no session.
+      8. `.ai/rules/tests.md`: "Sign the owner in through `signInOwner()`". `.ai/rules/http.md`: Form Requests now cover sign-in, change-password, and the Garmin import; access is the `auth` + `password.set` route middleware; drop the guest-import sentence.
+      9. `php artisan test --compact` (full suite), `vendor/bin/pint --dirty --format agent`.
+
+      ## Completion Criteria
+      - [ ] Every route but `/login` and `/up` redirects a signed-out request to `/login`
+      - [ ] Dashboard, windows, day detail, and trend show the signed-in owner's runs of either source; displayed-athlete selection gone
+      - [ ] Owner with no activity sees the existing empty screen
+      - [ ] Garmin upload, review, confirm, cancel, and summary require the session and import into `giarfa`; guest paths removed; throttle, 5 MB, session binding still hold
+      - [ ] No Strava route signs anyone in; no route creates or lists users
+      - [ ] Existing dashboard and import feature tests pass, signed in as `giarfa`
+      - [ ] Tests pass
+
+      ## Test Data
+      - N/A — no schema change; tests use `UserFactory::owner()` / `ownerWithPassword()` from TASK-01
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — the private `/` screen for the signed-in owner; displayed-athlete selection and guest access removed; `strava.fresh` no longer on the route
+      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — import target is the signed-in owner; CSV-only athlete creation and the masked guest review removed; limiter per user
+      - [ ] `.larapilot/docs/devs/strava-connection.md` — the callback no longer signs in and binds tokens to the signed-in owner; the publicly displayed athlete is gone (file is retired by US-021)
+      - [ ] `.larapilot/docs/devs/owner-authentication.md` — the route-group layout of the gate
+      - [ ] Folder `README.md` index rows refreshed
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-020): TASK-04 gate every route and make the dashboard and import owner-only`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update local notes
+  -
+    id: TASK-05
+    title: 'Route access matrix and sign-in page contract tests'
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 2
+    dependencies:
+      - TASK-04
+    body: |-
+      ## Description
+      Add PHPUnit coverage that keeps the gate whole as routes are added or removed (FR-021): every registered route is checked, not a hand-written list, so US-021 and later specs cannot open a route by accident.
+
+      ## Files Involved
+      - tests/Feature/Auth/RouteAccessTest.php (new)
+      - tests/Feature/Routing/SecurityHeadersTest.php
+
+      ## Steps
+      1. Use existing factories from `database/factories/` (`owner()`, `ownerWithPassword()`) — do not duplicate factory definitions here
+      2. `RouteAccessTest`: iterate `Route::getRoutes()`; skip `/login` and the health route `/up` (and vendor/dev routes such as `/larapilot/*` and `storage/*`, which are not in the deployed app); for each remaining route and method, a signed-out request (with a valid CSRF token for non-GET via `withoutMiddleware(ValidateCsrfToken::class)` only where needed) redirects to `/login` and writes no row. With a signed-in `giarfa` whose password is null, every remaining route except `password.change`, `password.update`, and `logout` redirects to `password.change`. Substitute route parameters if any appear (today none).
+      3. Assert `GET /login` and `GET /password/change` carry `noindex, nofollow` and the four security headers, and that no response in the matrix carries `WWW-Authenticate`.
+      4. Assert the sign-in limiter does not leak across usernames (5 failures for `giarfa` from one IP do not block the same IP signing in after the window, and do not block another IP).
+      5. `php artisan test --compact --filter=RouteAccessTest`
+      6. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites
+
+      ## Completion Criteria
+      - [ ] Every registered route outside `/login` and `/up` is proven gated, from the route table
+      - [ ] The forced-change redirect is proven on every route but the change page and sign-out
+      - [ ] Sign-in and change-password pages keep `noindex, nofollow` and the security headers; no basic-auth challenge anywhere
+      - [ ] Tests pass locally
+      - [ ] Coverage matches the NORMAL bar
+
+      ## Git Deliverables
+      - Commit: `test(US-020): TASK-05 cover the route access matrix`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare/update local notes
+  -
+    id: TASK-06
+    title: 'CHANGELOG, quality gate, and manual test handoff'
+    type: Impl
+    status: TODO
+    assignee: Albert
+    estimate_hours: 1
+    dependencies:
+      - TASK-05
+    body: |-
+      ## Description
+      Close the spec: record the user-facing change in `CHANGELOG.md` Unreleased, run the quality gate, and write the manual test steps for the two new pages.
+
+      ## Files Involved
+      - CHANGELOG.md
+      - .larapilot/docs/devs/README.md (final check)
+
+      ## Steps
+      1. `CHANGELOG.md` → `## [Unreleased]`: `### Added` — sign-in page and forced first password change for the single `giarfa` account; `### Changed` — every page requires the session; the dashboard shows only the signed-in owner; the Garmin import requires the session; signing out returns to the sign-in page; `### Removed` — the public read-only dashboard, the guest Garmin import, and sign-in through Strava. `### Security` — sign-in throttled per username and IP. Product words, no task ids.
+      2. Confirm every domain doc touched by TASK-01…TASK-04 is current and the devs `README.md` index lists `owner-authentication` with `US-020` as last touched.
+      3. `vendor/bin/pint --dirty --format agent`, `php artisan larapilot:quality`, `php artisan test --compact`.
+      4. Manual test handoff in the PR notes: sign in at 375 px and 1280 px in light and dark; tab order username → password → button; a screen reader announces the error; after 5 wrong passwords the 6th shows the seconds to wait; first sign-in with an empty password lands on "Set your password"; after setting it, `/` loads the heatmap and the Garmin import works.
+
+      ## Completion Criteria
+      - [ ] CHANGELOG Unreleased describes the change in product words
+      - [ ] Pint clean, Larastan level 5 clean, full suite green
+      - [ ] Manual test steps written in the PR notes
+      - [ ] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - N/A — no behaviour change in this task; it verifies the docs TASK-01…TASK-04 updated
+
+      ## Git Deliverables
+      - Commit: `chore(US-020): TASK-06 changelog and quality gate`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: finalize local PR notes toward `release/3.0.0`
+updated_at: '2026-10-26T20:14:09+00:00'

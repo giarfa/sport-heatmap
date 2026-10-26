@@ -1,0 +1,58 @@
+code: US-020
+title: 'Private instance: single-owner password login with forced first change'
+epic:
+  code: EP-001
+  title: 'Foundation & Strava connection'
+priority: HIGH
+points: 8
+status: 'IN PROGRESS'
+body: |
+  #### US-020: Private instance: single-owner password login with forced first change
+
+  **Epic:** EP-001 | **Priority:** HIGH | **Points:** 8 | **Status:** IN PROGRESS
+  **Blocked by:** -
+  **Type:** Change request
+  **Release:** 3.0.0
+  **Supersedes:** US-002 criterion "callback establishes the local session" · US-007 "public read-only dashboard" and its displayed-athlete rules (with US-009) · US-011 "Garmin CSV import open to signed-out visitors"
+  **Traces to:** FR-021 (MoSCoW: Must) · FR-017 · FR-018 · FR-011 · FR-019 · FR-020 · FR-009 · Technical Architecture Security
+  **Journey:** none — access gate in front of every existing page
+  **Prior art:** built-in — Laravel session guard and `Auth::attempt` plus one middleware forcing the first password change; Fortify and the starter kits bring registration, reset, and 2FA scaffolding a one-account instance does not use
+
+  **User Story**
+  As the Committed Amateur Runner, owner and only user of this instance,
+  I want to sign in with a username and password on a page that looks like the rest of the app, and to set my own password the first time,
+  so that my runs and heart rate are visible and writable only to me.
+
+  **Demonstrates**
+  After implementing this spec, a signed-out browser that opens any page lands on `/login`; `giarfa` with an empty password signs in once and is forced to set a password of at least 12 characters; afterwards only that password signs in, and the dashboard and Garmin import work as before for the signed-in owner. Removing Strava is US-021, which follows this spec in 3.0.0.
+
+  **Acceptance Criteria**
+
+  _Sign-in (FR-021)_
+  - [ ] A signed-out request to any route other than `/login` and `/up` — the dashboard, every window URL, every `import/garmin` route, `/logout`, and any other route still registered — redirects to `/login`; after a successful sign-in the owner lands on the URL first requested (the dashboard by default)
+  - [ ] `/login` renders inside `layouts/app.blade.php` with a username field, a password field, and a submit button: labelled fields, errors announced to assistive technology, light and dark themes at WCAG 2.2 AA, no horizontal page scroll at 375 px (FR-009); the page keeps `noindex, nofollow` and the security headers, the form is CSRF-protected, and no `WWW-Authenticate` / HTTP basic auth challenge is ever sent
+  - [ ] A wrong username or a wrong password shows the same single error ("These credentials do not match our records.") without saying which was wrong; the username stays filled in and the password field is empty
+  - [ ] After 5 failed attempts for the same username and IP within one minute, the next attempt is refused with a message giving the seconds to wait, and no credential check runs
+  - [ ] A successful sign-in regenerates the session id and sets no remember-me cookie; a signed-in owner opening `/login` is redirected to the dashboard; sign-out (`POST /logout`) ends the session and redirects to `/login`
+
+  _The one account and the forced first change (FR-021)_
+  - [ ] A migration adds a unique, nullable `username` column to `users`; on a database with users it sets `username = giarfa` and `password = null` on the owner's existing record (the connected allowlisted athlete if any, else the lowest-id user with activities, else the lowest-id user) and leaves its runs and every other column untouched; on an empty database it creates the `giarfa` record; `down()` drops the column
+  - [ ] While `giarfa` has no password, signing in with username `giarfa` and an empty password succeeds; every route other than the change-password page and `POST /logout` then redirects to the change-password page
+  - [ ] The change-password page (same layout and FR-009 bar) takes a new password and its confirmation; an empty, shorter than 12 characters, or mismatched value is refused with a message at the field and nothing is stored; a valid one is stored hashed, the session is regenerated, and the owner lands on the dashboard
+  - [ ] Once a password is set, signing in with an empty password is refused with the generic error, and no route redirects to the change-password page any more
+  - [ ] Signing in with any username other than `giarfa` is refused with the generic error; no route creates or lists users
+  - [ ] The README documents the first sign-in and the recovery: clearing `users.password` for `giarfa` re-arms the first-login change
+
+  _Change requests (FR-017, FR-018, FR-011, FR-019, FR-020)_
+  - [ ] The dashboard, every window, the day cell detail, and the weekly trend show the signed-in owner's runs of either source; the displayed-athlete selection (allowlist order, lowest-id fallback) is gone; an owner with no activity sees the existing empty screen (US-021 reduces it to the Garmin CSV import)
+  - [ ] No Strava route signs anyone in: the password form is the only way to get a session (US-021 then removes Strava entirely, so no Strava criterion is built here)
+  - [ ] The Garmin CSV import upload, review, confirm, cancel, and summary require the session and import into `giarfa`; the guest paths (CSV-only athlete creation, the masked guest conflict review) are removed; the existing throttle, 5 MB limit, and session binding still hold
+  - [ ] The existing feature tests for the import and the dashboard pass once updated to sign in as `giarfa`
+status_history:
+  -
+    status: PLANNED
+    at: '2026-10-26T20:14:09+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-10-26T20:16:17+00:00'
+rework: false
