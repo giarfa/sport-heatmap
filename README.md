@@ -62,6 +62,29 @@ restricted to an explicit allowlist of athlete ids.
    HTTP, where browsers drop `Secure` cookies, so set `SESSION_SECURE_COOKIE=false` in `.env` for
    that setup only.
 
+## First sign-in and recovery
+
+The whole app sits behind one account: the user `giarfa`. There is no registration and no other way in.
+
+1. Open the site. Every page sends a signed-out browser to `/login`.
+2. Sign in as `giarfa` with an **empty password**. This works only while no password is stored.
+3. Set a password of **at least 12 characters** (typed twice). You land on the dashboard, and from
+   then on only that password signs in.
+
+Do this right after every deploy that runs the username migration: until the password is set,
+anyone who knows the username can set it first (an accepted risk — the migration resets the owner's
+password to empty so the first sign-in can happen).
+
+Five wrong attempts for the same username and IP within a minute lock that pair out for the
+remaining seconds.
+
+**Recovery.** To re-arm the first sign-in (a forgotten password), clear the stored password on the
+SQLite file, then sign in with an empty password again:
+
+```sql
+UPDATE users SET password = NULL WHERE username = 'giarfa';
+```
+
 ## Registering the Strava application
 
 The app talks to Strava as a registered API client. You need to create one once, under your own
@@ -94,10 +117,10 @@ all is written until it passes.
 > in this product; copying an example id verbatim would authorize a stranger. Non-numeric entries
 > are discarded, so a blank or malformed value allows nobody rather than everybody.
 
-### Signing in
+### Connecting Strava
 
-Visit the app signed out and press **Connect with Strava**. That is the whole flow — there is no
-password, no registration, and no other way in.
+Strava no longer signs anyone in: you sign in with the password above, then press **Connect with
+Strava** on the empty screen to attach your Strava tokens to your account.
 
 A few things worth knowing before the first attempt:
 
@@ -185,10 +208,9 @@ This produces a full **16-week training block** for one demo athlete — includi
 week, a peak week and a partial current week — so the dashboard can be developed and reviewed
 without ever connecting to Strava.
 
-With `STRAVA_ALLOWED_ATHLETE_IDS` blank, the public home page shows that block without signing
-in: no allowlisted athlete has connected, so the page falls back to the seeded athlete. Once your
-own allowlisted athlete connects, they replace it. Never seed production — it would publish a demo
-athlete until you connect.
+The demo athlete is the owner account `giarfa` with no password, so a freshly seeded database starts
+at the first sign-in (see above). Never seed production — it would plant a demo athlete and runs in
+your real database.
 
 ## Running the sync
 

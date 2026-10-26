@@ -9,7 +9,7 @@
 
 ## Purpose
 
-This instance is private: one owner, one account, one password. Every page sits behind a session sign-in, and the owner's runs and heart rate are readable and writable only after it. This file describes the account (data model, first-sign-in state, recovery) and the sign-in flow. The forced first change and the route gate are added by the later tasks of `US-020`.
+This instance is private: one owner, one account, one password. Every page sits behind a session sign-in, and the owner's runs and heart rate are readable and writable only after it. This file describes the account (data model, first-sign-in state, recovery) and the sign-in flow. The forced first password change is described below; the route-group gate is added by the last code task of `US-020`.
 
 ## Functional flow
 
@@ -21,7 +21,14 @@ This instance is private: one owner, one account, one password. Every page sits 
 4. After 5 failures for the same username + IP within 60 seconds the next attempt is refused with "Too many sign-in attempts. Try again in N seconds." and no credential check runs.
 5. `POST /logout` ends the session, regenerates the CSRF token and redirects to `/login`. It never touches the Strava token columns.
 
-Forced first password change and the route gate: documented with the tasks that build them.
+### Forced first password change
+
+1. While `users.password` is null, signing in as `giarfa` with an empty password succeeds (and any non-empty password is refused).
+2. The `password.set` middleware (`EnsureOwnerPasswordIsSet`) redirects every signed-in route that carries it to `GET /password/change`. Only the change routes and `POST /logout` sit behind `auth` alone, so they stay reachable.
+3. `PUT /password/change` validates through `ChangePasswordRequest` (`required|string|min:12|confirmed`, a message per rule); a refused value stores nothing. A valid one is assigned to the `hashed` cast, saved, the session id regenerated, and the owner goes to the dashboard.
+4. Once a password exists, the change page and the update route redirect to the dashboard: a voluntary change is out of scope (FR-021), so the page is the one-time first change only. Signing in with an empty password is refused from then on and no route forces the change.
+
+The route-group gate (every other route behind the session): documented with the task that builds it.
 
 ## Technical design
 
@@ -34,9 +41,11 @@ Forced first password change and the route gate: documented with the tasks that 
 | Routes | `routes/web.php` (`login`, `login.store`, `logout`), `bootstrap/app.php` (`redirectGuestsTo`, `redirectUsersTo`) | Sign-in routes; guests go to `/login`, signed-in users to the dashboard |
 | Controllers | `app/Http/Controllers/Auth/ShowSignInFormController.php`, `SignInController.php`, `app/Http/Controllers/SignOutController.php` | Thin, single action |
 | Action | `app/Actions/Auth/SignInOwner.php` | The one decision: throttle → credential check → hit/clear the limiter |
-| Form Request | `app/Http/Requests/Auth/SignInRequest.php` | Edge validation of the form |
-| View | `resources/views/auth/login.blade.php` | Mirrors the Garmin upload form idiom; `.text-input` in `resources/css/app.css` |
-| Tests | `tests/Feature/Database/UsernameMigrationTest.php`, `SchemaTest.php`, `tests/Feature/Auth/SignInTest.php`, `SignOutTest.php` | Backfill branches, untouched columns, `down()`; sign-in, throttle, intended URL, sign-out |
+| Middleware | `app/Http/Middleware/EnsureOwnerPasswordIsSet.php` (alias `password.set`) | Forces the first password change while `password` is null |
+| Controllers (change) | `app/Http/Controllers/Auth/ShowChangePasswordFormController.php`, `ChangePasswordController.php` | The one-time first-password page and its handler |
+| Form Requests | `app/Http/Requests/Auth/SignInRequest.php`, `ChangePasswordRequest.php` | Edge validation of both forms |
+| Views | `resources/views/auth/login.blade.php`, `change-password.blade.php` | Mirrors the Garmin upload form idiom; `.text-input` in `resources/css/app.css` |
+| Tests | `tests/Feature/Database/UsernameMigrationTest.php`, `SchemaTest.php`, `tests/Feature/Auth/SignInTest.php`, `SignOutTest.php`, `ForcedPasswordChangeTest.php` | Backfill branches, untouched columns, `down()`; sign-in, throttle, intended URL, sign-out |
 
 ### Data model
 
@@ -65,6 +74,8 @@ That row gets `username = giarfa` and `password = null`; nothing else changes (r
 | Throttle inside `SignInOwner`, key `username|ip`, 5 per 60 s, checked first | Route `throttle` middleware | A route limiter cannot key on the submitted username; checking first means a refused attempt does no lookup and no hashing |
 | Wrong username runs one `Hash::check` against a fixed dummy hash | Return immediately | Response time must not reveal whether the username exists |
 | Intended URL pulled by the controller and accepted only when same-host | `redirect()->intended()` | The URL generator passes an absolute URL through untouched, so a planted off-site `url.intended` would become an open redirect |
+| The 12-character rule alone, not `Password::defaults()` | Mixed case, symbols, `uncompromised()` | The PRD fixes the rule at 12 characters; `uncompromised()` is an outbound call the PRD rules out |
+| The change page closes after the first password | A voluntary change form | A later change is out of scope for FR-021; the recovery path is clearing `users.password` |
 | `redirect()->route('login')` on failure | `back()` | `back()` depends on the Referer header |
 | Test databases clear the migration-created `giarfa` in `Tests\TestCase::setUp()` | Skip the insert under `testing` | The empty-database insert is part of the contract; tests arrange their own users and the unique username would otherwise collide with `owner()` |
 
@@ -76,6 +87,9 @@ That row gets `username = giarfa` and `password = null`; nothing else changes (r
 
 - **Invariant —** sign-in sets no remember-me cookie and regenerates the session id. _Breaks if:_ `Auth::login` is called with `remember: true`, or the regenerate is dropped (session fixation).
 - **Invariant —** a wrong username and a wrong password answer identically. _Breaks if:_ a distinct message or an early return is added; the owner's username becomes enumerable.
+
+- **Invariant —** `password.set` is on every signed-in route except the change routes and `POST /logout`. _Breaks if:_ a route is added without it (a first-sign-in owner reaches the data with no password) or the change routes get it (they redirect to themselves).
+- **Accepted risk —** between the migration and the first password change, whoever knows the username can set the password first. Mitigation: set it right after the deploy (README, "First sign-in and recovery").
 
 ## Extension points & gotchas
 

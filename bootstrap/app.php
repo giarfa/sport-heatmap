@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureFreshStravaToken;
+use App\Http\Middleware\EnsureOwnerPasswordIsSet;
 use App\Http\Middleware\SetSecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'password.set' => EnsureOwnerPasswordIsSet::class,
             'strava.fresh' => EnsureFreshStravaToken::class,
         ]);
 

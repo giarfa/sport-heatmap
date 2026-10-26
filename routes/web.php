@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Auth\ChangePasswordController;
+use App\Http\Controllers\Auth\ShowChangePasswordFormController;
 use App\Http\Controllers\Auth\ShowSignInFormController;
 use App\Http\Controllers\Auth\SignInController;
 use App\Http\Controllers\DashboardController;
@@ -24,16 +26,27 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', SignInController::class)->name('login.store');
 });
 
+/*
+ * The first-password page is the one place a signed-in owner with no password
+ * can be, and sign-out is the only other way out of it; both sit behind `auth`
+ * alone, never behind `password.set`, or they would redirect to themselves.
+ */
+Route::middleware('auth')->group(function (): void {
+    Route::get('/password/change', ShowChangePasswordFormController::class)->name('password.change');
+    Route::put('/password/change', ChangePasswordController::class)->name('password.update');
+    Route::post('/logout', SignOutController::class)->name('logout');
+});
+
 Route::get('/', DashboardController::class)
-    ->middleware('strava.fresh')
+    ->middleware(['password.set', 'strava.fresh'])
     ->name('dashboard');
 
 /*
- * Sign out is POST only, so a cross-site link or a prefetch cannot sign the
- * owner out; CSRF comes from the web group. No `strava.fresh`: signing out must never reach Strava, or depend on it. No
+ * Sign out (above, in the auth group) is POST only, so a cross-site link or a
+ * prefetch cannot sign the owner out; CSRF comes from the web group. No
+ * `strava.fresh`: signing out must never reach Strava, or depend on it. No
  * throttle: the route does no work worth limiting.
  */
-Route::post('/logout', SignOutController::class)->name('logout');
 
 /*
  * Both OAuth routes are throttled, not just the callback: the redirect route is
@@ -57,7 +70,7 @@ Route::middleware('throttle:strava-oauth')->group(function (): void {
  * only reaches the pending upload in its own session. strava.fresh stays: a
  * no-op for guests, it still re-checks a signed-in owner's allowlist and token.
  */
-Route::middleware(['strava.fresh'])
+Route::middleware(['password.set', 'strava.fresh'])
     ->prefix('import/garmin')
     ->name('garmin.import.')
     ->group(function (): void {

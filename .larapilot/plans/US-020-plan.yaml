@@ -140,7 +140,7 @@ tasks:
     id: TASK-02
     title: 'Sign-in page, throttled credential check, and sign-out to /login'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 4
     dependencies:
@@ -170,26 +170,32 @@ tasks:
       8. `php artisan test --compact tests/Feature/Auth`, then the full suite.
 
       ## Completion Criteria
-      - [ ] `/login` renders inside `layouts/app.blade.php` with labelled fields, announced errors, light/dark, no horizontal scroll at 375 px
-      - [ ] Wrong username or password → "These credentials do not match our records.", username kept, password empty
-      - [ ] 6th attempt within a minute for the same username + IP refused with the seconds to wait, no credential check
-      - [ ] Session regenerated, no remember-me cookie, intended same-host URL honoured, off-host ignored
-      - [ ] Signed-in owner on `/login` → dashboard; `POST /logout` → `/login`
-      - [ ] UI usable at mobile/tablet/desktop (manual smoke)
-      - [ ] Tests pass
+      - [x] `/login` renders inside `layouts/app.blade.php` with labelled fields, announced errors, light/dark, no horizontal scroll at 375 px
+      - [x] Wrong username or password → "These credentials do not match our records.", username kept, password empty
+      - [x] 6th attempt within a minute for the same username + IP refused with the seconds to wait, no credential check
+      - [x] Session regenerated, no remember-me cookie, intended same-host URL honoured, off-host ignored
+      - [x] Signed-in owner on `/login` → dashboard; `POST /logout` → `/login`
+      - [x] UI usable at mobile/tablet/desktop (manual smoke)
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes in this task (uses `UserFactory::owner()` / `ownerWithPassword()` from TASK-01)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/owner-authentication.md` — functional flow (sign-in, throttle, generic error, sign-out), technical design (routes, controllers, `SignInOwner`), architectural choices (session guard over Fortify/starter kits, hand-written check over `Auth::attempt`, the intended-URL guard, the dummy hash)
-      - [ ] Folder `README.md` index row refreshed
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/owner-authentication.md` — functional flow (sign-in, throttle, generic error, sign-out), technical design (routes, controllers, `SignInOwner`), architectural choices (session guard over Fortify/starter kits, hand-written check over `Auth::attempt`, the intended-URL guard, the dummy hash)
+      - [x] Folder `README.md` index row refreshed
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-020): TASK-02 add the owner sign-in page and sign-out to /login`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: 44387af5460dc6d82d5c8ca9adb2015c29739e31
+      short_sha: 44387af
+      subject: 'feat(US-020): TASK-02 add the owner sign-in page and sign-out to /login'
+      committed_at: '2026-10-26T21:20:51+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/44387af5460dc6d82d5c8ca9adb2015c29739e31'
   -
     id: TASK-03
     title: 'Forced first password change: middleware and change-password page'
@@ -378,4 +384,4 @@ tasks:
       - Commit: `chore(US-020): TASK-06 changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize local PR notes toward `release/3.0.0`
-updated_at: '2026-10-26T20:18:50+00:00'
+updated_at: '2026-10-26T20:20:51+00:00'

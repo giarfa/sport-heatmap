@@ -51,7 +51,11 @@ abstract class TestCase extends BaseTestCase
     protected function allowlistedAthlete(array $state = [], string $factoryState = 'stravaConnected'): User
     {
         /** @var User $user */
-        $user = User::factory()->{$factoryState}()->create($state);
+        $user = User::factory()->{$factoryState}()->create([
+            // A signed-in athlete has chosen a password; a null one is forced to the change page.
+            'password' => 'correct horse battery',
+            ...$state,
+        ]);
 
         $this->allowlistAthletes($user);
 

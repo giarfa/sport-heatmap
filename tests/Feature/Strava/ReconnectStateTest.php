@@ -128,7 +128,7 @@ class ReconnectStateTest extends TestCase
      */
     public function test_a_session_without_an_athlete_id_is_turned_away(): void
     {
-        $response = $this->actingAs(User::factory()->create())->get(route('dashboard'));
+        $response = $this->actingAs(User::factory()->create(['password' => 'correct horse battery']))->get(route('dashboard'));
 
         $response->assertForbidden();
         $this->assertGuest();

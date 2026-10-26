@@ -196,7 +196,7 @@ class PublicDashboardTest extends TestCase
 
     public function test_a_signed_in_athlete_removed_from_the_allowlist_still_gets_403_while_the_fallback_would_display_them(): void
     {
-        $removedAthlete = User::factory()->stravaConnected()->create();
+        $removedAthlete = User::factory()->stravaConnected()->create(['password' => 'correct horse battery']);
         $this->runOn($removedAthlete, '2026-09-03', 12_345);
         $this->allowlistAthletes();
 
