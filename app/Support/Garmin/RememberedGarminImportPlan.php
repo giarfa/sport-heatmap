@@ -64,8 +64,7 @@ final readonly class RememberedGarminImportPlan
 
     /**
      * A hash of what the planner reads from the stored runs: for each, by id, the
-     * columns it compares — the source (which runs can be "already imported"),
-     * the dates and start, the distance and the moving time. Any run added,
+     * columns it compares — the dates and start, the distance and the moving time. Any run added,
      * removed or changed on the upload's dates moves it.
      *
      * Not `updated_at`: it has one-second resolution and a query-builder write
@@ -77,7 +76,7 @@ final readonly class RememberedGarminImportPlan
      */
     private function stampOf(Collection $stored): string
     {
-        $columns = ['source', 'start_date_local', 'activity_date', 'distance_meters', 'moving_time_seconds'];
+        $columns = ['start_date_local', 'activity_date', 'distance_meters', 'moving_time_seconds'];
 
         return hash('sha256', (string) json_encode(
             $stored->sortKeys()->map(

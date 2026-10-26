@@ -173,14 +173,14 @@ calibrated bands, upper-inclusive.
 | Controller | `app/Http/Controllers/DashboardController.php` | The signed-in owner → grid + status; no run → the empty state |
 | Window | `app/Support/Heatmap/HeatmapWindow.php` | ISO-week anchored 112-day window: `current()`, `endingInWeekOf()`, strict `fromRequestedEnd()`, `previous()`, `next()` (clamped to the current window), `isCurrent()` |
 | Daily totals | `app/Support/Heatmap/DailyRunningDistance.php` | One grouped aggregate query, ranged by `Activity::onDaysBetween()` |
-| Day runs | `app/Support/Heatmap/DailyRuns.php`, `app/Data/Heatmap/DayRun.php` | One query per cache miss for the window's runs, grouped by day in start order; `DayRun` is a scalars-only run with its formatting (`kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()` — null when not recorded — and the Strava link from `Activity::stravaUrl()`) |
+| Day runs | `app/Support/Heatmap/DailyRuns.php`, `app/Data/Heatmap/DayRun.php` | One query per cache miss for the window's runs, grouped by day in start order; `DayRun` is a scalars-only run with its formatting (`kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()` — null when not recorded; it has no link and no source, `US-021`) |
 | Navigation | `app/Support/Heatmap/OldestRunDate.php`, `app/Data/Heatmap/WindowNavigation.php` | The oldest stored run (one `MIN`, outside the cache) and the heading, title, empty note and Previous / Next URLs of the shown window |
 | Weekly trend | `app/Support/Heatmap/BuildWeeklyTrend.php`, `app/Data/Heatmap/WeeklyTrend.php`, `TrendBar.php`, `TrendTick.php` | `US-014`: turns the window's `WeekRow`s into the chart's bars, 4-week average, y axis and every string it prints (below) |
 | Lead-in | `app/Support/Heatmap/LeadInDistance.php` | `US-014`: the three weeks before the window in one grouped query, feeding the first averages |
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
-| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v5:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
+| Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v6:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Import status | `app/Support/Garmin/ResolveImportStatus.php`, `app/Data/ImportStatus.php` | Fresh on every request; every user-facing import string |
 | Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `dashboard-empty.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `weekly-trend`, `import-chip`, `import-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
@@ -237,7 +237,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 | The day's runs live inside the cached grid (`DayCell::$runs`, US-012) | A JSON endpoint fetched when a day is opened; a second cache entry for the detail | The detail then shares the grid's one key and its one invalidation — the import's `forgetAthlete()` covers it with no new call site, and the two can never disagree. Opening a day costs no request, so it triggers no write (FR-017). The price is ~19 runs' worth of scalars per week in the entry, a few tens of KB for a 112-day window |
 | A per-athlete generation counter in the cache key; one `forgetAthlete()` bumps it (US-013) | Cache tags; forgetting each window's key in a loop; one entry holding every window | Navigation means an athlete has one cached grid per window they opened, and `cache.default` is `database`, which has no tags. A loop would have to guess which windows were cached; a single entry would rebuild every window on any miss. A counter makes one write retire every window at once; the orphans expire through `grid_cache_ttl`. The counter is created with `add()` then `increment()`d, because a bare `increment()` on a missing key answers `false` on the database store and a `forever(…, 1)` fallback lets two overlapping writes both land on 1. If the counter cannot be read the request builds the grid and leaves the cache alone, so a grid is never served or stored under a guessed generation; a failed bump is reported, not thrown, since the write it follows is already committed |
 | Only windows that can hold a run are cached (US-013) | Cache every requested window; clamp `to` to the oldest run; throttle `/` | `to` takes any past date and each week is a key, so a request could fill the cache table with empty grids back to year 0. A window that ends before the oldest run is built uncached (two small queries); the current window is always cached. Clamping would change what a shared link shows, and a throttle would hit the owner too |
-| A `v2` segment in the cache key (US-012; `v3` since US-013, when the key gained the generation; `v4` since US-014, when the grid gained its `trend`; `v5` since US-015, when a fix changed what a grid contains) | Reuse the key and rely on the unserialize `Throwable` catch; prove the TTL covers a content fix | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read. A content fix needs the same: the key carries `$today` and the TTL is 86 400 s, so a past window cached before the deploy would keep hiding its Sunday until midnight |
+| A `v2` segment in the cache key (US-012; `v3` since US-013, when the key gained the generation; `v4` since US-014, when the grid gained its `trend`; `v5` since US-015, when a fix changed what a grid contains; `v6` since US-021, when `DayRun` lost its Strava link) | Reuse the key and rely on the unserialize `Throwable` catch; prove the TTL covers a content fix | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read. A content fix needs the same: the key carries `$today` and the TTL is 86 400 s, so a past window cached before the deploy would keep hiding its Sunday until midnight |
 | Run formatting reuses `GarminImportFormat` | A second formatter in the heatmap layer | Pace, ascent, heart rate, distance and duration print the same on the review and in the day detail; one copy cannot drift |
 | The URL names the window's **end** week, as a `Y-m-d` query value (`/?to=2026-09-06`, `US-013`) | A path segment; the window's start date in the URL; a page number | A query value keeps `/` the one route and the one cache key shape; the end is what the reader navigates by and survives a change of `window_weeks`, where a start date would shift every shared link; a page number says nothing in a shared link |
 | A bad `to` renders the current window silently (`US-013`) | 404; 422; a redirect to `/` | The spec asks for a bad or future link to render "without an error"; an old bookmark is better served by today's map than by an error page, and the guest path stays free of any new response |
@@ -307,7 +307,9 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   `heatmap:grid:{…}` to `heatmap:grid:v2:{…}`; `US-013` made it `v3` when the
   generation joined the key, `US-014` made it `v4` when `HeatmapGrid` gained
   `trend`, and `US-015` made it `v5` when a query fix changed the content of every
-  cached grid (bump for a content fix too, not only a shape change). _Breaks if:_ a property is added
+  cached grid (bump for a content fix too, not only a shape change), and `US-021`
+  made it `v6` when `DayRun` lost `stravaUrl` (the migration that removed Strava also
+  flushes the whole cache, so no window shows a deleted run). _Breaks if:_ a property is added
   without bumping it — an entry from the previous deploy then restores with an
   uninitialized readonly property and every request fails until midnight.
 - **Invariant — how `activity_date` is stored, and how a window range compares it
@@ -371,18 +373,20 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   sign-in).
 - **Demo dataset (`TrainingBlockSeeder`).** The 16-week block is computed from the
   current week, so it always fills exactly the current window. Since `US-013` it is
-  preceded by seven weeks of Garmin-imported history (28.4, 31.0, 33.5, 36.2, 22.0,
-  **0.0**, 18.6 km, oldest first; `source = garmin_csv`, no metrics, each week summing to
-  its total in metres), so Previous is demonstrable after `migrate:fresh --seed`.
+  preceded by seven weeks of history (28.4, 31.0, 33.5, 36.2, 22.0,
+  **0.0**, 18.6 km, oldest first; no metrics, each week summing to its total in metres),
+  so Previous is demonstrable after `migrate:fresh --seed`.
   The totals are the ones the `US-014` mockup draws, so the two specs share one fixture and
-  the 0 km week gives the trend a rest week to show. The block itself is untouched and
-  the legend over the current window does not change. Do not run `migrate:fresh --seed` on a
+  the 0 km week gives the trend a rest week to show. Every run is what a Garmin import
+  writes (`US-021`): the block's first two weeks come from an older export with no
+  metrics, the rest carry them, about 15 % without a heart rate. The legend over the
+  current window does not change. Do not run `migrate:fresh --seed` on a
   database that holds real imports — point `DB_DATABASE` at a scratch file.
 
 
 ## Related
 
-- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`, `US-010`, `US-011`, `US-012`, `US-013`, `US-018`, `US-020`
+- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`, `US-010`, `US-011`, `US-012`, `US-013`, `US-018`, `US-020`, `US-021`
 - Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`, `US-010-plan.yaml`, `US-013-plan.yaml`, `US-020-plan.yaml`
 - Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`, `US-009.md`, `US-010.md`
-- Other domains: `owner-authentication.md`, `activity-sync.md`, `garmin-csv-import.md`
+- Other domains: `owner-authentication.md`, `garmin-csv-import.md`

@@ -75,28 +75,27 @@ class DailyRunsTest extends TestCase
         $this->assertCount(21, $runs);
     }
 
-    public function test_a_run_carries_its_metrics_and_only_strava_runs_link_out(): void
+    public function test_a_run_carries_its_metrics_and_a_missing_one_is_null(): void
     {
         $athlete = $this->signInOwner();
 
         Activity::factory()->for($athlete)->onDate(Carbon::parse('2026-10-10'))->create([
-            'strava_activity_id' => 4_242,
             'average_pace_seconds_per_km' => 323,
             'total_ascent_meters' => 45,
             'average_heart_rate' => 152,
         ]);
-        Activity::factory()->for($athlete)->garminImported()->withoutMetrics()->onDate(Carbon::parse('2026-10-09'))->create();
+        Activity::factory()->for($athlete)->withoutMetrics()->onDate(Carbon::parse('2026-10-09'))->create();
 
         $runs = (new DailyRuns)($athlete, HeatmapWindow::current());
 
-        $strava = $runs['2026-10-10'][0];
-        $this->assertSame('https://www.strava.com/activities/4242', $strava->stravaUrl);
-        $this->assertSame('5:23 /km', $strava->pace());
+        $withMetrics = $runs['2026-10-10'][0];
+        $this->assertSame('5:23 /km', $withMetrics->pace());
+        $this->assertSame('45 m', $withMetrics->ascent());
+        $this->assertSame('152 bpm', $withMetrics->heartRate());
 
-        $garmin = $runs['2026-10-09'][0];
-        $this->assertNull($garmin->stravaUrl);
-        $this->assertNull($garmin->pace());
-        $this->assertNull($garmin->heartRate());
+        $withoutMetrics = $runs['2026-10-09'][0];
+        $this->assertNull($withoutMetrics->pace());
+        $this->assertNull($withoutMetrics->heartRate());
     }
 
     public function test_the_windows_first_and_last_day_are_read_and_the_days_around_them_are_not(): void

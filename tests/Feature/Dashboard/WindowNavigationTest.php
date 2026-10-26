@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Dashboard;
 
-use App\Enums\ActivitySource;
 use App\Models\Activity;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapWindow;
@@ -154,7 +153,7 @@ class WindowNavigationTest extends TestCase
         $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
         $this->runOn($athlete, '2026-09-03', 12_000);
-        Activity::query()->update(['source' => ActivitySource::GarminCsv, 'updated_at' => now()->subHours(6)]);
+        Activity::query()->update(['updated_at' => now()->subHours(6)]);
 
         $current = $this->actingAs($athlete)->get('/');
         $past = $this->actingAs($athlete)->get('/?to=2026-08-09');
@@ -185,7 +184,7 @@ class WindowNavigationTest extends TestCase
     {
         $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-07-02', 10_000);
-        $keyOf = fn (string $to): string => "heatmap:grid:v5:{$athlete->id}:g0:"
+        $keyOf = fn (string $to): string => "heatmap:grid:v6:{$athlete->id}:g0:"
             .HeatmapWindow::fromRequestedEnd($to, now())->startsOn->toDateString().':2026-09-05';
 
         $this->actingAs($athlete)->get('/?to=2026-08-09')->assertOk();
@@ -226,7 +225,7 @@ class WindowNavigationTest extends TestCase
             ->assertSee($range);
     }
 
-    public function test_navigating_back_writes_nothing_and_sends_nothing_even_with_an_expired_token(): void
+    public function test_navigating_back_writes_nothing_and_sends_nothing(): void
     {
         $athlete = $this->signInOwner();
         $this->runOn($athlete, '2026-03-02', 10_000);
@@ -315,8 +314,7 @@ class WindowNavigationTest extends TestCase
     }
 
     /**
-     * Row counts of every table a request could write to, plus the athlete's raw token
-     * columns, read through the query builder so the encrypted values are compared as stored.
+     * Row counts of every table a request could write to, plus the athlete's row as stored.
      *
      * @return array<string, mixed>
      */
@@ -325,10 +323,9 @@ class WindowNavigationTest extends TestCase
         return [
             'users' => DB::table('users')->count(),
             'activities' => DB::table('activities')->count(),
-            'sync_runs' => DB::table('sync_runs')->count(),
             'athlete' => (array) DB::table('users')
                 ->where('id', $athlete->id)
-                ->first(['updated_at', 'strava_access_token', 'strava_refresh_token', 'strava_token_expires_at']),
+                ->first(['updated_at']),
         ];
     }
 }

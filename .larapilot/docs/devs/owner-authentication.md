@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-020` |
-| **Last updated by** | `US-020` — 2026-10-26 |
+| **Last updated by** | `US-021` — 2026-10-26 |
 | **Owner persona** | 🗄️ Mike |
 
 ## Purpose
@@ -67,6 +67,10 @@ in `heatmap-dashboard.md` and `garmin-csv-import.md`.
 - `users.password` — nullable. A **null password is the "first sign-in armed" state**: the owner signs in with an empty password and is forced to set one. Once set, it is a hash (the `hashed` cast).
 - `username` is deliberately outside `#[Fillable]` (identity column): the migration and the factory assign it explicitly.
 
+### The `users` columns
+
+After `US-021` the table holds `name`, `username`, `email`, `email_verified_at`, `password`, `remember_token` and the timestamps: the four Strava columns (`strava_athlete_id`, the two encrypted tokens and the token expiry) were dropped by `remove_strava_from_schema`, so the account holds no third-party credential. The backfill below is history: it reads `strava_athlete_id`, which exists when it runs and is gone afterwards, and `UsernameMigrationTest` rolls the newer migration back before exercising it.
+
 ### The owner backfill (migration `up()`)
 
 The migration uses the query builder only (no model, no events, no `updated_at` bump) and picks one row, in this order:
@@ -75,14 +79,14 @@ The migration uses the query builder only (no model, no events, no `updated_at` 
 2. else the lowest-id user that has activities;
 3. else the lowest-id user.
 
-That row gets `username = giarfa` and `password = null`; nothing else changes (runs, Strava tokens, name, email, `updated_at`). On an empty `users` table it inserts `giarfa` (`giarfa@heatmap.invalid`, a reserved `.invalid` address) with a null password. `down()` drops the unique index and the column.
+That row gets `username = giarfa` and `password = null`; nothing else changes (runs, name, email, `updated_at`; the Strava token columns it left alone were dropped by `US-021`). On an empty `users` table it inserts `giarfa` (`giarfa@heatmap.invalid`, a reserved `.invalid` address) with a null password. `down()` drops the unique index and the column.
 
 ## Architectural choices
 
 | Choice | Alternatives considered | Why this one |
 | --- | --- | --- |
 | Backfill with the query builder, self-contained | Eloquent model, an app Action | A migration must keep running after the model changes; Eloquent would fire events and bump `updated_at` on a row the owner did not edit |
-| `config('strava.allowed_athlete_ids', [])` with a `[]` default | Direct config read | `US-021` deletes `config/strava.php`; the migration must still run on a fresh database afterwards |
+| `config('strava.allowed_athlete_ids', [])` with a `[]` default | Direct config read | `US-021` deleted `config/strava.php`; the migration still runs on a fresh database, where only the later branches apply |
 | Other user rows are left untouched and simply not displayed | Merge them into the owner, delete them | Merging is out of scope for `US-020`; leaving them keeps the migration non-destructive (accepted trade-off) |
 | Session guard with a hand-written credential check | `Auth::attempt`, Fortify, a starter kit | `Auth::attempt` rejects a null stored hash and `ConvertEmptyStringsToNull` turns the empty first-sign-in password into null; Fortify and the kits bring registration, reset and 2FA a one-account instance does not use |
 | Throttle inside `SignInOwner`, key `username|ip`, 5 per 60 s, checked first | Route `throttle` middleware | A route limiter cannot key on the submitted username; checking first means a refused attempt does no lookup and no hashing |

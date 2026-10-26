@@ -3,7 +3,6 @@
 namespace Tests\Feature\Garmin;
 
 use App\Data\Heatmap\HeatmapGrid;
-use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
@@ -58,7 +57,7 @@ class GarminImportFlowTest extends TestCase
 
         $this->confirm($review)->assertRedirect(route('garmin.import.summary'));
 
-        $this->assertSame(37, Activity::where('source', ActivitySource::GarminCsv)->whereNull('strava_activity_id')->count());
+        $this->assertSame(37, Activity::count());
 
         $first = Activity::where('start_date_local', '2026-10-10 09:33:27')->sole();
         $this->assertSame(8_290, $first->distance_meters);
@@ -142,7 +141,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_a_stored_run_119_seconds_away_is_a_conflict(): void
     {
-        $stored = $this->storedStravaRun('2026-10-10 09:31:28');
+        $stored = $this->storedRun('2026-10-10 09:31:28');
 
         $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
         $review = $this->review();
@@ -154,7 +153,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_a_stored_run_121_seconds_away_is_not_a_conflict(): void
     {
-        $this->storedStravaRun('2026-10-10 09:31:26');
+        $this->storedRun('2026-10-10 09:31:26');
 
         $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
         $review = $this->review();
@@ -165,8 +164,8 @@ class GarminImportFlowTest extends TestCase
 
     public function test_the_review_pairs_the_csv_row_with_the_closer_of_two_stored_runs(): void
     {
-        $this->storedStravaRun('2026-10-10 09:31:40', ['name' => 'Farther run']);
-        $closer = $this->storedStravaRun('2026-10-10 09:34:00', ['name' => 'Closer run']);
+        $this->storedRun('2026-10-10 09:31:40', ['name' => 'Farther run']);
+        $closer = $this->storedRun('2026-10-10 09:34:00', ['name' => 'Closer run']);
 
         $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
         $this->confirm($this->review(), [0 => 'overwrite']);
@@ -182,7 +181,7 @@ class GarminImportFlowTest extends TestCase
      */
     public function test_a_later_row_that_matches_closer_wins_the_stored_run(): void
     {
-        $this->storedStravaRun('2026-10-10 10:01:30');
+        $this->storedRun('2026-10-10 10:01:30');
 
         $this->upload($this->csv(self::IT_HEADER, [
             'Corsa,2026-10-10 10:00:00,false,"Row A","5.00","00:30:00","00:30:00"',
@@ -215,10 +214,9 @@ class GarminImportFlowTest extends TestCase
         $this->assertSame(37, Activity::count());
     }
 
-    public function test_overwrite_replaces_the_csv_fields_marks_it_garmin_and_keeps_the_strava_id(): void
+    public function test_overwrite_replaces_the_csv_fields_of_the_stored_run(): void
     {
-        $stored = $this->storedStravaRun('2026-10-10 09:34:10', [
-            'strava_activity_id' => 4_242,
+        $stored = $this->storedRun('2026-10-10 09:34:10', [
             'name' => 'Morning Run',
             'distance_meters' => 8_150,
             'moving_time_seconds' => 3_238,
@@ -234,8 +232,6 @@ class GarminImportFlowTest extends TestCase
         $this->assertSame(3_263, $overwritten->moving_time_seconds);
         $this->assertSame('2026-10-10 09:33:27', $overwritten->start_date_local->format('Y-m-d H:i:s'));
         $this->assertSame(SportType::Run, $overwritten->sport_type);
-        $this->assertSame(ActivitySource::GarminCsv, $overwritten->source);
-        $this->assertSame(4_242, $overwritten->strava_activity_id);
         $this->assertSame(1, Activity::count());
 
         $this->actingAs($this->owner)->get(route('garmin.import.summary'))->assertSee('0 runs added, 1 overwritten.');
@@ -243,7 +239,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_skip_leaves_the_stored_run_byte_identical(): void
     {
-        $stored = $this->storedStravaRun('2026-10-10 09:34:10');
+        $stored = $this->storedRun('2026-10-10 09:34:10');
         $before = DB::table('activities')->where('id', $stored->id)->first();
 
         $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
@@ -256,7 +252,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_overwrite_all_shortcut_markup_is_rendered_hidden_for_js_to_reveal(): void
     {
-        $this->storedStravaRun('2026-10-10 09:34:10');
+        $this->storedRun('2026-10-10 09:34:10');
 
         $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
 
@@ -268,7 +264,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_a_confirm_without_an_answer_for_every_conflict_writes_nothing(): void
     {
-        $stored = $this->storedStravaRun('2026-10-10 09:34:10');
+        $stored = $this->storedRun('2026-10-10 09:34:10');
         $before = DB::table('activities')->where('id', $stored->id)->first();
 
         $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
@@ -306,7 +302,7 @@ class GarminImportFlowTest extends TestCase
         $this->upload($this->csv(self::IT_HEADER, [self::SAMPLE_FIRST_ROW]));
         $review = $this->review();
 
-        $this->storedStravaRun('2026-10-10 09:33:00');
+        $this->storedRun('2026-10-10 09:33:00');
 
         $this->confirm($review)
             ->assertRedirect(route('garmin.import.review'))
@@ -391,7 +387,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_overwrite_takes_the_csv_metrics_and_keeps_a_stored_value_where_the_csv_has_none(): void
     {
-        $stored = $this->storedStravaRun('2026-10-10 09:34:10', [
+        $stored = $this->storedRun('2026-10-10 09:34:10', [
             'average_pace_seconds_per_km' => 331,
             'total_ascent_meters' => 62,
             'average_heart_rate' => 150,
@@ -404,12 +400,11 @@ class GarminImportFlowTest extends TestCase
         $this->assertSame(327, $overwritten->average_pace_seconds_per_km, 'The CSV pace wins.');
         $this->assertSame(62, $overwritten->total_ascent_meters, 'A -- in the CSV keeps the stored ascent.');
         $this->assertSame(151, $overwritten->average_heart_rate, 'The CSV heart rate wins.');
-        $this->assertSame(ActivitySource::GarminCsv, $overwritten->source);
     }
 
     public function test_overwrite_with_no_metric_columns_keeps_every_stored_metric(): void
     {
-        $stored = $this->storedStravaRun('2026-10-10 09:34:10', [
+        $stored = $this->storedRun('2026-10-10 09:34:10', [
             'average_pace_seconds_per_km' => 331,
             'total_ascent_meters' => 62,
             'average_heart_rate' => 150,
@@ -460,7 +455,7 @@ class GarminImportFlowTest extends TestCase
             'distance_meters' => 8_290,
             'moving_time_seconds' => 3_263,
         ]);
-        $cacheKey = "heatmap:grid:v5:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $cacheKey = "heatmap:grid:v6:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
         $generationKey = "heatmap:grid:generation:{$this->owner->id}";
 
         $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
@@ -490,7 +485,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_the_review_shows_the_stored_and_the_csv_metrics_side_by_side(): void
     {
-        $this->storedStravaRun('2026-10-10 09:34:10', [
+        $this->storedRun('2026-10-10 09:34:10', [
             'average_pace_seconds_per_km' => 331,
             'total_ascent_meters' => 62,
             'average_heart_rate' => 150,
@@ -506,7 +501,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_the_review_prints_an_empty_stored_metric_as_a_dash_not_a_zero(): void
     {
-        $this->storedStravaRun('2026-10-10 09:34:10', [
+        $this->storedRun('2026-10-10 09:34:10', [
             'average_pace_seconds_per_km' => null,
             'total_ascent_meters' => null,
             'average_heart_rate' => null,
@@ -556,7 +551,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_confirming_forgets_the_cached_grid_for_today(): void
     {
-        $cacheKey = "heatmap:grid:v5:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $cacheKey = "heatmap:grid:v6:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
         $generationKey = "heatmap:grid:generation:{$this->owner->id}";
 
         // An owner with no run gets the empty state, which builds no grid to cache.
@@ -628,8 +623,8 @@ class GarminImportFlowTest extends TestCase
 
     public function test_an_older_clash_goes_through_the_same_review_and_overwrite_replaces_it(): void
     {
-        $stored = $this->storedStravaRun('2026-03-15 09:01:00', ['name' => 'Morning Run', 'distance_meters' => 7_900]);
-        $untouched = $this->storedStravaRun('2026-03-20 09:00:00', ['name' => 'Another day']);
+        $stored = $this->storedRun('2026-03-15 09:01:00', ['name' => 'Morning Run', 'distance_meters' => 7_900]);
+        $untouched = $this->storedRun('2026-03-20 09:00:00', ['name' => 'Another day']);
 
         $this->upload($this->csv(self::IT_HEADER, ['Corsa,2026-03-15 09:00:00,false,"Thirty weeks ago","8.00","00:45:00","00:45:00"']));
         $review = $this->review();
@@ -646,7 +641,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_skip_leaves_an_older_clash_byte_identical(): void
     {
-        $stored = $this->storedStravaRun('2026-03-15 09:01:00');
+        $stored = $this->storedRun('2026-03-15 09:01:00');
         $before = DB::table('activities')->where('id', $stored->id)->first();
 
         $this->upload($this->csv(self::IT_HEADER, ['Corsa,2026-03-15 09:00:00,false,"Thirty weeks ago","8.00","00:45:00","00:45:00"']));
@@ -683,7 +678,6 @@ class GarminImportFlowTest extends TestCase
     public function test_the_italian_sample_imports_in_full_however_old_it_is(): void
     {
         Carbon::setTestNow('2027-06-01 12:00:00');
-        $this->owner->forceFill(['strava_token_expires_at' => now()->addHours(6)])->save();
 
         $this->upload($this->fixture('activities-it.csv'));
         $review = $this->review();
@@ -781,7 +775,7 @@ class GarminImportFlowTest extends TestCase
     /**
      * @param  array<string, mixed>  $attributes
      */
-    private function storedStravaRun(string $start, array $attributes = []): Activity
+    private function storedRun(string $start, array $attributes = []): Activity
     {
         return Activity::factory()->for($this->owner)->create([
             'start_date_local' => $start,

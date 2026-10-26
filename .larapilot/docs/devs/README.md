@@ -34,8 +34,7 @@ Keep the table below current — it is the entry point for a new developer.
 
 | Domain | What it covers | Last touched by |
 | --- | --- | --- |
-| [activity-sync](activity-sync.md) | Deprecated by `US-021`: the nightly Strava sync is gone; only the `activities` data model (per-run metric columns, NULL for "not recorded") remains until TASK-03 folds it into garmin-csv-import | `US-021` |
-| [garmin-csv-import](garmin-csv-import.md) | Garmin Connect CSV upload for the signed-in owner: parsing, conflict review, Overwrite / Skip; optional pace / ascent / heart-rate columns; runs of any age kept, future-dated rows skipped; the review shares the upload's throttle and matches by date; no guest import | `US-020` |
+| [garmin-csv-import](garmin-csv-import.md) | Garmin Connect CSV upload for the signed-in owner, the only way a run enters: parsing, conflict review against every stored run, Overwrite / Skip; optional pace / ascent / heart-rate columns; runs of any age kept, future-dated rows skipped; the review shares the upload's throttle and matches by date; no guest import; the `activities` data model and the irreversible removal of Strava (`US-021`) | `US-021` |
 | [heatmap-dashboard](heatmap-dashboard.md) | The private `/` screen of the signed-in owner: 16-week grid, intensity scale, grid cache, fresh import status ("last import N ago", no warning state), the Garmin-only empty state and import entry point; the day cell detail; Previous / Next window navigation by a `to` date; the weekly-mileage trend builder; how `activity_date` is stored and how window ranges compare it; the security headers every web response carries | `US-021` |
 | [owner-authentication](owner-authentication.md) | The single private account: `users.username` (`giarfa`), the null password that arms the first sign-in, the owner backfill migration, the sign-in page, its throttle and the intended-URL guard, sign-out, the forced first password change, recovery | `US-020` |
 

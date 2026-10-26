@@ -97,7 +97,6 @@ class GarminImportReviewReuseTest extends TestCase
         $this->assertTally($this->review(), new: 0, clashes: 1);
 
         $stored->update([
-            'source' => 'garmin_csv',
             'start_date_local' => '2026-10-10 09:33:27',
             'distance_meters' => 8290,
             'moving_time_seconds' => 3263,

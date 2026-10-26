@@ -27,7 +27,6 @@ class SeederMeetsMigrationOwnerTest extends TestCase
         $this->assertSame(User::OWNER_USERNAME, $owner->username);
         $this->assertSame('Demo Athlete', $owner->name);
         $this->assertNull($owner->password);
-        $this->assertSame('10000001', $owner->strava_athlete_id);
         $this->assertGreaterThan(0, $owner->activities()->count());
     }
 }

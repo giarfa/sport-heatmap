@@ -2,7 +2,6 @@
 
 namespace App\Data\Garmin;
 
-use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use Carbon\CarbonImmutable;
@@ -37,7 +36,6 @@ final readonly class GarminCsvRow
      *     moving_time_seconds: int,
      *     start_date_local: CarbonImmutable,
      *     activity_date: CarbonImmutable,
-     *     source: ActivitySource,
      *     average_pace_seconds_per_km?: int,
      *     total_ascent_meters?: int,
      *     average_heart_rate?: int,
@@ -52,7 +50,6 @@ final readonly class GarminCsvRow
             'moving_time_seconds' => $this->movingTimeSeconds,
             'start_date_local' => $this->startDateLocal,
             'activity_date' => $this->activityDate,
-            'source' => ActivitySource::GarminCsv,
             ...$this->metricAttributes(),
         ];
     }

@@ -55,12 +55,10 @@ final readonly class PlanGarminImport
          * reloading it. The lookups keep the order `$stored` has, which the tie
          * rules below rely on.
          */
-        $garminByStartDate = [];
+        $storedByStartDate = [];
 
         foreach ($stored as $activity) {
-            if ($activity->isGarminSourced()) {
-                $garminByStartDate[$activity->start_date_local->format('Y-m-d')][] = $activity;
-            }
+            $storedByStartDate[$activity->start_date_local->format('Y-m-d')][] = $activity;
         }
 
         $alreadyImported = [];
@@ -74,7 +72,7 @@ final readonly class PlanGarminImport
          * fall through to "new" and be inserted a second time.
          */
         foreach ($rows as $index => $row) {
-            foreach ($garminByStartDate[$row->startDateLocal->format('Y-m-d')] ?? [] as $activity) {
+            foreach ($storedByStartDate[$row->startDateLocal->format('Y-m-d')] ?? [] as $activity) {
                 if (isset($identical[$activity->id]) || ! $row->isIdenticalTo($activity)) {
                     continue;
                 }

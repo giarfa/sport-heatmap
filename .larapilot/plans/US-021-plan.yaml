@@ -211,7 +211,7 @@ tasks:
     id: TASK-02
     title: 'Remove the Strava integration: routes, OAuth, client, sync command, schedule, config, and Strava UI'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
@@ -277,26 +277,32 @@ tasks:
       9. `php artisan route:list --except-vendor | grep -i strava` prints nothing. `php artisan schedule:list` prints no task. `php artisan test`, `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] No route under `strava/`; the redirect and callback controllers, `StravaClient`, `StravaOAuth`, the fresh-token middleware, the allowlist, Strava exceptions and data objects, and `config/strava.php` are deleted
-      - [ ] `.env.example` carries no `STRAVA_*` key
-      - [ ] `php artisan schedule:list` lists no task; `strava:sync` is not a command
-      - [ ] No page renders "Powered by Strava", "Connect with Strava", a Strava link, a reconnect notice, or the rejection page
-      - [ ] Day detail and import review carry no external link
-      - [ ] The Strava tests and helpers are deleted; the remaining suite passes
+      - [x] No route under `strava/`; the redirect and callback controllers, `StravaClient`, `StravaOAuth`, the fresh-token middleware, the allowlist, Strava exceptions and data objects, and `config/strava.php` are deleted
+      - [x] `.env.example` carries no `STRAVA_*` key
+      - [x] `php artisan schedule:list` lists no task; `strava:sync` is not a command
+      - [x] No page renders "Powered by Strava", "Connect with Strava", a Strava link, a reconnect notice, or the rejection page
+      - [x] Day detail and import review carry no external link
+      - [x] The Strava tests and helpers are deleted; the remaining suite passes
 
       ## Test Data
       - N/A — no model/schema changes in this task (factory and seeder Strava states leave with the columns in TASK-03)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/strava-connection.md` deleted, and its index row removed from `README.md`
-      - [ ] `.larapilot/docs/devs/activity-sync.md`: the nightly sync, `sync_runs`, and the OAuth/token sections removed. Only the `activities` data-model and metric-column sections remain, until TASK-03 folds them into `garmin-csv-import.md`.
-      - [ ] `heatmap-dashboard.md` (footer, day detail) and `owner-authentication.md` (sign-out no longer mentions tokens) corrected
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/strava-connection.md` deleted, and its index row removed from `README.md`
+      - [x] `.larapilot/docs/devs/activity-sync.md`: the nightly sync, `sync_runs`, and the OAuth/token sections removed. Only the `activities` data-model and metric-column sections remain, until TASK-03 folds them into `garmin-csv-import.md`.
+      - [x] `heatmap-dashboard.md` (footer, day detail) and `owner-authentication.md` (sign-out no longer mentions tokens) corrected
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-021): TASK-02 remove the Strava integration and its UI`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
+    commit:
+      sha: eb21baaee80c0cebf124f542d26e49eea89597d4
+      short_sha: eb21baa
+      subject: 'feat(US-021): TASK-02 remove the Strava integration and its UI'
+      committed_at: '2026-10-26T22:00:23+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/eb21baaee80c0cebf124f542d26e49eea89597d4'
   -
     id: TASK-03
     title: 'Irreversible migration: delete Strava runs, drop Strava columns and sync_runs; Garmin-only models, factories, seeder'
@@ -483,4 +489,4 @@ tasks:
       - Commit: `chore(US-021): TASK-05 README, changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.0.0`; remote only if the user asks
-updated_at: '2026-10-26T20:55:37+00:00'
+updated_at: '2026-10-26T21:00:23+00:00'
