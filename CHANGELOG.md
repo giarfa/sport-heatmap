@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A sign-in page for the single `giarfa` account. The first sign-in uses an empty password and
+  then asks you to set one of at least 12 characters; after that only that password signs in.
+
+### Changed
+
+- Every page now requires you to be signed in; a signed-out browser is sent to the sign-in page.
+- The dashboard shows only the signed-in owner's runs, from Strava or Garmin.
+- The Garmin CSV import requires a session and imports into your account.
+- Signing out returns to the sign-in page.
+- Connecting Strava attaches it to your account instead of signing you in.
+
+### Removed
+
+- The public read-only dashboard, the Garmin import for signed-out visitors, and signing in
+  through Strava.
+
+### Security
+
+- Sign-in attempts are limited to five a minute per username and IP address, and a refused
+  attempt says how many seconds to wait.
+
 ## [2.0.2] - 2026-10-18
 
 ### Security

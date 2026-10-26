@@ -325,7 +325,7 @@ tasks:
     id: TASK-05
     title: 'Route access matrix and sign-in page contract tests'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
@@ -347,16 +347,22 @@ tasks:
       6. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites
 
       ## Completion Criteria
-      - [ ] Every registered route outside `/login` and `/up` is proven gated, from the route table
-      - [ ] The forced-change redirect is proven on every route but the change page and sign-out
-      - [ ] Sign-in and change-password pages keep `noindex, nofollow` and the security headers; no basic-auth challenge anywhere
-      - [ ] Tests pass locally
-      - [ ] Coverage matches the NORMAL bar
+      - [x] Every registered route outside `/login` and `/up` is proven gated, from the route table
+      - [x] The forced-change redirect is proven on every route but the change page and sign-out
+      - [x] Sign-in and change-password pages keep `noindex, nofollow` and the security headers; no basic-auth challenge anywhere
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-020): TASK-05 cover the route access matrix`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: 8466169840b34a65e90a18df6019a0e78f22dcee
+      short_sha: '8466169'
+      subject: 'test(US-020): TASK-05 cover the route access matrix'
+      committed_at: '2026-10-26T21:31:27+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/8466169840b34a65e90a18df6019a0e78f22dcee'
   -
     id: TASK-06
     title: 'CHANGELOG, quality gate, and manual test handoff'
@@ -396,4 +402,4 @@ tasks:
       - Commit: `chore(US-020): TASK-06 changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize local PR notes toward `release/3.0.0`
-updated_at: '2026-10-26T20:30:27+00:00'
+updated_at: '2026-10-26T20:31:27+00:00'
