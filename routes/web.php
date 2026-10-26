@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Controllers\Auth\ChangePasswordController;
+use App\Http\Controllers\Auth\ShowChangePasswordFormController;
+use App\Http\Controllers\Auth\ShowSignInFormController;
+use App\Http\Controllers\Auth\SignInController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Garmin\CancelGarminImportController;
 use App\Http\Controllers\Garmin\ConfirmGarminImportController;
@@ -12,49 +16,73 @@ use App\Http\Controllers\Strava\StravaCallbackController;
 use App\Http\Controllers\Strava\StravaRedirectController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', DashboardController::class)
-    ->middleware('strava.fresh')
-    ->name('dashboard');
-
 /*
- * Sign out is POST only, so a cross-site link or a prefetch cannot sign the
- * owner out; CSRF comes from the web group. No `auth` middleware: no `login`
- * route exists, so a guest would get a 500 instead of the dashboard. No
- * `strava.fresh`: signing out must never reach Strava, or depend on it. No
- * throttle: the route does no work worth limiting.
+ * Sign-in is POSTed to a throttle that lives in the SignInOwner action, not a
+ * route limiter: the key is username + IP, which a route limiter cannot see.
+ * The gate that puts every other route behind the session is wired separately.
  */
-Route::post('/logout', SignOutController::class)->name('logout');
-
-/*
- * Both OAuth routes are throttled, not just the callback: the redirect route is
- * the cheaper one to hammer, and neither is ever hit more than a handful of
- * times by a legitimate athlete.
- */
-Route::middleware('throttle:strava-oauth')->group(function (): void {
-    Route::get('/auth/strava/redirect', StravaRedirectController::class)->name('strava.redirect');
-    Route::get('/auth/strava/callback', StravaCallbackController::class)->name('strava.callback');
+Route::middleware('guest')->group(function (): void {
+    Route::get('/login', ShowSignInFormController::class)->name('login');
+    Route::post('/login', SignInController::class)->name('login.store');
 });
 
 /*
- * The Garmin CSV import is open to signed-out visitors by the owner's choice
- * (PRD Security, accepted risk — US-011): a guest imports into the displayed
- * athlete, or creates the CSV-only athlete when none is displayed. What still
- * guards it: CSRF from the web group, the 5 MB rule in the Form Request, the
- * garmin-import throttle (per IP for guests) on upload, review, and confirm
- * (the review re-plans the upload against the stored runs: work a guest could
- * otherwise repeat without limit), and the
- * session binding — no route takes an import or an athlete id, so a request
- * only reaches the pending upload in its own session. strava.fresh stays: a
- * no-op for guests, it still re-checks a signed-in owner's allowlist and token.
+ * The first-password page is the one place a signed-in owner with no password
+ * can be, and sign-out is the only other way out of it; both sit behind `auth`
+ * alone, never behind `password.set`, or they would redirect to themselves.
+ *
+ * Sign out is POST only, so a cross-site link or a prefetch cannot sign the
+ * owner out; CSRF comes from the web group. It never reaches Strava, and has
+ * no throttle: the route does no work worth limiting.
  */
-Route::middleware(['strava.fresh'])
-    ->prefix('import/garmin')
-    ->name('garmin.import.')
-    ->group(function (): void {
-        Route::get('/', ShowGarminImportFormController::class)->name('create');
-        Route::post('/', UploadGarminCsvController::class)->middleware('throttle:garmin-import')->name('store');
-        Route::get('/review', ShowGarminImportReviewController::class)->middleware('throttle:garmin-import')->name('review');
-        Route::post('/confirm', ConfirmGarminImportController::class)->middleware('throttle:garmin-import')->name('confirm');
-        Route::post('/cancel', CancelGarminImportController::class)->name('cancel');
-        Route::get('/summary', ShowGarminImportSummaryController::class)->name('summary');
+Route::middleware('auth')->group(function (): void {
+    Route::get('/password/change', ShowChangePasswordFormController::class)->name('password.change');
+    Route::put('/password/change', ChangePasswordController::class)->name('password.update');
+    Route::post('/logout', SignOutController::class)->name('logout');
+});
+
+/*
+ * Everything else is the owner's: a session (`auth`) whose password has been
+ * set (`password.set`). /up, the health route, lives outside the web group and
+ * /login is the guest group above, so these are the only other routes there are.
+ * A route added later without this group is a gate bypass — RouteAccessTest
+ * walks the route table to catch it.
+ *
+ * strava.fresh is not on any of them: its allowlist check would 403 an owner
+ * with no Strava id, and neither the dashboard nor the Garmin import calls
+ * Strava. The class and alias stay until US-021 removes Strava.
+ */
+Route::middleware(['auth', 'password.set'])->group(function (): void {
+    Route::get('/', DashboardController::class)->name('dashboard');
+
+    /*
+     * Both OAuth routes are throttled, not just the callback: the redirect route
+     * is the cheaper one to hammer, and neither is ever hit more than a handful
+     * of times by a legitimate athlete. The callback no longer signs anyone in:
+     * it attaches Strava tokens to the signed-in owner.
+     */
+    Route::middleware('throttle:strava-oauth')->group(function (): void {
+        Route::get('/auth/strava/redirect', StravaRedirectController::class)->name('strava.redirect');
+        Route::get('/auth/strava/callback', StravaCallbackController::class)->name('strava.callback');
     });
+
+    /*
+     * The Garmin CSV import imports into the signed-in owner (US-020). What
+     * guards it besides the session: CSRF from the web group, the 5 MB rule in
+     * the Form Request, the garmin-import throttle (per user) on upload, review
+     * and confirm (the review re-plans the upload against the stored runs: work
+     * that could otherwise be repeated without limit), and the session binding —
+     * no route takes an import or an athlete id, so a request only reaches the
+     * pending upload in its own session.
+     */
+    Route::prefix('import/garmin')
+        ->name('garmin.import.')
+        ->group(function (): void {
+            Route::get('/', ShowGarminImportFormController::class)->name('create');
+            Route::post('/', UploadGarminCsvController::class)->middleware('throttle:garmin-import')->name('store');
+            Route::get('/review', ShowGarminImportReviewController::class)->middleware('throttle:garmin-import')->name('review');
+            Route::post('/confirm', ConfirmGarminImportController::class)->middleware('throttle:garmin-import')->name('confirm');
+            Route::post('/cancel', CancelGarminImportController::class)->name('cancel');
+            Route::get('/summary', ShowGarminImportSummaryController::class)->name('summary');
+        });
+});

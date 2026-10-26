@@ -40,6 +40,14 @@ class TrainingBlockSeederTest extends TestCase
         $this->assertNotNull(User::sole()->strava_athlete_id);
     }
 
+    public function test_the_demo_athlete_is_the_owner_with_no_password_yet(): void
+    {
+        $athlete = User::sole();
+
+        $this->assertSame(User::OWNER_USERNAME, $athlete->username);
+        $this->assertNull($athlete->password);
+    }
+
     /**
      * A volume sanity check, not a spec. The seeder can construct 52-94 activities
      * (13 normal weeks of 3-6 runs, 3 double-run days, 1 illness run, 8 peak runs and

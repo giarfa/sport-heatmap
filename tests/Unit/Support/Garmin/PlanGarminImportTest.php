@@ -109,16 +109,6 @@ class PlanGarminImportTest extends TestCase
         $this->assertSame([0, 1], array_keys($plan->newRows));
     }
 
-    public function test_with_no_target_every_row_is_new(): void
-    {
-        $rows = [$this->row('2026-10-10 09:33:27')];
-
-        $plan = $this->app->make(PlanGarminImport::class)(null, $rows);
-
-        $this->assertSame($rows, $plan->newRows);
-        $this->assertNull($plan->athleteId);
-    }
-
     /**
      * @param  array<int, GarminCsvRow>  $rows
      */

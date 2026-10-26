@@ -8,9 +8,8 @@ use Illuminate\Foundation\Http\FormRequest;
 class UploadGarminCsvRequest extends FormRequest
 {
     /**
-     * The import is open to signed-out visitors (US-011); strava.fresh still
-     * re-checks a signed-in owner's allowlist, and the parsed upload is bound
-     * to this visitor's session. There is no per-resource rule to evaluate.
+     * Access is the `auth` route middleware, and the parsed upload is bound to
+     * this session. There is no per-resource rule to evaluate.
      */
     public function authorize(): bool
     {

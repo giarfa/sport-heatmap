@@ -14,25 +14,28 @@ class ConnectStravaAthleteTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_a_first_connect_creates_exactly_one_athlete(): void
+    public function test_the_tokens_land_on_the_owner_and_no_user_is_created(): void
     {
-        $user = $this->connect($this->tokens());
+        $owner = User::factory()->ownerWithPassword()->create(['name' => 'giarfa']);
+
+        $connected = $this->connect($owner, $this->tokens());
 
         $this->assertSame(1, User::query()->count());
-        $this->assertSame('4821196', $user->strava_athlete_id);
-        $this->assertSame('access-token-value', $user->strava_access_token);
-        $this->assertSame('refresh-token-value', $user->strava_refresh_token);
-        $this->assertSame('Ada Lovelace', $user->name);
+        $this->assertTrue($owner->is($connected));
+        $this->assertSame('4821196', $connected->strava_athlete_id);
+        $this->assertSame('access-token-value', $connected->strava_access_token);
+        $this->assertSame('refresh-token-value', $connected->strava_refresh_token);
         $this->assertTrue(
-            CarbonImmutable::createFromTimestampUTC(1_788_000_000)->equalTo($user->strava_token_expires_at),
+            CarbonImmutable::createFromTimestampUTC(1_788_000_000)->equalTo($connected->strava_token_expires_at),
         );
     }
 
-    public function test_reconnecting_updates_the_existing_athlete_instead_of_adding_one(): void
+    public function test_reconnecting_replaces_the_tokens_on_the_same_owner(): void
     {
-        $this->connect($this->tokens());
+        $owner = User::factory()->ownerWithPassword()->create();
+        $this->connect($owner, $this->tokens());
 
-        $reconnected = $this->connect($this->tokens(
+        $reconnected = $this->connect($owner, $this->tokens(
             accessToken: 'second-access-token',
             refreshToken: 'second-refresh-token',
         ));
@@ -48,7 +51,7 @@ class ConnectStravaAthleteTest extends TestCase
      */
     public function test_the_tokens_are_encrypted_at_rest(): void
     {
-        $user = $this->connect($this->tokens());
+        $user = $this->connect(User::factory()->ownerWithPassword()->create(), $this->tokens());
 
         $raw = DB::table('users')->where('id', $user->id)->first();
 
@@ -59,33 +62,23 @@ class ConnectStravaAthleteTest extends TestCase
         $this->assertSame('refresh-token-value', $user->fresh()->strava_refresh_token);
     }
 
-    public function test_a_synthetic_email_is_assigned_and_never_overwritten(): void
+    public function test_the_owners_identity_and_password_are_never_overwritten(): void
     {
-        $user = $this->connect($this->tokens());
+        $owner = User::factory()->ownerWithPassword()->create(['name' => 'giarfa', 'email' => 'giarfa@heatmap.invalid']);
+        $hash = $owner->password;
 
-        $this->assertSame('athlete-4821196@strava.invalid', $user->email);
-        $this->assertNotNull($user->email_verified_at);
+        $this->connect($owner, $this->tokens(athleteName: 'Ada Lovelace'));
 
-        $this->connect($this->tokens());
-
-        $this->assertSame('athlete-4821196@strava.invalid', $user->fresh()->email);
+        $fresh = $owner->fresh();
+        $this->assertSame('giarfa', $fresh->name);
+        $this->assertSame('giarfa@heatmap.invalid', $fresh->email);
+        $this->assertSame('giarfa', $fresh->username);
+        $this->assertSame($hash, $fresh->password);
     }
 
-    public function test_a_blank_athlete_name_falls_back_to_the_athlete_id(): void
+    private function connect(User $owner, StravaTokens $tokens): User
     {
-        $user = $this->connect($this->tokens(athleteName: null));
-
-        $this->assertSame('Athlete 4821196', $user->name);
-    }
-
-    public function test_no_password_is_ever_set(): void
-    {
-        $this->assertNull($this->connect($this->tokens())->fresh()->password);
-    }
-
-    private function connect(StravaTokens $tokens): User
-    {
-        return (new ConnectStravaAthlete)($tokens);
+        return (new ConnectStravaAthlete)($owner, $tokens);
     }
 
     private function tokens(

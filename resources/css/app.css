@@ -1100,7 +1100,8 @@ html.dark {
     color: var(--ink-muted);
 }
 
-.file-input {
+.file-input,
+.text-input {
     display: block;
     width: 100%;
     margin-top: 0.5rem;
@@ -1125,7 +1126,8 @@ html.dark {
     cursor: pointer;
 }
 
-.file-input[aria-invalid='true'] {
+.file-input[aria-invalid='true'],
+.text-input[aria-invalid='true'] {
     border-color: var(--warn-ink);
 }
 

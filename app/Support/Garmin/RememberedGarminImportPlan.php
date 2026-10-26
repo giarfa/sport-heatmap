@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
  * Plans the pending upload for the review, and reuses that plan on a reload.
  *
  * Planning matches every row against the stored runs of the upload's dates, and
- * the review is a GET a visitor can reload at will. The plan is therefore
+ * the review is a GET the owner can reload at will. The plan is therefore
  * remembered in the session next to the upload, with a stamp of everything the
  * planner read from the database, and handed back while the stamp still holds.
  * A new upload replaces the whole pending entry (PendingGarminImport::put()), so
@@ -28,12 +28,8 @@ final readonly class RememberedGarminImportPlan
         private PendingGarminImport $pendingImport,
     ) {}
 
-    public function __invoke(?User $athlete, ParsedGarminCsv $parsed): GarminImportPlan
+    public function __invoke(User $athlete, ParsedGarminCsv $parsed): GarminImportPlan
     {
-        if ($athlete === null) {
-            return ($this->planGarminImport)($athlete, $parsed->rows);
-        }
-
         /*
          * Loaded once for the whole render: the stamp is made from it, the
          * planner takes it, and a reused plan names its stored runs from it, so

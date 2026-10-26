@@ -1,10 +1,10 @@
 # Sport Heatmap
 
-A single-athlete training heatmap, public and read-only. It syncs your own runs from Strava once a day and
-renders them as a GitHub-style contribution grid, so a training block is readable at a glance.
+A private single-athlete training heatmap. It syncs your own runs from Strava once a day (or imports a
+Garmin CSV) and renders them as a GitHub-style contribution grid, so a training block is readable at a glance.
 
-One athlete, one screen, no public signup: identity comes from Strava OAuth and access is
-restricted to an explicit allowlist of athlete ids.
+One athlete, one screen, no public signup: every page sits behind a single password-protected account
+(see "First sign-in and recovery" below).
 
 ## Requirements
 
@@ -62,6 +62,29 @@ restricted to an explicit allowlist of athlete ids.
    HTTP, where browsers drop `Secure` cookies, so set `SESSION_SECURE_COOKIE=false` in `.env` for
    that setup only.
 
+## First sign-in and recovery
+
+The whole app sits behind one account: the user `giarfa`. There is no registration and no other way in.
+
+1. Open the site. Every page sends a signed-out browser to `/login`.
+2. Sign in as `giarfa` with an **empty password**. This works only while no password is stored.
+3. Set a password of **at least 12 characters** (typed twice). You land on the dashboard, and from
+   then on only that password signs in.
+
+Do this right after every deploy that runs the username migration: until the password is set,
+anyone who knows the username can set it first (an accepted risk — the migration resets the owner's
+password to empty so the first sign-in can happen).
+
+Five wrong attempts for the same username and IP within a minute lock that pair out for the
+remaining seconds.
+
+**Recovery.** To re-arm the first sign-in (a forgotten password), clear the stored password on the
+SQLite file, then sign in with an empty password again:
+
+```sql
+UPDATE users SET password = NULL WHERE username = 'giarfa';
+```
+
 ## Registering the Strava application
 
 The app talks to Strava as a registered API client. You need to create one once, under your own
@@ -94,10 +117,10 @@ all is written until it passes.
 > in this product; copying an example id verbatim would authorize a stranger. Non-numeric entries
 > are discarded, so a blank or malformed value allows nobody rather than everybody.
 
-### Signing in
+### Connecting Strava
 
-Visit the app signed out and press **Connect with Strava**. That is the whole flow — there is no
-password, no registration, and no other way in.
+Strava no longer signs anyone in: you sign in with the password above, then press **Connect with
+Strava** on the empty screen to attach your Strava tokens to your account.
 
 A few things worth knowing before the first attempt:
 
@@ -185,10 +208,9 @@ This produces a full **16-week training block** for one demo athlete — includi
 week, a peak week and a partial current week — so the dashboard can be developed and reviewed
 without ever connecting to Strava.
 
-With `STRAVA_ALLOWED_ATHLETE_IDS` blank, the public home page shows that block without signing
-in: no allowlisted athlete has connected, so the page falls back to the seeded athlete. Once your
-own allowlisted athlete connects, they replace it. Never seed production — it would publish a demo
-athlete until you connect.
+The demo athlete is the owner account `giarfa` with no password, so a freshly seeded database starts
+at the first sign-in (see above). Never seed production — it would plant a demo athlete and runs in
+your real database.
 
 ## Running the sync
 
@@ -261,19 +283,11 @@ stored: it is read during the request and discarded. Imported runs carry no Stra
 
 ## The dashboard
 
-The home page (`/`) is **public and read-only**. A signed-out visitor sees the heatmap, weekly
-totals, legend and sync status of the **first connected athlete of `STRAVA_ALLOWED_ATHLETE_IDS`, in
-configured order** — the same content the signed-in owner sees, without a Strava sign-in. A guest
-request never refreshes a token, calls Strava, or writes a row. Signing in is only needed to connect
-Strava, from the discreet "Owner? Connect with Strava" line under the map (a signed-in owner gets
-**Sign out** there), and stays allowlist-only. While no allowlisted athlete has connected yet, the
-home page shows the stored athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
-appears only when no stored athlete has any activity. Removing an athlete from the allowlist
-therefore no longer hides their stored runs — deleting their user row does. The page keeps
-`noindex, nofollow`: reachable by link, not promoted.
-
-If the owner's Strava token can no longer be refreshed, they are signed out and land on the public
-map with a one-off "Your Strava connection expired" banner.
+The home page (`/`) is **private**: a signed-out browser is sent to `/login`. The signed-in owner sees
+the heatmap, weekly totals, legend and sync status built from their own runs, from Strava or Garmin.
+Opening it never refreshes a token, calls Strava, or writes a row. Under the map, a discreet line
+offers **Import Garmin CSV** and **Sign out**. An owner with no runs and no Strava connection sees
+the connect screen. The page keeps `noindex, nofollow`.
 
 The heatmap grid is cached per athlete, per 16-week window and per calendar day
 (`App\Support\Heatmap\HeatmapGridCache`), so a second request the same day skips the aggregate

@@ -9,7 +9,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
 /**
- * A coherent 16-week training block for one fixed demo athlete.
+ * A coherent 16-week training block for one fixed demo athlete: the owner account
+ * `giarfa` with no password yet, so a seeded database starts at the first sign-in.
  *
  * The block is always computed relative to the current week, so it can never drift
  * out of the window the dashboard renders. Its shape is deliberate: an illness week
@@ -70,11 +71,21 @@ class TrainingBlockSeeder extends Seeder
             return;
         }
 
-        $athlete = User::factory()->stravaConnected()->create([
+        /*
+         * The username migration already creates the owner on an empty database,
+         * and `username` is unique: a second `giarfa` would throw. The demo athlete
+         * becomes that row when it exists.
+         */
+        $athlete = User::query()->where('username', User::OWNER_USERNAME)->first()
+            ?? User::factory()->owner()->make();
+
+        $athlete->forceFill(User::factory()->stravaConnected()->raw([
             'name' => 'Demo Athlete',
             'email' => 'athlete@sport-heatmap.test',
             'strava_athlete_id' => '10000001',
-        ]);
+            'username' => User::OWNER_USERNAME,
+            'password' => null,
+        ]))->save();
 
         $block = $this->trainingBlock();
         $garminRuns = $this->garminRuns($block);

@@ -41,6 +41,15 @@ class SchemaTest extends TestCase
         $this->assertTrue($this->columnIsNullable('users', 'password'));
     }
 
+    public function test_users_username_is_nullable_and_unique(): void
+    {
+        $this->assertTrue($this->columnIsNullable('users', 'username'));
+        $this->assertTrue(
+            $this->hasIndexOn('users', ['username'], unique: true),
+            'users.username must carry a unique index.',
+        );
+    }
+
     public function test_strava_athlete_id_is_unique(): void
     {
         $this->assertTrue(

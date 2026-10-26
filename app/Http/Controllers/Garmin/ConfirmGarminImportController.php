@@ -8,7 +8,6 @@ use App\Http\Requests\Garmin\ConfirmGarminImportRequest;
 use App\Models\User;
 use App\Support\Garmin\PendingGarminImport;
 use App\Support\Garmin\PlanGarminImport;
-use App\Support\Garmin\ResolveGarminImportTarget;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +15,7 @@ use Illuminate\Support\Facades\Cache;
 class ConfirmGarminImportController extends Controller
 {
     /**
-     * Apply the reviewed import, provided the visitor is still answering the
+     * Apply the reviewed import, provided the owner is still answering the
      * review they were shown, for the athlete it was planned against.
      */
     public function __invoke(
@@ -24,7 +23,6 @@ class ConfirmGarminImportController extends Controller
         PendingGarminImport $pendingImport,
         PlanGarminImport $planGarminImport,
         ApplyGarminImport $applyGarminImport,
-        ResolveGarminImportTarget $resolveImportTarget,
     ): RedirectResponse {
         $parsed = $pendingImport->parsed();
         $token = $pendingImport->token();
@@ -34,24 +32,16 @@ class ConfirmGarminImportController extends Controller
         }
 
         /*
-         * One confirm at a time for the whole instance, not per athlete: a
-         * guest's first import has no athlete to key on until the CSV-only
-         * athlete exists, and this is a single-athlete instance, so the
-         * serialisation costs nothing. A double-clicked "Confirm import", or
-         * two guests confirming a first import at once, therefore run one
-         * after the other; the second re-plans after the first committed —
-         * against the athlete it just created, or with its runs already
-         * imported — fails the fingerprint and writes nothing.
-         *
-         * The target is resolved inside the lock for the same reason: read
-         * before it, the second request would still see "no athlete" and
-         * plan against a target that no longer exists.
+         * One confirm at a time for the whole instance: this is a single-owner
+         * instance, so the serialisation costs nothing. A double-clicked
+         * "Confirm import", or the same review confirmed from two tabs, run one
+         * after the other; the second re-plans after the first committed, with
+         * its runs already imported, fails the fingerprint and writes nothing.
          */
         try {
-            return Cache::lock('garmin-import:confirm', 30)->block(10, function () use ($request, $parsed, $token, $pendingImport, $planGarminImport, $applyGarminImport, $resolveImportTarget): RedirectResponse {
-                /** @var User|null $signedIn */
-                $signedIn = $request->user();
-                $athlete = $resolveImportTarget($signedIn);
+            return Cache::lock('garmin-import:confirm', 30)->block(10, function () use ($request, $parsed, $token, $pendingImport, $planGarminImport, $applyGarminImport): RedirectResponse {
+                /** @var User $athlete */
+                $athlete = $request->user();
 
                 /*
                  * Planned fresh, never through RememberedGarminImportPlan: the fingerprint
@@ -61,7 +51,7 @@ class ConfirmGarminImportController extends Controller
                  * as it is now, never taken from the form. A sync or a second tab
                  * may have changed the stored runs since the review rendered; if
                  * the conflicts no longer pair the same rows with the same stored
-                 * runs, the visitor's answers could land on runs they never saw, so
+                 * runs, the owner's answers could land on runs they never saw, so
                  * nothing is written. The fingerprint carries the target athlete
                  * too, so a target that changed since the review fails the same
                  * way. The token ties the form to this upload: a review page left
@@ -90,10 +80,9 @@ class ConfirmGarminImportController extends Controller
             });
         } catch (LockTimeoutException) {
             /*
-             * The lock is instance-wide and guests can reach it, so another
-             * visitor's large confirm can hold it past the wait. Nothing was
-             * written and the upload is still pending, so the visitor goes back
-             * to the review rather than getting a 500.
+             * The lock is instance-wide, so another large confirm can hold it past
+             * the wait. Nothing was written and the upload is still pending, so
+             * the owner goes back to the review rather than getting a 500.
              */
             return redirect()->route('garmin.import.review')
                 ->with('garmin_import.stale', 'Another import is being saved — confirm again in a moment.');

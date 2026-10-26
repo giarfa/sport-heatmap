@@ -5,11 +5,11 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 8
-status: TODO
+status: PLANNED
 body: |
   #### US-021: Remove Strava: the Garmin CSV import is the only way runs enter
 
-  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** TODO
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** PLANNED
   **Blocked by:** US-020
   **Type:** Change request
   **Release:** 3.0.0
@@ -48,3 +48,8 @@ body: |
   _Docs and tests_
   - [ ] `README.md` drops the Strava application registration, the `STRAVA_*` keys, the sync command, and the cron entry, and adds one step: revoke the former app at strava.com/settings/apps; `.larapilot/docs/devs/strava-connection.md` and `activity-sync.md` are removed or rewritten for the Garmin-only flow, and the devs README index follows
   - [ ] The Strava tests are deleted; factories and `TrainingBlockSeeder` produce Garmin-sourced runs only, with no `SyncRun` factory; the remaining suite, Pint, and Larastan pass
+status_history:
+  -
+    status: PLANNED
+    at: '2026-10-26T20:48:02+00:00'
+rework: false

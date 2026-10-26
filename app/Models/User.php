@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $name
+ * @property string|null $username
  * @property string $email
  * @property Carbon|null $email_verified_at
  * @property string|null $password
@@ -46,6 +47,11 @@ use Illuminate\Support\Carbon;
 ])]
 class User extends Authenticatable
 {
+    /**
+     * The one sign-in identity of this instance.
+     */
+    public const OWNER_USERNAME = 'giarfa';
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
@@ -60,8 +66,8 @@ class User extends Authenticatable
     }
 
     /**
-     * Whether this athlete exists only to own Garmin CSV imports: no Strava
-     * identity, so no token, no sync, and no sign-in.
+     * Whether this user has no Strava identity: no token and no sync, so its runs
+     * come from Garmin CSV imports only.
      */
     public function isCsvOnly(): bool
     {

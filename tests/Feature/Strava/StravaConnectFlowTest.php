@@ -3,23 +3,20 @@
 namespace Tests\Feature\Strava;
 
 use App\Models\User;
-use Illuminate\Auth\Events\Login;
-use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
-use Tests\Support\RecordSessionId;
 use Tests\TestCase;
 
 /**
- * The acceptance criteria for US-002 are mostly negative — what must *not* happen
- * when the wrong athlete completes the flow. Every rejection case therefore
- * asserts against empty tables rather than trusting the branch that was taken.
+ * The OAuth callback attaches Strava tokens to the signed-in owner and signs
+ * nobody in (US-020). The acceptance criteria are mostly negative — what must
+ * *not* happen when the wrong athlete completes the flow — so every rejection
+ * case asserts that the owner's Strava columns are still empty rather than
+ * trusting the branch that was taken.
  */
 class StravaConnectFlowTest extends TestCase
 {
@@ -29,9 +26,13 @@ class StravaConnectFlowTest extends TestCase
 
     private const STATE = 'a-known-state-value';
 
+    private User $owner;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->owner = $this->signInOwner();
 
         Config::set('strava.client_id', '123456');
         Config::set('strava.client_secret', 'test-client-secret');
@@ -53,75 +54,68 @@ class StravaConnectFlowTest extends TestCase
         $this->assertStringNotContainsString('write', (string) $response->headers->get('Location'));
     }
 
-    public function test_an_allowlisted_athlete_signs_in(): void
+    public function test_an_allowlisted_athlete_is_attached_to_the_signed_in_owner(): void
     {
         $this->fakeTokenEndpoint(self::ALLOWED_ATHLETE_ID);
 
         $response = $this->withOAuthState()->get($this->callbackUrl());
 
         $response->assertRedirect(route('dashboard'));
-        $this->assertAuthenticated();
+        $this->assertAuthenticatedAs($this->owner);
 
         $this->assertSame(1, User::query()->count());
 
-        $user = User::query()->sole();
-        $this->assertSame(self::ALLOWED_ATHLETE_ID, $user->strava_athlete_id);
-        $this->assertSame('fresh-access-token', $user->strava_access_token);
-        $this->assertSame('fresh-refresh-token', $user->strava_refresh_token);
+        $owner = $this->owner->fresh();
+        $this->assertSame(self::ALLOWED_ATHLETE_ID, $owner->strava_athlete_id);
+        $this->assertSame('fresh-access-token', $owner->strava_access_token);
+        $this->assertSame('fresh-refresh-token', $owner->strava_refresh_token);
+        $this->assertSame('giarfa', $owner->username);
     }
 
     /**
-     * A recaller outlives SESSION_LIFETIME by about 400 days and signs a lost or
-     * shared device back in; sign-in must not mint one (US-019).
+     * The callback used to be the sign-in. It is behind the session gate now, so a
+     * signed-out request never reaches Strava or writes anything.
      */
-    public function test_a_successful_sign_in_sets_no_remember_me_cookie(): void
+    public function test_a_signed_out_callback_goes_to_the_sign_in_page_and_writes_nothing(): void
+    {
+        $this->fakeTokenEndpoint(self::ALLOWED_ATHLETE_ID);
+        auth()->logout();
+
+        $this->withOAuthState()->get($this->callbackUrl())->assertRedirect(route('login'));
+
+        $this->assertGuest();
+        $this->assertNothingStored();
+        Http::assertNothingSent();
+    }
+
+    public function test_the_callback_sets_no_remember_me_cookie(): void
     {
         $this->fakeTokenEndpoint(self::ALLOWED_ATHLETE_ID);
 
         $response = $this->withOAuthState()->get($this->callbackUrl());
 
         $response->assertRedirect(route('dashboard'));
-        $this->assertAuthenticated();
         $response->assertCookieMissing(Auth::guard()->getRecallerName());
-        $this->assertEmpty(User::query()->sole()->getRememberToken());
     }
 
     /**
-     * Session fixation: the id the athlete arrived on must not be the id they
-     * leave authenticated on.
-     *
-     * Both ids are taken *inside* the request — the id as the route was entered,
-     * and the id at the moment the Login event fired. Comparing across the call
-     * would prove nothing, because the test client starts a fresh session per
-     * request; comparing to the id after the controller returned would only prove
-     * that some later regenerate() ran, not that the login boundary itself
-     * migrated the session.
+     * A Strava id another row already holds would hand the owner somebody else's
+     * identity (and break the unique index); nothing is written.
      */
-    public function test_signing_in_regenerates_the_session_id(): void
+    public function test_an_athlete_id_held_by_another_row_is_rejected_with_nothing_written(): void
     {
+        User::factory()->create(['strava_athlete_id' => self::ALLOWED_ATHLETE_ID]);
         $this->fakeTokenEndpoint(self::ALLOWED_ATHLETE_ID);
 
-        RecordSessionId::$id = null;
+        $response = $this->withOAuthState()->get($this->callbackUrl());
 
-        /*
-         * The kernel is resolved first on purpose: constructing it syncs its own
-         * middleware groups onto the router, which would overwrite a push made
-         * before that happened.
-         */
-        $this->app->make(Kernel::class);
-        $this->app->make(Router::class)->pushMiddlewareToGroup('web', RecordSessionId::class);
-
-        $idAtLogin = null;
-
-        Event::listen(Login::class, function () use (&$idAtLogin): void {
-            $idAtLogin = session()->getId();
-        });
-
-        $this->withOAuthState()->get($this->callbackUrl())->assertRedirect(route('dashboard'));
-
-        $this->assertNotNull(RecordSessionId::$id, 'The request never reached the route.');
-        $this->assertNotNull($idAtLogin, 'The athlete was never logged in.');
-        $this->assertNotSame(RecordSessionId::$id, $idAtLogin);
+        $response->assertForbidden();
+        $response->assertViewIs('strava.rejected');
+        $response->assertViewHas('reason', 'taken');
+        $response->assertSee('already in use');
+        $this->assertSame(2, User::query()->count());
+        $this->assertNull($this->owner->fresh()->strava_athlete_id);
+        $this->assertNull($this->owner->fresh()->strava_access_token);
     }
 
     /**
@@ -138,9 +132,8 @@ class StravaConnectFlowTest extends TestCase
         $response->assertViewIs('strava.rejected');
         $response->assertSee('9999999', escape: false);
 
-        $this->assertGuest();
-        $this->assertDatabaseCount('users', 0);
-        $this->assertDatabaseEmpty('users');
+        $this->assertAuthenticatedAs($this->owner);
+        $this->assertNothingStored();
     }
 
     public function test_a_mismatched_state_is_rejected(): void
@@ -150,8 +143,7 @@ class StravaConnectFlowTest extends TestCase
         $response = $this->withOAuthState()->get($this->callbackUrl(state: 'a-different-state'));
 
         $response->assertForbidden();
-        $this->assertGuest();
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
     }
 
     public function test_a_missing_state_is_rejected(): void
@@ -161,8 +153,7 @@ class StravaConnectFlowTest extends TestCase
         $response = $this->withOAuthState()->get('/auth/strava/callback?code=auth-code&scope=read,activity:read_all');
 
         $response->assertForbidden();
-        $this->assertGuest();
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
     }
 
     public function test_the_state_is_single_use(): void
@@ -179,8 +170,7 @@ class StravaConnectFlowTest extends TestCase
         $response = $this->withOAuthState()->get('/auth/strava/callback?error=access_denied&state='.self::STATE);
 
         $response->assertRedirect(route('dashboard'));
-        $this->assertGuest();
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
 
         Http::assertNothingSent();
     }
@@ -191,8 +181,7 @@ class StravaConnectFlowTest extends TestCase
 
         $response->assertForbidden();
         $response->assertViewIs('strava.rejected');
-        $this->assertGuest();
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
 
         Http::assertNothingSent();
     }
@@ -205,8 +194,7 @@ class StravaConnectFlowTest extends TestCase
 
         $response->assertStatus(503);
         $response->assertViewIs('strava.rejected');
-        $this->assertGuest();
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
     }
 
     /**
@@ -222,8 +210,7 @@ class StravaConnectFlowTest extends TestCase
         $response->assertViewIs('strava.rejected');
         $response->assertSee('Only read access is accepted');
 
-        $this->assertGuest();
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
 
         Http::assertNothingSent();
     }
@@ -241,10 +228,9 @@ class StravaConnectFlowTest extends TestCase
                 ->get('/auth/strava/callback?'.http_build_query([$parameter => ['injected']]));
 
             $response->assertForbidden();
-            $this->assertGuest();
         }
 
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
         Http::assertNothingSent();
     }
 
@@ -255,8 +241,7 @@ class StravaConnectFlowTest extends TestCase
 
         $response->assertStatus(400);
         $response->assertViewIs('strava.rejected');
-        $this->assertGuest();
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
 
         Http::assertNothingSent();
     }
@@ -274,8 +259,7 @@ class StravaConnectFlowTest extends TestCase
 
         $response->assertStatus(503);
         $response->assertViewIs('strava.rejected');
-        $this->assertGuest();
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
     }
 
     /**
@@ -291,7 +275,7 @@ class StravaConnectFlowTest extends TestCase
             ->assertRedirect(route('dashboard'));
 
         $this->get($this->callbackUrl())->assertForbidden();
-        $this->assertDatabaseEmpty('users');
+        $this->assertNothingStored();
     }
 
     public function test_the_callback_is_rate_limited(): void
@@ -315,9 +299,12 @@ class StravaConnectFlowTest extends TestCase
         $this->get(route('strava.redirect'))->assertStatus(429);
     }
 
-    public function test_reconnecting_does_not_create_a_second_athlete(): void
+    public function test_reconnecting_replaces_the_tokens_without_adding_a_user(): void
     {
-        User::factory()->create(['strava_athlete_id' => self::ALLOWED_ATHLETE_ID]);
+        $this->owner->forceFill([
+            'strava_athlete_id' => self::ALLOWED_ATHLETE_ID,
+            'strava_access_token' => 'stale-access-token',
+        ])->save();
 
         $this->fakeTokenEndpoint(self::ALLOWED_ATHLETE_ID);
 
@@ -325,6 +312,17 @@ class StravaConnectFlowTest extends TestCase
 
         $this->assertSame(1, User::query()->count());
         $this->assertSame('fresh-access-token', User::query()->sole()->strava_access_token);
+    }
+
+    /**
+     * Nothing was attached: the owner is still the only user and holds no Strava
+     * identity or token.
+     */
+    private function assertNothingStored(): void
+    {
+        $this->assertSame(1, User::query()->count());
+        $this->assertNull(User::query()->sole()->strava_athlete_id);
+        $this->assertNull(User::query()->sole()->strava_access_token);
     }
 
     private function withOAuthState(): static

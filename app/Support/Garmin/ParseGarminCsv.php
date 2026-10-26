@@ -33,9 +33,9 @@ final readonly class ParseGarminCsv
     private const MAX_RUNS = 5_000;
 
     /*
-     * Plausibility bounds on the run metrics: the file is attacker-supplied for a
-     * signed-out visitor and the values are shown on the public map, so a reading no
-     * run can have counts as "not recorded".
+     * Plausibility bounds on the run metrics: the file is untrusted input and the
+     * values are drawn on the map, so a reading no run can have counts as
+     * "not recorded".
      */
     private const MAX_PACE_SECONDS_PER_KM = 36_000;
 

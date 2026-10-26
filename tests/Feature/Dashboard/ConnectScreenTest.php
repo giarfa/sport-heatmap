@@ -8,7 +8,7 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * The signed-out entry point, plus the layout invariants that US-004, US-005 and
+ * The empty screen an owner with no run and no Strava connection sees, plus the layout invariants that US-004, US-005 and
  * US-006 will build on and could quietly break.
  */
 class ConnectScreenTest extends TestCase
@@ -22,8 +22,10 @@ class ConnectScreenTest extends TestCase
         Http::preventStrayRequests();
     }
 
-    public function test_a_signed_out_visit_renders_the_connect_screen_rather_than_an_error(): void
+    public function test_an_owner_with_nothing_to_show_gets_the_connect_screen_rather_than_an_error(): void
     {
+        $this->signInOwner();
+
         $response = $this->get('/');
 
         $response->assertOk();
@@ -32,22 +34,10 @@ class ConnectScreenTest extends TestCase
         $response->assertSee(route('strava.redirect'), escape: false);
     }
 
-    public function test_a_guest_on_the_public_map_gets_a_discreet_connect_link_beside_the_garmin_import(): void
-    {
-        $this->allowlistedAthlete();
-
-        $response = $this->get('/');
-
-        $response->assertViewIs('dashboard');
-        $response->assertSee('Owner?');
-        $response->assertSee('Connect with Strava');
-        $response->assertSee('href="'.route('strava.redirect').'"', escape: false);
-        $response->assertSee('Import Garmin CSV');
-        $response->assertSee('href="'.route('garmin.import.create').'"', escape: false);
-    }
-
     public function test_the_connect_screen_also_offers_the_garmin_import(): void
     {
+        $this->signInOwner();
+
         $response = $this->get('/');
 
         $response->assertOk();
@@ -57,22 +47,15 @@ class ConnectScreenTest extends TestCase
         $response->assertSee('<a href="'.route('garmin.import.create').'" class="btn btn--secondary mt-3 w-full">Import Garmin CSV</a>', escape: false);
     }
 
-    public function test_the_import_form_keeps_noindex_and_the_strava_attribution_for_a_guest(): void
+    public function test_the_import_form_keeps_noindex_and_the_strava_attribution(): void
     {
+        $this->signInOwner();
+
         $response = $this->get(route('garmin.import.create'));
 
         $response->assertOk();
         $response->assertSee('<meta name="robots" content="noindex, nofollow">', escape: false);
         $response->assertSee('Powered by Strava');
-    }
-
-    public function test_the_signed_in_owner_does_not_get_the_guest_connect_link(): void
-    {
-        $response = $this->actingAs($this->allowlistedAthlete())->get('/');
-
-        $response->assertViewIs('dashboard');
-        $response->assertDontSee('Owner?');
-        $response->assertDontSee('Connect with Strava');
     }
 
     public function test_a_connected_athlete_gets_the_dashboard(): void
@@ -85,6 +68,8 @@ class ConnectScreenTest extends TestCase
 
     public function test_the_connect_screen_states_the_scope_and_the_read_only_promise(): void
     {
+        $this->signInOwner();
+
         $response = $this->get('/');
 
         $response->assertSee('activity:read_all');
@@ -149,6 +134,8 @@ class ConnectScreenTest extends TestCase
 
     public function test_the_connect_screen_renders_the_cancellation_notice(): void
     {
+        $this->signInOwner();
+
         $response = $this->withSession(['status' => 'Strava authorization was cancelled. Nothing was stored.'])
             ->get('/');
 
@@ -156,7 +143,7 @@ class ConnectScreenTest extends TestCase
         $response->assertSee('Strava authorization was cancelled. Nothing was stored.');
     }
 
-    public function test_the_public_map_renders_the_cancellation_notice(): void
+    public function test_the_map_renders_the_cancellation_notice(): void
     {
         $this->allowlistedAthlete();
 
@@ -172,14 +159,11 @@ class ConnectScreenTest extends TestCase
      */
     private function bothScreens(): array
     {
+        $this->signInOwner();
         $connect = $this->get('/');
-
-        $this->allowlistedAthlete();
-        $guestDashboard = $this->get('/');
 
         return [
             'connect' => $connect,
-            'guest dashboard' => $guestDashboard,
             'dashboard' => $this->actingAs($this->allowlistedAthlete())->get('/'),
         ];
     }

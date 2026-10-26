@@ -11,23 +11,19 @@ use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
 use App\Support\Heatmap\LeadInDistance;
 use App\Support\Heatmap\OldestRunDate;
-use App\Support\Strava\ResolveDisplayedAthlete;
 use App\Support\Sync\ResolveSyncStatus;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
     /**
-     * The single screen of this product, public and read-only.
+     * The single screen of this product, private to the signed-in owner.
      *
-     * The signed-in athlete sees their own map. A signed-out visitor sees the
-     * displayed athlete's — the first connected id of the allowlist, else the
-     * lowest-id stored athlete with an activity — and only gets the connect
-     * screen when no stored athlete has any activity. The connect screen
-     * renders rather than redirects: there is no login page, and a redirect
-     * loop is the failure mode this route exists to avoid.
+     * It shows the owner's runs of either source. An owner with no run and no
+     * Strava connection gets the connect screen, which renders rather than
+     * redirects: the dashboard is where a redirect would loop. An owner who has
+     * connected Strava keeps the dashboard, so the first sync shows its skeleton.
      */
     public function __invoke(
         Request $request,
@@ -38,20 +34,14 @@ class DashboardController extends Controller
         HeatmapGridCache $gridCache,
         OldestRunDate $oldestRunDate,
         ResolveSyncStatus $resolveSyncStatus,
-        ResolveDisplayedAthlete $resolveDisplayedAthlete,
     ): View {
-        /*
-         * The guest branch is read-only by structure, not by care: the
-         * strava.fresh middleware is a no-op for guests, nothing below calls
-         * EnsureFreshAccessToken or StravaClient, and the resolver selects no
-         * token column. A guest request therefore cannot refresh a token,
-         * reach Strava, or write a domain row — only the session and cache
-         * stores write, as they do for any request.
-         */
-        /** @var User|null $athlete */
-        $athlete = Auth::user() ?? $resolveDisplayedAthlete();
+        // Behind the `auth` route middleware, so the user is never null here.
+        /** @var User $athlete */
+        $athlete = $request->user();
 
-        if ($athlete === null) {
+        $oldestRun = $oldestRunDate($athlete);
+
+        if ($oldestRun === null && $athlete->strava_athlete_id === null) {
             return view('strava.connect');
         }
 
@@ -59,13 +49,10 @@ class DashboardController extends Controller
         $window = HeatmapWindow::fromRequestedEnd($this->requestedEnd($request), $today);
 
         /*
-         * The cache key is per athlete, not per viewer, so guests and the
-         * signed-in owner share one cached grid — a guest visit never costs a
-         * rebuild the owner has already paid for, and vice versa. The day detail's
-         * runs are part of the same cached grid, so a sync or an import that forgets
-         * the grid forgets the detail with it — they cannot disagree.
+         * The cache key is per athlete. The day detail's runs are part of the same
+         * cached grid, so a sync or an import that forgets the grid forgets the
+         * detail with it — they cannot disagree.
          */
-        $oldestRun = $oldestRunDate($athlete);
 
         /*
          * The weekly trend is built with the grid and cached inside it, so its one extra
@@ -85,7 +72,7 @@ class DashboardController extends Controller
 
         /*
          * Only windows that can hold a run are cached, plus the current one. `to` accepts any
-         * past date, and every distinct week is a distinct cache key: without this a guest
+         * past date, and every distinct week is a distinct cache key: without this a request
          * could fill the cache table with one empty grid per week back to year 0. A window
          * that ends before the oldest run is empty by construction, costs two small queries,
          * and is never linked to by Previous.

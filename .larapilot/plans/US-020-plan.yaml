@@ -52,7 +52,7 @@ tasks:
     id: TASK-00
     title: 'Bootstrap feature branch on release/3.0.0'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
@@ -70,8 +70,8 @@ tasks:
       4. Draft internal PR title/body toward `base` (`release/3.0.0`)
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] PR title/body drafted toward `release/3.0.0` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/3.0.0` (not `develop`)
 
       ## Git Deliverables
       - Commit: `chore(US-020): TASK-00 bootstrap feature branch for release/3.0.0` (only if the command did not already leave you on the new branch with a commit — an empty commit is optional)
@@ -81,7 +81,7 @@ tasks:
     id: TASK-01
     title: 'Add users.username with the giarfa owner backfill, factory states and seeder'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 3
     dependencies:
@@ -109,32 +109,38 @@ tasks:
       8. `php artisan test --compact tests/Feature/Database` then the full suite (still green: no route changes yet).
 
       ## Completion Criteria
-      - [ ] `users.username` is nullable and unique; `down()` drops it
-      - [ ] Backfill picks allowlisted-connected → lowest-id with activities → lowest-id, and creates `giarfa` on an empty table
-      - [ ] The owner's runs and every other column are untouched by the migration
-      - [ ] `UserFactory` has `owner()` and `ownerWithPassword()`; `csvOnly()` no longer depends on `CreateCsvOnlyAthlete`
-      - [ ] Seeder produces `giarfa` with a null password and the unchanged training block
-      - [ ] Tests pass
+      - [x] `users.username` is nullable and unique; `down()` drops it
+      - [x] Backfill picks allowlisted-connected → lowest-id with activities → lowest-id, and creates `giarfa` on an empty table
+      - [x] The owner's runs and every other column are untouched by the migration
+      - [x] `UserFactory` has `owner()` and `ownerWithPassword()`; `csvOnly()` no longer depends on `CreateCsvOnlyAthlete`
+      - [x] Seeder produces `giarfa` with a null password and the unchanged training block
+      - [x] Tests pass
 
       ## Test Data
-      - [ ] `database/factories/UserFactory.php` updated in this same task (`owner()`, `ownerWithPassword()`, `username` default)
-      - [ ] `TrainingBlockSeeder` seeds `giarfa` with a null password
-      - [ ] Verified through `TrainingBlockSeederTest` on the test database — never `migrate:fresh --seed` on the dev SQLite file
+      - [x] `database/factories/UserFactory.php` updated in this same task (`owner()`, `ownerWithPassword()`, `username` default)
+      - [x] `TrainingBlockSeeder` seeds `giarfa` with a null password
+      - [x] Verified through `TrainingBlockSeederTest` on the test database — never `migrate:fresh --seed` on the dev SQLite file
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/owner-authentication.md` created from `TEMPLATE.md` — data model section: `username`, nullable password as the "first sign-in armed" state, the owner-selection order and why, the empty-database insert, other user rows left undisplayed (accepted trade-off), recovery by clearing `users.password`
-      - [ ] Folder `README.md` index row added for `owner-authentication`
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/owner-authentication.md` created from `TEMPLATE.md` — data model section: `username`, nullable password as the "first sign-in armed" state, the owner-selection order and why, the empty-database insert, other user rows left undisplayed (accepted trade-off), recovery by clearing `users.password`
+      - [x] Folder `README.md` index row added for `owner-authentication`
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-020): TASK-01 add users.username with the giarfa owner backfill`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: 919734c9a1c82940e66305dc88fe3cdef980aff5
+      short_sha: 919734c
+      subject: 'feat(US-020): TASK-01 add users.username with the giarfa owner backfill'
+      committed_at: '2026-10-26T21:18:50+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/919734c9a1c82940e66305dc88fe3cdef980aff5'
   -
     id: TASK-02
     title: 'Sign-in page, throttled credential check, and sign-out to /login'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 4
     dependencies:
@@ -164,31 +170,37 @@ tasks:
       8. `php artisan test --compact tests/Feature/Auth`, then the full suite.
 
       ## Completion Criteria
-      - [ ] `/login` renders inside `layouts/app.blade.php` with labelled fields, announced errors, light/dark, no horizontal scroll at 375 px
-      - [ ] Wrong username or password → "These credentials do not match our records.", username kept, password empty
-      - [ ] 6th attempt within a minute for the same username + IP refused with the seconds to wait, no credential check
-      - [ ] Session regenerated, no remember-me cookie, intended same-host URL honoured, off-host ignored
-      - [ ] Signed-in owner on `/login` → dashboard; `POST /logout` → `/login`
-      - [ ] UI usable at mobile/tablet/desktop (manual smoke)
-      - [ ] Tests pass
+      - [x] `/login` renders inside `layouts/app.blade.php` with labelled fields, announced errors, light/dark, no horizontal scroll at 375 px
+      - [x] Wrong username or password → "These credentials do not match our records.", username kept, password empty
+      - [x] 6th attempt within a minute for the same username + IP refused with the seconds to wait, no credential check
+      - [x] Session regenerated, no remember-me cookie, intended same-host URL honoured, off-host ignored
+      - [x] Signed-in owner on `/login` → dashboard; `POST /logout` → `/login`
+      - [x] UI usable at mobile/tablet/desktop (manual smoke)
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes in this task (uses `UserFactory::owner()` / `ownerWithPassword()` from TASK-01)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/owner-authentication.md` — functional flow (sign-in, throttle, generic error, sign-out), technical design (routes, controllers, `SignInOwner`), architectural choices (session guard over Fortify/starter kits, hand-written check over `Auth::attempt`, the intended-URL guard, the dummy hash)
-      - [ ] Folder `README.md` index row refreshed
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/owner-authentication.md` — functional flow (sign-in, throttle, generic error, sign-out), technical design (routes, controllers, `SignInOwner`), architectural choices (session guard over Fortify/starter kits, hand-written check over `Auth::attempt`, the intended-URL guard, the dummy hash)
+      - [x] Folder `README.md` index row refreshed
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-020): TASK-02 add the owner sign-in page and sign-out to /login`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: 44387af5460dc6d82d5c8ca9adb2015c29739e31
+      short_sha: 44387af
+      subject: 'feat(US-020): TASK-02 add the owner sign-in page and sign-out to /login'
+      committed_at: '2026-10-26T21:20:51+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/44387af5460dc6d82d5c8ca9adb2015c29739e31'
   -
     id: TASK-03
     title: 'Forced first password change: middleware and change-password page'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
@@ -218,32 +230,38 @@ tasks:
       8. `php artisan test --compact tests/Feature/Auth`, then the full suite.
 
       ## Completion Criteria
-      - [ ] Empty-password first sign-in works only while no password is stored
-      - [ ] Every route but the change page and sign-out redirects to the change page while no password is stored
-      - [ ] Empty, <12, or mismatched value refused at the field, nothing stored
-      - [ ] Valid value stored hashed, session regenerated, owner lands on the dashboard
-      - [ ] Once set: empty password refused, no forced redirect, change page redirects to the dashboard
-      - [ ] README documents the first sign-in and the recovery
-      - [ ] UI usable at mobile/tablet/desktop (manual smoke)
-      - [ ] Tests pass
+      - [x] Empty-password first sign-in works only while no password is stored
+      - [x] Every route but the change page and sign-out redirects to the change page while no password is stored
+      - [x] Empty, <12, or mismatched value refused at the field, nothing stored
+      - [x] Valid value stored hashed, session regenerated, owner lands on the dashboard
+      - [x] Once set: empty password refused, no forced redirect, change page redirects to the dashboard
+      - [x] README documents the first sign-in and the recovery
+      - [x] UI usable at mobile/tablet/desktop (manual smoke)
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/owner-authentication.md` — forced-change flow, the `password.set` middleware, why the page closes after the first change, the 12-character rule vs `Password::defaults()`, the accepted empty-password risk and its mitigation, recovery
-      - [ ] Folder `README.md` index row refreshed
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/owner-authentication.md` — forced-change flow, the `password.set` middleware, why the page closes after the first change, the 12-character rule vs `Password::defaults()`, the accepted empty-password risk and its mitigation, recovery
+      - [x] Folder `README.md` index row refreshed
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-020): TASK-03 force the first password change`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: e330b61ba8015b4954d9b9d4fcd4d7bf72533768
+      short_sha: e330b61
+      subject: 'feat(US-020): TASK-03 force the first password change'
+      committed_at: '2026-10-26T21:22:43+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e330b61ba8015b4954d9b9d4fcd4d7bf72533768'
   -
     id: TASK-04
     title: 'Gate every route behind the session; owner-only dashboard and Garmin import'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 6
     dependencies:
@@ -274,34 +292,40 @@ tasks:
       9. `php artisan test --compact` (full suite), `vendor/bin/pint --dirty --format agent`.
 
       ## Completion Criteria
-      - [ ] Every route but `/login` and `/up` redirects a signed-out request to `/login`
-      - [ ] Dashboard, windows, day detail, and trend show the signed-in owner's runs of either source; displayed-athlete selection gone
-      - [ ] Owner with no activity sees the existing empty screen
-      - [ ] Garmin upload, review, confirm, cancel, and summary require the session and import into `giarfa`; guest paths removed; throttle, 5 MB, session binding still hold
-      - [ ] No Strava route signs anyone in; no route creates or lists users
-      - [ ] Existing dashboard and import feature tests pass, signed in as `giarfa`
-      - [ ] Tests pass
+      - [x] Every route but `/login` and `/up` redirects a signed-out request to `/login`
+      - [x] Dashboard, windows, day detail, and trend show the signed-in owner's runs of either source; displayed-athlete selection gone
+      - [x] Owner with no activity sees the existing empty screen
+      - [x] Garmin upload, review, confirm, cancel, and summary require the session and import into `giarfa`; guest paths removed; throttle, 5 MB, session binding still hold
+      - [x] No Strava route signs anyone in; no route creates or lists users
+      - [x] Existing dashboard and import feature tests pass, signed in as `giarfa`
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no schema change; tests use `UserFactory::owner()` / `ownerWithPassword()` from TASK-01
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — the private `/` screen for the signed-in owner; displayed-athlete selection and guest access removed; `strava.fresh` no longer on the route
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — import target is the signed-in owner; CSV-only athlete creation and the masked guest review removed; limiter per user
-      - [ ] `.larapilot/docs/devs/strava-connection.md` — the callback no longer signs in and binds tokens to the signed-in owner; the publicly displayed athlete is gone (file is retired by US-021)
-      - [ ] `.larapilot/docs/devs/owner-authentication.md` — the route-group layout of the gate
-      - [ ] Folder `README.md` index rows refreshed
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — the private `/` screen for the signed-in owner; displayed-athlete selection and guest access removed; `strava.fresh` no longer on the route
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — import target is the signed-in owner; CSV-only athlete creation and the masked guest review removed; limiter per user
+      - [x] `.larapilot/docs/devs/strava-connection.md` — the callback no longer signs in and binds tokens to the signed-in owner; the publicly displayed athlete is gone (file is retired by US-021)
+      - [x] `.larapilot/docs/devs/owner-authentication.md` — the route-group layout of the gate
+      - [x] Folder `README.md` index rows refreshed
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-020): TASK-04 gate every route and make the dashboard and import owner-only`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: c5b96930535b70e2983fe75ea79716e5ee3310de
+      short_sha: c5b9693
+      subject: 'feat(US-020): TASK-04 gate every route and make the dashboard and import owner-only'
+      committed_at: '2026-10-26T21:30:27+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c5b96930535b70e2983fe75ea79716e5ee3310de'
   -
     id: TASK-05
     title: 'Route access matrix and sign-in page contract tests'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 2
     dependencies:
@@ -323,21 +347,27 @@ tasks:
       6. Do **not** add Playwright, Dusk, Pest browser, or viewport E2E suites
 
       ## Completion Criteria
-      - [ ] Every registered route outside `/login` and `/up` is proven gated, from the route table
-      - [ ] The forced-change redirect is proven on every route but the change page and sign-out
-      - [ ] Sign-in and change-password pages keep `noindex, nofollow` and the security headers; no basic-auth challenge anywhere
-      - [ ] Tests pass locally
-      - [ ] Coverage matches the NORMAL bar
+      - [x] Every registered route outside `/login` and `/up` is proven gated, from the route table
+      - [x] The forced-change redirect is proven on every route but the change page and sign-out
+      - [x] Sign-in and change-password pages keep `noindex, nofollow` and the security headers; no basic-auth challenge anywhere
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-020): TASK-05 cover the route access matrix`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare/update local notes
+    commit:
+      sha: 8466169840b34a65e90a18df6019a0e78f22dcee
+      short_sha: '8466169'
+      subject: 'test(US-020): TASK-05 cover the route access matrix'
+      committed_at: '2026-10-26T21:31:27+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/8466169840b34a65e90a18df6019a0e78f22dcee'
   -
     id: TASK-06
     title: 'CHANGELOG, quality gate, and manual test handoff'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 1
     dependencies:
@@ -357,10 +387,10 @@ tasks:
       4. Manual test handoff in the PR notes: sign in at 375 px and 1280 px in light and dark; tab order username → password → button; a screen reader announces the error; after 5 wrong passwords the 6th shows the seconds to wait; first sign-in with an empty password lands on "Set your password"; after setting it, `/` loads the heatmap and the Garmin import works.
 
       ## Completion Criteria
-      - [ ] CHANGELOG Unreleased describes the change in product words
-      - [ ] Pint clean, Larastan level 5 clean, full suite green
-      - [ ] Manual test steps written in the PR notes
-      - [ ] Tests pass
+      - [x] CHANGELOG Unreleased describes the change in product words
+      - [x] Pint clean, Larastan level 5 clean, full suite green
+      - [x] Manual test steps written in the PR notes
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema changes in this task
@@ -372,4 +402,10 @@ tasks:
       - Commit: `chore(US-020): TASK-06 changelog and quality gate`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalize local PR notes toward `release/3.0.0`
-updated_at: '2026-10-26T20:14:09+00:00'
+    commit:
+      sha: 69243bc7125fc36ddb16cd737b23d53db3715fdb
+      short_sha: 69243bc
+      subject: 'chore(US-020): TASK-06 changelog and quality gate'
+      committed_at: '2026-10-26T21:31:48+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/69243bc7125fc36ddb16cd737b23d53db3715fdb'
+updated_at: '2026-10-26T20:31:49+00:00'

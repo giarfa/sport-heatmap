@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\Strava;
+namespace Tests\Feature\Auth;
 
 use App\Enums\SyncRunStatus;
 use App\Models\SyncRun;
@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * Signing out: a CSRF-protected POST that ends the session and nothing else.
+ * Signing out: a CSRF-protected POST that ends the session and returns to the sign-in page.
  */
 class SignOutTest extends TestCase
 {
@@ -26,18 +26,14 @@ class SignOutTest extends TestCase
         Config::set('strava.retry_backoff_ms', [0, 0, 0]);
     }
 
-    public function test_signing_out_ends_the_session_and_returns_to_the_dashboard(): void
+    public function test_signing_out_ends_the_session_and_returns_to_the_sign_in_page(): void
     {
         $owner = $this->allowlistedAthlete();
 
         $response = $this->actingAs($owner)->withSession(['_token' => 'before'])->post(route('logout'));
 
-        $response->assertRedirect(route('dashboard'));
+        $response->assertRedirect(route('login'));
         $this->assertGuest();
-
-        $this->get(route('dashboard'))
-            ->assertSee('Connect with Strava')
-            ->assertDontSee('Sign out');
     }
 
     public function test_signing_out_flushes_the_session_and_issues_a_fresh_csrf_token(): void
@@ -83,13 +79,6 @@ class SignOutTest extends TestCase
         $this->assertAuthenticatedAs($owner);
     }
 
-    public function test_a_guest_posting_to_it_lands_on_the_dashboard_without_an_error(): void
-    {
-        $this->post(route('logout'))->assertRedirect(route('dashboard'));
-
-        $this->assertGuest();
-    }
-
     public function test_signing_out_keeps_the_strava_tokens_and_the_nightly_sync_still_runs(): void
     {
         $owner = $this->allowlistedAthlete();
@@ -121,7 +110,7 @@ class SignOutTest extends TestCase
         $this->assertNotSame('a-recaller-from-2-0-1', $owner->refresh()->getRememberToken());
     }
 
-    public function test_the_dashboard_offers_sign_out_as_a_csrf_form_to_a_signed_in_owner_only(): void
+    public function test_the_dashboard_offers_sign_out_as_a_csrf_form(): void
     {
         $owner = $this->allowlistedAthlete();
 
@@ -132,13 +121,5 @@ class SignOutTest extends TestCase
         $signedIn->assertSee('method="POST"', escape: false);
         $signedIn->assertSee('name="_token"', escape: false);
         $signedIn->assertSeeInOrder(['<button type="submit"', 'Sign out</button>'], escape: false);
-
-        auth()->logout();
-
-        $guest = $this->get(route('dashboard'));
-
-        $guest->assertOk();
-        $guest->assertDontSee('Sign out');
-        $guest->assertDontSee(route('logout'), escape: false);
     }
 }
