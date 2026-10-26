@@ -1,6 +1,30 @@
 # What was decided about each vulnerable dependency, and the trend of the checks.
 # Written by php artisan larapilot:vendor-audit and larapilot:vendor-link: commit it.
-decisions: []
+decisions:
+  GHSA-587h-7wmj-h5pm:
+    state: waived
+    reason: 'vite 8.2.2 build-time dev server only (launch-editor, Windows); the host serves pre-built assets and never runs vite. Owner waived for v3.0.0 on 2026-10-26; bump to 8.2.4 in 3.0.1.'
+    at: '2026-10-26T21:25:55+00:00'
+  GHSA-698v-4r3x-3vcv:
+    state: waived
+    reason: 'vite 8.2.2 build-time dev server only (launch-editor, Windows); the host serves pre-built assets and never runs vite. Owner waived for v3.0.0 on 2026-10-26; bump to 8.2.4 in 3.0.1.'
+    at: '2026-10-26T21:25:55+00:00'
+  GHSA-9jrq-w75r-8gcw:
+    state: waived
+    reason: 'vite 8.2.2 build-time dev server only (launch-editor, Windows); the host serves pre-built assets and never runs vite. Owner waived for v3.0.0 on 2026-10-26; bump to 8.2.4 in 3.0.1.'
+    at: '2026-10-26T21:25:55+00:00'
+  GHSA-r825-w8mm-5pxw:
+    state: waived
+    reason: 'vite 8.2.2 build-time dev server only (launch-editor, Windows); the host serves pre-built assets and never runs vite. Owner waived for v3.0.0 on 2026-10-26; bump to 8.2.4 in 3.0.1.'
+    at: '2026-10-26T21:25:55+00:00'
+  GHSA-rq7h-c2jc-7f22:
+    state: waived
+    reason: 'vite 8.2.2 build-time dev server only (launch-editor, Windows); the host serves pre-built assets and never runs vite. Owner waived for v3.0.0 on 2026-10-26; bump to 8.2.4 in 3.0.1.'
+    at: '2026-10-26T21:25:55+00:00'
+  GHSA-vfpm-58rq-9qcg:
+    state: waived
+    reason: 'vite 8.2.2 build-time dev server only (launch-editor, Windows); the host serves pre-built assets and never runs vite. Owner waived for v3.0.0 on 2026-10-26; bump to 8.2.4 in 3.0.1.'
+    at: '2026-10-26T21:25:55+00:00'
 history:
   -
     checked_at: '2026-10-17T07:12:06+00:00'
@@ -44,6 +68,30 @@ history:
     unknown: 0
   -
     checked_at: '2026-10-18T18:12:56+00:00'
+    components: 231
+    critical: 0
+    high: 0
+    medium: 0
+    low: 0
+    unknown: 0
+  -
+    checked_at: '2026-10-26T21:22:35+00:00'
+    components: 231
+    critical: 0
+    high: 1
+    medium: 4
+    low: 1
+    unknown: 0
+  -
+    checked_at: '2026-10-26T21:25:48+00:00'
+    components: 231
+    critical: 0
+    high: 1
+    medium: 4
+    low: 1
+    unknown: 0
+  -
+    checked_at: '2026-10-26T21:25:56+00:00'
     components: 231
     critical: 0
     high: 0

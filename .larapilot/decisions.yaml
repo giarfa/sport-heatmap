@@ -1195,4 +1195,30 @@ decisions:
     source: chat
     spec: US-021
     supersedes: null
-updated_at: '2026-10-26T20:54:34+00:00'
+  -
+    id: 631b5ca1b1568830
+    ts: '2026-10-26T21:25:56+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'vite 8.2.2 advisories at v3.0.0 ship'
+    label: 'vite 8.2.2 advisories at v3.0.0 ship'
+    value: 'Waived; bump vite to 8.2.4 in 3.0.1'
+    question: null
+    rationale: 'Dev-server-only Windows flaw; host never runs vite'
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 1d6fc208073785bb
+    ts: '2026-10-26T21:25:56+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'production deploy target'
+    label: 'production deploy target'
+    value: 'Cipi 5.7 on Oracle Cloud ARM VM (app heatmap), Deployer-based; private behind Cipi basic auth'
+    question: null
+    rationale: "Actual host since 2026-10-26; refines 'Custom VPS / Deployer'"
+    source: chat
+    spec: null
+    supersedes: null
+updated_at: '2026-10-26T21:25:56+00:00'
