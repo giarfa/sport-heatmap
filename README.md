@@ -1,10 +1,10 @@
 # Sport Heatmap
 
-A single-athlete training heatmap, public and read-only. It syncs your own runs from Strava once a day and
-renders them as a GitHub-style contribution grid, so a training block is readable at a glance.
+A private single-athlete training heatmap. It imports your own runs from a Garmin Connect CSV export
+and renders them as a GitHub-style contribution grid, so a training block is readable at a glance.
 
-One athlete, one screen, no public signup: identity comes from Strava OAuth and access is
-restricted to an explicit allowlist of athlete ids.
+One athlete, one screen, no public signup: every page sits behind a single password-protected account
+(see "First sign-in and recovery" below).
 
 ## Requirements
 
@@ -28,7 +28,7 @@ restricted to an explicit allowlist of athlete ids.
    ```
 
    Herd then serves the app at **`https://sport-heatmap.test`**. `herd secure` issues the local
-   TLS certificate — Strava requires an HTTPS callback, so this step is not optional.
+   TLS certificate, which the secure session cookie below needs.
 
 2. **Install and bootstrap.** The `setup` script installs dependencies, creates `.env`,
    generates the application key, migrates, and builds the frontend assets:
@@ -47,7 +47,7 @@ restricted to an explicit allowlist of athlete ids.
    APP_URL=https://sport-heatmap.test
    ```
 
-   `APP_URL` must match the domain Herd serves, or the OAuth callback will not line up. Add
+   `APP_URL` must match the domain Herd serves, or generated links will not line up. Add
    `LOG_LEVEL=debug` if you want the full log. Leave `SESSION_SECURE_COOKIE=true` — Herd serves
    HTTPS.
 
@@ -62,72 +62,46 @@ restricted to an explicit allowlist of athlete ids.
    HTTP, where browsers drop `Secure` cookies, so set `SESSION_SECURE_COOKIE=false` in `.env` for
    that setup only.
 
-## Registering the Strava application
+## First sign-in and recovery
 
-The app talks to Strava as a registered API client. You need to create one once, under your own
-Strava account.
+The whole app sits behind one account: the user `giarfa`. There is no registration and no other way in.
 
-1. Go to **<https://www.strava.com/settings/api>** and create an application.
-2. Set **Authorization Callback Domain** to the host of your app **without scheme or path**:
-   - development: `sport-heatmap.test`
-   - production: your real domain
-3. Note the **Client ID** and **Client Secret** Strava shows you.
-4. The app requests the **`activity:read_all`** scope — read-only. No write scope is ever
-   requested, and nothing is ever pushed back to Strava.
-5. Find your numeric **athlete id**: it is the last segment of your profile URL
-   (`https://www.strava.com/athletes/10000001` → `10000001`).
-6. Put the values in your local `.env` — **never commit them**:
+1. Open the site. Every page sends a signed-out browser to `/login`.
+2. Sign in as `giarfa` with an **empty password**. This works only while no password is stored.
+3. Set a password of **at least 12 characters** (typed twice). You land on the dashboard, and from
+   then on only that password signs in.
 
-   ```dotenv
-   STRAVA_CLIENT_ID=123456
-   STRAVA_CLIENT_SECRET=your-client-secret
-   STRAVA_REDIRECT_URI=https://sport-heatmap.test/auth/strava/callback
-   STRAVA_ALLOWED_ATHLETE_IDS=replace-with-your-own-athlete-id
-   ```
+Do this right after every deploy that runs the username migration: until the password is set,
+anyone who knows the username can set it first (an accepted risk — the migration resets the owner's
+password to empty so the first sign-in can happen).
 
-Only athletes listed in `STRAVA_ALLOWED_ATHLETE_IDS` may connect. Anyone else who completes the
-Strava authorization is rejected **before** any token, user record, or session is created — the
-allowlist is checked against the athlete id Strava returns with the token exchange, and nothing at
-all is written until it passes.
+Five wrong attempts for the same username and IP within a minute lock that pair out for the
+remaining seconds.
 
-> **Put your own athlete id there and nobody else's.** The allowlist is the only access control
-> in this product; copying an example id verbatim would authorize a stranger. Non-numeric entries
-> are discarded, so a blank or malformed value allows nobody rather than everybody.
+**Recovery.** To re-arm the first sign-in (a forgotten password), clear the stored password on the
+SQLite file, then sign in with an empty password again:
 
-### Signing in
+```sql
+UPDATE users SET password = NULL WHERE username = 'giarfa';
+```
 
-Visit the app signed out and press **Connect with Strava**. That is the whole flow — there is no
-password, no registration, and no other way in.
+## Removing the former Strava connection
 
-A few things worth knowing before the first attempt:
+Since 3.0.0 the app has no Strava connection: no OAuth, no nightly sync, no stored token, and no
+Strava data. Runs enter only through the Garmin CSV import (see below).
 
-- **The callback domain is the setting that fails confusingly.** Strava's *Authorization Callback
-  Domain* is a bare host — no scheme, no path, no port. If it does not match the host in
-  `STRAVA_REDIRECT_URI`, Strava rejects the callback with an opaque error rather than a useful one.
-  Under Herd that host is your HTTPS `.test` domain, e.g. `sport-heatmap.test`.
-- **The app only ever requests `activity:read_all`.** The scope is a literal in
-  `config/strava.php`, not an environment value, so no deployment can widen it. Nothing is ever
-  written back to Strava.
-- **Sign-in creates a synthetic email address.** Strava exposes no email under this scope and
-  `users.email` is `NOT NULL UNIQUE`, so the account is created as
-  `athlete-{id}@strava.invalid`. `.invalid` is the RFC 2606 reserved TLD — that address can never
-  resolve, and the app never sends anything to it.
-- **Tokens are refreshed transparently.** The access token is renewed from the refresh token when
-  it has expired or is within `STRAVA_TOKEN_REFRESH_MARGIN` seconds of expiring. Strava rotates the
-  refresh token on every refresh and both halves are stored, encrypted at rest.
-- **If you revoke the app on Strava**, the next visit shows the connect screen in a reconnect
-  state rather than an error. Press the button again to reconnect.
-- **Removing yourself from the allowlist signs you out immediately.** It is re-checked on every
-  request, not only at connect time, so an existing session does not outlive the edit.
-- **Sign out is under the map.** A signed-in owner presses **Sign out** in the line below the map.
-  No remember-me cookie is set, so a session lasts `SESSION_LIFETIME` minutes. Signing out keeps the
-  Strava connection and the nightly sync. After upgrading to 2.0.2, one sign-out revokes any older
-  remember-me cookie.
+If you used an earlier version, do one thing by hand: **revoke the former app at
+<https://www.strava.com/settings/apps>**, so Strava stops listing it among your authorized
+applications. The upgrade migration **permanently deletes every run that came from Strava**, so back
+up `database/database.sqlite` first. To restore older days afterwards, import your full Garmin Connect
+history.
+
+No scheduler (cron) and no queue worker are required: nothing runs in the background.
 
 ### Before putting this on a real host
 
-The OAuth routes are reachable without a session, which makes them the part of this app a stranger
-can actually touch. Start with how the code is installed, then the settings.
+Only `/login` and the `/up` health route answer without a session, which makes them the part of this
+app a stranger can actually touch. Start with how the code is installed, then the settings.
 
 **Install without the development tools.** Every deployment runs:
 
@@ -148,30 +122,25 @@ gone: `php artisan route:list --path=larapilot` must list no route.
 | --- | --- | --- |
 | `APP_ENV` | `production` | Turns off the development affordances that assume a trusted visitor |
 | `APP_DEBUG` | `false` | Otherwise any unhandled error renders a stack trace, environment variables included, to whoever triggered it |
-| `APP_URL` | `https://…` | The host's own HTTPS URL; the OAuth callback and generated links are built from it |
+| `APP_URL` | `https://…` | The host's own HTTPS URL; generated links are built from it |
 | `LOG_STACK` | `daily` | One file per day, old ones rotated out, instead of a single log that grows forever |
 | `LOG_LEVEL` | `warning` | `debug` writes request detail to disk that nobody on a real host needs |
 | `SESSION_SECURE_COOKIE` | `true` | Without it the sign-in cookies are also sent over plain HTTP |
 
-If the app sits behind a reverse proxy or CDN, also configure trusted proxies — the OAuth rate
-limiter keys on the client IP, and every request arriving from the proxy's address collapses that
-budget into one shared bucket.
+If the app sits behind a reverse proxy or CDN, also configure trusted proxies — the sign-in throttle
+keys on the username and the client IP, and every request arriving from the proxy's address collapses
+that budget into one shared bucket.
 
 ## Environment variables
 
+The app-specific keys are few. Everything else in `.env.example` is Laravel's own.
+
 | Key | Meaning | Example |
 | --- | --- | --- |
-| `STRAVA_CLIENT_ID` | Client ID of your Strava API application | `123456` |
-| `STRAVA_CLIENT_SECRET` | Client secret of that application — secret, never committed | `2f9c…` |
-| `STRAVA_REDIRECT_URI` | OAuth callback URL; its host must match the callback domain registered with Strava | `https://sport-heatmap.test/auth/strava/callback` |
-| `STRAVA_ALLOWED_ATHLETE_IDS` | Comma-separated allowlist of Strava athlete ids permitted to connect. Numeric entries only; blank means nobody may connect. Order matters: the first id that has connected is displayed publicly on the home page; with none connected, the home page shows the stored athlete with the lowest id who has at least one activity, whatever the allowlist says. | your own athlete id |
-| `STRAVA_TOKEN_REFRESH_MARGIN` | Seconds before expiry at which the access token is refreshed pre-emptively | `300` |
-| `STRAVA_SYNC_HOUR` | Local hour (0–23) at which the daily sync runs | `3` |
-| `STRAVA_SYNC_TIMEZONE` | Timezone that `STRAVA_SYNC_HOUR` is expressed in | `Europe/Rome` |
+| `HEATMAP_DISPLAY_TIMEZONE` | Timezone the import card prints its absolute "Last import" time in (timestamps are stored in UTC) | `Europe/Rome` |
 
-`.env.example` lists all of them with empty or safe placeholder values. They are read through
-`config/strava.php` — never call `env()` for them outside that file, because `env()` returns
-`null` once `config:cache` has run.
+`.env.example` lists it with its default. It is read through `config/heatmap.php` — never call `env()`
+for it outside that file, because `env()` returns `null` once `config:cache` has run.
 
 ## Database and demo data
 
@@ -183,57 +152,16 @@ php artisan migrate:fresh --seed
 
 This produces a full **16-week training block** for one demo athlete — including an illness
 week, a peak week and a partial current week — so the dashboard can be developed and reviewed
-without ever connecting to Strava.
+from Garmin-imported runs alone.
 
-With `STRAVA_ALLOWED_ATHLETE_IDS` blank, the public home page shows that block without signing
-in: no allowlisted athlete has connected, so the page falls back to the seeded athlete. Once your
-own allowlisted athlete connects, they replace it. Never seed production — it would publish a demo
-athlete until you connect.
-
-## Running the sync
-
-Every run reconciles the full 112-day window: it requests activities with `after` set to the
-start of the window and paginates at Strava's maximum page size until a page comes back short.
-Only running sport types (`Run`, `TrailRun`, `VirtualRun`) are stored; everything else is
-discarded. Activities are upserted on their Strava activity id, so an edit made on Strava
-(distance, name, sport type) propagates on the next run, and a Strava-sourced activity inside the
-window that Strava no longer returns is deleted — so the Strava part of the map always matches
-Strava, in both directions. Runs imported from a Garmin CSV are never touched by the sync (see
-[Importing runs from Garmin Connect](#importing-runs-from-garmin-connect)).
-The command is idempotent: running it twice in a row leaves the database byte-identical. Every
-attempt — success or failure — writes exactly one row to `sync_runs` (start, finish, status,
-upserted/deleted counts, and the error on failure), which is what the dashboard's sync-status
-indicator reads.
-
-Run it manually:
-
-```bash
-php artisan strava:sync
-```
-
-Run it on a schedule. It registers itself to run daily at `STRAVA_SYNC_HOUR` in
-`STRAVA_SYNC_TIMEZONE`; the host only ever needs Laravel's one-minute scheduler tick:
-
-```cron
-* * * * * cd /path/to/sport-heatmap && php artisan schedule:run >> /dev/null 2>&1
-```
-
-`php artisan schedule:list` shows the registration and its next run time.
-
-### Rate limits
-
-One run costs one or two Strava API requests, well inside any allowance Strava currently issues —
-the application hardcodes no quota, since Strava has changed the default allowance for newer
-applications. Confirm the allowance issued to this application in the Strava developer dashboard
-before relying on it in production. A `429` response is retried with backoff (the retry
-count and delays are literals in `config/strava.php`); an exhausted retry records the observed
-`X-RateLimit-Usage` response header in `sync_runs.error_message`, which is where to look if the
-daily sync starts failing.
+The demo athlete is the owner account `giarfa` with no password, so a freshly seeded database starts
+at the first sign-in (see above). Never seed production — it would plant a demo athlete and runs in
+your real database.
 
 ## Importing runs from Garmin Connect
 
-Runs that Strava is missing, or that Garmin recorded better, can be added by hand from a Garmin
-Connect export. Signed in as the owner, follow **Import Garmin CSV** under the map.
+The Garmin Connect CSV export is the only way a run enters the app. Signed in as the owner, follow
+**Import Garmin CSV** under the map (or on the empty screen).
 
 1. On the Garmin Connect **website**, open **Activities → All activities**, scroll until every
    run of the last 16 weeks is loaded, and press **Export CSV**. Both Italian (`Tipo di attività`,
@@ -241,7 +169,7 @@ Connect export. Signed in as the owner, follow **Import Garmin CSV** under the m
 2. Upload the file (max 5 MB). The account must use **metric units**: Garmin writes distance in the
    account's unit, and an imperial export cannot be told apart from a metric one.
 3. Review. Only running types are kept (every other type is counted and listed by name); rows
-   outside the 16-week window or in the future are counted and skipped; a row with an unreadable
+   dated in the future are counted and skipped, while runs of any age are kept; a row with an unreadable
    date, distance or moving time is listed with its line number while the rest still import.
    A row **clashes** with a stored run that starts on the same date within ±2 minutes (the closest
    one). For each clash choose:
@@ -253,34 +181,23 @@ Connect export. Signed in as the owner, follow **Import Garmin CSV** under the m
    writes nothing. A summary shows imported, overwritten, skipped, already-imported, ignored,
    outside-window and unreadable counts, and the map updates immediately.
 
-**Garmin wins permanently.** The nightly sync never reverts an overwritten run, never re-adds its
-Strava twin, and never deletes a Garmin-imported run — even when Strava still returns the twin. If
-Strava later sends a run that starts within ±2 minutes of a run imported as new, the sync links the
-two instead of adding a duplicate, keeping Garmin's values. The uploaded file itself is never
-stored: it is read during the request and discarded. Imported runs carry no Strava link.
+A stored run is never replaced by a re-read of the file: only an explicit **Overwrite** changes one,
+and nothing else writes a run. The uploaded file itself is never stored: it is read during the request
+and discarded. Imported runs carry no link anywhere.
 
 ## The dashboard
 
-The home page (`/`) is **public and read-only**. A signed-out visitor sees the heatmap, weekly
-totals, legend and sync status of the **first connected athlete of `STRAVA_ALLOWED_ATHLETE_IDS`, in
-configured order** — the same content the signed-in owner sees, without a Strava sign-in. A guest
-request never refreshes a token, calls Strava, or writes a row. Signing in is only needed to connect
-Strava, from the discreet "Owner? Connect with Strava" line under the map (a signed-in owner gets
-**Sign out** there), and stays allowlist-only. While no allowlisted athlete has connected yet, the
-home page shows the stored athlete with the lowest id who has at least one activity (Strava or Garmin); the connect screen
-appears only when no stored athlete has any activity. Removing an athlete from the allowlist
-therefore no longer hides their stored runs — deleting their user row does. The page keeps
-`noindex, nofollow`: reachable by link, not promoted.
-
-If the owner's Strava token can no longer be refreshed, they are signed out and land on the public
-map with a one-off "Your Strava connection expired" banner.
+The home page (`/`) is **private**: a signed-out browser is sent to `/login`. The signed-in owner sees
+the heatmap, weekly totals, legend and import status built from their own imported runs. Opening it
+never calls out or writes a row. Under the map, a discreet line offers **Import Garmin CSV** and
+**Sign out**. An owner with no runs sees an empty screen that offers only the Garmin CSV import. The
+page keeps `noindex, nofollow`.
 
 The heatmap grid is cached per athlete, per 16-week window and per calendar day
 (`App\Support\Heatmap\HeatmapGridCache`), so a second request the same day skips the aggregate
-query. The cache is cleared automatically for every synced athlete once `strava:sync` succeeds, so a
-mid-day sync is visible on the next request; a failed sync leaves the cache alone, since there is
-nothing new to show. The calendar day is part of the cache key, so a cached grid can never survive
-into the next day even without a sync in between.
+query. The cache is cleared for the owner after every confirmed import, so the new runs are visible on
+the next request. The calendar day is part of the cache key, so a cached grid can never survive into
+the next day even without an import in between.
 
 On first visit the theme follows the browser's `prefers-color-scheme`; toggling it in the header
 persists the explicit choice in `localStorage` (`theme`), which then wins over the OS preference on
@@ -296,7 +213,7 @@ interpolation** (the numpy / Excel `PERCENTILE.INC` default). That method is not
 it is the one that reproduces this project's validated legend, and a different percentile method
 (nearest-rank, for instance) silently desynchronises the legend from the ramp it was designed
 against. Thresholds are recomputed by `App\Support\Heatmap\CalibrateIntensityScale` from scratch on
-every request that misses the grid cache, and the cache is cleared on every successful sync — so
+every request that misses the grid cache, and the cache is cleared on every confirmed import — so
 the scale is never carried over from a previous window's distribution.
 
 Two fallbacks fall back to the same fixed bands (`0 / ≤ 5 / ≤ 10 / ≤ 20 / 20+ km`) rather than a
@@ -313,45 +230,24 @@ for that colour table. The palette validator script the mockup README cites was 
 this repository, so there is no automated gate that would catch a retuned step; treat that README
 table as authoritative before changing a hex.
 
-### Sync status
+### Import status
 
-`App\Support\Sync\ResolveSyncStatus` reads `sync_runs` fresh on every request — never from the
-grid cache — and resolves one of five states, in this precedence order:
+`App\Support\Garmin\ResolveImportStatus` reads the newest imported run's `updated_at` fresh on every
+request — never from the grid cache. The header chip reads **"Last import {relative time}"**, or **"No
+runs imported yet"** with none, and below 640 px the footer's lowercase line takes over. The import card
+in the rail prints the absolute time in `HEATMAP_DISPLAY_TIMEZONE`. A re-import that writes nothing does
+not move it: the label means "data last changed by an import".
 
-| State | Condition | What renders |
-| --- | --- | --- |
-| **Never synced** | no `sync_runs` row at all, or the only rows are still `running` | The header chip reads "Never synced"; a banner says "Waiting for the first sync" and names the nightly job's hour. |
-| **Failed** | the most recent run's status is `failed` | An alert banner names the run's own `error_message` and offers **Reconnect Strava**; wins even over a recent success, because the map is now frozen at that last good sync. |
-| **Stale** | the most recent **successful** run finished more than `stale_after_hours` ago | An alert banner names the date the map's data is from and offers **Reconnect Strava**. |
-| **Loading** | a run is `running` and no run has ever succeeded | A skeleton in the grid's exact geometry, `aria-busy="true"` with a polite live region — the only moment the product has geometry to hold open and no data yet. |
-| **Healthy** | none of the above | The header chip alone reads "Synced {relative time}". |
-
-`stale_after_hours` (48) is a literal in `config/strava.php`, not an environment value, since it is
-a product invariant rather than a deployment knob — see the comment there for why. The boundary is
-strict: a success finished exactly 48 hours ago is still healthy, one second more is stale.
-
-A **failed** sync deliberately leaves the cached grid in place — the map keeps showing the last
-good data under the warning, which is what "stale data is never presented as current, but the grid
-still renders what it has" actually means in practice. Seeing an old map under an amber banner is
-the feature working, not a bug to chase.
-
-To reach each state in local dev without editing `TrainingBlockSeeder`, edit the newest
-`sync_runs` row directly:
-
-- **Never synced** — delete the newest row (or every row).
-- **Stale** — set its `finished_at` to more than 48 hours in the past.
-- **Failed** — set its `status` to `failed` and give it an `error_message`.
-- **Loading** — set its `finished_at` to `null`.
+There is no stale, failed or reconnect warning in any state, because nothing runs in the background that
+could fall behind.
 
 ### Manual review checklist
 
 Automated coverage is PHPUnit only at this project's `NORMAL` test bar — no Playwright, Dusk, or
-axe automation. Before accepting a change to the dashboard's states, check by hand:
+axe automation. Before accepting a change to the dashboard, check by hand:
 
-- Each of the five sync states above, at 375 px and 1280 px, in both light and dark theme.
-- The amber warning banner clears contrast against both card surfaces.
-- The skeleton's pulse stops under an OS "reduce motion" setting (`prefers-reduced-motion:
-  reduce`) and otherwise animates.
+- The status line and the empty state, at 375 px and 1280 px, in both light and dark theme.
+- The empty state's **Import Garmin CSV** button is a full-width 44 px target on a phone.
 - The header chip disappears below 640 px and the footer's lowercase line takes over.
 
 ## Tests and quality

@@ -10,10 +10,10 @@ use Carbon\CarbonInterface;
  * Decides whether two records are the same run: same local date, starts at most
  * ±2 minutes apart, closest start wins.
  *
- * The Garmin import (to find a conflict) and the Strava sync (to link a late twin)
- * both ask this one class. If each kept its own rule, a run the importer treated
- * as "already stored" could be one the sync treats as "new", and the day would be
- * counted twice.
+ * The Garmin import asks this one class both when it plans a file (to find a
+ * conflict) and when it confirms (to re-check it). If each kept its own rule, a run
+ * the review treated as "already stored" could be one the write treats as "new", and
+ * the day would be counted twice.
  */
 final readonly class StartTimeMatcher
 {
@@ -72,8 +72,8 @@ final readonly class StartTimeMatcher
     /**
      * Seconds of the wall-clock reading, ignoring the instance's timezone.
      *
-     * Start times are local wall-clock values on both sides: the Strava and Garmin
-     * DTOs build them in UTC, while Eloquent reads the stored column back in the
+     * Start times are local wall-clock values on both sides: the Garmin row builds
+     * them in UTC, while Eloquent reads the stored column back in the
      * app timezone. Comparing the instants would shift one side by the app's UTC
      * offset and match runs hours apart; comparing the wall-clock readings cannot.
      */

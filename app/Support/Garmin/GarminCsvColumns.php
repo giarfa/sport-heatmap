@@ -102,8 +102,8 @@ final class GarminCsvColumns
      * The language whose headers the row carries, wherever they sit.
      *
      * Its activity-type header plus all but one of the other required headers
-     * must be present: other exports reuse single names (Strava's has
-     * "Activity Type", "Distance" and "Moving Time"), and a Garmin export
+     * must be present: other exports reuse single names ("Activity Type",
+     * "Distance" and "Moving Time"), and a Garmin export
      * missing one column should hear which one, not "unrecognised".
      *
      * @param  array<int, string>  $header

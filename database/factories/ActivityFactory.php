@@ -2,7 +2,6 @@
 
 namespace Database\Factories;
 
-use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
@@ -15,6 +14,13 @@ use Illuminate\Support\Carbon;
  */
 class ActivityFactory extends Factory
 {
+    /**
+     * Garmin names a run after its place and its type.
+     *
+     * @var array<int, string>
+     */
+    private const RUN_NAMES = ['Paese Corsa', 'Verona Corsa', 'Bolzano Corsa', 'Lazise Corsa'];
+
     /**
      * Define the model's default state.
      *
@@ -31,24 +37,13 @@ class ActivityFactory extends Factory
         $startDateLocal = Carbon::instance(fake()->dateTimeBetween('-112 days', 'now'));
 
         return [
-            'strava_activity_id' => fake()->unique()->numberBetween(1_000_000_000, 9_999_999_999),
             'user_id' => User::factory(),
             'sport_type' => SportType::Run,
-            'name' => fake()->randomElement([
-                'Morning Run',
-                'Easy shakeout',
-                'Long run',
-                'Lunch Run',
-                'Evening Run',
-                'Tempo session',
-                'Recovery jog',
-                'Intervals on the track',
-            ]),
+            'name' => fake()->randomElement(self::RUN_NAMES),
             'distance_meters' => $distanceMeters,
             'moving_time_seconds' => (int) round($distanceMeters / 1_000 * $secondsPerKilometre),
             'start_date_local' => $startDateLocal,
             'activity_date' => $startDateLocal->toDateString(),
-            'source' => ActivitySource::Strava,
             'average_pace_seconds_per_km' => $secondsPerKilometre,
             'total_ascent_meters' => fake()->numberBetween(5, 180),
             'average_heart_rate' => fake()->numberBetween(135, 172),
@@ -80,27 +75,14 @@ class ActivityFactory extends Factory
     }
 
     /**
-     * A run imported new from a Garmin Connect CSV: it never existed on Strava, so it
-     * has no Strava id. Garmin names a run after its place and type.
+     * A run imported from a Garmin Connect CSV, which is what every stored run is. The
+     * default definition already is one; this reads better where a test is about the
+     * import.
      */
     public function garminImported(): static
     {
         return $this->state(fn (array $attributes): array => [
-            'source' => ActivitySource::GarminCsv,
-            'strava_activity_id' => null,
-            'name' => fake()->randomElement(['Paese Corsa', 'Verona Corsa', 'Bolzano Corsa', 'Lazise Corsa']),
-        ]);
-    }
-
-    /**
-     * A Strava twin the owner overwrote with Garmin's values: the Strava id stays, so
-     * the sync recognises the twin and leaves it alone.
-     */
-    public function garminOverwritten(): static
-    {
-        return $this->state(fn (array $attributes): array => [
-            'source' => ActivitySource::GarminCsv,
-            'name' => fake()->randomElement(['Paese Corsa', 'Verona Corsa', 'Bolzano Corsa', 'Lazise Corsa']),
+            'name' => fake()->randomElement(self::RUN_NAMES),
         ]);
     }
 

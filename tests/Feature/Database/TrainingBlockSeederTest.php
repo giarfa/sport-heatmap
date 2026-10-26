@@ -2,17 +2,15 @@
 
 namespace Tests\Feature\Database;
 
-use App\Enums\ActivitySource;
 use App\Enums\SportType;
-use App\Enums\SyncRunStatus;
 use App\Models\Activity;
-use App\Models\SyncRun;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapWindow;
 use Database\Seeders\TrainingBlockSeeder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class TrainingBlockSeederTest extends TestCase
@@ -34,10 +32,18 @@ class TrainingBlockSeederTest extends TestCase
         $this->seed(TrainingBlockSeeder::class);
     }
 
-    public function test_it_creates_exactly_one_demo_athlete_with_a_strava_identity(): void
+    public function test_it_creates_exactly_one_demo_athlete(): void
     {
         $this->assertSame(1, User::count());
-        $this->assertNotNull(User::sole()->strava_athlete_id);
+        $this->assertSame('Demo Athlete', User::sole()->name);
+    }
+
+    public function test_the_demo_athlete_is_the_owner_with_no_password_yet(): void
+    {
+        $athlete = User::sole();
+
+        $this->assertSame(User::OWNER_USERNAME, $athlete->username);
+        $this->assertNull($athlete->password);
     }
 
     /**
@@ -69,7 +75,6 @@ class TrainingBlockSeederTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-09-07 08:00:00'));
 
         User::query()->delete();
-        SyncRun::query()->delete();
 
         $this->seed(TrainingBlockSeeder::class);
 
@@ -136,22 +141,6 @@ class TrainingBlockSeederTest extends TestCase
         });
     }
 
-    public function test_the_block_seeds_two_garmin_imported_runs_and_one_garmin_overwritten_twin(): void
-    {
-        $this->assertSame(2, $this->activities()->where('source', ActivitySource::GarminCsv)->whereNull('strava_activity_id')->count());
-        $this->assertSame(1, $this->activities()->where('source', ActivitySource::GarminCsv)->whereNotNull('strava_activity_id')->count());
-    }
-
-    public function test_no_garmin_sourced_run_sits_in_the_current_week(): void
-    {
-        $this->assertSame(
-            0,
-            Activity::where('source', ActivitySource::GarminCsv)
-                ->whereDate('activity_date', '>=', Carbon::today()->startOfWeek()->toDateString())
-                ->count(),
-        );
-    }
-
     public function test_the_block_includes_days_with_two_runs(): void
     {
         $daysWithTwoRuns = $this->activities()
@@ -184,28 +173,6 @@ class TrainingBlockSeederTest extends TestCase
         );
     }
 
-    public function test_the_garmin_imported_runs_have_no_metrics(): void
-    {
-        $garminImported = $this->activities()->where('source', ActivitySource::GarminCsv)->whereNull('strava_activity_id');
-
-        $this->assertCount(2, $garminImported);
-        $garminImported->each(function (Activity $activity): void {
-            $this->assertNull($activity->average_pace_seconds_per_km);
-            $this->assertNull($activity->total_ascent_meters);
-            $this->assertNull($activity->average_heart_rate);
-        });
-    }
-
-    public function test_one_day_lists_a_strava_run_and_a_garmin_run(): void
-    {
-        $mixedDays = $this->activities()
-            ->groupBy(fn (Activity $activity): string => $activity->activity_date->toDateString())
-            ->filter(fn (Collection $activities): bool => $activities->contains('source', ActivitySource::Strava)
-                && $activities->contains('source', ActivitySource::GarminCsv));
-
-        $this->assertGreaterThanOrEqual(1, $mixedDays->count());
-    }
-
     public function test_the_stored_pace_is_the_pace_of_the_moving_time(): void
     {
         $this->activities()
@@ -219,13 +186,25 @@ class TrainingBlockSeederTest extends TestCase
             });
     }
 
-    public function test_the_most_recent_sync_run_succeeded(): void
+    public function test_the_first_block_weeks_come_from_an_older_export_with_no_metrics(): void
     {
-        $this->assertGreaterThanOrEqual(1, SyncRun::count());
-        $this->assertSame(
-            SyncRunStatus::Succeeded,
-            SyncRun::orderByDesc('started_at')->firstOrFail()->status,
+        $oldExport = $this->activities()->filter(
+            fn (Activity $activity): bool => $activity->activity_date->lessThan($this->blockStart()->addWeeks(2)),
         );
+
+        $this->assertNotEmpty($oldExport);
+        $oldExport->each(function (Activity $activity): void {
+            $this->assertNull($activity->average_pace_seconds_per_km);
+            $this->assertNull($activity->total_ascent_meters);
+            $this->assertNull($activity->average_heart_rate);
+        });
+    }
+
+    public function test_the_demo_has_no_sync_history_and_no_strava_columns(): void
+    {
+        $this->assertFalse(Schema::hasTable('sync_runs'));
+        $this->assertFalse(Schema::hasColumn('users', 'strava_athlete_id'));
+        $this->assertFalse(Schema::hasColumn('activities', 'strava_activity_id'));
     }
 
     public function test_every_activity_belongs_to_the_seeded_athlete(): void
@@ -234,16 +213,14 @@ class TrainingBlockSeederTest extends TestCase
     }
 
     /**
-     * Seven weeks of Garmin history sit before the block, Monday to Sunday, the 0 km week
-     * included, and every run in it is a Garmin import with no metrics.
+     * Seven weeks of history sit before the block, Monday to Sunday, the 0 km week
+     * included, and every run in it comes from an export with no metrics.
      */
     public function test_seven_weeks_of_garmin_history_sit_before_the_block(): void
     {
         $history = $this->historyActivities();
 
-        $this->assertTrue($history->every(fn (Activity $activity): bool => $activity->source === ActivitySource::GarminCsv
-            && $activity->strava_activity_id === null
-            && $activity->average_pace_seconds_per_km === null
+        $this->assertTrue($history->every(fn (Activity $activity): bool => $activity->average_pace_seconds_per_km === null
             && $activity->total_ascent_meters === null
             && $activity->average_heart_rate === null));
 
@@ -285,7 +262,7 @@ class TrainingBlockSeederTest extends TestCase
     }
 
     /**
-     * The Garmin history before the block.
+     * The history before the block.
      *
      * @return Collection<int, Activity>
      */

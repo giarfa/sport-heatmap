@@ -3,22 +3,23 @@
 namespace Database\Seeders;
 
 use App\Models\Activity;
-use App\Models\SyncRun;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
 /**
- * A coherent 16-week training block for one fixed demo athlete.
+ * A coherent 16-week training block for one fixed demo athlete: the owner account
+ * `giarfa` with no password yet, so a seeded database starts at the first sign-in.
  *
  * The block is always computed relative to the current week, so it can never drift
  * out of the window the dashboard renders. Its shape is deliberate: an illness week
  * and a peak week give the intensity scale a real distribution to bucket, and the
  * current week stays partial so future days render as out-of-range.
  *
- * Before the block sit seven weeks of Garmin-imported history, so Previous has
- * something to show after `migrate:fresh --seed` (US-013). Its weekly totals are the
- * ones the US-014 mockup draws, so both specs share one fixture.
+ * Every run is what a Garmin Connect CSV import writes. Before the block sit seven
+ * weeks of history, so Previous has something to show after `migrate:fresh --seed`
+ * (US-013). Its weekly totals are the ones the US-014 mockup draws, so both specs
+ * share one fixture.
  */
 class TrainingBlockSeeder extends Seeder
 {
@@ -36,19 +37,15 @@ class TrainingBlockSeeder extends Seeder
     private const DOUBLE_RUN_WEEK_INDEXES = [2, 6, 10];
 
     /**
-     * The double-run week whose second run is the Garmin import, so the demo has a day
-     * that lists a Strava run and a Garmin run side by side.
-     */
-    private const MIXED_SOURCE_WEEK_INDEX = 6;
-
-    /**
      * How many runs were recorded without a heart-rate strap, as a percentage.
      */
     private const WITHOUT_HEART_RATE_PERCENT = 15;
 
-    private const GARMIN_IMPORTED_RUNS = 2;
-
-    private const GARMIN_OVERWRITTEN_RUNS = 1;
+    /**
+     * How many of the block's first weeks come from an older export whose metric columns
+     * hold `--`, so the demo shows a run that lacks every metric.
+     */
+    private const EXPORT_WITHOUT_METRICS_WEEKS = 2;
 
     /**
      * Weekly distance of the seven weeks right before the block, oldest first. The sixth
@@ -70,31 +67,35 @@ class TrainingBlockSeeder extends Seeder
             return;
         }
 
-        $athlete = User::factory()->stravaConnected()->create([
+        /*
+         * The username migration already creates the owner on an empty database,
+         * and `username` is unique: a second `giarfa` would throw. The demo athlete
+         * becomes that row when it exists.
+         */
+        $athlete = User::query()->where('username', User::OWNER_USERNAME)->first()
+            ?? User::factory()->owner()->make();
+
+        $athlete->forceFill(User::factory()->raw([
             'name' => 'Demo Athlete',
             'email' => 'athlete@sport-heatmap.test',
-            'strava_athlete_id' => '10000001',
-        ]);
+            'username' => User::OWNER_USERNAME,
+            'password' => null,
+        ]))->save();
 
-        $block = $this->trainingBlock();
-        $garminRuns = $this->garminRuns($block);
-
-        foreach ($block as $weekIndex => $runs) {
-            foreach ($runs as $runIndex => $run) {
+        foreach ($this->trainingBlock() as $weekIndex => $runs) {
+            foreach ($runs as $run) {
                 $this->createActivity(
                     $athlete,
                     $run['date'],
                     $run['distance_meters'],
-                    $garminRuns["{$weekIndex}.{$runIndex}"] ?? null,
+                    hasMetrics: $weekIndex >= self::EXPORT_WITHOUT_METRICS_WEEKS,
                 );
             }
         }
 
         foreach ($this->historyBeforeBlock() as $run) {
-            $this->createActivity($athlete, $run['date'], $run['distance_meters'], 'garminImported');
+            $this->createActivity($athlete, $run['date'], $run['distance_meters'], hasMetrics: false);
         }
-
-        $this->createSyncRuns();
     }
 
     /**
@@ -333,48 +334,11 @@ class TrainingBlockSeeder extends Seeder
     }
 
     /**
-     * Pick the runs that came from a Garmin Connect CSV import: GARMIN_IMPORTED_RUNS
-     * imported new and GARMIN_OVERWRITTEN_RUNS overwriting a Strava twin, so the
-     * demo map exercises every activity source. One imported run is always the second
-     * run of a double-run day whose first run is from Strava. Taken from completed
-     * weeks only, so the current week stays exactly what the last sync returned.
-     *
-     * @param  array<int, array<int, array{date: Carbon, distance_meters: int}>>  $block
-     * @return array<string, string> "{weekIndex}.{runIndex}" => factory state name
+     * One run as a Garmin import writes it. The history before the block, and the block's
+     * first weeks, come from an older export whose metric columns hold `--`, so those runs
+     * have none; a few later runs lack a heart rate, as a run without a strap does.
      */
-    private function garminRuns(array $block): array
-    {
-        $mixedSourceRun = self::MIXED_SOURCE_WEEK_INDEX.'.'.array_key_last($block[self::MIXED_SOURCE_WEEK_INDEX]);
-        $mixedDayStravaRun = self::MIXED_SOURCE_WEEK_INDEX.'.0';
-
-        $candidates = [];
-
-        foreach ($block as $weekIndex => $runs) {
-            if ($weekIndex === self::BLOCK_WEEKS - 1) {
-                continue;
-            }
-
-            foreach (array_keys($runs) as $runIndex) {
-                if (! in_array("{$weekIndex}.{$runIndex}", [$mixedSourceRun, $mixedDayStravaRun], true)) {
-                    $candidates[] = "{$weekIndex}.{$runIndex}";
-                }
-            }
-        }
-
-        shuffle($candidates);
-
-        $states = [
-            ...array_fill(0, self::GARMIN_IMPORTED_RUNS - 1, 'garminImported'),
-            ...array_fill(0, self::GARMIN_OVERWRITTEN_RUNS, 'garminOverwritten'),
-        ];
-
-        return [
-            $mixedSourceRun => 'garminImported',
-            ...array_combine(array_slice($candidates, 0, count($states)), $states),
-        ];
-    }
-
-    private function createActivity(User $athlete, Carbon $date, int $distanceMeters, ?string $garminState = null): void
+    private function createActivity(User $athlete, Carbon $date, int $distanceMeters, bool $hasMetrics = true): void
     {
         $factory = Activity::factory()->for($athlete)->onDate($date);
 
@@ -385,20 +349,10 @@ class TrainingBlockSeeder extends Seeder
         };
 
         // Applied last, so Garmin's place-and-type name wins over the sport-type state's.
-        $factory = match ($garminState) {
-            'garminImported' => $factory->garminImported(),
-            'garminOverwritten' => $factory->garminOverwritten(),
-            default => $factory,
-        };
+        $factory = $factory->garminImported();
 
-        /*
-         * A Garmin import of the owner's real export carries `--` in the metric columns,
-         * so those runs have none; a Garmin-won twin keeps the metrics Strava gave it,
-         * because Overwrite never replaces a stored value with `--`. A few Strava runs
-         * lack a heart rate, as a run without a strap does.
-         */
         $factory = match (true) {
-            $garminState === 'garminImported' => $factory->withoutMetrics(),
+            ! $hasMetrics => $factory->withoutMetrics(),
             fake()->boolean(self::WITHOUT_HEART_RATE_PERCENT) => $factory->withoutHeartRate(),
             default => $factory,
         };
@@ -410,28 +364,10 @@ class TrainingBlockSeeder extends Seeder
             'moving_time_seconds' => (int) round($distanceMeters / 1_000 * $secondsPerKilometre),
         ];
 
-        if ($garminState !== 'garminImported') {
+        if ($hasMetrics) {
             $attributes['average_pace_seconds_per_km'] = $secondsPerKilometre;
         }
 
         $factory->create($attributes);
-    }
-
-    /**
-     * A short sync history whose most recent entry succeeded, so the dashboard renders
-     * the healthy FR-007 state by default.
-     */
-    private function createSyncRuns(): void
-    {
-        SyncRun::factory()->stale()->create();
-
-        $failedStartedAt = now()->subHours(26);
-
-        SyncRun::factory()->failed()->create([
-            'started_at' => $failedStartedAt,
-            'finished_at' => $failedStartedAt->copy()->addSeconds(12),
-        ]);
-
-        SyncRun::factory()->create();
     }
 }

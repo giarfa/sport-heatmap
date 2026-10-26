@@ -2,18 +2,11 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Schedule;
 
+/*
+ * Nothing is scheduled: the Garmin CSV import is the only way a run enters, and
+ * it is the owner's own action, so no background job runs on this instance.
+ */
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
-
-/*
- * withoutOverlapping() because a run that outlives its window would otherwise
- * overlap the next day's, and two concurrent reconciles of the same window
- * race on the delete pass.
- */
-Schedule::command('strava:sync')
-    ->dailyAt(sprintf('%02d:00', (int) config('strava.sync_hour')))
-    ->timezone((string) config('strava.sync_timezone'))
-    ->withoutOverlapping();

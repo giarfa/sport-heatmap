@@ -34,10 +34,9 @@ Keep the table below current — it is the entry point for a new developer.
 
 | Domain | What it covers | Last touched by |
 | --- | --- | --- |
-| [activity-sync](activity-sync.md) | Nightly `strava:sync`: fetch the 112-day window, reconcile `activities`, record `sync_runs`; activity sources; per-run metric columns; CSV-only athletes skipped | `US-015` |
-| [garmin-csv-import](garmin-csv-import.md) | Garmin Connect CSV upload: parsing, import target, CSV-only athlete, conflict review, Overwrite / Skip; optional pace / ascent / heart-rate columns; runs of any age kept, future-dated rows skipped; the review shares the upload's throttle and matches by date | `US-018` |
-| [heatmap-dashboard](heatmap-dashboard.md) | The public `/` screen: 16-week grid, intensity scale, grid cache, fresh sync status (CSV-only import status), Garmin import entry points for every visitor; the day cell detail with each run's pace, ascent and heart rate; Previous / Next window navigation by a `to` date; the weekly-mileage trend builder (bars, 4-week average, axis); how `activity_date` is stored and how window ranges compare it; the security headers every web response carries | `US-019` |
-| [strava-connection](strava-connection.md) | OAuth connect, athlete allowlist, encrypted tokens, refresh, the `strava.fresh` guard, the publicly displayed athlete (also the guest import target) and its stored-athlete fallback | `US-019` |
+| [garmin-csv-import](garmin-csv-import.md) | Garmin Connect CSV upload for the signed-in owner, the only way a run enters: parsing, conflict review against every stored run, Overwrite / Skip; optional pace / ascent / heart-rate columns; runs of any age kept, future-dated rows skipped; the review shares the upload's throttle and matches by date; no guest import; the `activities` data model and the irreversible removal of Strava (`US-021`) | `US-021` |
+| [heatmap-dashboard](heatmap-dashboard.md) | The private `/` screen of the signed-in owner: 16-week grid, intensity scale, grid cache, fresh import status ("last import N ago", no warning state), the Garmin-only empty state and import entry point; the day cell detail; Previous / Next window navigation by a `to` date; the weekly-mileage trend builder; how `activity_date` is stored and how window ranges compare it; the security headers every web response carries | `US-021` |
+| [owner-authentication](owner-authentication.md) | The single private account: `users.username` (`giarfa`), the null password that arms the first sign-in, the owner backfill migration, the sign-in page, its throttle and the intended-URL guard, sign-out, the forced first password change, recovery; the `users` columns after Strava | `US-021` |
 
 ## Who writes them
 

@@ -3,40 +3,46 @@
 namespace Tests;
 
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
     /**
-     * Put athletes on the allowlist for the duration of one test.
-     *
-     * The allowlist is re-checked on every authenticated request, so a test that
-     * signs an athlete in has to say they are allowed in — leaving it implicit is
-     * how the guard silently stops being exercised.
+     * Whether a RefreshDatabase test starts with no user. Set it to false to meet
+     * the owner the username migration creates on an empty database.
      */
-    protected function allowlistAthletes(User|string ...$athletes): void
+    protected bool $clearsMigrationOwner = true;
+
+    protected function setUp(): void
     {
-        Config::set('strava.allowed_athlete_ids', array_map(
-            static fn (User|string $athlete): string => $athlete instanceof User
-                ? (string) $athlete->strava_athlete_id
-                : $athlete,
-            $athletes,
-        ));
+        parent::setUp();
+
+        /*
+         * The username migration creates the giarfa owner on an empty database,
+         * so every freshly migrated test database starts with one user. Tests
+         * arrange their own users (and the unique username would collide with
+         * the owner() factory states), so clear the row inside the test's
+         * transaction. UsernameMigrationTest covers the migration itself.
+         */
+        if ($this->clearsMigrationOwner && in_array(RefreshDatabase::class, class_uses_recursive($this), true)) {
+            DB::table('users')->delete();
+        }
     }
 
     /**
-     * Create a connected athlete who is on the allowlist.
+     * Sign the owner in: `giarfa` with a password already chosen.
      *
      * @param  array<string, mixed>  $state
      */
-    protected function allowlistedAthlete(array $state = [], string $factoryState = 'stravaConnected'): User
+    protected function signInOwner(array $state = []): User
     {
-        /** @var User $user */
-        $user = User::factory()->{$factoryState}()->create($state);
+        /** @var User $owner */
+        $owner = User::factory()->ownerWithPassword()->create($state);
 
-        $this->allowlistAthletes($user);
+        $this->actingAs($owner);
 
-        return $user;
+        return $owner;
     }
 }

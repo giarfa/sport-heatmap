@@ -17,20 +17,26 @@ class SecurityHeadersTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * @return array<string, array{string, int}>
+     * @return array<string, array{string, int, bool}>
      */
     public static function webResponses(): array
     {
         return [
-            'dashboard' => ['/', 200],
-            'garmin import form' => ['/import/garmin', 200],
-            'unknown path' => ['/no-such-page', 404],
+            'sign-in page' => ['/login', 200, false],
+            'dashboard' => ['/', 200, true],
+            'garmin import form' => ['/import/garmin', 200, true],
+            'redirect to sign-in' => ['/', 302, false],
+            'unknown path' => ['/no-such-page', 404, false],
         ];
     }
 
     #[DataProvider('webResponses')]
-    public function test_every_web_response_carries_the_four_security_headers(string $uri, int $status): void
+    public function test_every_web_response_carries_the_four_security_headers(string $uri, int $status, bool $signedIn): void
     {
+        if ($signedIn) {
+            $this->signInOwner();
+        }
+
         $response = $this->get($uri);
 
         $response->assertStatus($status);
@@ -42,7 +48,7 @@ class SecurityHeadersTest extends TestCase
 
     public function test_hsts_is_not_sent_over_http(): void
     {
-        $response = $this->get('http://sport-heatmap.test/');
+        $response = $this->get('http://sport-heatmap.test/login');
 
         $response->assertOk();
         $response->assertHeaderMissing('Strict-Transport-Security');
@@ -50,7 +56,7 @@ class SecurityHeadersTest extends TestCase
 
     public function test_hsts_is_sent_over_https_without_subdomains_or_preload(): void
     {
-        $response = $this->get('https://sport-heatmap.test/');
+        $response = $this->get('https://sport-heatmap.test/login');
 
         $response->assertOk();
         $response->assertHeader('Strict-Transport-Security', 'max-age=31536000');

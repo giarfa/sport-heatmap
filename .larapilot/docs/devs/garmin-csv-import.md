@@ -4,20 +4,18 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-008` |
-| **Last updated by** | `US-018` — 2026-10-18 |
+| **Last updated by** | `US-021` — 2026-10-26 |
 | **Owner persona** | 🔧 Alex |
 
 ## Purpose
 
-Lets the owner add runs that Strava is missing, or that Garmin recorded better,
-by uploading the "Activities" CSV exported from the Garmin Connect website
-(FR-018). Since US-011 any visitor can import, signed in or not: a guest
-imports into the displayed athlete, or — on a fresh install — creates a local
-CSV-only athlete, so the heatmap works with CSV imports only. The file is parsed into running rows of any age (dated today or earlier, so the
+Lets the owner load their runs, the only way a run enters the app, by uploading the "Activities" CSV exported from the Garmin Connect website
+(FR-018). Since `US-020` the import requires the owner's session and always
+imports into the signed-in owner (`giarfa`): there is no guest import and no
+CSV-only athlete creation, and the heatmap works from imports alone. The file is parsed into running rows of any age (dated today or earlier, so the
 heatmap can be navigated back to them — `US-013`), and
 every row that clashes with a stored run is reviewed before anything is
-written. If it stops working, Garmin-only runs never reach the heatmap; the
-Strava sync is unaffected.
+written. If it stops working, no run reaches the heatmap.
 
 ## Functional flow
 
@@ -33,7 +31,7 @@ file and returns a `ParsedGarminCsv`. It writes nothing.
    - the header carries neither `Tipo di attività` (Italian) nor
      `Activity Type` (English) together with all but one of that language's
      other required headers → "This is not a Garmin Connect activities
-     export…" (Strava's export shares three English names, so one shared name
+     export…" (other exports share three English names, so one shared name
      is not enough)
    - a required column of that language is missing → the message names it
    - there is a header but no data row → "The file has no activities."
@@ -114,8 +112,8 @@ Matched trimmed and case-insensitively (`GarminRunningTypes`):
 | Average heart rate | up to three digits, optional decimal rounded; `0` is not recorded | `"152"` → 152 · `"148.6"` → 149 |
 
 Implausible values are not recorded either (pace above 36 000 s/km, ascent above
-20 000 m, heart rate above 250 bpm): the file is attacker-supplied for a
-signed-out visitor and the values are shown on the public map.
+20 000 m, heart rate above 250 bpm): the file is untrusted input and the
+values are drawn on the owner's map.
 
 `--`, empty, an absent column, or anything that does not match is a **null
 metric, never `0`**: a stored `0` would read on the dashboard as a measurement.
@@ -128,47 +126,41 @@ so an upload parked before `US-012` shipped can still be confirmed afterwards.
 the file recorded** — an empty one is left out, not nulled, so writing the
 attributes onto a stored run can never blank a value it already holds.
 
-### 2. Target and planning (`ResolveGarminImportTarget`, `PlanGarminImport`)
+### 2. Target and planning (`PlanGarminImport`)
 
-`ResolveGarminImportTarget::__invoke(?User $signedIn)` picks the athlete the
-import plans against and writes to:
+The import plans against and writes to the **signed-in owner**
+(`$request->user()`), passed to the planner and the apply action as a non-null
+`User`. There is no resolver: the review and the confirm read the same user from
+the session.
 
-1. the **signed-in owner**, when there is one;
-2. else the **displayed athlete** (`ResolveDisplayedAthlete`, FR-017) — the
-   narrow `id, strava_athlete_id` model, so no token is ever loaded;
-3. else **null** — no stored athlete has an activity yet.
-
-The review and the confirm both resolve through it.
-
-`PlanGarminImport::__invoke(?User, rows)` sorts the parsed rows against the
-target's stored activities. It reads only. With a **null target** every row is
-new and no query runs.
+`PlanGarminImport::__invoke(User, rows)` sorts the parsed rows against the
+owner's stored activities. It reads only.
 
 1. **One query** loads the owner's activities on the dates the file contains
    (`Activity::onDates()`, a `whereIn` on `activity_date` served by the
    `(user_id, activity_date)` index) — never one query per row. The stored runs
-   are then **indexed by date once** (garmin-sourced runs by `start_date_local`
+   are then **indexed by date once** (every stored run by `start_date_local`
    date for the identity pass, the unclaimed ones by `activity_date` for the
    pairing pass), so a row is compared only with the runs of its own date, not
    with every stored run on every date of the file (`US-018`).
-2. **Already imported** (first pass, whole file): a stored `garmin_csv` row with
+2. **Already imported** (first pass, whole file): a stored run with
    the identical start (to the second), distance and moving time. It is not
    asked about, and that stored row is claimed.
 3. **Conflict** (second pass, whole file): every (CSV row, stored row) pair
-   that `StartTimeMatcher::difference()` accepts — a stored row of **either
-   source** on the same local date within **±2 minutes inclusive** (120 s
+   that `StartTimeMatcher::difference()` accepts — **any stored run**,
+   including one imported in an earlier session, on the same local date within **±2 minutes inclusive** (120 s
    matches, 121 s does not) — is ranked by start difference, and pairs are
    taken **closest first**, each CSV row and each stored row at most once.
    Ties go to the earlier CSV row, then the lower stored id.
 4. **New**: everything else.
 
 **The review reuses its plan** (`RememberedGarminImportPlan`, `US-018`). The review
-is a GET a visitor can reload, so the plan is computed once and kept in the session
+is a GET the owner can reload, so the plan is computed once and kept in the session
 under the pending entry (`garmin_import.pending.plan`: the target athlete id, a
 stamp, and the row indexes of the new rows plus the stored run id of each conflict
 and each already-imported row). On the next render the stored runs on the upload's
 dates are loaded once (`PlanGarminImport::storedRuns()`), the **stamp** — a SHA-256 of
-each such run's `source`, `start_date_local`, `activity_date`, `distance_meters` and
+each such run's `start_date_local`, `activity_date`, `distance_meters` and
 `moving_time_seconds`, by id — is recomputed, and when the athlete and the stamp match
 the plan is rebuilt from the parsed rows and those loaded runs with no planning. Any
 run added, removed or changed on one of those dates, a different target, or a new
@@ -180,26 +172,19 @@ under its lock.
 The result is a `GarminImportPlan` (`newRows`, `conflicts`, `alreadyImported`,
 all keyed by the row's index in the parsed file, `alreadyImportedActivities` —
 the stored run each already-imported row matched, so the apply step needs no
-second lookup — plus the target's `athleteId`, null when there is none) with a
+second lookup — plus the target's `athleteId`) with a
 `fingerprint()`: a SHA-256 of the
 target id, the `rowIndex => storedActivityId` conflict pairs, and the
-already-imported row indexes — what the visitor was shown.
+already-imported row indexes — what the owner was shown.
 
 ### 3. Applying (`ApplyGarminImport`)
 
-`ApplyGarminImport::__invoke(?User, plan, resolutions, parsed)` runs inside
+`ApplyGarminImport::__invoke(User, plan, resolutions, parsed)` runs inside
 **one** `DB::transaction`:
 
-- **null target with new rows** → `CreateCsvOnlyAthlete` first, inside the
-  transaction: `firstOrCreate` on `email = csv-athlete@garmin.invalid`,
-  `name = Garmin CSV athlete`, no password, no Strava id, no tokens. A null
-  target with nothing to add writes nothing and creates no athlete;
-- each new row → `$user->activities()->create()` with `source = garmin_csv`
-  and no Strava id;
+- each new row → `$user->activities()->create()`;
 - **Overwrite** → the stored row takes the CSV's name, distance, moving time,
-  start, `activity_date` and sport type, and `source` becomes `garmin_csv`.
-  `strava_activity_id` is **kept**, so the nightly sync recognises the twin and
-  skips it (see `activity-sync.md`). The three run metrics are replaced by the
+  start, `activity_date` and sport type. The three run metrics are replaced by the
   CSV's **except where the CSV recorded none**: `GarminCsvRow::toAttributes()`
   omits an empty metric, so a `--` keeps the stored value. Blanking a pace the
   owner already has because the new export lacks it would be data loss;
@@ -213,10 +198,8 @@ already-imported row indexes — what the visitor was shown.
   still count as "already imported" in the summary — backfilling adds no new
   count.
 
-The passed athlete is only read, never `save()`d — it may be the narrow
-displayed-athlete model. After the commit it retires every cached window grid
-of the athlete actually written to
-(`HeatmapGridCache::forgetAthlete()`), so the dashboard shows the import on the next
+The passed owner is only read, never `save()`d. After the commit it retires every
+cached window grid of the owner (`HeatmapGridCache::forgetAthlete()`), so the dashboard shows the import on the next
 request, whichever window is opened — also after a backfill-only import, whose metrics the cached day
 detail carries. It returns a `GarminImportSummary`: imported, overwritten, skipped,
 already imported, ignored by type, future-dated, invalid. The action does not
@@ -224,38 +207,30 @@ authorize (`.ai/rules/actions.md`); the caller has.
 
 ### 4. HTTP flow
 
-All routes sit under `import/garmin`, named `garmin.import.*`, behind
-`strava.fresh` only — **open to signed-out visitors** by the owner's choice
-(US-011; PRD Security, accepted risk). `strava.fresh` is a no-op for guests and
-still re-checks a signed-in owner's allowlist and token. CSRF comes from the
-`web` group.
+All routes sit under `import/garmin`, named `garmin.import.*`, in the `auth` +
+`password.set` route group (`US-020`): a signed-out request goes to `/login`,
+an owner with no password yet to the first-password page. CSRF comes from the `web` group.
 
 | Route | Name | Does |
 | --- | --- | --- |
 | `GET /import/garmin` | `create` | Upload form |
-| `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per signed-in owner, else per IP; the review and the confirm draw on the same budget, and the redirect to the review is itself a hit, so an upload and its review cost two of the ten) |
-| `GET /import/garmin/review` | `review` | Throttled `garmin-import`, the same limiter as upload and confirm (`US-018`). Resolves the target and plans the pending rows against the DB **as it is now**, reusing the plan remembered from the previous render while the stored runs on the upload's dates are unchanged (see *The review reuses its plan*); renders conflicts, new rows, counts, `token`, `fingerprint` |
-| `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under the **instance-wide** `Cache::lock('garmin-import:confirm')`, resolves the target, re-plans; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
+| `POST /import/garmin` | `store` | `UploadGarminCsvRequest` → `ParseGarminCsv` → `PendingGarminImport::put()` → review. Throttled `garmin-import` (10/min per signed-in owner; the review and the confirm draw on the same budget, and the redirect to the review is itself a hit, so an upload and its review cost two of the ten) |
+| `GET /import/garmin/review` | `review` | Throttled `garmin-import`, the same limiter as upload and confirm (`US-018`). Plans the pending rows for the owner against the DB **as it is now**, reusing the plan remembered from the previous render while the stored runs on the upload's dates are unchanged (see *The review reuses its plan*); renders conflicts, new rows, counts, `token`, `fingerprint` |
+| `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under the **instance-wide** `Cache::lock('garmin-import:confirm')`, re-plans for the owner; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
 | `POST /import/garmin/cancel` | `cancel` | Forgets the pending import → dashboard, "Import cancelled. Nothing was written." |
 | `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary`; without one → dashboard |
 
-- **Guests** reach every page. A guest's target is the displayed athlete
-  (narrow model, no token column), else none — the confirm then creates the
-  CSV-only athlete. A guest request never calls Strava and never reads or
-  refreshes a token.
-- **Instance-wide confirm lock**: one confirm at a time on the whole instance,
-  with the target resolved **inside** the lock. A per-athlete key cannot exist
-  before the CSV-only athlete does; serialised, a second concurrent first
-  import re-plans against the athlete the first just created, fails the
-  fingerprint and goes back to the review. A confirm that waits out the 10 s
+- **Instance-wide confirm lock**: one confirm at a time on the whole instance
+  (one owner, so serialising costs nothing); a second concurrent confirm (a
+  double click, a second tab) re-plans after the first committed, finds its runs
+  already imported, fails the fingerprint and goes back to the review. A confirm that waits out the 10 s
   block (`LockTimeoutException`) writes nothing and goes back to the review
   with "Another import is being saved — confirm again in a moment."; the upload
   stays pending.
 - **Session binding**: `PendingGarminImport` is the only reader and writer of
   `garmin_import.pending` = `{token, parsed}` (scalars only). No route or field
   names an import or an athlete, so a request can only reach the one in its
-  own session — this is what keeps two signed-out visitors apart.
-  Abandoning the review leaves just this entry; the next upload replaces it.
+  own session. Abandoning the review leaves just this entry; the next upload replaces it.
 - **The file is never stored**: the controller parses
   `$request->file('csv')->getRealPath()` and never calls `store()`; PHP deletes
   the temporary upload when the request ends.
@@ -264,31 +239,25 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
   token with the session's (both with `hash_equals`). A mismatch redirects to
   the review with "Your stored activities changed since this review — check
   the conflicts again." and writes nothing. A review page left open across a
-  newer upload fails the token check the same way, and so does a target that
-  changed since the review (an allowlisted athlete connected, the visitor
-  signed in, another guest created the CSV-only athlete).
+  newer upload fails the token check the same way, and so does a different
+  signed-in user.
 - **Rejections** (`UploadGarminCsvRequest` or `GarminCsvRejectedException`) go
   back to the form with the message on `csv`, linked to the input through
   `aria-describedby`; nothing is parsed into the session.
-- **Guest masking**: the review controller passes
-  `showsStoredRunDetails` (`$request->user() !== null`) once; the view only
-  branches on it. The owner's review is unchanged; the Garmin-file side and the
-  Overwrite / Skip choice are the same for everyone.
 - **Views** (`resources/views/garmin/`) follow `.larapilot/mockups/US-008/`:
   real `<table>`s with captions and scoped headers that reflow into stacked
   cards below 640 px (`td[data-label]`); a fieldset per conflict with Skip
   pre-checked; "Overwrite all" / "Skip all" rendered `hidden` and revealed by
-  `resources/js/app.js` (`data-resolve-all`); "View on Strava" only where
-  `Activity::stravaUrl()` is not null (FR-008). Formats come from
+  `resources/js/app.js` (`data-resolve-all`); the stored side of a conflict shows its
+  values and the run's name, with no link and no source label. Formats come from
   `GarminImportFormat` (km to one decimal, `H:MM:SS`, `HH:MM:SS` start, and
   `pace()` `5:23 /km`, `ascent()` `45 m`, `heartRate()` `152 bpm` — each null
   when not recorded, which `<x-run-metric>` prints as an em dash read aloud as
   "not recorded").
 - **Review metrics** (`US-012`, mockup `.larapilot/mockups/US-012/review-metrics.html`):
   each conflict's Stored and Garmin-file sides gain `Avg pace`, `Ascent` and
-  `Heart rate` rows under `Moving`. A guest's Stored side still shows the start
-  only — no metrics, the same rule as name, distance, moving time and the Strava
-  link, so crafted rows cannot read stored runs through the review.
+  `Heart rate` rows under `Moving`. The Stored side always shows the stored
+  run's details (the guest masking is gone with the guest path).
 
 ## Technical design
 
@@ -297,26 +266,46 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | Parser | `app/Support/Garmin/ParseGarminCsv.php` | File → `ParsedGarminCsv`; `SplFileObject`, no package |
 | Header sets | `app/Support/Garmin/GarminCsvColumns.php` | Language detection, column lookup by name |
 | Type map | `app/Support/Garmin/GarminRunningTypes.php` | Garmin type name → `SportType` |
-| Row DTO | `app/Data/Garmin/GarminCsvRow.php` | `toAttributes()` (always `source = garmin_csv`), `toSessionArray()` / `fromSessionArray()`, `isIdenticalTo(Activity)` |
+| Row DTO | `app/Data/Garmin/GarminCsvRow.php` | `toAttributes()`, `toSessionArray()` / `fromSessionArray()`, `isIdenticalTo(Activity)` |
 | Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, future-dated count, invalid list; session round-trip (`fromSessionArray()` tolerates the pre-`US-013` `outside_window` key and reads the missing `future_dated` as 0, so an upload or summary in flight across the deploy still opens) |
 | Rejection | `app/Exceptions/Garmin/GarminCsvRejectedException.php` | Owner-facing messages; no file content beyond a column name |
-| Target | `app/Support/Garmin/ResolveGarminImportTarget.php` | Signed-in owner, else displayed athlete, else null |
 | Remembered plan | `app/Support/Garmin/RememberedGarminImportPlan.php`, `PendingGarminImport::rememberPlan()` / `rememberedPlan()` | The review's plan, kept in the session with a stamp of the planner's database inputs and reused while it holds (`US-018`) |
-| Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query through `Activity::onDates()`, per-date indexes, claiming; all new with no target |
-| CSV-only athlete | `app/Actions/Garmin/CreateCsvOnlyAthlete.php`, `User::isCsvOnly()`, `UserFactory::csvOnly()` | Placeholder identity (`NAME`, `EMAIL` constants), reused by `firstOrCreate` |
-| Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id — shared with the sync |
+| Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query through `Activity::onDates()`, per-date indexes, claiming |
+| Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id |
 | Plan DTOs | `app/Data/Garmin/GarminImportPlan.php`, `GarminImportConflict.php` | The plan and its `fingerprint()` |
-| Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction, CSV-only athlete created inside it; Overwrite and the already-imported metric backfill; every cached window grid of the athlete retired after commit (`forgetAthlete()`) |
+| Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction; Overwrite and the already-imported metric backfill; every cached window grid of the athlete retired after commit (`forgetAthlete()`) |
 | Answer | `app/Enums/ConflictResolution.php` | `overwrite`, `skip` |
 | Summary DTO | `app/Data/Garmin/GarminImportSummary.php` | The seven counts; session round-trip for the summary page |
-| Routes | `routes/web.php` (`garmin.import.*`, `strava.fresh` only), `garmin-import` limiter in `app/Providers/AppServiceProvider.php` | |
+| Routes | `routes/web.php` (`garmin.import.*`, in the `auth` + `password.set` group), `garmin-import` limiter in `app/Providers/AppServiceProvider.php` | |
 | Controllers | `app/Http/Controllers/Garmin/*` | Six single-action controllers |
 | Form Requests | `app/Http/Requests/Garmin/UploadGarminCsvRequest.php`, `ConfirmGarminImportRequest.php` | `required\|file\|max:5120\|mimes:csv,txt`; token, fingerprint, `resolutions.*` in `ConflictResolution` |
 | Session binding | `app/Support/Garmin/PendingGarminImport.php` | The one reader/writer of `garmin_import.pending` |
 | Formatting | `app/Support/Garmin/GarminImportFormat.php` | Shared by the review's stored and CSV sides |
 | Views / assets | `resources/views/garmin/{create,review,summary}.blade.php`, "Garmin import" block in `resources/css/app.css`, `data-resolve-all` in `resources/js/app.js` | |
-| Tests | `tests/Feature/Garmin/*`, `tests/Unit/Support/Garmin/StartTimeMatcherTest.php`, `tests/Feature/Strava/ReconcileStravaWindowTest.php` | |
+| Tests | `tests/Feature/Garmin/*`, `tests/Unit/Support/Garmin/*`, `tests/Feature/Database/RemoveStravaMigrationTest.php` | |
 | Fixtures | `tests/Fixtures/Garmin/activities-it.csv` (client sample, verbatim), `activities-en.csv` | |
+
+### Data model (`activities`)
+
+The table the import writes and the dashboard reads — one row per run (moved here from
+the retired `activity-sync.md` by `US-021`). `activity_date` is the local calendar date
+of the run, indexed together with `user_id` as `[user_id, activity_date]`, the shape of
+the dashboard aggregate and of the import's conflict lookup. `sport_type` is one of
+`Run`, `TrailRun`, `VirtualRun` (`app/Enums/SportType.php`, FR-003).
+
+Three nullable integer columns hold the per-run metrics: `average_pace_seconds_per_km`
+(whole seconds per km), `total_ascent_meters` (whole metres) and `average_heart_rate`
+(whole bpm). **NULL means "not recorded"** and is shown as an em dash; a stored `0`
+would read as a measurement, so there is no column default and no writer may store `0`
+for a missing value. They are plain `#[Fillable]` values cast to `integer`, read only
+with the run's own row, so they carry **no index**: every query filters on
+`(user_id, activity_date)` first. `activities.user_id` is not mass-assignable; write
+through `$user->activities()`.
+
+There is no `source` and no `strava_activity_id` column: `US-021` deleted every
+Strava-sourced run and dropped both, together with the Strava columns of `users` and
+the `sync_runs` table (`remove_strava_from_schema`). The migration is irreversible: its
+`down()` restores the schema, never the deleted rows or the tokens.
 
 ## Architectural choices
 
@@ -327,27 +316,23 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 | Parse inside the request | Queue a job | A whole export parses in milliseconds, and the owner is waiting on the review page anyway |
 | Locate columns by header name, per language | Fixed column positions | Garmin translates headers and changes column sets between exports; positions would silently read the wrong column |
 | List unknown types by name in the summary (decision `56c5683061907ab8`) | Drop them silently; reject the file | Only `Corsa` is confirmed by a real export. A missed running variant must be visible to the owner so it becomes a one-line addition |
-| "Already imported" = same start, distance and moving time on a `garmin_csv` row | A hash of the CSV row as its identity | Garmin exports carry no activity id, and a re-export may add, drop or reorder columns, changing the hash of an unchanged run |
+| "Already imported" = same start, distance and moving time on a stored run | A hash of the CSV row as its identity | Garmin exports carry no activity id, and a re-export may add, drop or reorder columns, changing the hash of an unchanged run |
 | Identity pass before the conflict pass | One pass in file order | A row a minute away could claim the stored run first, and the row identical to it — a re-import — would be inserted a second time |
 | Claim each stored row for one CSV row, closest pairs first | Let every CSV row match freely; claim in file order | Free matching lets two CSV runs overwrite one stored run; file order lets an earlier row 90 s away take a stored run a later row matches to the second, so the later row is planned as new and a Skip leaves that run on the map twice |
-| Instance-wide lock around confirm, target resolved inside it | Rely on the token and fingerprint alone; a per-athlete lock | A double-clicked confirm sends two requests carrying the same session; serialised, the second re-plans after the first committed, finds its runs already imported, fails the fingerprint and writes nothing. A per-athlete key cannot exist before a guest's first import creates the athlete, and a single-athlete instance loses nothing by serialising |
-| Import open to signed-out visitors (US-011) | Keep it owner-only behind `auth` | The owner's choice, recorded in the decision journal and PRD Security as an accepted risk: the heatmap must work with CSV imports only, with no Strava sign-in |
-| Conflicts with **either** source | Only with Strava rows | A second, slightly different Garmin export of the same run must be reviewed, not duplicated |
-| Overwrite keeps `strava_activity_id` | Clear it | Without the id the sync no longer recognises the twin and would re-add Strava's copy the next night |
+| Instance-wide lock around confirm | Rely on the token and fingerprint alone; a per-athlete lock | A double-clicked confirm sends two requests carrying the same session; serialised, the second re-plans after the first committed, finds its runs already imported, fails the fingerprint and writes nothing. A single-owner instance loses nothing by serialising |
+| Import behind the owner session (`US-020`; supersedes the signed-out import of US-011) | Keep the guest import | The instance is private: the import writes into the owner's data, so only the signed-in owner may use it. The heatmap still works with CSV imports only |
+| Every stored run is a conflict candidate (US-021) | Only runs of a given source | With Strava gone there is one source; a second, slightly different export of the same run must be reviewed, not duplicated, whichever session imported the stored one |
+| The `activities.source` column is dropped, not narrowed to one value (US-021) | Keep it with only `garmin_csv` as a value; a check constraint | A column that cannot differ says nothing and invites a reader to look for the other value; SQLite rebuilds the table either way, so narrowing saved nothing. The migration that deleted the Strava runs is `remove_strava_from_schema` |
 | A missing answer is Skip | Reject the confirm | Skip is the pre-checked, non-destructive default; the Form Request already requires an answer |
 | Pending rows in the owner's session | A `pending_imports` table | A table would persist owner data beyond the request, need cleanup of abandoned reviews, and expose an id a request could name |
-| Re-plan at confirm and compare a fingerprint | Trust the plan rendered in the review | A sync or another tab can change stored runs between review and confirm; the owner's answers must apply to the runs they saw |
+| Re-plan at confirm and compare a fingerprint | Trust the plan rendered in the review | Another tab can change stored runs between review and confirm; the owner's answers must apply to the runs they saw |
 | Form Requests for upload and confirm | Inline `$request->validate()` | First user-submitted forms in the app; `.ai/rules/http.md` was amended for them |
 | Reject the whole file only for file-level problems | Reject on the first bad row | One corrupt row must not cost the owner the other thirty-nine |
-| One resolver for the import target, used by review and confirm | Each controller reading `$request->user()` | A guest has no user; two copies of "owner, else displayed athlete" could drift and plan against one athlete while writing to another |
-| CSV-only athlete with placeholder `name` / `email` | A migration making `users.name` / `users.email` nullable | No migration for one row; the fixed `.invalid` address plus the existing UNIQUE index makes a second CSV-only athlete impossible |
-| Create the CSV-only athlete inside the import transaction, only with rows | Create it on upload or on review | Upload and review write nothing; a failed insert must not leave an empty athlete, and an empty one would never be displayed |
 | Fingerprint carries the target id | Compare the conflicts only | A plan with no conflicts hashes the same for every athlete, so a target change between review and confirm would go unnoticed |
-| Masked stored side for guests (start + "Clashes with a stored run") | Accept the disclosure (rejected by the owner, decision journal); hide clashes from guests entirely | Hiding clashes would stop the visitor making an informed Overwrite / Skip choice; the start time is enough to recognise the run |
-| Throttle the review with the upload's and confirm's `garmin-import` limiter, and index stored runs by date (US-018) | A looser limit for the review; a cached plan alone; leave the scan | Each render re-plans every row against the stored runs, so an open (guest) route repeated in a loop was unbounded work: rows × stored runs per reload. One shared limiter means the three routes cannot be hammered in turn to get ten of each. Indexing makes the work rows × runs-of-that-date, and the plan keeps the same results because the matcher already required the same date |
-| Remember the review's plan in the session, stamped with the planner's inputs (US-018) | Cache it; stamp by `updated_at` or a count / `MAX(updated_at)` aggregate; re-plan every render | The plan belongs to one visitor's pending upload, which already lives in the session, so it dies with the upload and needs no key or TTL, and one guest's plan can never reach another's. `updated_at` has one-second resolution and a query-builder write does not touch it; an aggregate cannot see a run whose distance changed. A stamp over exactly the columns the planner compares can. The stored runs are loaded once per render and feed the stamp, the planner and a reused plan alike, so the review costs one activities query hit or miss, and the runs it renders (name, metrics, link) are always current |
+| Throttle the review with the upload's and confirm's `garmin-import` limiter, and index stored runs by date (US-018) | A looser limit for the review; a cached plan alone; leave the scan | Each render re-plans every row against the stored runs, so a route repeated in a loop was unbounded work: rows × stored runs per reload. One shared limiter means the three routes cannot be hammered in turn to get ten of each. Indexing makes the work rows × runs-of-that-date, and the plan keeps the same results because the matcher already required the same date |
+| Remember the review's plan in the session, stamped with the planner's inputs (US-018) | Cache it; stamp by `updated_at` or a count / `MAX(updated_at)` aggregate; re-plan every render | The plan belongs to the pending upload, which already lives in the session, so it dies with the upload and needs no key or TTL. `updated_at` has one-second resolution and a query-builder write does not touch it; an aggregate cannot see a run whose distance changed. A stamp over exactly the columns the planner compares can. The stored runs are loaded once per render and feed the stamp, the planner and a reused plan alike, so the review costs one activities query hit or miss, and the runs it renders (name, metrics, link) are always current |
 | The confirm still plans fresh (US-018) | Confirm from the remembered plan | The confirm's fingerprint exists to compare the review against the database at write time, inside the lock; a remembered plan would compare it with itself |
-| Wall-clock dates built in UTC | Parse with the app timezone | Same contract as Strava's `start_date_local`; a conversion moves late-evening runs to the wrong day |
+| Wall-clock dates built in UTC | Parse with the app timezone | Garmin exports the runner's local wall-clock time; a conversion moves late-evening runs to the wrong day |
 
 ## Key decisions & invariants
 
@@ -355,23 +340,19 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
   come first. _Breaks if:_ a write is added here — abandoning the review would
   no longer leave the database untouched.
 - **Invariant — one definition of "the same run".** Conflicts use
-  `StartTimeMatcher`, the class the sync uses to link late twins: same local
-  date, ±2 minutes **inclusive**, closest wins. _Breaks if:_ either side
-  inlines its own rule — a run the importer called "stored" could be one the
-  sync calls "new", and the day is counted twice.
-- **Invariant — Garmin wins permanently.** An overwritten or imported row is
-  `garmin_csv`, and the sync never reverts it, never re-adds its Strava twin and
-  never deletes it — including a night Strava still returns the twin. A Strava
-  activity that turns up later within ±2 minutes of a run imported as new is
-  **linked** to it (its Strava id is stored, Garmin's values stay; decision
-  `7baf70c6656a936f`). See `activity-sync.md`.
+  `StartTimeMatcher`: same local date, ±2 minutes **inclusive**, closest wins.
+  _Breaks if:_ the review and the confirm inline their own rule — a run the review
+  called "stored" could be one the write calls "new", and the day is counted twice.
+- **Invariant — a stored run is never replaced by a re-read of the file.** Only an
+  explicit Overwrite changes one, and an already-imported row fills only the metrics
+  its stored run lacks. Nothing else writes a run: no background job exists.
 - **Invariant — all or nothing.** Every write of one confirm is in one
   transaction. _Breaks if:_ rows are created outside it — a failure halfway
   would leave half an import that a re-upload then reports as part new, part
   already imported.
-- **Invariant — at most one CSV-only athlete**, created only together with at
-  least one run. _Breaks if:_ its email changes per import, or it is created
-  outside the transaction.
+- **Invariant — the import never creates a user.** It writes into the
+  signed-in owner only; `CreateCsvOnlyAthlete` and the guest path are gone.
+  _Breaks if:_ a route imports for anyone but `$request->user()`.
 - **Invariant — the fingerprint carries the target.** _Breaks if:_ the athlete
   id is dropped from it — a confirm could write to an athlete the review never
   planned against.
@@ -379,26 +360,14 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
   already imported, so nothing is created or asked about.
 - **Invariant — the session is the only binding.** _Breaks if:_ a route or
   form field starts naming an import or an athlete — a request could then
-  reach another visitor's pending rows or write to a chosen athlete.
-- **Invariant — a guest never sees a stored run's details.** The review shows
-  a guest only the start of a clashing stored run and "Clashes with a stored
-  run" — no name, distance, moving time, Strava link or source label. Reason:
-  crafted rows within ±2 minutes would otherwise enumerate the displayed
-  athlete's names, distances, moving times and Strava links, private activities
-  included, without confirming anything. _Breaks if:_ the view decides from
-  anything but `showsStoredRunDetails`, or a new stored field is added outside
-  the owner branch.
-- **Accepted risk — anyone can import.** Any visitor can add or overwrite runs
-  on the displayed athlete's map. Bounded by CSRF, 5 MB, the per-IP throttle
-  (upload, review and confirm share it), and the review step; re-decide before deploying to a public URL that others
-  know (PRD Security).
+  reach another session's pending rows or write to a chosen athlete.
 - **Invariant — the raw file is never persisted.** _Breaks if:_ the upload is
   `store()`d — an export carries heart rate, cadence and locations.
 - **Invariant — a remembered plan is reused only while every input of the planner is
   unchanged.** _Breaks if:_ the planner starts reading a stored column the stamp
   leaves out (`RememberedGarminImportPlan::stampOf()`), or a new field joins what
   the plan is made from: a reload would then show a stale review. The confirm's
-  fingerprint would still refuse a stale write, but the visitor would answer a
+  fingerprint would still refuse a stale write, but the owner would answer a
   review that no longer matches.
 - **Invariant — nothing is written before confirm**, and a stale confirm writes
   nothing.
@@ -432,8 +401,8 @@ still re-checks a signed-in owner's allowlist and token. CSRF comes from the
 
 ## Related
 
-- Specs: `US-008`, `US-011`, `US-012`, `US-013`, `US-018`
-- Plans: `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-011-plan.yaml`, `.larapilot/plans/US-013-plan.yaml`
+- Specs: `US-008`, `US-011`, `US-012`, `US-013`, `US-018`, `US-020`, `US-021`
+- Plans: `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-011-plan.yaml`, `.larapilot/plans/US-013-plan.yaml`, `.larapilot/plans/US-020-plan.yaml`
 - Mockups: `.larapilot/mockups/US-008/`
-- Decisions: `7baf70c6656a936f` (late Strava twin links to the Garmin row), `56c5683061907ab8` (running type names; unknowns surfaced)
-- Other domains: `activity-sync.md`, `heatmap-dashboard.md`
+- Decisions: `56c5683061907ab8` (running type names; unknowns surfaced)
+- Other domains: `heatmap-dashboard.md`, `owner-authentication.md`
