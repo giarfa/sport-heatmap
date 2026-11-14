@@ -9,7 +9,7 @@
 
 ## Purpose
 
-Lets the owner load their runs, the only way a run enters the app, by uploading the "Activities" CSV exported from the Garmin Connect website
+Lets the owner load their runs, one of the two ways a run enters the app (the other is the Garmin API sync, `garmin-api-sync.md`), by uploading the "Activities" CSV exported from the Garmin Connect website
 (FR-018). Since `US-020` the import requires the owner's session and always
 imports into the signed-in owner (`giarfa`): there is no guest import and no
 CSV-only athlete creation, and the heatmap works from imports alone. The file is parsed into running rows of any age (dated today or earlier, so the
@@ -271,7 +271,7 @@ an owner with no password yet to the first-password page. CSRF comes from the `w
 | Rejection | `app/Exceptions/Garmin/GarminCsvRejectedException.php` | Owner-facing messages; no file content beyond a column name |
 | Remembered plan | `app/Support/Garmin/RememberedGarminImportPlan.php`, `PendingGarminImport::rememberPlan()` / `rememberedPlan()` | The review's plan, kept in the session with a stamp of the planner's database inputs and reused while it holds (`US-018`) |
 | Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query through `Activity::onDates()`, per-date indexes, claiming |
-| Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id |
+| Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id. Two callers: the import plan and the API sync (`garmin-api-sync.md`), which links a CSV run to its Garmin activity with it |
 | Plan DTOs | `app/Data/Garmin/GarminImportPlan.php`, `GarminImportConflict.php` | The plan and its `fingerprint()` |
 | Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction; Overwrite and the already-imported metric backfill; every cached window grid of the athlete retired after commit (`forgetAthlete()`) |
 | Answer | `app/Enums/ConflictResolution.php` | `overwrite`, `skip` |
@@ -361,8 +361,9 @@ rolling back the Strava removal in a test first needs the `US-022` migration und
   no longer leave the database untouched.
 - **Invariant — one definition of "the same run".** Conflicts use
   `StartTimeMatcher`: same local date, ±2 minutes **inclusive**, closest wins.
-  _Breaks if:_ the review and the confirm inline their own rule — a run the review
-  called "stored" could be one the write calls "new", and the day is counted twice.
+  _Breaks if:_ the review, the confirm or the API sync inline their own rule — a run the
+  review called "stored" could be one the write calls "new", and the day is counted twice
+  (the sync links a CSV run with it instead of creating a twin).
 - **Invariant — a stored run is never replaced by a re-read of the file.** Only an
   explicit Overwrite changes one, and an already-imported row fills only the metrics
   its stored run lacks. Nothing else writes a run: no background job exists.
