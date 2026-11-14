@@ -154,7 +154,7 @@ tasks:
     id: TASK-02
     title: 'MeasureAerobicEfficiency: FR-023 calculation'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
@@ -182,24 +182,30 @@ tasks:
       10. `php artisan test --filter=MeasureAerobicEfficiency` (TASK-03 adds the full suite; add a smoke test here so the class is covered in this commit)
 
       ## Completion Criteria
-      - [ ] 5.0 km / 40 m / 30:00 / 150 bpm is treated as 5.32 km at 30:00
-      - [ ] One reference HR per window, used by the window line, the steep/hilly dots and last year's line
-      - [ ] A run < 3 km, without pace or HR, steep, or > reference + 10 never moves a line point; null metrics never read as 0
-      - [ ] Breaks are nulls, never interpolated
-      - [ ] Tests pass
+      - [x] 5.0 km / 40 m / 30:00 / 150 bpm is treated as 5.32 km at 30:00
+      - [x] One reference HR per window, used by the window line, the steep/hilly dots and last year's line
+      - [x] A run < 3 km, without pace or HR, steep, or > reference + 10 never moves a line point; null metrics never read as 0
+      - [x] Breaks are nulls, never interpolated
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — new `### Aerobic efficiency (US-024, FR-023)` under Functional flow with the rules step by step; Architectural choices: median not mean, reference HR from the window only, speed from stored pace, 10 m/km cap and 8× factor (FR-023 source), steep runs drawn adjusted but excluded (decision 8a053a5ea5155d84); Key invariants: one reference HR per window, steep never moves the line
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — new `### Aerobic efficiency (US-024, FR-023)` under Functional flow with the rules step by step; Architectural choices: median not mean, reference HR from the window only, speed from stored pace, 10 m/km cap and 8× factor (FR-023 source), steep runs drawn adjusted but excluded (decision 8a053a5ea5155d84); Key invariants: one reference HR per window, steep never moves the line
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-02 measure aerobic efficiency`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: ab0a993dc72895e4797d6a9d8c82b84461ec9876
+      short_sha: ab0a993
+      subject: 'feat(US-024): TASK-02 measure aerobic efficiency'
+      committed_at: '2026-11-14T18:45:55+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ab0a993dc72895e4797d6a9d8c82b84461ec9876'
   -
     id: TASK-03
     title: 'Pest coverage for the efficiency calculation'
@@ -556,4 +562,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:44:21+00:00'
+updated_at: '2026-11-14T17:45:57+00:00'
