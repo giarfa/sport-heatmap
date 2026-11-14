@@ -179,7 +179,11 @@ metrics ride the same two methods: `GarminCsvRow` holds one `ExtendedRunMetrics
 $extendedMetrics`, `metricAttributes()` spreads its `toAttributes()` (non-null values
 only), and `toSessionArray()` parks them under one compact `extended` key that
 `fromSessionArray()` reads with `?? []`, so an upload parked before `US-023` still
-confirms. They stay out of the run's identity like the three metrics above.
+confirms. They stay out of the run's identity like the three metrics above. **Session size:**
+only recorded values are parked, keyed by column name, so a 5,000-row export with every metric
+costs a few MB of session payload (the 5 MB upload and 5,000-row caps bound it); shorten the
+keys if the session column or the database packet size ever gets tight. Enrichment is one
+`UPDATE` per run that gained a value, inside the confirm's single transaction.
 
 ### 2. Target and planning (`PlanGarminImport`)
 

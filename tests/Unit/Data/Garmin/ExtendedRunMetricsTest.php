@@ -263,6 +263,7 @@ class ExtendedRunMetricsTest extends TestCase
         $this->assertNull($pace(-2.0));
         $this->assertNull($pace(null));
         $this->assertNull($pace('4.0'));
+        $this->assertNull($pace(1.0e-18), 'A tiny speed must not overflow into a pace.');
         $this->assertNull($pace(0.01), 'A pace slower than ten hours a kilometre is not a run.');
     }
 

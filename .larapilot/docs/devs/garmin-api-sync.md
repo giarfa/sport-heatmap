@@ -106,8 +106,8 @@ code. `SyncGarminActivities` is unchanged.
 | Config keys | `config/services.php` → `garmin`, `GARMIN_API_KEY` in `.env.example` | Key (env); host, paths, page size, re-read span, token store, timeouts (literals) |
 | Run columns | `app/Models/Activity.php`, `add_garmin_sync_to_activities_table` migration | `source`, `garmin_activity_id` (see `garmin-csv-import.md` → Data model) |
 | Enums | `app/Enums/ActivitySource.php`, `GarminSyncTrigger.php`, `GarminSyncOutcome.php`, `GarminSyncFailure.php` | The closed vocabularies of the two tables |
-| Factories | `database/factories/GarminSyncFactory.php`, `ActivityFactory::garminSynced()` | `succeeded()`, `failed()`, `running()`, `manual()`, `scheduled()`, `fullHistory()` |
-| Seeder | `database/seeders/TrainingBlockSeeder.php` | Last four weeks as API-synced runs, one succeeded full-history scheduled sync finished this morning |
+| Factories | `database/factories/GarminSyncFactory.php`, `ActivityFactory::garminSynced()`, `withExtendedMetrics()`, `withApiOnlyMetrics()`, `withTrainingStressScore()` | `succeeded()`, `failed()`, `running()`, `manual()`, `scheduled()`, `fullHistory()`; the activity states give coherent extended metrics (`US-023`) |
+| Seeder | `database/seeders/TrainingBlockSeeder.php` | Last four weeks as API-synced runs carrying the CSV-and-API and API-only extended metrics, one succeeded full-history scheduled sync finished this morning |
 | Tests | `tests/Feature/Database/SchemaTest.php`, `GarminSyncMigrationTest.php`, `tests/Unit/Models/ActivityTest.php`, `tests/Feature/Garmin/GarminPersonalApiClientTest.php`, `GarminSyncTest.php`, `GarminSyncCommandTest.php`, `tests/Feature/Console/ScheduleTest.php` | Schema, client, the sync, the command, the schedule |
 
 ### API field → column (`ExtendedRunMetrics::fromApiPayload()`)

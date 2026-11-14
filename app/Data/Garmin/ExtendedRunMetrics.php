@@ -174,7 +174,9 @@ final readonly class ExtendedRunMetrics
          * the average pace. A null, zero or negative speed has no pace.
          */
         $maxSpeed = self::number($field('maxSpeed'));
-        $bestPace = $maxSpeed !== null && $maxSpeed > 0 ? (int) round(1_000 / $maxSpeed) : null;
+        $paceSeconds = $maxSpeed !== null && $maxSpeed > 0 ? round(1_000 / $maxSpeed) : null;
+        /* Bounded as a float before the int cast: a tiny speed would overflow it and wrap to a bogus pace. */
+        $bestPace = $paceSeconds !== null && $paceSeconds >= 1 && $paceSeconds <= self::MAX_PACE_SECONDS_PER_KM ? (int) $paceSeconds : null;
 
         return new self(
             calories: self::whole($field('calories'), 0, 20_000, true),
@@ -182,7 +184,7 @@ final readonly class ExtendedRunMetrics
             aerobicTrainingEffect: self::decimal($field('aerobicTrainingEffect'), 0.0, 5.0, false),
             averageRunningCadence: self::whole($field('averageRunningCadenceInStepsPerMinute'), 0, 400, true),
             maxRunningCadence: self::whole($field('maxRunningCadenceInStepsPerMinute'), 0, 400, true),
-            bestPaceSecondsPerKm: $bestPace !== null && $bestPace > 0 && $bestPace <= self::MAX_PACE_SECONDS_PER_KM ? $bestPace : null,
+            bestPaceSecondsPerKm: $bestPace,
             totalDescentMeters: self::whole($field('elevationLoss'), 0, 20_000, false),
             /* Already centimetres, the unit of the column: the CSV is the one that is converted. */
             averageStrideLengthCm: self::decimal($field('avgStrideLength'), 0.0, 500.0, true),

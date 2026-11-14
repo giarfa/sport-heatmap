@@ -414,8 +414,15 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   The totals are the ones the `US-014` mockup draws, so the two specs share one fixture and
   the 0 km week gives the trend a rest week to show. Every run is what a Garmin import
   writes (`US-021`): the block's first two weeks come from an older export with no
-  metrics, the rest carry them, about 15 % without a heart rate. The legend over the
-  current window does not change. Do not run `migrate:fresh --seed` on a
+  metrics, the rest carry them, about 15 % without a heart rate. Since `US-023` those
+  runs also carry the extended metrics (`ActivityFactory::withExtendedMetrics()`, derived from
+  the run's own distance and time so the record never contradicts itself): the last four
+  API-synced weeks add the API-only ones (`withApiOnlyMetrics()`: heart-rate zones, fastest
+  splits, place name), about 20 % of the CSV runs carry a Training Stress Score
+  (`withTrainingStressScore()`), and the older-export weeks and the history keep none, so a
+  re-import has something to enrich. The distance and time go into the factory as a state
+  before the extended states: a `create()` override is applied last and the metrics would be
+  derived from the factory's random run. The legend over the current window does not change. Do not run `migrate:fresh --seed` on a
   database that holds real imports — point `DB_DATABASE` at a scratch file.
 
 
