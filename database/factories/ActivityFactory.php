@@ -77,6 +77,88 @@ class ActivityFactory extends Factory
     }
 
     /**
+     * A run carrying the extended metrics both Garmin sources record, every value
+     * derived from the run's own distance, moving time, and pace so the record never
+     * contradicts itself: the elapsed time is never shorter than the moving time, the
+     * best pace is faster than the average, the steps follow the cadence, the descent
+     * follows the ascent, and the lowest point is never above the highest. One-decimal
+     * values are rounded here, the way the import boundary rounds them.
+     */
+    public function withExtendedMetrics(): static
+    {
+        return $this->state(function (array $attributes): array {
+            $distanceMeters = (int) $attributes['distance_meters'];
+            $movingSeconds = (int) $attributes['moving_time_seconds'];
+            $averagePace = $movingSeconds / ($distanceMeters / 1_000);
+            $averageCadence = fake()->numberBetween(158, 180);
+            $steps = (int) round($averageCadence * $movingSeconds / 60);
+            $ascent = (int) ($attributes['total_ascent_meters'] ?? fake()->numberBetween(5, 180));
+            $lowestPoint = fake()->numberBetween(60, 300);
+
+            return [
+                'calories' => (int) round($distanceMeters / 1_000 * fake()->numberBetween(58, 72)),
+                'max_heart_rate' => min(250, (int) ($attributes['average_heart_rate'] ?? 150) + fake()->numberBetween(12, 28)),
+                'aerobic_training_effect' => round(fake()->randomFloat(1, 2.0, 4.8), 1),
+                'average_running_cadence' => $averageCadence,
+                'max_running_cadence' => $averageCadence + fake()->numberBetween(10, 25),
+                'best_pace_seconds_per_km' => max(150, (int) round($averagePace * fake()->randomFloat(2, 0.78, 0.92))),
+                'total_descent_meters' => max(0, (int) round($ascent * fake()->randomFloat(2, 0.85, 1.15))),
+                'average_stride_length_cm' => min(500.0, round($distanceMeters / $steps * 100, 1)),
+                'average_vertical_ratio_percent' => round(fake()->randomFloat(1, 6.0, 9.0), 1),
+                'average_vertical_oscillation_cm' => round(fake()->randomFloat(1, 7.5, 10.5), 1),
+                'average_ground_contact_time_ms' => fake()->numberBetween(215, 265),
+                'average_ground_contact_balance_left_percent' => round(fake()->randomFloat(1, 48.0, 52.0), 1),
+                'steps' => $steps,
+                'lap_count' => max(1, (int) ceil($distanceMeters / 1_000)),
+                'elapsed_time_seconds' => $movingSeconds + (int) round($movingSeconds * fake()->randomFloat(3, 0, 0.05)),
+                'min_elevation_meters' => $lowestPoint,
+                'max_elevation_meters' => $lowestPoint + max($ascent, 10),
+            ];
+        });
+    }
+
+    /**
+     * The metrics only the Garmin Connect API carries: time in each heart-rate zone,
+     * the fastest 1 km, mile, and 5 km, and the place name. The zones never add up to
+     * more than the elapsed time, and a split exists only when the run covered it.
+     */
+    public function withApiOnlyMetrics(): static
+    {
+        return $this->state(function (array $attributes): array {
+            $distanceMeters = (int) $attributes['distance_meters'];
+            $movingSeconds = (int) $attributes['moving_time_seconds'];
+            $elapsedSeconds = (int) ($attributes['elapsed_time_seconds'] ?? $movingSeconds);
+            $averagePace = $movingSeconds / ($distanceMeters / 1_000);
+
+            $zoneShares = [0.05, 0.35, 0.35, 0.2, 0.05];
+            $zones = [];
+
+            foreach ($zoneShares as $index => $share) {
+                $zones['hr_zone_'.($index + 1).'_seconds'] = (int) floor($elapsedSeconds * $share * fake()->randomFloat(2, 0.8, 1.0));
+            }
+
+            return [
+                ...$zones,
+                'fastest_1k_seconds' => $distanceMeters >= 1_000 ? (int) round($averagePace * fake()->randomFloat(2, 0.82, 0.93)) : null,
+                'fastest_mile_seconds' => $distanceMeters >= 1_609 ? (int) round($averagePace * 1.609 * fake()->randomFloat(2, 0.85, 0.95)) : null,
+                'fastest_5k_seconds' => $distanceMeters >= 5_000 ? (int) round($averagePace * 5 * fake()->randomFloat(2, 0.9, 0.97)) : null,
+                'location_name' => fake()->randomElement(['Lazise', 'Verona', 'Bolzano']),
+            ];
+        });
+    }
+
+    /**
+     * A run whose Garmin CSV row carried a Training Stress Score: the one extended metric
+     * the API never supplies.
+     */
+    public function withTrainingStressScore(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'training_stress_score' => round(fake()->randomFloat(1, 25.0, 190.0), 1),
+        ]);
+    }
+
+    /**
      * A run imported from a Garmin Connect CSV: no Garmin activity id, a place-and-type
      * name. The default definition already is one; this states it where a test or the
      * seeder is about the source.

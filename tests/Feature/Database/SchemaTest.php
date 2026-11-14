@@ -137,6 +137,16 @@ class SchemaTest extends TestCase
         }
     }
 
+    /**
+     * Start and end positions are never stored from either Garmin source.
+     */
+    public function test_activities_has_no_latitude_or_longitude_column(): void
+    {
+        foreach (Schema::getColumnListing('activities') as $column) {
+            $this->assertDoesNotMatchRegularExpression('/(^|_)(lat|latitude|lon|lng|longitude)(_|$)/i', $column, "activities.{$column} looks like a coordinate.");
+        }
+    }
+
     public function test_there_is_no_sync_runs_table(): void
     {
         $this->assertFalse(Schema::hasTable('sync_runs'));

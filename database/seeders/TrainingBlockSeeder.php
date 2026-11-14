@@ -46,6 +46,11 @@ class TrainingBlockSeeder extends Seeder
     private const WITHOUT_HEART_RATE_PERCENT = 15;
 
     /**
+     * How many CSV-imported runs carry a Training Stress Score, as a percentage.
+     */
+    private const WITH_TRAINING_STRESS_SCORE_PERCENT = 20;
+
+    /**
      * How many of the block's first weeks come from an older export whose metric columns
      * hold `--`, so the demo shows a run that lacks every metric.
      */
@@ -413,6 +418,30 @@ class TrainingBlockSeeder extends Seeder
             $attributes['average_pace_seconds_per_km'] = $secondsPerKilometre;
         }
 
-        $factory->create($attributes);
+        /*
+         * The run's distance and time go in as a state before the extended states, not into
+         * create() after them: a state closure reads the attributes built so far, and a
+         * create() override is applied last, so the extended metrics would otherwise be
+         * derived from the factory's random distance and contradict the run they sit on.
+         */
+        $factory = $factory->state($attributes);
+
+        /*
+         * Extended metrics follow where the run came from: the Garmin sync writes the
+         * CSV-and-API set plus the API-only one, a CSV import the CSV set and, now and then,
+         * a Training Stress Score. Runs of the older export, whose columns hold `--`, keep
+         * none, so a re-import has something to enrich.
+         */
+        if ($hasMetrics) {
+            $factory = $factory->withExtendedMetrics();
+
+            $factory = match (true) {
+                $isApiSynced => $factory->withApiOnlyMetrics(),
+                fake()->boolean(self::WITH_TRAINING_STRESS_SCORE_PERCENT) => $factory->withTrainingStressScore(),
+                default => $factory,
+            };
+        }
+
+        $factory->create();
     }
 }

@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-008` |
-| **Last updated by** | `US-022` — 2026-11-14 |
+| **Last updated by** | `US-023` — 2026-11-14 |
 | **Owner persona** | 🔧 Alex |
 
 ## Purpose
@@ -307,6 +307,43 @@ with the run's own row, so they carry **no index**: every query filters on
 `(user_id, activity_date)` first. `activities.user_id` is not mass-assignable; write
 through `$user->activities()`.
 
+### Extended run metrics (`US-023`, `add_extended_metrics_to_activities_table`)
+
+27 more nullable columns on `activities` hold the extended metrics of FR-022. Same rule as
+the three above: **NULL means "not recorded"**, no default, no index, plain `#[Fillable]`
+values read only with the run's own row, and no writer stores `0` for a missing value. The
+only zeros kept are the ones Garmin really reports (descent, elevation, time in an HR zone,
+aerobic training effect); the DTO that writes them decides, not the schema. Decimal columns
+are cast `float` and rounded to one decimal before they are stored, so a re-import or a
+second sync compares equal. **No coordinate column exists**: start and end positions are
+never read or stored.
+
+| Column | Type | Unit / shape | Source |
+| --- | --- | --- | --- |
+| `calories` | unsigned int | kcal | CSV + API |
+| `max_heart_rate` | unsigned small int | bpm | CSV + API |
+| `aerobic_training_effect` | decimal(3,1) | 0.0–5.0 | CSV + API |
+| `average_running_cadence`, `max_running_cadence` | unsigned small int | steps per minute | CSV + API |
+| `best_pace_seconds_per_km` | unsigned int | s/km (API: from `maxSpeed`) | CSV + API |
+| `total_descent_meters` | unsigned int | m | CSV + API |
+| `average_stride_length_cm` | decimal(5,1) | **cm** (the CSV writes metres, converted) | CSV + API |
+| `average_vertical_ratio_percent` | decimal(4,1) | % | CSV + API |
+| `average_vertical_oscillation_cm` | decimal(4,1) | cm | CSV + API |
+| `average_ground_contact_time_ms` | unsigned small int | ms | CSV + API |
+| `average_ground_contact_balance_left_percent` | decimal(4,1) | the **left** share, % | CSV + API |
+| `steps`, `lap_count` | unsigned int / small int | count | CSV + API |
+| `elapsed_time_seconds` | unsigned int | s (never below the moving time) | CSV + API |
+| `min_elevation_meters`, `max_elevation_meters` | **signed** int | m (0 and negatives are real) | CSV + API |
+| `training_stress_score` | decimal(6,1) | one decimal | **CSV only** |
+| `hr_zone_1_seconds` … `hr_zone_5_seconds` | unsigned int | s | **API only** |
+| `fastest_1k_seconds`, `fastest_mile_seconds`, `fastest_5k_seconds` | unsigned int | s | **API only** |
+| `location_name` | string(255) | trimmed place name | **API only** |
+
+The migration is additive: `up()` adds only these columns, so every stored run and value
+survives and reads NULL for them; `down()` drops exactly these 27 and nothing else. The
+parsing rules per column, the accepted headers, and the enrichment of stored runs are in
+the flow sections of this file.
+
 Two columns say where a run came from (`US-022`, `add_garmin_sync_to_activities_table`):
 
 - `source` — string, not null, default `garmin_csv` (`app/Enums/ActivitySource.php`:
@@ -357,6 +394,7 @@ rolling back the Strava removal in a test first needs the `US-022` migration und
 | Throttle the review with the upload's and confirm's `garmin-import` limiter, and index stored runs by date (US-018) | A looser limit for the review; a cached plan alone; leave the scan | Each render re-plans every row against the stored runs, so a route repeated in a loop was unbounded work: rows × stored runs per reload. One shared limiter means the three routes cannot be hammered in turn to get ten of each. Indexing makes the work rows × runs-of-that-date, and the plan keeps the same results because the matcher already required the same date |
 | Remember the review's plan in the session, stamped with the planner's inputs (US-018) | Cache it; stamp by `updated_at` or a count / `MAX(updated_at)` aggregate; re-plan every render | The plan belongs to the pending upload, which already lives in the session, so it dies with the upload and needs no key or TTL. `updated_at` has one-second resolution and a query-builder write does not touch it; an aggregate cannot see a run whose distance changed. A stamp over exactly the columns the planner compares can. The stored runs are loaded once per render and feed the stamp, the planner and a reused plan alike, so the review costs one activities query hit or miss, and the runs it renders (name, metrics, link) are always current |
 | The confirm still plans fresh (US-018) | Confirm from the remembered plan | The confirm's fingerprint exists to compare the review against the database at write time, inside the lock; a remembered plan would compare it with itself |
+| Extended metrics as 27 nullable columns (US-023) | One JSON `extended_metrics` column; a separate 1:1 `activity_metrics` table | JSON has no per-metric "fill only empty", no casts, and is opaque to Larastan, and the acceptance criteria ask for nullable columns. A 1:1 table adds a join for data no page reads yet; the columns ride the row every query already loads, and `DailyRuns` selects only the columns it renders, so no extended value reaches the grid cache |
 | Wall-clock dates built in UTC | Parse with the app timezone | Garmin exports the runner's local wall-clock time; a conversion moves late-evening runs to the wrong day |
 
 ## Key decisions & invariants
