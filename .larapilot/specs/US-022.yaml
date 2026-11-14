@@ -5,11 +5,11 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 8
-status: PLANNED
+status: DONE
 body: |
   #### US-022: Automatic Garmin Connect sync: daily schedule and Sync now
 
-  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** PLANNED
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** DONE
   **Blocked by:** -
   **Type:** Change request
   **Release:** 3.1.0
@@ -36,38 +36,53 @@ body: |
   **Acceptance Criteria**
 
   _Sync (FR-002, FR-003)_
-  - [ ] With `GARMIN_API_KEY` set, `php artisan garmin:sync` exchanges the key for a token, reuses a cached token until one hour before its `exp`, and reads the owner's activities through the activity search, paging with `start`/`limit` until a page comes back short
-  - [ ] The command is scheduled once a day; `php artisan schedule:list` shows it
-  - [ ] Only the running `typeKey` values above are stored, mapped to `Run`, `TrailRun`, or `VirtualRun`; every other type is ignored and counted; an activity whose local start is after today is skipped and counted as future-dated
-  - [ ] Each stored run carries `source` `garmin_api`, the unique `garmin_activity_id`, name, `distance_meters` (rounded integer), `moving_time_seconds` (rounded), `start_date_local` and `activity_date` from `startTimeLocal`, pace as `round(1000 / averageSpeed)` s/km, ascent and average heart rate as rounded integers; a null or zero `averageSpeed`, a null `elevationGain` or `averageHR` stores an empty metric, never 0
-  - [ ] The first sync (no run with a Garmin id stored) reads the whole history; later syncs re-read at least the last 7 days, and a run renamed or edited on Garmin in that span is updated
-  - [ ] A synced activity on the same date within ±2 minutes of a stored run with no Garmin id is the same run: it gains the Garmin id and the API values, no second run is created, and no review is shown
-  - [ ] Running the sync twice in a row changes nothing; a run deleted on Garmin stays stored
-  - [ ] After a sync that writes at least one run, every cached window, the intensity scale, and the trend show the new data
+  - [x] With `GARMIN_API_KEY` set, `php artisan garmin:sync` exchanges the key for a token, reuses a cached token until one hour before its `exp`, and reads the owner's activities through the activity search, paging with `start`/`limit` until a page comes back short
+  - [x] The command is scheduled once a day; `php artisan schedule:list` shows it
+  - [x] Only the running `typeKey` values above are stored, mapped to `Run`, `TrailRun`, or `VirtualRun`; every other type is ignored and counted; an activity whose local start is after today is skipped and counted as future-dated
+  - [x] Each stored run carries `source` `garmin_api`, the unique `garmin_activity_id`, name, `distance_meters` (rounded integer), `moving_time_seconds` (rounded), `start_date_local` and `activity_date` from `startTimeLocal`, pace as `round(1000 / averageSpeed)` s/km, ascent and average heart rate as rounded integers; a null or zero `averageSpeed`, a null `elevationGain` or `averageHR` stores an empty metric, never 0
+  - [x] The first sync (no run with a Garmin id stored) reads the whole history; later syncs re-read at least the last 7 days, and a run renamed or edited on Garmin in that span is updated
+  - [x] A synced activity on the same date within ±2 minutes of a stored run with no Garmin id is the same run: it gains the Garmin id and the API values, no second run is created, and no review is shown
+  - [x] Running the sync twice in a row changes nothing; a run deleted on Garmin stays stored
+  - [x] After a sync that writes at least one run, every cached window, the intensity scale, and the trend show the new data
 
   _Sync now (FR-010)_
-  - [ ] The dashboard shows a "Sync now" button only when `GARMIN_API_KEY` is set; it is a CSRF-protected, throttled `POST`, and a signed-out request is redirected to `/login` and calls nothing
-  - [ ] After it finishes, the dashboard reports new, updated, linked, ignored, and future-dated counts, or the failure cause
-  - [ ] Only one sync runs at a time: a Sync now while the scheduled or another sync runs is refused with a message and starts nothing
+  - [x] The dashboard shows a "Sync now" button only when `GARMIN_API_KEY` is set; it is a CSRF-protected, throttled `POST`, and a signed-out request is redirected to `/login` and calls nothing
+  - [x] After it finishes, the dashboard reports new, updated, linked, ignored, and future-dated counts, or the failure cause
+  - [x] Only one sync runs at a time: a Sync now while the scheduled or another sync runs is refused with a message and starts nothing
 
   _Status and failures (FR-007, FR-017)_
-  - [ ] Every attempt is recorded in `garmin_syncs` with trigger (scheduled / manual), start and end time, outcome, failure cause, and counts
-  - [ ] The status line shows the more recent of "last sync N ago" (a successful sync, even one that wrote nothing) and "last import N ago" (a confirmed CSV import that wrote a row)
-  - [ ] While the latest attempt failed, a warning reads "Garmin key rejected — renew it" when the token exchange answers 401 or 403, or "Garmin unreachable" on a timeout, connection error, or 5xx; the next successful sync removes it
-  - [ ] A 401 on a data call re-exchanges the token once and retries; a second refusal records the key-rejected failure
-  - [ ] A failed or partial sync keeps every run written before the failure
-  - [ ] With no `GARMIN_API_KEY`, the scheduled run calls nothing and records nothing, no Sync now or sync status appears, and the dashboard behaves exactly as today
+  - [x] Every attempt is recorded in `garmin_syncs` with trigger (scheduled / manual), start and end time, outcome, failure cause, and counts
+  - [x] The status line shows the more recent of "last sync N ago" (a successful sync, even one that wrote nothing) and "last import N ago" (a confirmed CSV import that wrote a row)
+  - [x] While the latest attempt failed, a warning reads "Garmin key rejected — renew it" when the token exchange answers 401 or 403, or "Garmin unreachable" on a timeout, connection error, or 5xx; the next successful sync removes it
+  - [x] A 401 on a data call re-exchanges the token once and retries; a second refusal records the key-rejected failure
+  - [x] A failed or partial sync keeps every run written before the failure
+  - [x] With no `GARMIN_API_KEY`, the scheduled run calls nothing and records nothing, no Sync now or sync status appears, and the dashboard behaves exactly as today
 
   _Coexistence with the CSV import (FR-018)_
-  - [ ] The CSV upload, conflict review, summary counts, throttle, and idempotent re-import behave as before; a CSV row matching an API-synced run goes through the same review, and Overwrite keeps its `garmin_activity_id`
+  - [x] The CSV upload, conflict review, summary counts, throttle, and idempotent re-import behave as before; a CSV row matching an API-synced run goes through the same review, and Overwrite keeps its `garmin_activity_id`
 
   _Security, docs, tests_
-  - [ ] The key and the token never appear in the database, a log line, an exception message, or a response; `.env.example` carries an empty `GARMIN_API_KEY`
-  - [ ] `README.md` explains creating and renewing the key (connect.garmin.com → Settings → Personal API token, expiry 30 days to one year) and the scheduler cron entry needed on the host (Cipi production)
-  - [ ] Feature tests fake every Garmin HTTP call (no test reaches Garmin): raw-JWT token exchange and reuse, paging, type mapping, metric rounding and empty metrics, linking a CSV run, idempotence, the 401 retry, both failure warnings, no-key behaviour, the concurrency refusal, and the signed-out redirect
-  - [ ] The developer domain doc for activity import under `.larapilot/docs/devs/` describes the Garmin sync
+  - [x] The key and the token never appear in the database, a log line, an exception message, or a response; `.env.example` carries an empty `GARMIN_API_KEY`
+  - [x] `README.md` explains creating and renewing the key (connect.garmin.com → Settings → Personal API token, expiry 30 days to one year) and the scheduler cron entry needed on the host (Cipi production)
+  - [x] Feature tests fake every Garmin HTTP call (no test reaches Garmin): raw-JWT token exchange and reuse, paging, type mapping, metric rounding and empty metrics, linking a CSV run, idempotence, the 401 retry, both failure warnings, no-key behaviour, the concurrency refusal, and the signed-out redirect
+  - [x] The developer domain doc for activity import under `.larapilot/docs/devs/` describes the Garmin sync
 status_history:
   -
     status: PLANNED
     at: '2026-11-14T12:29:45+00:00'
+  -
+    status: 'IN PROGRESS'
+    at: '2026-11-14T12:37:42+00:00'
+  -
+    status: REVIEW
+    at: '2026-11-14T13:01:48+00:00'
+  -
+    status: DONE
+    at: '2026-11-14T14:04:40+00:00'
 rework: false
+merge_commit:
+  sha: f8806468ab74adae766de23787d0e48e45f6ab11
+  short_sha: f880646
+  subject: 'docs(US-022): review artifact and manual test handoff'
+  committed_at: '2026-11-14T14:01:47+01:00'
+  url: 'https://github.com/giarfa/sport-heatmap/commit/f8806468ab74adae766de23787d0e48e45f6ab11'

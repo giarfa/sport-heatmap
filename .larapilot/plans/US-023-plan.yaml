@@ -1,0 +1,675 @@
+code: US-023
+plan_body: |
+  **Release:** 3.1.0
+
+  ## Technical Solution
+
+  US-023 enriches every stored run with the extended metrics Garmin records (FR-022), from both entry points, without changing what the dashboard shows. It extends the two existing paths and adds no new flow:
+
+  - **CSV import (FR-018)** — `GarminCsvColumns` learns the extended headers as optional keys in both languages, `ParseGarminCsv` reads them, and `GarminCsvRow` carries them. The existing "fill only empty metrics of an already-imported run" step in `ApplyGarminImport` becomes the **enrichment** path, now counted and reported.
+  - **API sync (FR-002)** — `GarminApiActivity::fromApiPayload()` maps the extended API fields. `SyncGarminActivities` already writes `toRunAttributes()` on create, link, and update, so the extended values flow through with no change to the action.
+
+  ### One value object for the extended metrics (John)
+
+  A new `App\Data\Garmin\ExtendedRunMetrics` final readonly DTO holds the 27 nullable values. It has two named factories that do all the defensive parsing at the boundary (`.ai/rules/data.md`):
+  - `fromCsvValues(array<string, string> $raw)` — canonical key ⇒ raw cell text
+  - `fromApiPayload(array<string, mixed> $payload)`
+
+  It also provides:
+  - `toAttributes()` — **only the non-null values**, keyed by column
+  - `toSessionArray()` / `fromSessionArray()` — compact: only the non-null keys, and missing keys read as null, so an upload parked before the deploy still confirms
+
+  `GarminCsvRow` and `GarminApiActivity` each gain one `public ExtendedRunMetrics $extendedMetrics = new ExtendedRunMetrics` constructor parameter. Their `metricAttributes()` spreads `...$this->extendedMetrics->toAttributes()`. That single change carries the existing invariants to the new columns:
+  - a `--` / null never blanks a stored value: Overwrite, link, and update all fill only the keys present
+  - the metrics stay outside run identity (`isIdenticalTo()` / `identityKey()`), so a re-import still recognises its runs
+  - the CSV-only Training Stress Score of a linked run is never touched by a sync, because the API attributes never carry that key
+
+  Rejected alternatives:
+  - 27 more constructor arguments on each DTO: duplicated parsing, unreadable signatures
+  - one JSON `extended_metrics` column: no per-metric "fill only empty", no casts, opaque to Larastan, and the AC demands nullable columns
+  - a separate `activity_metrics` 1:1 table: an extra join for data no page reads yet
+
+  Shared CSV number parsing moves out of `ParseGarminCsv` into `App\Support\Garmin\GarminCsvValues`, a final class of static, pure parsers that both the parser and the DTO use, so there is one parser per value shape:
+  - `thousands-separated number`
+  - `duration`
+  - `pace`
+  - `signed number`
+  - `left balance`
+
+  `ParseGarminCsv` keeps its behaviour for the existing columns, guarded by the existing tests.
+
+  ### Columns (all nullable, no default, no index — read only with the run's own row)
+
+  | Column | Type | CSV (it / en) | API | Rule |
+  | --- | --- | --- | --- | --- |
+  | `calories` | unsigned int | `Calorie` / `Calories` | `calories` | whole kcal, 0 ⇒ null, ≤ 20,000 |
+  | `max_heart_rate` | unsigned small int | `FC max` / `Max HR` | `maxHR` | whole bpm, 0 ⇒ null, ≤ 250 |
+  | `aerobic_training_effect` | decimal(3,1) | `TE aerobico` / `Aerobic TE` | `aerobicTrainingEffect` | 0.0–5.0, one decimal (0.0 is a real Garmin reading) |
+  | `average_running_cadence` / `max_running_cadence` | unsigned small int | `Cadenza di corsa media` / `max` · `Avg Run Cadence` / `Max Run Cadence` | `averageRunningCadenceInStepsPerMinute` / `maxRunningCadenceInStepsPerMinute` | whole spm, 0 ⇒ null, ≤ 400 |
+  | `best_pace_seconds_per_km` | unsigned int | `Passo migliore` / `Best Pace` | from `maxSpeed` (m/s) ⇒ `round(1000 / v)` | same rule as average pace |
+  | `total_descent_meters` | unsigned int | `Discesa totale` / `Total Descent` | `elevationLoss` | whole m, 0 kept, ≤ 20,000 |
+  | `average_stride_length_cm` | decimal(5,1) | `Lunghezza media passo` / `Avg Stride Length` (**metres**, `1.00`) | `avgStrideLength` (**centimetres**) | **normalised to cm**, one decimal, 0 ⇒ null, ≤ 500 |
+  | `average_vertical_ratio_percent` | decimal(4,1) | `Rapporto verticale medio` / `Avg Vertical Ratio` | `avgVerticalRatio` | one decimal, 0 ⇒ null, ≤ 100 |
+  | `average_vertical_oscillation_cm` | decimal(4,1) | `Oscillazione verticale media` / `Avg Vertical Oscillation` (cm, `9.6`) | `avgVerticalOscillation` (cm) | cm, one decimal, 0 ⇒ null, ≤ 50 |
+  | `average_ground_contact_time_ms` | unsigned small int | `Tempo medio di contatto con il suolo` / `Avg Ground Contact Time` | `avgGroundContactTime` | whole ms, 0 ⇒ null, ≤ 2,000 |
+  | `average_ground_contact_balance_left_percent` | decimal(4,1) | `Bilanciamento TCS medio` / `Avg GCT Balance` (`49.8% S / 50.2% D`, `49.8% L / 50.2% R`) | `avgGroundContactBalance` | the **left** share, one decimal, 0 ⇒ null, ≤ 100 |
+  | `steps` | unsigned int | `Passi` / `Steps` (`8,240`) | `steps` | whole, 0 ⇒ null, ≤ 1,000,000 |
+  | `lap_count` | unsigned small int | `Numero di Lap` / `Number of Laps` | `lapCount` | whole, 0 ⇒ null, ≤ 10,000 |
+  | `elapsed_time_seconds` | unsigned int | `Tempo trascorso` / `Elapsed Time` | `elapsedDuration` | whole s, 0 ⇒ null, ≤ 36,000,000 |
+  | `min_elevation_meters` / `max_elevation_meters` | **signed** int | `Quota minima` / `Quota massima` · `Min Elev` **or** `Min Elevation` / `Max Elev` **or** `Max Elevation` (`1,065`) | `minElevation` / `maxElevation` | whole m, 0 and negatives kept, −500…9,000 |
+  | `training_stress_score` | decimal(6,1) | `Training Stress Score®` (both) | — | one decimal, **0.0 ⇒ null** (every real local export writes `0.0` when no power data exists), ≤ 10,000 |
+  | `hr_zone_1_seconds` … `hr_zone_5_seconds` | unsigned int | — | `hrTimeInZone_1` … `_5` | whole s, 0 kept (a real zero), ≤ 36,000,000 |
+  | `fastest_1k_seconds` / `fastest_mile_seconds` / `fastest_5k_seconds` | unsigned int | — | `fastestSplit_1000` / `_1609` / `_5000` | whole s, 0 ⇒ null, ≤ 36,000,000 |
+  | `location_name` | string(255) | — | `locationName` | trimmed, `''` ⇒ null, cut at 255 |
+
+  Decimal columns are cast `float`; every value is rounded to one decimal **at the DTO boundary**, so a second sync or re-import compares equal and `isDirty()` stays false. Eloquent compares `float` casts with an epsilon.
+
+  **Formats were read off nine real Italian exports during planning:** thousands separators in calories, steps, and elevation; `S`/`D` balance letters; stride in metres; TSS always `0.0`. The committed sample `client-materials/Activities (1).csv` is an anonymised copy in which every extended column is `--` except `Tempo trascorso`. Its import therefore stores **elapsed time only** and leaves the rest null. New synthetic fixtures (`activities-it-extended.csv`, `activities-en-extended.csv`) carry populated values in the real formats.
+
+  **English headers** (decision journal: *us-023 english garmin extended headers*): standard Garmin English names. Where Garmin's spelling varies, both are accepted (`Min Elev` / `Min Elevation`, `Max Elev` / `Max Elevation`, balance letters `L`/`R`). They are not yet confirmed by a real English export, so they are flagged as unconfirmed in the domain doc. A real export later is a one-line fix in `GarminCsvColumns`. Header lookup moves from one text per key to a **list of accepted texts per key**. Extended keys are optional and never count toward language detection.
+
+  **No coordinates.** `startLatitude`, `startLongitude`, `endLatitude`, and `endLongitude` are never read. The API fixture carries them, and a test proves no column receives them and the schema has no latitude/longitude column.
+
+  ### Enrichment (FR-022 "reported as enriched")
+
+  `ApplyGarminImport::fillEmptyMetricsOfAlreadyImportedRuns()` returns how many already-imported runs gained at least one metric. `GarminImportSummary` gains `enriched`. The two counts partition the already-imported rows:
+  - `alreadyImported` — identical rows that changed nothing
+  - `enriched` — identical rows that filled at least one empty metric
+
+  `fromSessionArray()` reads a missing `enriched` as 0. The rule is unchanged: a stored value is never replaced, so a second re-import enriches 0 and writes nothing. Enrichment covers both the 3 US-012 metrics and the 27 new ones, through one code path.
+
+  The **import summary page** gains one `Enriched` tally row, and its lede counts enrichment as a change. This is a motivated deviation from the US-008 `summary.html` mockup (required by the AC). It is logged with `decision-log --topic="mockup deviation"` and a `## Deviations` row in `.larapilot/mockups/US-008/README.md`. **No other screen changes**: the day cell detail, grid, legend, scale, and trend are untouched. `DailyRuns` already selects only the columns `DayRun` reads, so neither the grid cache nor the views ever see an extended value.
+
+  ### Sync (no action change)
+
+  - `SyncGarminActivities` keeps its shape: `toRunAttributes()` now includes the extended keys
+  - update path: an API-linked run whose extended values differ is saved and counted `updated` once, and a second sync changes nothing
+  - link path: a CSV run gains the API values and keeps its TSS
+  - known limit, documented: a later sync re-reads only the last 7 days, so API runs synced **before** this deploy outside that window keep empty API-only metrics (zones, splits, location). Production is unaffected because 3.1.0 ships US-022 and US-023 together and the first production sync reads the whole history. Only the dev database holds such runs.
+
+  ### Query shape
+
+  - no new reads on hot paths
+  - import planning keeps its single `(user_id, activity_date)` query, and enrichment reuses the stored runs the plan already holds (`alreadyImportedActivities`): no extra query per row
+  - sync keeps one query per page
+  - session payload stays compact because only non-null extended keys are parked (5,000-row bound unchanged)
+
+  ## Git & Branching
+  - Mode: `GITFLOW` — no automatic push
+  - Release: **3.1.0** — the branch comes from `release/3.1.0`, and the PR targets `release/3.1.0`
+  - TASK-00 first (decision journal: *us-022 merge before us-023*):
+    1. commit the pending `.larapilot/` artifacts on `feature/US-022-garmin-connect-sync`
+    2. merge that approved branch into `release/3.1.0` locally (`--no-ff`, no push)
+    3. `php artisan larapilot:release-feature --semver=3.1.0 --spec=US-023 --slug=extended-run-metrics`
+  - Per task: one Conventional Commit `type(US-023): TASK-NN …`, with code, tests, and domain docs together
+  - Push and remote PR: only when the user asks in-session
+  - Merge into `release/3.1.0` after `larapilot-review` approval
+
+  ## Test Data Strategy
+  - **Mike/Alex** keep `ActivityFactory` and `TrainingBlockSeeder` current in TASK-01, the same task as the migration
+  - `ActivityFactory::withExtendedMetrics()`: the CSV-and-API metrics, coherent with the run:
+    - `elapsed ≥ moving time`
+    - `best pace < average pace`
+    - `steps ≈ cadence × minutes`
+    - `descent ≈ ascent`
+    - `min ≤ max elevation`
+  - `ActivityFactory::withApiOnlyMetrics()`:
+    - HR zones summing to at most the elapsed time
+    - fastest splits only for distances the run covers
+    - a location name
+  - `ActivityFactory::withTrainingStressScore()`
+  - The default definition stays **without** extended metrics, so every existing test keeps its meaning
+  - Demo dataset (`TrainingBlockSeeder`):
+    - the last 4 weeks of API-synced runs carry CSV+API metrics and API-only metrics
+    - the CSV runs of the middle weeks carry CSV extended metrics, and a few carry a TSS
+    - the oldest weeks have none (the "older export" that a re-import enriches)
+  - **Never `migrate:fresh --seed` on the dev database.** `database/database.sqlite` holds the owner's real runs and there is no `.env.testing`.
+    - Seeders are verified by `TrainingBlockSeederTest` / `SeederMeetsMigrationOwnerTest` on the in-memory test DB (`phpunit.xml` ⇒ `:memory:`)
+    - The additive migration reaches dev only through `php artisan migrate`, after copying `database/database.sqlite` aside
+
+  ## Test Strategy
+  - Bar: **NORMAL**, PHPUnit (`php artisan make:test --phpunit`), feature-first, no browser/E2E/viewport suites
+  - **Anne** interleaves three test tasks: CSV parsing (TASK-03), import enrichment and screens (TASK-05), API mapping and sync (TASK-07)
+  - Cases come straight from the acceptance criteria:
+    - Italian and English extended columns
+    - `--` and missing columns
+    - unreadable and out-of-bound values (empty, never 0, row never rejected)
+    - the sample export storing elapsed time only
+    - enrichment and its idempotence
+    - Overwrite keeping stored values on `--`
+    - API mapping from a faked search response
+    - linked CSV run keeping TSS
+    - second sync no-op
+    - no coordinates
+    - dashboard unchanged
+    - migration additive with a reversible `down()`
+  - Existing suites (`ParseGarminCsvTest`, `GarminImportFlowTest`, `GarminSyncTest`, `Dashboard/*`) must pass **unchanged** except where a partitioned count is asserted
+  - HTTP is faked with `Http::fake()` + `Http::preventStrayRequests()` in `setUp()`, and config is set with `Config::set()` (`.ai/rules/tests.md`)
+  - Every page test signs in through `signInOwner()`
+  - Manual test handoff in TASK-09:
+    - re-import a real Italian export over the dev copy
+    - a real `garmin:sync` on dev, comparing one linked run's CSV and API values to confirm the stride/oscillation unit normalisation
+tasks:
+  -
+    id: TASK-00
+    title: 'Merge approved US-022 into release/3.1.0 and bootstrap the feature branch'
+    assignee: Sarah
+    estimate_hours: 1
+    dependencies: {}
+    type: Impl
+    status: TODO
+    body: |
+      ## Description
+      Bootstrap Gitflow for US-023 on release `3.1.0`. US-023 is blocked by US-022, which is approved (DONE) but **not yet merged** into `release/3.1.0` (12 commits ahead), and its approval artifacts are uncommitted. Merge it locally first (decision journal: *us-022 merge before us-023*), then create `feature/US-023-extended-run-metrics` from `release/3.1.0` and prepare the internal PR toward `release/3.1.0`. Do **not** push.
+
+      ## Files Involved
+      - `.larapilot/` artifacts only (backlog, specs, plans, releases, usage ledger) — no application files
+
+      ## Steps
+      1. On `feature/US-022-garmin-connect-sync`, run `git status`. Commit the pending `.larapilot/` changes (US-022 approval, the US-023 plan) as `chore(larapilot): record US-022 approval and US-023 plan`. Do not commit `.larapilot/plans/*.lock` files: delete a stale lock only if no Larapilot command is running.
+      2. `git checkout release/3.1.0 && git merge --no-ff feature/US-022-garmin-connect-sync -m "Merge feature/US-022-garmin-connect-sync into release/3.1.0"`. On a conflict, stop and report. Sarah resolves it, and the user decides on anything non-mechanical.
+      3. `php artisan test --compact` on `release/3.1.0` — green before branching.
+      4. `php artisan larapilot:release-feature --semver=3.1.0 --spec=US-023 --slug=extended-run-metrics`. Read `branch`, `base`, and `checked_out`, and stop on `checked_out: false`, surfacing `reason`.
+      5. Draft the internal PR title/body toward `release/3.1.0` (kept local).
+      6. Dev DB note for later tasks: `php artisan config:show database.connections.sqlite.database` names the real dev file. Never `migrate:fresh` / `db:seed` it.
+
+      ## Completion Criteria
+      - [ ] Pending `.larapilot/` artifacts committed on the US-022 branch
+      - [ ] `release/3.1.0` contains `feature/US-022-garmin-connect-sync` (merge commit, no push)
+      - [ ] Test suite green on `release/3.1.0`
+      - [ ] `release-feature` returned `ok: true` and `checked_out: true` on `feature/US-023-extended-run-metrics`
+      - [ ] PR title/body drafted toward `release/3.1.0`
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — no behaviour change
+
+      ## Git Deliverables
+      - Commit: `chore(larapilot): record US-022 approval and US-023 plan` (on the US-022 branch, before the merge)
+      - Merge: `Merge feature/US-022-garmin-connect-sync into release/3.1.0` (local)
+      - Commit: `chore(US-023): TASK-00 bootstrap feature branch for release/3.1.0` (empty commit optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+  -
+    id: TASK-01
+    title: 'Schema: 27 nullable extended-metric columns on activities, model casts, factory states, seeder'
+    assignee: Mike
+    estimate_hours: 3
+    dependencies:
+      - TASK-00
+    type: Impl
+    status: TODO
+    body: |
+      ## Description
+      Add the extended run metrics of FR-022 to `activities`: only nullable columns, no default, no index, every stored run and value kept. Make them mass-assignable and typed on `Activity`. Keep the factory and the demo dataset coherent in this same task. Column names, types, and units follow the **Columns** table of the plan body.
+
+      ## Files Involved
+      - `database/migrations/2026_11_14_xxxxxx_add_extended_metrics_to_activities_table.php` (`php artisan make:migration add_extended_metrics_to_activities_table --table=activities --no-interaction`)
+      - `app/Models/Activity.php` — `#[Fillable]` gains the 27 columns (identity columns stay out); `casts()` adds `integer` / `float` / `string`; the class `@property int|null` / `float|null` / `string|null` docblock lists every new column (`.ai/rules/models.md`)
+      - `database/factories/ActivityFactory.php` — `withExtendedMetrics()`, `withApiOnlyMetrics()`, `withTrainingStressScore()`; the default definition unchanged
+      - `database/seeders/TrainingBlockSeeder.php`
+      - `tests/Feature/Database/ExtendedRunMetricsMigrationTest.php` (new), `tests/Feature/Database/SchemaTest.php`, `tests/Feature/Database/TrainingBlockSeederTest.php`
+
+      ## Steps
+      1. Migration `up()`:
+         - add the columns in the order of the plan table: decimals as `decimal(p,1)`, elevations as signed `integer`, `location_name` as `string(255)`, all `->nullable()`
+         - a `/* */` block states why there is no default and no index (`NULL` = not recorded, `0` would read as a measurement; read only with the run's row), mirroring `add_run_metrics_to_activities_table`
+         - `down()` drops exactly the 27 new columns
+      2. `Activity`: fillable, casts (decimal columns ⇒ `float`), docblock. `user_id`, `source`, and `garmin_activity_id` stay non-fillable.
+      3. Factory states:
+         - `withExtendedMetrics()` — values derived from the run's own distance, moving time, and pace (see the plan **Test Data Strategy**), all one-decimal values pre-rounded
+         - `withApiOnlyMetrics()` — zones 1–5 summing ≤ elapsed, `fastest_1k_seconds` only when ≥ 1 km, `fastest_mile_seconds` only when ≥ 1,609 m, `fastest_5k_seconds` only when ≥ 5 km, and a location name such as `Lazise`, `Verona`, or `Bolzano`
+         - `withTrainingStressScore()`
+      4. `TrainingBlockSeeder`:
+         - API-synced last 4 weeks ⇒ `withExtendedMetrics()->withApiOnlyMetrics()`
+         - CSV middle weeks ⇒ `withExtendedMetrics()`, about 20% `withTrainingStressScore()`
+         - oldest metric-less weeks unchanged (the older export that a re-import enriches)
+      5. Tests:
+         - `ExtendedRunMetricsMigrationTest` — the 27 columns exist and are nullable; a run stored before the migration keeps every value and reads null extended metrics; `down()` removes only the 27 and keeps every row and every other column
+         - `SchemaTest` asserts no latitude/longitude column on `activities`
+         - `TrainingBlockSeederTest` asserts:
+           - recent synced runs carry zones, splits, and a location
+           - some CSV runs carry TSS
+           - the oldest runs carry no extended metric
+           - every seeded run satisfies `elapsed ≥ moving` and `min ≤ max` elevation
+      6. Verify on the in-memory DB: `php artisan test --compact --filter='SchemaTest|ExtendedRunMetricsMigrationTest|ActivityTest|TrainingBlockSeederTest|SeederMeetsMigrationOwnerTest'`. **Never `migrate:fresh --seed` on the dev DB.** To apply on dev, copy `database/database.sqlite` aside, then run `php artisan migrate`.
+      7. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] Migration adds only the 27 nullable columns; `down()` drops only them; existing runs and values are kept (test)
+      - [ ] `Activity` fillable, casts, and `@property` docblock are in sync with the migration (Larastan level 5 clean)
+      - [ ] Factory states produce coherent, domain-realistic extended metrics; the default definition is unchanged
+      - [ ] Seeder yields runs with CSV+API metrics, CSV-only TSS, and no metrics, and its test asserts each
+      - [ ] No coordinate column exists
+      - [ ] Targeted tests pass on the in-memory DB
+
+      ## Test Data
+      - [ ] `database/factories/ActivityFactory.php` updated (`withExtendedMetrics()`, `withApiOnlyMetrics()`, `withTrainingStressScore()`)
+      - [ ] `TrainingBlockSeeder` composes the new states with meaningful volumes
+      - [ ] Factory and seeder updated in **this same task** as the migration
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — `### Data model (activities)` lists the 27 columns with unit, type, and empty rule; the `Architectural choices` section records columns vs JSON vs 1:1 table and why
+      - [ ] `.larapilot/docs/devs/README.md` index row for `garmin-csv-import` → last touched by `US-023`
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-023): TASK-01 add extended run metric columns with factory and seeder`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+  -
+    id: TASK-02
+    title: 'ExtendedRunMetrics DTO, shared CSV value parsers, extended headers (it/en with aliases), CSV row wiring'
+    assignee: Alex
+    estimate_hours: 4
+    dependencies:
+      - TASK-01
+    type: Impl
+    status: TODO
+    body: |
+      ## Description
+      Read the extended metrics out of Italian and English Garmin CSV exports into a typed DTO that rides on `GarminCsvRow`. A missing column, `--`, or an unreadable or out-of-bound value leaves that metric null and never rejects the row (FR-022, FR-018).
+
+      ## Files Involved
+      - `app/Data/Garmin/ExtendedRunMetrics.php` (new, `php artisan make:class Data/Garmin/ExtendedRunMetrics --no-interaction`) — final readonly; 27 nullable promoted properties; `fromCsvValues()`, `toAttributes()`, `toSessionArray()`, `fromSessionArray()`; `fromApiPayload()` is added in TASK-06
+      - `app/Support/Garmin/GarminCsvValues.php` (new) — static pure parsers extracted from `ParseGarminCsv`:
+        - `wholeNumber(string, min, max, zeroIsEmpty)` — strips `,` thousands separators; signed when `min < 0`
+        - `oneDecimal(string, min, max, zeroIsEmpty)`
+        - `durationSeconds(string)`
+        - `paceSecondsPerKm(string)`
+        - `leftBalancePercent(string)` — `49.8% S / 50.2% D` and `49.8% L / 50.2% R` ⇒ 49.8, the left side found by its letter (S/L) rather than by position
+      - `app/Support/Garmin/GarminCsvColumns.php`:
+        - `HEADER_SETS` values become `list<string>` of accepted header texts per key
+        - extended keys are added to `OPTIONAL_KEYS`
+        - `Min Elev` / `Min Elevation` and `Max Elev` / `Max Elevation` are aliases
+        - a `/* */` block cites the decision *us-023 english garmin extended headers* (unconfirmed English names)
+      - `app/Support/Garmin/ParseGarminCsv.php` — builds `ExtendedRunMetrics::fromCsvValues()` from the optional cells; existing pace/ascent/HR parsing delegates to `GarminCsvValues` with unchanged behaviour
+      - `app/Data/Garmin/GarminCsvRow.php`:
+        - new `ExtendedRunMetrics $extendedMetrics = new ExtendedRunMetrics` parameter
+        - `metricAttributes()` spreads its `toAttributes()`
+        - `toSessionArray()` adds a compact `extended` key, and `fromSessionArray()` reads it with `?? []`
+        - the array-shape PHPDoc is updated
+      - `app/Data/Garmin/ParsedGarminCsv.php` — only if its session shape PHPDoc names row keys
+      - `tests/Fixtures/Garmin/activities-it-extended.csv`, `tests/Fixtures/Garmin/activities-en-extended.csv` (new) — **synthetic** values in the real formats observed in local exports:
+        - `1,028` kcal
+        - `8,240` steps
+        - `1,065` / `1,100` elevation
+        - `1.00` stride (metres)
+        - `9.6` oscillation
+        - `9.4` ratio
+        - `302` GCT
+        - `49.8% S / 50.2% D` balance
+        - TSS `0.0` and one row with a real TSS such as `48.3`
+        - one row of `--`
+        - one row of unreadable values
+        - the English file uses `Min Elev` / `Max Elev`
+        - no real personal data
+
+      ## Steps
+      1. `GarminCsvValues`: move the number, duration, and pace helpers out of `ParseGarminCsv` unchanged, then add the signed, one-decimal, and balance parsers. Bounds and "0 ⇒ null" follow the plan's Columns table.
+      2. `ExtendedRunMetrics::fromCsvValues()`: canonical key ⇒ raw text, and stride **metres × 100 ⇒ cm** (one decimal). `/* */` blocks explain:
+         - the unit normalisation
+         - TSS `0.0` ⇒ null
+         - zero kept for descent, elevation, and TE
+      3. `GarminCsvColumns`: accepted-text lists, optional extended keys, and language detection still driven only by the required keys.
+      4. Wire `ParseGarminCsv` and `GarminCsvRow` as listed. Metrics stay out of `isIdenticalTo()` / `identityKey()`.
+      5. `php artisan test --compact --filter='ParseGarminCsvTest|GarminImport'`: the existing suites stay green unchanged.
+      6. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] Italian and English extended headers are read wherever they sit; a file without them imports exactly as before
+      - [ ] `--`, empty, unreadable, and out-of-bound values become null; no row is rejected for an extended metric
+      - [ ] Stride is normalised to cm; balance is the left share; elevations may be negative; TSS `0.0` is null
+      - [ ] A pending upload parked in the session before this deploy still confirms (missing `extended` reads as empty)
+      - [ ] Existing CSV tests pass unchanged
+
+      ## Test Data
+      - N/A — no model/schema change; new CSV fixtures only
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`:
+        - `### Accepted headers` lists every extended header in both languages, with aliases, and flags the English ones as unconfirmed
+        - `### Value rules` lists formats, units, bounds, and the empty rule per metric
+        - `Technical design` names `ExtendedRunMetrics` and `GarminCsvValues`
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-023): TASK-02 parse extended run metrics from Garmin CSV exports`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+  -
+    id: TASK-03
+    title: 'Tests: extended CSV parsing — Italian, English, `--`, missing columns, units, bounds, session round-trip'
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-02
+    type: Test
+    status: TODO
+    body: |
+      ## Description
+      Add PHPUnit coverage for reading extended metrics out of Garmin CSV exports, at the NORMAL bar.
+
+      ## Files Involved
+      - `tests/Unit/Data/Garmin/ExtendedRunMetricsTest.php` (new, `php artisan make:test --phpunit --unit Data/Garmin/ExtendedRunMetricsTest`)
+      - `tests/Unit/Support/Garmin/GarminCsvValuesTest.php` (new)
+      - `tests/Feature/Garmin/ParseGarminCsvTest.php` (extend)
+      - `tests/Unit/Support/Garmin/GarminCsvColumnsTest.php` (new, or inside `ParseGarminCsvTest` if that is the existing home of header cases)
+
+      ## Steps
+      1. Use the fixtures from TASK-02 and the existing factories. Do not duplicate factory definitions.
+      2. Cases:
+         - `activities-it-extended.csv` stores every extended value from Italian headers, exactly: `1,028` ⇒ 1028, `1.00` m ⇒ 100.0 cm, `49.8% S / 50.2% D` ⇒ 49.8, `1,065` ⇒ 1065, `6:03` ⇒ 363
+         - `activities-en-extended.csv` yields the **same** values from English headers, including `Min Elev` / `Max Elev`; the `Min Elevation` / `Max Elevation` alias is also accepted
+         - a `--` row and a missing-column file ⇒ every extended metric null, and the row is still a run
+         - unreadable and out-of-bound cells ⇒ null, never 0, and the row is not invalid
+         - TSS `0.0` ⇒ null; a real TSS is kept to one decimal
+         - a negative elevation is kept, and 0 descent/elevation is kept
+         - the committed sample `client-materials/Activities (1).csv` ⇒ its 37 `Corsa` rows store `elapsed_time_seconds` and every other extended metric is null
+         - `GarminCsvRow::toSessionArray()` → `fromSessionArray()` round-trips the extended values, and an array without `extended` (a pre-deploy upload) rebuilds with all-null metrics
+         - extended metrics stay out of `identityKey()`: two rows differing only in calories collapse to one
+         - an extended header alone never makes an unknown file pass language detection
+      3. `php artisan test --compact --filter='ExtendedRunMetricsTest|GarminCsvValuesTest|ParseGarminCsvTest|GarminCsvColumnsTest'`
+      4. Do **not** add Playwright, Dusk, browser, or viewport suites.
+
+      ## Completion Criteria
+      - [ ] Tests pass locally
+      - [ ] Every CSV-side acceptance case above is covered at the NORMAL bar
+
+      ## Git Deliverables
+      - Commit: `test(US-023): TASK-03 cover extended metric parsing from Garmin CSV`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+  -
+    id: TASK-04
+    title: 'Import enrichment count, Overwrite rule on extended metrics, summary page Enriched row'
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-02
+    type: Impl
+    status: TODO
+    body: |
+      ## Description
+      Re-importing an export over runs that lack metrics fills them without a conflict review, and the summary reports those runs as **enriched**. A second re-import changes nothing. On Overwrite a `--` extended metric keeps the stored value. The import summary page gains one `Enriched` tally row; no other screen changes.
+
+      ## Files Involved
+      - `app/Actions/Garmin/ApplyGarminImport.php` — `fillEmptyMetricsOfAlreadyImportedRuns()` returns the enriched count (runs that gained at least one metric); its doc block covers the extended metrics; the Overwrite comment notes that `toAttributes()` now carries the extended keys under the same "`--` keeps stored" rule
+      - `app/Data/Garmin/GarminImportSummary.php`:
+        - new `int $enriched`, with `alreadyImported` = identical rows that changed nothing
+        - `toSessionArray()` / `fromSessionArray()` carry `enriched`; `?? 0` keeps a pre-deploy summary readable
+        - the array-shape PHPDoc is updated
+      - `resources/views/garmin/summary.blade.php`:
+        - `<div><dt>Enriched</dt><dd>…</dd></div>` after `Already imported`
+        - the lede treats enrichment as a change. Marika's copy:
+          - "Nothing new — every run was already imported." only when imported + overwritten + enriched = 0
+          - otherwise the current sentence, plus " {n} existing run(s) gained missing metrics." when enriched > 0
+      - `.larapilot/mockups/US-008/README.md` — `## Deviations` row: "Summary: added `Enriched` tally row and lede clause (US-023 AC, FR-022)"
+      - Domain doc listed below
+
+      ## Steps
+      1. `Mirrors:` `.larapilot/mockups/US-008/summary.html`. Read the US-008 README (Fidelity contract) and the screen first. The only deviation is the AC-mandated `Enriched` row and lede clause: same `tally` markup, same tokens, no new styles. Log it with `php artisan larapilot:decision-log --topic="mockup deviation" --value="US-008 summary: Enriched tally row and lede clause for US-023" --source=chat --skill=larapilot-implement --spec=US-023` and the README row.
+      2. Enrichment logic:
+         - unchanged rule: only metrics whose stored value is null
+         - count a run once, however many metrics it gains
+         - no extra query: it uses `plan->alreadyImportedActivities`
+         - the stored `source` is unchanged, so an API run enriched with a CSV TSS stays `garmin_api`
+      3. Overwrite: no code change beyond the comment. Prove the behaviour in TASK-05.
+      4. Mobile-first check of the summary at 375 / 768 / 1280 px (manual smoke): the `dl.tally` grid already wraps.
+      5. `php artisan test --compact --filter='GarminImport|ImportStatus'`: existing tests stay green. Adjust only assertions on `already_imported` that now partition into `enriched`, and say so in the commit body.
+      6. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] A re-import over stored runs that lack metrics fills them with no conflict review and reports them under **Enriched**
+      - [ ] A second re-import of the same file reports 0 enriched and writes nothing (`updated_at` unchanged)
+      - [ ] Overwrite with a `--` extended cell keeps the stored value
+      - [ ] Summary page shows the `Enriched` row; the deviation is logged in the journal and the README
+      - [ ] Day cell detail, grid, legend, scale, trend, and review page unchanged
+      - [ ] Summary usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
+      - [ ] Tests pass
+
+      ## Test Data
+      - N/A — no model/schema change in this task (states from TASK-01 are reused)
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`:
+        - `### 3. Applying (ApplyGarminImport)` describes enrichment, the enriched/already-imported partition, and idempotence
+        - `### 4. HTTP flow` notes the summary `Enriched` row
+        - `Key decisions & invariants` covers the "never replace a stored metric on re-import" and "`--` keeps stored on Overwrite" rules for all 30 metrics
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-023): TASK-04 report enriched runs on Garmin CSV re-import`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+  -
+    id: TASK-05
+    title: 'Tests: enrichment and idempotence, Overwrite keeps stored on `--`, summary row, dashboard unchanged'
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-03
+      - TASK-04
+    type: Test
+    status: TODO
+    body: |
+      ## Description
+      Add feature coverage for the import side of FR-022 through the real HTTP flow (upload → review → confirm → summary), at the NORMAL bar.
+
+      ## Files Involved
+      - `tests/Feature/Garmin/GarminImportEnrichmentTest.php` (new, `php artisan make:test --phpunit Garmin/GarminImportEnrichmentTest`)
+      - `tests/Feature/Dashboard/ExtendedMetricsNotDisplayedTest.php` (new)
+      - `tests/Unit/Data/Garmin/GarminImportSummaryTest.php` (new or existing home), for the session shape
+
+      ## Steps
+      1. Sign in with `signInOwner()`. Build stored runs with `Activity::factory()->for($owner)->garminImported()->withoutMetrics()`, plus `withExtendedMetrics()` where a stored value must survive.
+      2. Cases:
+         - **Enrichment** — store the runs of `activities-it-extended.csv` with identical start/distance/moving time and no metrics; re-upload the file ⇒ no review screen (no conflicts), every run gains its extended values, and the summary shows `Enriched` = number of runs that gained a value, `Already imported` = the rest
+         - **Idempotence** — upload the same file again ⇒ `Enriched` 0, no attribute changed, and `updated_at` unchanged for every run
+         - **No replacement** — a stored run whose calories differ from the file keeps its stored calories on re-import and fills only its null metrics
+         - **Overwrite** — a conflict (±2 min, different distance) answered Overwrite with `--` extended cells keeps the stored extended values, while a populated cell replaces its stored value
+         - **Sample export** — re-importing `client-materials/Activities (1).csv` over its own runs stored without `elapsed_time_seconds` reports them enriched and fills elapsed time only
+         - **Session** — `GarminImportSummary::fromSessionArray()` without `enriched` reads 0
+         - **Summary page** — `Enriched` row rendered with its count; lede says "Nothing new" only when nothing was added, overwritten, or enriched
+         - **Dashboard unchanged** — a run seeded `withExtendedMetrics()->withApiOnlyMetrics()->withTrainingStressScore()`; the dashboard response contains none of its distinctive extended values (location name, calories, steps), and the day detail shows the same pace/ascent/HR output as before
+      3. `php artisan test --compact --filter='GarminImportEnrichmentTest|ExtendedMetricsNotDisplayedTest|GarminImportSummaryTest'`, then the whole `tests/Feature/Garmin` and `tests/Feature/Dashboard` folders.
+      4. Do **not** add Playwright, Dusk, browser, or viewport suites.
+
+      ## Completion Criteria
+      - [ ] Tests pass locally
+      - [ ] Enrichment, idempotence, Overwrite-on-`--`, the summary row, and the unchanged dashboard are each asserted
+
+      ## Git Deliverables
+      - Commit: `test(US-023): TASK-05 cover enrichment, overwrite and unchanged dashboard`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+  -
+    id: TASK-06
+    title: 'Map extended metrics from the Garmin API search response into GarminApiActivity'
+    assignee: Matt
+    estimate_hours: 3
+    dependencies:
+      - TASK-02
+    type: Impl
+    status: TODO
+    body: |
+      ## Description
+      A Garmin sync stores the extended metrics of every run it reads (FR-022, FR-002), a linked CSV run included. A null or unreadable API field leaves the metric empty and never makes the activity invalid. The CSV-only Training Stress Score of a linked run is kept. No start or end coordinates are read.
+
+      ## Files Involved
+      - `app/Data/Garmin/ExtendedRunMetrics.php` — `fromApiPayload(array<string, mixed>)`:
+        - numeric fields accept int|float only; anything else ⇒ null
+        - same bounds and "0 ⇒ null" as the Columns table
+        - `maxSpeed` (m/s) ⇒ `best_pace_seconds_per_km = round(1000 / v)`
+        - `avgStrideLength` is already cm
+        - `elapsedDuration`, `hrTimeInZone_N`, and `fastestSplit_*` are rounded to whole seconds
+        - `locationName` is trimmed, cut at 255, `''` ⇒ null
+        - TSS is always null (not an API field)
+      - `app/Data/Garmin/GarminApiActivity.php`:
+        - new `ExtendedRunMetrics $extendedMetrics = new ExtendedRunMetrics` parameter, filled in `fromApiPayload()`
+        - `metricAttributes()` spreads `toAttributes()`; the `toRunAttributes()` PHPDoc shape is updated
+        - a `/* */` block: coordinates (`startLatitude`, …) are deliberately not read
+      - `tests/Fixtures/Garmin/api/activities-page-mixed.json`:
+        - every running activity gains realistic extended fields **and** `startLatitude` / `startLongitude` / `endLatitude` / `endLongitude`
+        - one running activity carries `null` for every extended field
+        - one carries strings/garbage
+        - non-running entries unchanged
+      - `app/Actions/Garmin/SyncGarminActivities.php` — **no logic change expected**; update the comment on the update/link paths so it names the extended metrics ("a metric the API leaves empty, including the CSV-only TSS, is never blanked")
+      - `.env.example` / `config/services.php` — no change (no new configuration)
+
+      ## Steps
+      1. Implement `fromApiPayload()` with `/* */` blocks for the unit normalisation (stride already cm, best pace from speed) and for why coordinates are skipped.
+      2. Wire `GarminApiActivity` as listed. Its required-field validation is unchanged: an extended field never invalidates an activity.
+      3. Confirm with the existing `GarminSyncTest` and `GarminApiActivityTest` that create, link, and update still behave the same. A second sync over the same page must leave `updated` at 0: one-decimal rounding at the boundary keeps `isDirty()` false.
+      4. `php artisan test --compact --filter='GarminApiActivityTest|GarminSyncTest|GarminSyncCommandTest|SyncGarminNowTest'`
+      5. `vendor/bin/pint --dirty --format agent`
+
+      ## Completion Criteria
+      - [ ] Every API field in the spec table maps to its column, with units normalised to the CSV side
+      - [ ] Null, missing, or unreadable API fields ⇒ the metric is empty, and the activity is still stored
+      - [ ] A linked CSV run gains the API values and keeps its TSS and any CSV-only value
+      - [ ] No coordinate is read or stored
+      - [ ] Existing sync tests pass unchanged; a second sync changes nothing
+
+      ## Test Data
+      - N/A — no model/schema change; API fixture JSON extended only
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/garmin-api-sync.md`:
+        - `Functional flow` covers the extended metrics read per activity
+        - `Technical design` covers the API field ⇒ column map and units
+        - `Key decisions & invariants` covers: no coordinates, the API never blanks a CSV-only metric, TSS is CSV-only
+        - `Extension points & gotchas` covers runs synced before US-023 outside the 7-day window, which keep empty API-only metrics
+      - [ ] `.larapilot/docs/devs/README.md` index row for `garmin-api-sync` → `US-023`
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-023): TASK-06 map extended run metrics from the Garmin API`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+  -
+    id: TASK-07
+    title: 'Tests: API mapping from a faked search response, sync create/link/update, TSS kept, no coordinates'
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-06
+    type: Test
+    status: TODO
+    body: |
+      ## Description
+      Add coverage for the API side of FR-022, at the NORMAL bar, with HTTP faked and stray requests forbidden.
+
+      ## Files Involved
+      - `tests/Unit/Data/Garmin/GarminApiActivityTest.php` (extend)
+      - `tests/Unit/Data/Garmin/ExtendedRunMetricsTest.php` (extend with the API factory)
+      - `tests/Feature/Garmin/GarminSyncTest.php` (extend) or `tests/Feature/Garmin/GarminSyncExtendedMetricsTest.php` (new, `php artisan make:test --phpunit Garmin/GarminSyncExtendedMetricsTest`)
+
+      ## Steps
+      1. `setUp()`: `Http::preventStrayRequests()` plus `Http::fake()` with the token and search responses from `activities-page-mixed.json`; `Config::set()` for the Garmin key (`.ai/rules/tests.md`).
+      2. Cases:
+         - **Mapping** — each API field lands in its column with the right unit:
+           - `maxSpeed` ⇒ best pace
+           - stride in cm
+           - one-decimal rounding
+           - zones/splits in whole seconds
+           - location name trimmed
+         - null / missing / string / negative / zero fields ⇒ the metric is null and the run is still stored, never 0 (zone seconds 0 kept)
+         - **Create** — a new synced run stores every extended metric of the faked response
+         - **Link** — a CSV run (`garminImported()->withExtendedMetrics()->withTrainingStressScore()`) within ±2 min gains the Garmin id and the API values, and **keeps its TSS**
+         - **Update** — an API-linked run with a changed extended value is saved once (`updated` = 1); an immediate second sync gives `updated` = 0 and no `updated_at` change
+         - **No blanking** — an API response with null `calories` keeps the stored calories of a linked run
+         - **Units agree** — the same run, as a CSV row (`1.00` m stride, `9.6` cm oscillation) and as an API payload (`100.4` cm, `9.6` cm), normalises to the same units within one decimal
+         - **No coordinates** — after a sync, no `activities` attribute contains the fixture's latitude/longitude values, and no such column exists
+      3. `php artisan test --compact --filter='GarminApiActivityTest|ExtendedRunMetricsTest|GarminSync'`
+      4. Do **not** add Playwright, Dusk, browser, or viewport suites.
+
+      ## Completion Criteria
+      - [ ] Tests pass locally
+      - [ ] API mapping, create/link/update, TSS kept, second-sync no-op, and no coordinates are each asserted
+
+      ## Git Deliverables
+      - Commit: `test(US-023): TASK-07 cover extended metrics from the Garmin API sync`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+  -
+    id: TASK-08
+    title: 'CHANGELOG, README, and domain-doc consistency pass'
+    assignee: Albert
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-05
+      - TASK-07
+    type: Impl
+    status: TODO
+    body: |
+      ## Description
+      Leave the baseline docs current for 3.1.0. Make sure the two touched domain docs agree with the shipped code and with each other, and that the activity-import doc lists every extended metric (AC).
+
+      ## Files Involved
+      - `CHANGELOG.md` — `Unreleased` / 3.1.0 entry under **Added**: "Runs keep the extra values Garmin records (calories, max heart rate, training effect, cadence, best pace, descent, running form, steps, laps, elapsed time, elevation range, Training Stress Score; heart-rate zones, fastest splits and location from the sync). Re-importing an older export fills them and reports the runs as enriched. Nothing new is shown on the dashboard yet."
+      - `README.md` — only if it lists what an import or sync stores (update that list); no new env var
+      - `.larapilot/docs/devs/garmin-csv-import.md`, `.larapilot/docs/devs/garmin-api-sync.md`, `.larapilot/docs/devs/heatmap-dashboard.md` (only to state that extended metrics are deliberately not read by `DailyRuns` / the grid cache), `.larapilot/docs/devs/README.md`
+
+      ## Steps
+      1. Read both Garmin domain docs against the final code. Fix anything stale, de-duplicate the column table (it lives in `garmin-csv-import.md`; `garmin-api-sync.md` links to it), and refresh the `Last updated by: US-023` metadata.
+      2. Confirm the English-header caveat (unconfirmed, aliases) and the pre-US-023 synced-run gotcha are both recorded.
+      3. CHANGELOG entry as above, in product words: no codes, no people.
+      4. No PRD edit: FR-022 already describes the behaviour.
+
+      ## Completion Criteria
+      - [ ] CHANGELOG entry present
+      - [ ] Domain docs match the code, list all 30 stored metrics with unit and empty rule, and carry the English-header and pre-US-023-sync caveats
+      - [ ] README index rows are current
+
+      ## Test Data
+      - N/A — documentation only
+
+      ## Domain Docs
+      - [ ] `garmin-csv-import.md`, `garmin-api-sync.md`, and (if touched) `heatmap-dashboard.md` current, plus the `README.md` index
+      - [ ] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-023): TASK-08 document extended run metrics`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+  -
+    id: TASK-09
+    title: 'Verification: full suite, quality gate, acceptance walk-through, manual test handoff'
+    assignee: Anne
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-08
+    type: Test
+    status: TODO
+    body: |
+      ## Description
+      Prove the spec end to end before review, and leave the owner manual steps for what automation cannot see: real exports and the real Garmin API.
+
+      ## Files Involved
+      - `.larapilot/review/US-023-manual-tests.md` (or the review artifact's manual section, as US-022 did)
+
+      ## Steps
+      1. `php artisan test --compact` — the whole suite is green.
+      2. `php artisan larapilot:quality`, run as-is (no `-v` paste) — Pint clean, Larastan level 5 clean.
+      3. Walk every acceptance criterion of US-023 and cite the test that proves it. Any criterion without a test ⇒ add one, or flag it.
+      4. Write the manual test handoff (the owner runs it):
+         1. Copy `database/database.sqlite` aside, then `php artisan migrate` on dev — 27 columns are added and the run count is unchanged.
+         2. Sign in and re-import a full real Italian export (`~/Downloads/Activities (2).csv`, 260 runs). Expect no review for unchanged runs, `Enriched` > 0, and an unchanged dashboard. Re-import it again: `Enriched` 0.
+         3. With `GARMIN_API_KEY` set, press **Sync now**. For one run present in both sources, compare stride, oscillation, cadence, and calories between the CSV and the API values (Boost `database-query`, read-only): units agree within rounding.
+         4. Check that no latitude/longitude appears in `activities`.
+      5. Do **not** add Playwright, Dusk, browser, or viewport suites. Never run `migrate:fresh` / `db:seed` against the dev DB.
+
+      ## Completion Criteria
+      - [ ] Full suite green
+      - [ ] Quality gate green
+      - [ ] Every acceptance criterion mapped to a passing test
+      - [ ] Manual test handoff written
+
+      ## Git Deliverables
+      - Commit: `test(US-023): TASK-09 verification and manual test handoff`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+updated_at: '2026-11-14T14:17:06+00:00'
