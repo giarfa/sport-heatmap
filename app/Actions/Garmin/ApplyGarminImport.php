@@ -5,6 +5,7 @@ namespace App\Actions\Garmin;
 use App\Data\Garmin\GarminImportPlan;
 use App\Data\Garmin\GarminImportSummary;
 use App\Data\Garmin\ParsedGarminCsv;
+use App\Enums\ActivitySource;
 use App\Enums\ConflictResolution;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapGridCache;
@@ -48,8 +49,15 @@ final readonly class ApplyGarminImport
                  * The metrics follow the same rule except for one:
                  * toAttributes() leaves out a metric the file recorded as "--",
                  * so an empty cell keeps the stored value instead of blanking it.
+                 *
+                 * `source` records who wrote the run's current values, so it becomes the CSV;
+                 * `garmin_activity_id` is the run's identity on Garmin and a CSV row has none,
+                 * so it is neither in toAttributes() nor touched here — an API-synced run
+                 * keeps it, and the next sync still recognises the run as its own.
                  */
-                $conflict->stored->fill($conflict->row->toAttributes())->save();
+                $conflict->stored->fill($conflict->row->toAttributes())
+                    ->forceFill(['source' => ActivitySource::GarminCsv])
+                    ->save();
                 $overwritten++;
             }
 

@@ -42,6 +42,34 @@ final class GarminRunningTypes
     ];
 
     /**
+     * Activity type key of the Connect API => sport type (FR-003). The API names a type
+     * with a stable snake_case key, never a localised label, so this map is exact and
+     * needs no case folding. Every key outside it is not a run.
+     *
+     * @var array<string, SportType>
+     */
+    private const API_TYPE_KEYS = [
+        'running' => SportType::Run,
+        'street_running' => SportType::Run,
+        'track_running' => SportType::Run,
+        'indoor_running' => SportType::Run,
+        'treadmill_running' => SportType::Run,
+        'ultra_run' => SportType::Run,
+        'obstacle_run' => SportType::Run,
+        'trail_running' => SportType::TrailRun,
+        'virtual_run' => SportType::VirtualRun,
+    ];
+
+    /**
+     * The sport type for a Connect API `activityType.typeKey`, or null when it is not a
+     * run.
+     */
+    public static function sportTypeForTypeKey(string $typeKey): ?SportType
+    {
+        return self::API_TYPE_KEYS[$typeKey] ?? null;
+    }
+
+    /**
      * The sport type for a Garmin type name, matched trimmed and
      * case-insensitively, or null when it is not a run.
      */

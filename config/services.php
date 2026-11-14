@@ -35,4 +35,28 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Garmin Connect Personal API
+    |--------------------------------------------------------------------------
+    |
+    | Only the key is a deployment choice. The host and the two paths are product
+    | invariants, written as literals so no environment file can send the key to
+    | another host. The access token lives in the `file` cache store and never in
+    | the default one: CACHE_STORE=database would write it into SQLite.
+    |
+    */
+
+    'garmin' => [
+        'api_key' => env('GARMIN_API_KEY'),
+        'base_url' => 'https://personal.connectapi.garmin.com',
+        'token_path' => '/personalapitoken-service/personal-api/personal-api-key/token',
+        'activities_path' => '/activitylist-service/activities/search/activities',
+        'page_size' => 100,
+        'resync_days' => 7,
+        'token_cache_store' => 'file',
+        'connect_timeout' => 5,
+        'timeout' => 20,
+    ],
+
 ];

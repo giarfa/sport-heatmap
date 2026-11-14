@@ -5,11 +5,11 @@ epic:
   title: 'Activity sync'
 priority: HIGH
 points: 5
-status: TODO
+status: PLANNED
 body: |
   #### US-023: Extended run metrics from the Garmin API and the Garmin CSV
 
-  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** TODO
+  **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** PLANNED
   **Blocked by:** US-022
   **Type:** Feature
   **Release:** 3.1.0
@@ -61,3 +61,8 @@ body: |
   - [ ] The day cell detail, grid, legend, scale, and trend render exactly as before; no extended metric is displayed
   - [ ] The migration adds only nullable columns, keeps every stored run and value, and its `down()` drops only the new columns
   - [ ] Tests cover Italian and English extended columns, `--` and missing columns, enrichment and its idempotence, Overwrite keeping stored values on `--`, and the API mapping from a faked search response; the developer domain doc for activity import lists the extended metrics
+status_history:
+  -
+    status: PLANNED
+    at: '2026-11-14T14:17:06+00:00'
+rework: false

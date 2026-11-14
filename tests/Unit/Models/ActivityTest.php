@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Models;
 
+use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
@@ -133,12 +134,48 @@ class ActivityTest extends TestCase
         $this->assertSame('2026-03-14', $activity->start_date_local->toDateString());
     }
 
-    public function test_an_activity_has_no_strava_attribute_and_no_source(): void
+    public function test_an_activity_has_no_strava_attribute(): void
     {
         $activity = Activity::factory()->create()->fresh();
 
         $this->assertArrayNotHasKey('strava_activity_id', $activity->getAttributes());
-        $this->assertArrayNotHasKey('source', $activity->getAttributes());
+    }
+
+    public function test_a_run_is_a_csv_import_with_no_garmin_id_unless_it_was_synced(): void
+    {
+        $activity = Activity::factory()->create()->fresh();
+
+        $this->assertSame(ActivitySource::GarminCsv, $activity->source);
+        $this->assertNull($activity->garmin_activity_id);
+        $this->assertSame(ActivitySource::GarminCsv, Activity::factory()->garminImported()->create()->fresh()->source);
+    }
+
+    public function test_the_garmin_synced_state_carries_a_unique_eleven_digit_garmin_id(): void
+    {
+        $runs = Activity::factory()->garminSynced()->count(3)->create();
+
+        foreach ($runs as $run) {
+            $this->assertSame(ActivitySource::GarminApi, $run->fresh()->source);
+            $this->assertIsInt($run->fresh()->garmin_activity_id);
+            $this->assertSame(11, strlen((string) $run->garmin_activity_id));
+        }
+
+        $this->assertCount(3, $runs->pluck('garmin_activity_id')->unique());
+    }
+
+    public function test_the_source_and_the_garmin_id_are_not_mass_assignable(): void
+    {
+        $activity = Activity::factory()->create();
+
+        $activity->fill([
+            'source' => ActivitySource::GarminApi->value,
+            'garmin_activity_id' => 12_345_678_901,
+            'name' => 'Renamed',
+        ]);
+
+        $this->assertSame('Renamed', $activity->name);
+        $this->assertSame(ActivitySource::GarminCsv, $activity->source);
+        $this->assertNull($activity->garmin_activity_id);
     }
 
     public function test_the_sport_type_enum_exposes_exactly_the_three_running_types(): void

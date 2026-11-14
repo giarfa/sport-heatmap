@@ -11,6 +11,8 @@
 @section('content')
     <x-session-notices class="mx-auto mb-4 max-w-sm" />
 
+    <x-sync-warning :status="$status" class="mx-auto mb-4 max-w-sm" />
+
     <div class="card mx-auto max-w-sm p-6 text-center">
         <svg width="36" height="36" viewBox="0 0 32 32" aria-hidden="true" class="mx-auto">
             <rect x="3" y="17" width="12" height="12" rx="3" fill="#86b6ef"/>
@@ -26,6 +28,13 @@
         </p>
 
         <a href="{{ route('garmin.import.create') }}" class="btn btn--primary mt-4 w-full">Import Garmin CSV</a>
+
+        @if ($status->syncConfigured)
+            <form method="POST" action="{{ route('garmin.sync') }}" class="mt-3">
+                @csrf
+                <button type="submit" class="btn btn--secondary w-full">Sync now</button>
+            </form>
+        @endif
 
         {{-- The owner is always signed in here (the route sits behind `auth`). --}}
         <form method="POST" action="{{ route('logout') }}" class="mt-3">

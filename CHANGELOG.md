@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Garmin Connect sync: with a personal API key in `GARMIN_API_KEY`, your running activities are read
+  from Garmin Connect once a day at 05:00 (your display timezone) and whenever you press **Sync now**.
+  The first sync reads your whole history; later ones re-read the last seven days, so a renamed run is
+  updated. A run you already imported from a CSV is linked, not duplicated, and running the sync twice
+  changes nothing. The host needs the scheduler's cron entry (see the README).
+- **Sync now** under the map and on the empty screen, with a summary of what the sync did.
+- A warning above the map while the latest sync failed — "Garmin key rejected — renew it",
+  "Garmin unreachable" or "Garmin sync failed" — which goes away after the next successful sync.
+- `php artisan garmin:sync` to run the sync, or the first full-history read, from the command line.
+
+### Changed
+
+- The status line shows the more recent of "Last sync N ago" and "Last import N ago", and the card in
+  the rail gains a "Last sync" row — only when `GARMIN_API_KEY` is set.
+- The Garmin CSV import is now one of two ways runs enter. Overwriting a synced run with a CSV row keeps
+  its Garmin id.
+- With no `GARMIN_API_KEY` nothing changes: no Sync now, no sync status, no warning, nothing scheduled
+  that calls out.
+
 ## [3.0.0] - 2026-10-26
 
 **Upgrade warning: the migration that ships with this release permanently deletes every run that

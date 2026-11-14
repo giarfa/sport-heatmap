@@ -10,6 +10,7 @@ use App\Http\Controllers\Garmin\ConfirmGarminImportController;
 use App\Http\Controllers\Garmin\ShowGarminImportFormController;
 use App\Http\Controllers\Garmin\ShowGarminImportReviewController;
 use App\Http\Controllers\Garmin\ShowGarminImportSummaryController;
+use App\Http\Controllers\Garmin\SyncGarminNowController;
 use App\Http\Controllers\Garmin\UploadGarminCsvController;
 use App\Http\Controllers\SignOutController;
 use Illuminate\Support\Facades\Route;
@@ -68,4 +69,13 @@ Route::middleware(['auth', 'password.set'])->group(function (): void {
             Route::post('/cancel', CancelGarminImportController::class)->name('cancel');
             Route::get('/summary', ShowGarminImportSummaryController::class)->name('summary');
         });
+
+    /*
+     * Sync now: the second way a run enters. A POST so a link or a prefetch cannot start
+     * a sync, with CSRF from the web group, the garmin-sync throttle (per user) and the
+     * session as its only guard — it takes no id and no input, and writes into the
+     * signed-in owner. Behind the same group as everything else, so a signed-out request
+     * is redirected to /login before the controller runs and calls nothing.
+     */
+    Route::post('/sync/garmin', SyncGarminNowController::class)->middleware('throttle:garmin-sync')->name('garmin.sync');
 });

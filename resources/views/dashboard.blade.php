@@ -16,6 +16,8 @@
 
     <x-window-nav :navigation="$navigation" />
 
+    <x-sync-warning :status="$status" class="mt-4" />
+
     <div class="dash mt-4">
         <section class="card dash-grid p-3 sm:p-5" aria-labelledby="grid-heading">
             <h2 id="grid-heading" class="sr-only">Daily running distance, 16 weeks by weekday</h2>
@@ -27,7 +29,7 @@
             <x-heatmap-grid :grid="$grid" />
         </section>
         <x-day-detail :grid="$grid" />
-        <aside class="rail" aria-label="Legend, weekly trend and import detail">
+        <aside class="rail" aria-label="Legend, weekly trend and {{ $status->syncConfigured ? 'sync' : 'import' }} detail">
             <div class="card p-4">
                 <x-heatmap-legend :scale="$grid->scale" />
             </div>
@@ -48,6 +50,15 @@
         <a href="{{ route('garmin.import.create') }}"
            class="inline-flex min-h-11 items-center underline underline-offset-2"
            style="color: var(--accent);">Import Garmin CSV</a>
+        @if ($status->syncConfigured)
+            <span aria-hidden="true">·</span>
+            <form method="POST" action="{{ route('garmin.sync') }}" class="inline">
+                @csrf
+                <button type="submit"
+                        class="inline-flex min-h-11 items-center underline underline-offset-2"
+                        style="color: var(--accent);">Sync now</button>
+            </form>
+        @endif
         <span aria-hidden="true">·</span>
         <form method="POST" action="{{ route('logout') }}" class="inline">
             @csrf

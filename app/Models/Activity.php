@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -26,6 +27,8 @@ use Illuminate\Support\Carbon;
  * @property int|null $average_pace_seconds_per_km
  * @property int|null $total_ascent_meters
  * @property int|null $average_heart_rate
+ * @property ActivitySource $source
+ * @property int|null $garmin_activity_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $user
@@ -33,7 +36,11 @@ use Illuminate\Support\Carbon;
 /*
  * user_id is deliberately not mass-assignable: activity ownership must come from the
  * relation the import is writing through ($user->activities()->create(...)), never
- * from an attribute array that a request could reach.
+ * from an attribute array that a request could reach. `source` and `garmin_activity_id`
+ * are left out for the same reason: they say where a run came from and which Garmin
+ * activity it is, so only the code that does the linking assigns them, explicitly. An
+ * import row or a request body can never plant an id that would make a later sync
+ * overwrite, or refuse to create, an unrelated run.
  */
 #[Fillable([
     'sport_type',
@@ -121,6 +128,8 @@ class Activity extends Model
             'average_pace_seconds_per_km' => 'integer',
             'total_ascent_meters' => 'integer',
             'average_heart_rate' => 'integer',
+            'source' => ActivitySource::class,
+            'garmin_activity_id' => 'integer',
         ];
     }
 }
