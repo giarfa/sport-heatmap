@@ -256,7 +256,7 @@ tasks:
     id: TASK-04
     title: 'BuildAerobicEfficiency: card strings, axis and chart geometry'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
@@ -290,23 +290,29 @@ tasks:
       11. `php artisan test --filter=BuildAerobicEfficiency` (smoke here; TASK-05 is the suite)
 
       ## Completion Criteria
-      - [ ] Every string in the mockup's card is produced by the builder, word for word
-      - [ ] Faster paces sit higher (smaller y); axis covers dots and both lines
-      - [ ] Copy has no colour, verdict, praise, warning or advice — numbers, units, faster / slower only
-      - [ ] Tests pass
+      - [x] Every string in the mockup's card is produced by the builder, word for word
+      - [x] Faster paces sit higher (smaller y); axis covers dots and both lines
+      - [x] Copy has no colour, verdict, praise, warning or advice — numbers, units, faster / slower only
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: BuildAerobicEfficiency, its DTOs and the card states; the geometry formulas; the NoMedian state as an agreed mockup deviation (decision 7b05de091be150ce)
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: BuildAerobicEfficiency, its DTOs and the card states; the geometry formulas; the NoMedian state as an agreed mockup deviation (decision 7b05de091be150ce)
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-04 build the aerobic efficiency card`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: 56568dae039575c2352a3acd9bcfab28083e574c
+      short_sha: 56568da
+      subject: 'feat(US-024): TASK-04 build the aerobic efficiency card'
+      committed_at: '2026-11-14T18:50:14+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/56568dae039575c2352a3acd9bcfab28083e574c'
   -
     id: TASK-05
     title: 'Pest coverage for the efficiency card builder'
@@ -568,4 +574,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:47:05+00:00'
+updated_at: '2026-11-14T17:50:14+00:00'
