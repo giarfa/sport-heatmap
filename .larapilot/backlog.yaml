@@ -1420,11 +1420,11 @@ specs:
       title: 'Activity sync'
     priority: HIGH
     points: 5
-    status: 'IN PROGRESS'
+    status: REVIEW
     body: |
       #### US-023: Extended run metrics from the Garmin API and the Garmin CSV
 
-      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** IN PROGRESS
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** REVIEW
       **Blocked by:** US-022
       **Type:** Feature
       **Release:** 3.1.0
@@ -1479,4 +1479,5 @@ specs:
     status_history:
       - { status: PLANNED, at: '2026-11-14T14:17:06+00:00' }
       - { status: 'IN PROGRESS', at: '2026-11-14T14:18:54+00:00' }
+      - { status: REVIEW, at: '2026-11-14T14:37:23+00:00' }
     rework: false
