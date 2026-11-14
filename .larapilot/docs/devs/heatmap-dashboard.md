@@ -4,15 +4,15 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-021` — 2026-10-26 |
+| **Last updated by** | `US-022` — 2026-11-14 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
 
 The single screen of the product, served at `/` and **private to the signed-in
 owner** (`US-020`): a 16-week × 7-day grid of daily running distance with weekly
-totals, a self-calibrating intensity legend, an import status ("last import N
-ago": header chip, footer line, detail card), and a day detail that lists each run of a tapped day with
+totals, a self-calibrating intensity legend, a data status ("last sync N ago" or
+"last import N ago", whichever is more recent: header chip, footer line, detail card), and a day detail that lists each run of a tapped day with
 its pace, ascent and heart rate. A signed-out browser is redirected to `/login`
 (see `owner-authentication.md`); there is no public view and no displayed-athlete
 selection. It must never present stale data as current. If it stops working, the
@@ -51,12 +51,14 @@ owner loses the only view of their training.
       week, each Ran day's runs) → `CalibrateIntensityScale` (p25 / p50 / p75, R-7) and
       `BuildWeeklyTrend` (the weekly-mileage chart, from the same `WeekRow`s) — all of it
       cached as the one `HeatmapGrid`, so the chart has no cache of its own.
-   3. `ResolveImportStatus` reads the newest `updated_at` among the owner's
-      imported activities and the activity count of the **current** window —
-      never the shown one — **outside** the cache and returns an `ImportStatus`,
-      so the chip, the footer line and the import card are the same on every
-      window (`US-013`). There is no warning state: nothing runs in the
-      background, so nothing can fall behind (`US-021`).
+   3. `ResolveImportStatus` reads the newest `updated_at` among the owner's CSV-imported
+      activities (`source = garmin_csv`) and the activity count of the **current**
+      window — never the shown one — **outside** the cache and returns an
+      `ImportStatus`, so the chip, the footer line and the import card are the same on
+      every window (`US-013`). With `GARMIN_API_KEY` set it also reads the newest
+      succeeded sync and the newest *finished* sync attempt's failure (`US-022`); with
+      no key those two queries do not run and the status is what it was before the sync
+      existed.
    4. `OldestRunDate` (one `MIN(activity_date)`, read fresh) and the window feed
       `WindowNavigation::for()`: the heading ("Last 16 weeks" on the current
       window, "16 weeks to 6 Sep" on an earlier one), the page title, the empty
@@ -128,7 +130,8 @@ empty state: the one-off `status` flash (for example "Import cancelled. Nothing 
 written."). Both views carry it because the import redirects to `dashboard`, which
 the owner sees as the map once there is a run, and as the empty state otherwise.
 
-**Owner UI.** One line under the map: "Import Garmin CSV · Sign out" — text links
+**Owner UI.** One line under the map: "Import Garmin CSV · Sync now · Sign out" ("Sync now"
+only when `GARMIN_API_KEY` is set, `US-022`) — text links
 (44 px tap targets; `--accent` ink, global `focus-visible` ring; the `·` separator
 is `aria-hidden`). It is not a header button: the 375 px header has no room for a
 second control and the line must stay discreet on a page whose job is the map.
@@ -141,25 +144,46 @@ prefetch (US-019, see `owner-authentication.md`). SEO contract:
 **Empty state (`US-021`).** When the owner has no run, `dashboard-empty.blade.php`
 shows the logo mark, "See your training at a glance", "Import a Garmin Connect CSV
 export to build your 16-week heatmap.", one full-width primary "Import Garmin CSV"
-button (44 px) and a secondary "Sign out" form button. The owner's first confirmed
-import gives them a run, and the next visit to `/` shows the map instead.
+button (44 px), with a key set a secondary full-width "Sync now" form button, and a
+secondary "Sign out" form button. The owner's first confirmed import or sync gives them a
+run, and the next visit to `/` shows the map instead.
 
 A confirmed import retires every cached window grid of the written athlete (`HeatmapGridCache::forgetAthlete()`), so the map shows the imported runs on
 the next request in whichever window is opened, and "Import cancelled. Nothing was written." arrives through
 `<x-session-notices />`. Garmin-imported runs are ordinary rows to the grid:
 `DailyRunningDistance` sums every run alike.
 
-**Import status (`ImportStatus`, `US-021`, FR-007)**: the chip reads "Last import
-{relative}" from the newest imported row's `updated_at`, or "No runs imported yet"
-with none; the footer prints the same text in lower case below 640 px, where the
-chip is hidden. The detail card is "Import / Last import / Runs in window": the
+**Sync now (`US-022`, FR-010).** A native `<form method="POST">` with `@csrf` to
+`POST /sync/garmin` (`garmin.sync`, `SyncGarminNowController`), inside the `auth` +
+`password.set` group with the `garmin-sync` throttle (3 a minute per user id). It runs the
+sync in the request and redirects to `/` with the result as the usual `session('status')`
+notice: "Sync finished: N new, N updated, N linked, N ignored, N future-dated." (", N
+unreadable" only when above 0), "Sync failed: {warning}", "A Garmin sync is already
+running — nothing started." or, with no key, "Garmin sync is not configured." (the button is
+not rendered then, so only a hand-made POST sees it).
+
+**Sync warning (`US-022`).** While the newest *finished* attempt in `garmin_syncs` failed,
+`<x-sync-warning>` renders the banner of `mockups/heatmap-dashboard/states.html` §3 without
+its button, `role="alert"`, above the grid and above the empty-state card: the failure's
+`warning()` as the title ("Garmin key rejected — renew it", "Garmin unreachable", "Garmin
+sync failed") and `advice()` under it. A `running` attempt has no verdict and never hides an
+earlier failure; the next success becomes the newest and removes the banner.
+
+**Import status (`ImportStatus`, `US-021` / `US-022`, FR-007)**: the chip reads the more
+recent of "Last sync {relative}" (the newest succeeded attempt's `finished_at`, even one
+that wrote nothing) and "Last import {relative}" (the newest CSV row's `updated_at`; API-synced
+rows never move it), or "No runs imported yet" with neither — "Not synced yet" when a key is
+set. The footer prints the same text in lower case below 640 px, where the
+chip is hidden. The detail card is "Import / Last import / Runs in window", plus a "Last
+sync" row first when a key is set: the
 absolute stamp is printed in `config('heatmap.display_timezone')`
 (`HEATMAP_DISPLAY_TIMEZONE`, default `Europe/Rome`) with the relative time under
 it, "Never" without one. Headings and every string come from `ImportStatus`
 (`chipLabel()`, `footerLabel()`, `detailHeading()`, `lastImportLabel()`,
-`lastImportRelative()`, `emptyWindowNote()`), so Blade stays markup-only. There is
-no stale, failed, reconnect or first-sync state, and no outcome row: one source,
-nothing to report.
+`lastImportRelative()`, `lastSyncLabel()`, `lastSyncRelative()`, `syncWarning()`,
+`syncWarningDetail()`, `emptyWindowNote()`), so Blade stays markup-only. Without a key there
+is no stale, failed, reconnect or first-sync state and no sync row: the dashboard behaves
+exactly as it did when the CSV import was the only source.
 
 **Intensity scale**: fewer than 4 running days → fixed bands (5 / 10 / 20 km)
 with a "too few" note; p25 = p75 → fixed bands with a "too alike" note; otherwise
@@ -181,7 +205,8 @@ calibrated bands, upper-inclusive.
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
 | Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v6:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
-| Import status | `app/Support/Garmin/ResolveImportStatus.php`, `app/Data/ImportStatus.php` | Fresh on every request; every user-facing import string |
+| Import status | `app/Support/Garmin/ResolveImportStatus.php`, `app/Data/ImportStatus.php` | Fresh on every request; every user-facing import and sync string |
+| Sync now | `app/Http/Controllers/Garmin/SyncGarminNowController.php`, `routes/web.php` (`garmin.sync`), `AppServiceProvider` (`garmin-sync` limiter), `resources/views/components/sync-warning.blade.php` | The button, its flash, the failure banner (`US-022`) |
 | Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `dashboard-empty.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `weekly-trend`, `import-chip`, `import-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Security headers | `app/Http/Middleware/SetSecurityHeaders.php`, registered with `$middleware->prepend()` in `bootstrap/app.php` (`US-018`) | Global: the four headers on every response, HSTS when `isSecure()`; a header already on the response is left alone |
@@ -189,7 +214,7 @@ calibrated bands, upper-inclusive.
 | Tests | `tests/Feature/Dashboard/*`, `tests/Feature/Routing/SecurityHeadersTest.php`, `tests/Unit/Support/Heatmap/*`, `tests/Unit/Data/Heatmap/*`, `tests/Unit/Data/ImportStatusTest.php`, `tests/Unit/Support/Garmin/ResolveImportStatusTest.php` | |
 
 A dashboard request costs one grouped query, one run query and one lead-in query on a cache miss, zero on a hit, plus
-two small indexed queries for the import status and one `MIN()` for the oldest run (`US-013`).
+two small indexed queries for the import status (two more on `garmin_syncs` when a key is set, `US-022`) and one `MIN()` for the oldest run (`US-013`).
 
 ### Weekly trend (`US-014`, FR-020)
 
@@ -255,7 +280,8 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 | HSTS only on secure requests, without `includeSubDomains` or `preload` (US-018) | Always send it; add both directives | Browsers ignore HSTS over HTTP, but a header sent where TLS is not guaranteed misleads. The other subdomains of the host are unknown and both directives are close to irreversible once cached |
 | R-7 percentiles | Nearest-rank | Only R-7 reproduces the mockup's validated legend (7.2 / 9.9 / 14.1 km) |
 | Last import = newest `updated_at` of the owner's imported activities (US-011, kept by US-021) | A `users.garmin_imported_at` column; an import log table | No migration and no extra write for one stamp; the cost is that a re-import that changes nothing does not move it — the label means "data last changed by an import" |
-| No warning state of any kind (US-021) | Warn when the last import is old | Nothing runs in the background, so the data cannot fall behind; an old import is the owner's own pace, not a fault. The Strava stale / failed / reconnect / first-sync states were retired with the sync (accepted mockup deviation, decision `c022654e858f07e5`) |
+| A warning only for a failed Garmin sync, and only with a key (US-022; supersedes "no warning state", US-021) | Warn when the last import is old; always read `garmin_syncs` | An old CSV import is the owner's own pace, not a fault, so the CSV never warns. A failed sync is a fault the owner can fix (renew the key) and a map that silently stopped updating is the product's fatal failure mode. With no key the table is not read, so a CSV-only instance behaves exactly as before. Placement reuses the states mockup §3 banner without its Strava button (decision `aad88aa01db73362`) |
+| "Last import" counts CSV rows only (US-022) | Newest `updated_at` of any run | A sync that updates a run touches `updated_at`; counting it would make "last import" move on every sync and the chip could never say which source is the fresher |
 | The absolute import stamp is printed in `display_timezone` (US-021) | The app timezone (UTC); the browser's zone | Timestamps are stored in UTC and an evening import is the owner's next morning in UTC; a server-rendered page has no browser zone, so the owner's wall clock is a deployment setting (`HEATMAP_DISPLAY_TIMEZONE`) |
 | All copy and arithmetic in DTOs / `ImportStatus` | Logic in Blade | Testable without rendering; components stay markup-only |
 | `@yield('header-status')` in the layout | View composer / shared variable | Screens that extend the same layout may render no chip |
@@ -271,10 +297,14 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 
 ## Key decisions & invariants
 
-- **Invariant — no state of the dashboard warns.** _Breaks if:_ a stale, failed
-  or reconnect state is reintroduced without a background job that can fail. The
-  "Last import …" stamp means "data last changed by an import": a re-import that
-  changes nothing does not move it.
+- **Invariant — with no `GARMIN_API_KEY` no state of the dashboard warns, and nothing of
+  the sync is rendered.** _Breaks if:_ `ResolveImportStatus` reads `garmin_syncs` or a view
+  shows "Sync now", "Last sync" or the banner without `syncConfigured`. The "Last import …"
+  stamp means "data last changed by a CSV import": a re-import that changes nothing does
+  not move it, and API-synced rows never do.
+- **Invariant — the banner shows the newest *finished* attempt's failure.** _Breaks if:_ a
+  `running` row is read as the latest attempt (it would hide a real failure for the length
+  of a sync) or a failure older than a success keeps warning.
 
 - **Invariant — a view of `/` is strictly read-only.** Only a confirmed Garmin
   import writes (US-011), never the page itself. _Breaks if:_ anything on the
@@ -386,7 +416,7 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 
 ## Related
 
-- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`, `US-010`, `US-011`, `US-012`, `US-013`, `US-018`, `US-020`, `US-021`
+- Specs: `US-004`, `US-005`, `US-006`, `US-007`, `US-008`, `US-009`, `US-010`, `US-011`, `US-012`, `US-013`, `US-018`, `US-020`, `US-021`, `US-022`
 - Plans: `.larapilot/plans/US-004-plan.yaml`, `US-005-plan.yaml`, `US-006-plan.yaml`, `US-007-plan.yaml`, `US-009-plan.yaml`, `US-010-plan.yaml`, `US-013-plan.yaml`, `US-020-plan.yaml`
 - Review: `.larapilot/docs/review/US-004.md`, `US-005.md`, `US-006.md`, `US-007.md`, `US-009.md`, `US-010.md`
-- Other domains: `owner-authentication.md`, `garmin-csv-import.md`
+- Other domains: `owner-authentication.md`, `garmin-csv-import.md`, `garmin-api-sync.md`

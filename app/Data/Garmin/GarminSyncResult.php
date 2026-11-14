@@ -22,4 +22,29 @@ final readonly class GarminSyncResult
     {
         return $this->outcome === GarminSyncOutcome::Succeeded;
     }
+
+    /**
+     * The sentence Sync now flashes: what a finished sync did, or why it failed. The
+     * unreadable count is mentioned only when something was unreadable.
+     */
+    public function summary(): string
+    {
+        if ($this->failure !== null) {
+            return "Sync failed: {$this->failure->warning()}";
+        }
+
+        $parts = [
+            "{$this->counts->new} new",
+            "{$this->counts->updated} updated",
+            "{$this->counts->linked} linked",
+            "{$this->counts->ignored} ignored",
+            "{$this->counts->futureDated} future-dated",
+        ];
+
+        if ($this->counts->invalid > 0) {
+            $parts[] = "{$this->counts->invalid} unreadable";
+        }
+
+        return 'Sync finished: '.implode(', ', $parts).'.';
+    }
 }

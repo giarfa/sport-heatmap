@@ -17,8 +17,10 @@ stays (`garmin-csv-import.md`); both write the same `activities` table.
 ## Functional flow
 
 Entry points: `php artisan garmin:sync [--scheduled]` (the scheduler runs it daily at
-05:00 in `HEATMAP_DISPLAY_TIMEZONE`, so `schedule:list` shows it in UTC) and, from
-`US-022` TASK-06, the dashboard's Sync now. Both call `SyncGarminActivities`.
+05:00 in `HEATMAP_DISPLAY_TIMEZONE`, so `schedule:list` shows it in UTC) and the dashboard's
+Sync now (`POST /sync/garmin`). Both call `SyncGarminActivities`; the controller runs it in
+the request and flashes `GarminSyncResult::summary()`, or the already-running refusal, or "Garmin
+sync is not configured." for a POST with no key (see `heatmap-dashboard.md` for the screen).
 
 1. **No key** — the command prints "GARMIN_API_KEY is not set — nothing to sync." and exits
    0; nothing is called and nothing is recorded.
@@ -81,6 +83,7 @@ when the id, local start, distance or moving time is missing or unreadable.
 | --- | --- | --- |
 | Model / table | `app/Models/GarminSync.php`, `create_garmin_syncs_table` migration | One row per sync attempt |
 | Action | `app/Actions/Garmin/SyncGarminActivities.php` | Lock, record, window, pages, match / link / create / update, cache, finalise; never authorizes (the caller decides) |
+| Controller / route | `app/Http/Controllers/Garmin/SyncGarminNowController.php`, `POST /sync/garmin` (`garmin.sync`), limiter `garmin-sync` | Sync now; 3 a minute per user id |
 | Command | `app/Console/Commands/Garmin/GarminSyncCommand.php`, `routes/console.php` | Thin wrapper; the daily schedule |
 | DTOs | `app/Data/Garmin/GarminSyncCounts.php`, `GarminSyncResult.php` | What an attempt did and how it ended |
 | Owner | `app/Support/Garmin/ResolveSyncOwner.php` | The `giarfa` account, found by username (no session in a command) |
