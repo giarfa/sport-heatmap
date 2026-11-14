@@ -1,7 +1,8 @@
 # Sport Heatmap
 
-A private single-athlete training heatmap. It imports your own runs from a Garmin Connect CSV export
-and renders them as a GitHub-style contribution grid, so a training block is readable at a glance.
+A private single-athlete training heatmap. It reads your own runs from Garmin Connect — automatically
+every day, on demand with **Sync now**, or from a CSV export — and renders them as a GitHub-style
+contribution grid, so a training block is readable at a glance.
 
 One athlete, one screen, no public signup: every page sits behind a single password-protected account
 (see "First sign-in and recovery" below).
@@ -87,8 +88,8 @@ UPDATE users SET password = NULL WHERE username = 'giarfa';
 
 ## Removing the former Strava connection
 
-Since 3.0.0 the app has no Strava connection: no OAuth, no nightly sync, no stored token, and no
-Strava data. Runs enter only through the Garmin CSV import (see below).
+Since 3.0.0 the app has no Strava connection: no OAuth, no stored token, and no Strava data. Runs
+enter through the Garmin Connect sync or the Garmin CSV import (see below).
 
 If you used an earlier version, do one thing by hand: **revoke the former app at
 <https://www.strava.com/settings/apps>**, so Strava stops listing it among your authorized
@@ -96,7 +97,8 @@ applications. The upgrade migration **permanently deletes every run that came fr
 up `database/database.sqlite` first. To restore older days afterwards, import your full Garmin Connect
 history.
 
-No scheduler (cron) and no queue worker are required: nothing runs in the background.
+No queue worker is required. The scheduler (cron) is needed only for the daily Garmin sync (see
+**Syncing runs from Garmin Connect**); without a `GARMIN_API_KEY` nothing runs in the background.
 
 ### Before putting this on a real host
 
@@ -137,7 +139,8 @@ The app-specific keys are few. Everything else in `.env.example` is Laravel's ow
 
 | Key | Meaning | Example |
 | --- | --- | --- |
-| `HEATMAP_DISPLAY_TIMEZONE` | Timezone the import card prints its absolute "Last import" time in (timestamps are stored in UTC) | `Europe/Rome` |
+| `HEATMAP_DISPLAY_TIMEZONE` | Timezone the import card prints its absolute "Last import" and "Last sync" times in, and the one the daily sync is scheduled in (timestamps are stored in UTC) | `Europe/Rome` |
+| `GARMIN_API_KEY` | Your Garmin Connect personal API key. Empty (the default) turns the sync off: no Sync now button, no schedule effect, no status or warning | *(empty — never commit it)* |
 
 `.env.example` lists it with its default. It is read through `config/heatmap.php` — never call `env()`
 for it outside that file, because `env()` returns `null` once `config:cache` has run.
@@ -158,10 +161,53 @@ The demo athlete is the owner account `giarfa` with no password, so a freshly se
 at the first sign-in (see above). Never seed production — it would plant a demo athlete and runs in
 your real database.
 
+## Syncing runs from Garmin Connect
+
+With a personal API key the app reads your running activities from Garmin Connect on its own: once a
+day at 05:00 (`HEATMAP_DISPLAY_TIMEZONE`), and whenever you press **Sync now** under the map or on the
+empty screen. The CSV import below keeps working next to it. With no key, nothing here applies.
+
+**Create the key.** On the Garmin Connect website open **Settings → Personal API token**
+(connect.garmin.com), create a key and put it in `.env` as `GARMIN_API_KEY=…` — the name only here, the
+value never in Git, a log or a ticket. A key expires after somewhere between 30 days and a year. When it
+does, the dashboard shows **"Garmin key rejected — renew it"**: create a new key, replace the value in
+`.env` (and run `php artisan config:clear` if the config is cached), and press **Sync now**; the warning
+goes away after the next successful sync.
+
+**The first sync.** It reads your whole Garmin history, which can take longer than a web request
+allows. Run it once from the command line on the host:
+
+```bash
+php artisan garmin:sync
+```
+
+It prints what it did (new, updated, linked, ignored, future-dated, invalid). A first sync that is cut
+off is safe: what it stored stays, and the next attempt reads the whole history again until one has
+finished. Later syncs re-read from seven days before your newest synced run, so a run you rename or edit
+on Garmin within that span is updated here; a run you delete on Garmin stays here.
+
+**What it writes.** Only running activities (running, street, track, indoor, treadmill, ultra, obstacle,
+trail and virtual runs). A run on the same date starting within two minutes of one you imported from a
+CSV is the same run: it gains its Garmin id and Garmin's values, and no review is shown. Running the sync
+twice in a row changes nothing. A failed sync keeps every run it wrote before failing; the dashboard
+names the cause ("Garmin key rejected — renew it", "Garmin unreachable", "Garmin sync failed") until the
+next sync succeeds. Only one sync runs at a time, and Sync now is limited to three a minute.
+
+**The scheduler.** The daily run is a Laravel scheduled task, so the host must run the scheduler every
+minute. Add this cron entry for the app's user (on the production host, Cipi, add it as the app's cron
+job) and check it with `php artisan schedule:list`:
+
+```cron
+* * * * * cd /path/to/the/app && php artisan schedule:run >> /dev/null 2>&1
+```
+
+The access token is kept in the `file` cache store (`storage/framework/cache`), never in the database,
+and neither it nor the key is ever written to a log or an error message.
+
 ## Importing runs from Garmin Connect
 
-The Garmin Connect CSV export is the only way a run enters the app. Signed in as the owner, follow
-**Import Garmin CSV** under the map (or on the empty screen).
+The Garmin Connect CSV export is the other way a run enters the app (the sync above is the first).
+Signed in as the owner, follow **Import Garmin CSV** under the map (or on the empty screen).
 
 1. On the Garmin Connect **website**, open **Activities → All activities**, scroll until every
    run of the last 16 weeks is loaded, and press **Export CSV**. Both Italian (`Tipo di attività`,
@@ -174,7 +220,9 @@ The Garmin Connect CSV export is the only way a run enters the app. Signed in as
    A row **clashes** with a stored run that starts on the same date within ±2 minutes (the closest
    one). For each clash choose:
    - **Skip** (pre-selected) — keep the stored run untouched;
-   - **Overwrite** — replace its name, distance, moving time and start with Garmin's values.
+   - **Overwrite** — replace its name, distance, moving time and start with Garmin's values. A run the
+     sync wrote keeps its Garmin id; note that the next sync re-reads the last seven days and applies
+     Garmin Connect's values again.
    Runs with no clash are added as they are. A row identical to a run already imported from Garmin
    is not asked about, so re-importing the same file changes nothing.
 4. **Confirm import** writes everything in one transaction; **Cancel**, or simply leaving the page,
@@ -182,21 +230,21 @@ The Garmin Connect CSV export is the only way a run enters the app. Signed in as
    outside-window and unreadable counts, and the map updates immediately.
 
 A stored run is never replaced by a re-read of the file: only an explicit **Overwrite** changes one,
-and nothing else writes a run. The uploaded file itself is never stored: it is read during the request
+and nothing else writes a run except the Garmin sync. The uploaded file itself is never stored: it is read during the request
 and discarded. Imported runs carry no link anywhere.
 
 ## The dashboard
 
 The home page (`/`) is **private**: a signed-out browser is sent to `/login`. The signed-in owner sees
-the heatmap, weekly totals, legend and import status built from their own imported runs. Opening it
-never calls out or writes a row. Under the map, a discreet line offers **Import Garmin CSV** and
-**Sign out**. An owner with no runs sees an empty screen that offers only the Garmin CSV import. The
-page keeps `noindex, nofollow`.
+the heatmap, weekly totals, legend and import status built from their own runs. Opening it
+never calls out or writes a row. Under the map, a discreet line offers **Import Garmin CSV**, **Sync
+now** (only with a `GARMIN_API_KEY`) and **Sign out**. An owner with no runs sees an empty screen that
+offers the Garmin CSV import and, with a key, **Sync now**. The page keeps `noindex, nofollow`.
 
 The heatmap grid is cached per athlete, per 16-week window and per calendar day
 (`App\Support\Heatmap\HeatmapGridCache`), so a second request the same day skips the aggregate
-query. The cache is cleared for the owner after every confirmed import, so the new runs are visible on
-the next request. The calendar day is part of the cache key, so a cached grid can never survive into
+query. The cache is cleared for the owner after every confirmed import and after every sync that wrote a run,
+so the new runs are visible on the next request. The calendar day is part of the cache key, so a cached grid can never survive into
 the next day even without an import in between.
 
 On first visit the theme follows the browser's `prefers-color-scheme`; toggling it in the header
@@ -232,14 +280,17 @@ table as authoritative before changing a hex.
 
 ### Import status
 
-`App\Support\Garmin\ResolveImportStatus` reads the newest imported run's `updated_at` fresh on every
-request — never from the grid cache. The header chip reads **"Last import {relative time}"**, or **"No
-runs imported yet"** with none, and below 640 px the footer's lowercase line takes over. The import card
-in the rail prints the absolute time in `HEATMAP_DISPLAY_TIMEZONE`. A re-import that writes nothing does
-not move it: the label means "data last changed by an import".
+`App\Support\Garmin\ResolveImportStatus` reads the status fresh on every request — never from the grid
+cache. The header chip reads the more recent of **"Last sync {relative time}"** (the newest successful
+sync, even one that wrote nothing) and **"Last import {relative time}"** (the newest CSV-imported run's
+`updated_at`; runs the sync wrote never move it). With neither it reads **"No runs imported yet"**, or
+**"Not synced yet"** when a key is set. Below 640 px the footer's lowercase line takes over. The card in
+the rail prints the absolute times in `HEATMAP_DISPLAY_TIMEZONE`, with a **Last sync** row only when a key
+is set. A re-import that writes nothing does not move the import time.
 
-There is no stale, failed or reconnect warning in any state, because nothing runs in the background that
-could fall behind.
+While the newest finished sync attempt failed, a warning above the map names the cause; the next
+successful sync removes it. With no `GARMIN_API_KEY` there is no sync status, no warning and no **Sync
+now** anywhere: the dashboard behaves exactly as it did before the sync existed.
 
 ### Manual review checklist
 
@@ -247,7 +298,11 @@ Automated coverage is PHPUnit only at this project's `NORMAL` test bar — no Pl
 axe automation. Before accepting a change to the dashboard, check by hand:
 
 - The status line and the empty state, at 375 px and 1280 px, in both light and dark theme.
-- The empty state's **Import Garmin CSV** button is a full-width 44 px target on a phone.
+- The empty state's **Import Garmin CSV** button is a full-width 44 px target on a phone, and with a
+  key **Sync now** sits under it as a secondary full-width button.
+- With a key: **Sync now** in the line under the map is a 44 px target; set a wrong key and check
+  **"Garmin key rejected — renew it"** reads clearly in both themes, then restore the key and check it
+  goes away after the next sync.
 - The header chip disappears below 640 px and the footer's lowercase line takes over.
 
 ## Tests and quality
