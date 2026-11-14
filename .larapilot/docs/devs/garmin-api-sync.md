@@ -34,7 +34,7 @@ sync is not configured." for a POST with no key (see `heatmap-dashboard.md` for 
 5. **Pages** — `start` += 100 until a page comes back short; 200 full pages in a row is a
    failure (an API that ignores `start`).
 6. **Per page** — each activity is classified: not a running `typeKey` → *ignored*; a
-   required field missing → *invalid*; local start after today → *future-dated*. The rest
+   required field missing → *invalid*; local start after today (the owner's day in `HEATMAP_DISPLAY_TIMEZONE`, not the server's) → *future-dated*. The rest
    are written in one `DB::transaction` after **one** candidate query (the owner's runs on
    the page's dates, or carrying one of the page's ids):
    - same `garmin_activity_id` → every API-owned column is compared and the row is saved
@@ -74,8 +74,8 @@ when the id, local start, distance or moving time is missing or unreadable.
 | What happened | Cause |
 | --- | --- |
 | Token call `401` / `403`; data call `403`; data call `401` twice | `key_rejected` |
-| `ConnectionException` (including a timeout), `429`, any `5xx` | `unreachable` |
-| Any other status, an unreadable token or `exp`, a body that is not a JSON list | `unexpected` |
+| Any `HttpClientException` (connection failure, timeout), `429`, any `5xx` | `unreachable` |
+| Any other status (a redirect included: redirects are never followed), an unreadable token or `exp`, a body that is not a JSON list | `unexpected` |
 
 ## Technical design
 
@@ -156,6 +156,21 @@ the dashboard copy lives: "Garmin key rejected — renew it", "Garmin unreachabl
 
 ## Extension points & gotchas
 
+- **Known race with the CSV import.** The import does not take the `garmin:sync` lock, and the
+  sync reads its link candidates once per page. A CSV confirm that commits between that read and
+  the insert leaves an unlinked CSV run beside a new API run for the same activity, and the
+  7-day re-read never re-matches it. Tolerated for a single owner; take the same lock in
+  `ApplyGarminImport` if it ever matters.
+- **A metric Garmin later empties is not blanked.** `metricAttributes()` leaves empty metrics
+  out so CSV-backfilled values survive; the price is that a heart rate removed on Garmin after
+  an edit keeps its old value here.
+- **The token file.** The token sits serialized in `storage/framework/cache/data` (mode follows
+  the process umask). The key is already in `.env` and the token lasts 24 h; on a shared host
+  keep `storage/` unreadable to other users.
+- **Long web requests.** A full-history first sync inside a web request can hit
+  `max_execution_time`, which skips `finally`. The row stays `running` and the lock refuses
+  syncs until it expires; the next attempt closes any `running` row older than the lock
+  lifetime as `unexpected`. Run the first sync with `garmin:sync` on the host.
 - `US-023` extends the API-owned columns: add the column to `GarminApiActivity::toRunAttributes()`
   / `metricAttributes()` and the comparison in `SyncGarminActivities::writeRuns()` follows.
 - A new sync trigger is a `GarminSyncTrigger` case; the action never authorizes, so the

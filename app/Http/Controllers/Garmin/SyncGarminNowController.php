@@ -37,6 +37,13 @@ class SyncGarminNowController extends Controller
         /** @var User $owner */
         $owner = $request->user();
 
+        /*
+         * A first full read can outlive the browser's patience; without this a closed tab
+         * ends the script mid-page. The sync is safe to cut short either way, but finishing
+         * it records the attempt.
+         */
+        ignore_user_abort(true);
+
         try {
             $result = $syncGarminActivities($owner, GarminSyncTrigger::Manual);
         } catch (GarminSyncAlreadyRunningException $exception) {

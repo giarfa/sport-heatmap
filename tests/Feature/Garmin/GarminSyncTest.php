@@ -132,6 +132,35 @@ class GarminSyncTest extends TestCase
         );
     }
 
+    public function test_today_is_the_owners_day_so_a_run_after_local_midnight_is_not_future_dated(): void
+    {
+        Config::set('heatmap.display_timezone', 'Europe/Rome');
+        $this->travelTo('2026-11-14 23:30:00'); // 00:30 on the 15th in Rome
+        $this->pages = [0 => [
+            $this->apiRun(1, '2026-11-15 00:10:00'),
+            $this->apiRun(2, '2026-11-16 07:00:00'),
+        ]];
+
+        $result = $this->sync();
+
+        $this->assertSame(1, $result->counts->new);
+        $this->assertSame(1, $result->counts->futureDated);
+        $this->assertSame(1, Activity::sole()->garmin_activity_id);
+    }
+
+    public function test_an_attempt_left_running_beyond_the_lock_lifetime_is_closed_as_failed_when_the_next_starts(): void
+    {
+        $stale = GarminSync::factory()->running()->create(['started_at' => now()->subMinutes(31)]);
+        $recent = GarminSync::factory()->running()->create(['started_at' => now()->subMinutes(5)]);
+
+        $this->sync();
+
+        $this->assertSame(GarminSyncOutcome::Failed, $stale->refresh()->outcome);
+        $this->assertSame(GarminSyncFailure::Unexpected, $stale->failure_cause);
+        $this->assertNotNull($stale->finished_at);
+        $this->assertSame(GarminSyncOutcome::Running, $recent->refresh()->outcome, 'A recent running row may still be alive.');
+    }
+
     public function test_a_stored_run_carries_every_value_the_api_gave_rounded(): void
     {
         $this->pages = [0 => [$this->apiRun(11111111101, '2026-11-10 07:12:34')]];

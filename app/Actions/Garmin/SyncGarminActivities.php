@@ -78,6 +78,21 @@ final readonly class SyncGarminActivities
 
     private function sync(User $owner, GarminSyncTrigger $trigger): GarminSyncResult
     {
+        /*
+         * A process killed mid-sync (a PHP timeout in a web request is a fatal error, so
+         * `finally` never runs) leaves its row `running` for good. The lock has expired by
+         * the time a row is this old, so nobody can still be working on it: it is closed as
+         * an unexpected failure, which is what it was.
+         */
+        GarminSync::query()
+            ->where('outcome', GarminSyncOutcome::Running->value)
+            ->where('started_at', '<', now()->subSeconds(self::LOCK_SECONDS))
+            ->update([
+                'outcome' => GarminSyncOutcome::Failed->value,
+                'failure_cause' => GarminSyncFailure::Unexpected->value,
+                'finished_at' => now(),
+            ]);
+
         $fullHistory = $this->needsFullHistory($owner);
 
         $attempt = GarminSync::query()->create([
@@ -92,7 +107,12 @@ final readonly class SyncGarminActivities
 
         try {
             $startDate = $fullHistory ? null : $this->windowStart($owner);
-            $today = now()->format('Y-m-d');
+            /*
+             * "Today" is the owner's day, not the server's: `startTimeLocal` is the runner's
+             * wall clock, so a run done at 00:10 in Rome while UTC is still yesterday would
+             * otherwise look like tomorrow and be skipped as future-dated.
+             */
+            $today = now()->setTimezone((string) config('heatmap.display_timezone'))->format('Y-m-d');
             $limit = (int) config('services.garmin.page_size');
 
             for ($page = 0; ; $page++) {

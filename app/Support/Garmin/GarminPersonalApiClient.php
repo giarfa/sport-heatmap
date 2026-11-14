@@ -5,7 +5,7 @@ namespace App\Support\Garmin;
 use App\Exceptions\Garmin\GarminApiException;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Cache\Repository;
-use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\HttpClientException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -101,7 +101,7 @@ final class GarminPersonalApiClient
                 ->withToken($token)
                 ->acceptJson()
                 ->get(config('services.garmin.activities_path'), $query);
-        } catch (ConnectionException $exception) {
+        } catch (HttpClientException $exception) {
             throw GarminApiException::unreachable(self::ACTIVITIES_CALL, previous: $exception);
         }
     }
@@ -148,7 +148,7 @@ final class GarminPersonalApiClient
             $response = $this->request()
                 ->withHeaders(['Authorization' => "ApiKey {$key}"])
                 ->post(config('services.garmin.token_path'));
-        } catch (ConnectionException $exception) {
+        } catch (HttpClientException $exception) {
             throw GarminApiException::unreachable(self::TOKEN_CALL, previous: $exception);
         }
 
@@ -219,7 +219,13 @@ final class GarminPersonalApiClient
     {
         return Http::baseUrl(config('services.garmin.base_url'))
             ->connectTimeout(config('services.garmin.connect_timeout'))
-            ->timeout(config('services.garmin.timeout'));
+            ->timeout(config('services.garmin.timeout'))
+            /*
+             * Never follow a redirect: the API does not redirect, and a Location header
+             * must not be able to carry the key or the token to another host. A 3xx is
+             * then just an unexpected status.
+             */
+            ->withOptions(['allow_redirects' => false]);
     }
 
     /**

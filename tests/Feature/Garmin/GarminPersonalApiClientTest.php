@@ -175,6 +175,7 @@ class GarminPersonalApiClientTest extends TestCase
             '503 is unreachable' => [503, GarminSyncFailure::Unreachable],
             '400 is unexpected' => [400, GarminSyncFailure::Unexpected],
             '404 is unexpected' => [404, GarminSyncFailure::Unexpected],
+            'a redirect is never followed and is unexpected' => [302, GarminSyncFailure::Unexpected],
         ];
     }
 
@@ -203,6 +204,7 @@ class GarminPersonalApiClientTest extends TestCase
             '503 is unreachable' => [503, GarminSyncFailure::Unreachable],
             '400 is unexpected' => [400, GarminSyncFailure::Unexpected],
             '404 is unexpected' => [404, GarminSyncFailure::Unexpected],
+            'a redirect is never followed and is unexpected' => [302, GarminSyncFailure::Unexpected],
         ];
     }
 
