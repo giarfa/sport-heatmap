@@ -157,7 +157,7 @@ tasks:
     estimate_hours: 1
     dependencies: {}
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Bootstrap Gitflow for US-023 on release `3.1.0`. US-023 is blocked by US-022, which is approved (DONE) but **not yet merged** into `release/3.1.0` (12 commits ahead), and its approval artifacts are uncommitted. Merge it locally first (decision journal: *us-022 merge before us-023*), then create `feature/US-023-extended-run-metrics` from `release/3.1.0` and prepare the internal PR toward `release/3.1.0`. Do **not** push.
@@ -174,11 +174,11 @@ tasks:
       6. Dev DB note for later tasks: `php artisan config:show database.connections.sqlite.database` names the real dev file. Never `migrate:fresh` / `db:seed` it.
 
       ## Completion Criteria
-      - [ ] Pending `.larapilot/` artifacts committed on the US-022 branch
-      - [ ] `release/3.1.0` contains `feature/US-022-garmin-connect-sync` (merge commit, no push)
-      - [ ] Test suite green on `release/3.1.0`
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true` on `feature/US-023-extended-run-metrics`
-      - [ ] PR title/body drafted toward `release/3.1.0`
+      - [x] Pending `.larapilot/` artifacts committed on the US-022 branch
+      - [x] `release/3.1.0` contains `feature/US-022-garmin-connect-sync` (merge commit, no push)
+      - [x] Test suite green on `release/3.1.0`
+      - [x] `release-feature` returned `ok: true` and `checked_out: true` on `feature/US-023-extended-run-metrics`
+      - [x] PR title/body drafted toward `release/3.1.0`
 
       ## Test Data
       - N/A — git only
@@ -192,6 +192,12 @@ tasks:
       - Commit: `chore(US-023): TASK-00 bootstrap feature branch for release/3.1.0` (empty commit optional)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: ffe6a0c4251d1be44410803cb9c51bfbdf6eef46
+      short_sha: ffe6a0c
+      subject: 'chore(US-023): TASK-00 bootstrap feature branch for release/3.1.0'
+      committed_at: '2026-11-14T15:18:55+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ffe6a0c4251d1be44410803cb9c51bfbdf6eef46'
   -
     id: TASK-01
     title: 'Schema: 27 nullable extended-metric columns on activities, model casts, factory states, seeder'
@@ -200,7 +206,7 @@ tasks:
     dependencies:
       - TASK-00
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Add the extended run metrics of FR-022 to `activities`: only nullable columns, no default, no index, every stored run and value kept. Make them mass-assignable and typed on `Activity`. Keep the factory and the demo dataset coherent in this same task. Column names, types, and units follow the **Columns** table of the plan body.
@@ -238,27 +244,33 @@ tasks:
       7. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Migration adds only the 27 nullable columns; `down()` drops only them; existing runs and values are kept (test)
-      - [ ] `Activity` fillable, casts, and `@property` docblock are in sync with the migration (Larastan level 5 clean)
-      - [ ] Factory states produce coherent, domain-realistic extended metrics; the default definition is unchanged
-      - [ ] Seeder yields runs with CSV+API metrics, CSV-only TSS, and no metrics, and its test asserts each
-      - [ ] No coordinate column exists
-      - [ ] Targeted tests pass on the in-memory DB
+      - [x] Migration adds only the 27 nullable columns; `down()` drops only them; existing runs and values are kept (test)
+      - [x] `Activity` fillable, casts, and `@property` docblock are in sync with the migration (Larastan level 5 clean)
+      - [x] Factory states produce coherent, domain-realistic extended metrics; the default definition is unchanged
+      - [x] Seeder yields runs with CSV+API metrics, CSV-only TSS, and no metrics, and its test asserts each
+      - [x] No coordinate column exists
+      - [x] Targeted tests pass on the in-memory DB
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` updated (`withExtendedMetrics()`, `withApiOnlyMetrics()`, `withTrainingStressScore()`)
-      - [ ] `TrainingBlockSeeder` composes the new states with meaningful volumes
-      - [ ] Factory and seeder updated in **this same task** as the migration
+      - [x] `database/factories/ActivityFactory.php` updated (`withExtendedMetrics()`, `withApiOnlyMetrics()`, `withTrainingStressScore()`)
+      - [x] `TrainingBlockSeeder` composes the new states with meaningful volumes
+      - [x] Factory and seeder updated in **this same task** as the migration
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — `### Data model (activities)` lists the 27 columns with unit, type, and empty rule; the `Architectural choices` section records columns vs JSON vs 1:1 table and why
-      - [ ] `.larapilot/docs/devs/README.md` index row for `garmin-csv-import` → last touched by `US-023`
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — `### Data model (activities)` lists the 27 columns with unit, type, and empty rule; the `Architectural choices` section records columns vs JSON vs 1:1 table and why
+      - [x] `.larapilot/docs/devs/README.md` index row for `garmin-csv-import` → last touched by `US-023`
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-023): TASK-01 add extended run metric columns with factory and seeder`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: 898a07abe00a6f87ebd3bbe76a9ec9e749e86b0f
+      short_sha: 898a07a
+      subject: 'feat(US-023): TASK-01 add extended run metric columns with factory and seeder'
+      committed_at: '2026-11-14T15:21:22+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/898a07abe00a6f87ebd3bbe76a9ec9e749e86b0f'
   -
     id: TASK-02
     title: 'ExtendedRunMetrics DTO, shared CSV value parsers, extended headers (it/en with aliases), CSV row wiring'
@@ -672,4 +684,4 @@ tasks:
       - Commit: `test(US-023): TASK-09 verification and manual test handoff`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
-updated_at: '2026-11-14T14:17:06+00:00'
+updated_at: '2026-11-14T14:21:22+00:00'

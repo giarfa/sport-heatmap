@@ -322,7 +322,8 @@ class ParseGarminCsvTest extends TestCase
         $this->assertNull($row->averagePaceSecondsPerKm);
         $this->assertNull($row->totalAscentMeters);
         $this->assertNull($row->averageHeartRate);
-        $this->assertSame([], $row->metricAttributes());
+        // The only metric this row records is the elapsed time its "Tempo trascorso" column holds.
+        $this->assertSame(['elapsed_time_seconds' => 2_100], $row->metricAttributes());
     }
 
     public function test_every_run_of_the_verbatim_client_sample_has_empty_metrics(): void
@@ -422,6 +423,7 @@ class ParseGarminCsvTest extends TestCase
             'average_pace_seconds_per_km' => 323,
             'total_ascent_meters' => 45,
             'average_heart_rate' => 152,
+            'elapsed_time_seconds' => 2_678,
         ], $this->rowNamed($parsed, 'Paese Corsa')->metricAttributes());
 
         $partial = $this->rowNamed($parsed, 'Passo illeggibile')->toAttributes();

@@ -79,16 +79,40 @@ rows still parse.
 | average pace | `Passo medio` | `Avg Pace` | no — `US-012` |
 | total ascent | `Ascesa totale` | `Total Ascent` | no — `US-012` |
 | average heart rate | `FC Media` | `Avg HR` | no — `US-012` |
+| calories | `Calorie` | `Calories` | no — `US-023` |
+| max heart rate | `FC max` | `Max HR` | no — `US-023` |
+| aerobic training effect | `TE aerobico` | `Aerobic TE` | no — `US-023` |
+| average / max running cadence | `Cadenza di corsa media` / `Cadenza di corsa max` | `Avg Run Cadence` / `Max Run Cadence` | no — `US-023` |
+| best pace | `Passo migliore` | `Best Pace` | no — `US-023` |
+| total descent | `Discesa totale` | `Total Descent` | no — `US-023` |
+| average stride length | `Lunghezza media passo` | `Avg Stride Length` | no — `US-023` |
+| average vertical ratio | `Rapporto verticale medio` | `Avg Vertical Ratio` | no — `US-023` |
+| average vertical oscillation | `Oscillazione verticale media` | `Avg Vertical Oscillation` | no — `US-023` |
+| average ground contact time | `Tempo medio di contatto con il suolo` | `Avg Ground Contact Time` | no — `US-023` |
+| average GCT balance | `Bilanciamento TCS medio` | `Avg GCT Balance` | no — `US-023` |
+| steps | `Passi` | `Steps` | no — `US-023` |
+| laps | `Numero di Lap` | `Number of Laps` | no — `US-023` |
+| elapsed time | `Tempo trascorso` | `Elapsed Time` | no — `US-023` |
+| minimum elevation | `Quota minima` | `Min Elev` **or** `Min Elevation` | no — `US-023` |
+| maximum elevation | `Quota massima` | `Max Elev` **or** `Max Elevation` | no — `US-023` |
+| training stress score | `Training Stress Score®` | `Training Stress Score®` | no — `US-023`, CSV only |
 
 Columns are located **by name**, never by position. A UTF-8 BOM on the first
 cell is stripped. Optional columns are skipped when absent and never count
 toward language detection, so a file without them parses exactly as before.
+`GarminCsvColumns::HEADER_SETS` maps each key to a **list** of accepted header
+texts, the first being canonical; the aliases (`Min Elev` / `Min Elevation`,
+`Max Elev` / `Max Elevation`) are the only keys with more than one.
 
 **English metric headers are an assumption** (decision `98fe4bd16f3263d6`): the
 Italian names come from a real export; `Avg Pace` / `Total Ascent` / `Avg HR`
 follow the existing English fixture and are unconfirmed by a real English export.
 If a real one differs, the fix is one line in `GarminCsvColumns::HEADER_SETS`;
 until then an English file imports with empty metrics, which is safe.
+
+**The extended English headers are unconfirmed too** (`US-023`, decision "us-023
+english garmin extended headers"): they are Garmin's standard English names, not read
+off a real English export. The Italian ones were read off nine real exports.
 
 ### Running types
 
@@ -111,6 +135,32 @@ Matched trimmed and case-insensitively (`GarminRunningTypes`):
 | Total ascent | metres, `,` thousands, optional decimal rounded; up to six integer digits; a flat run's `0` stays `0` | `"1,234"` → 1234 · `"45.6"` → 46 |
 | Average heart rate | up to three digits, optional decimal rounded; `0` is not recorded | `"152"` → 152 · `"148.6"` → 149 |
 
+The extended metrics (`US-023`) are parsed by `ExtendedRunMetrics::fromCsvValues()`
+through the shared parsers of `GarminCsvValues`. **Empty means null, never `0`**, except where
+Garmin really reports a zero (marked "0 kept"):
+
+| Metric | Format read | Stored as | Bound / empty rule |
+| --- | --- | --- | --- |
+| Calories | `,` thousands (`"1,028"`) | whole kcal | 0 → empty, ≤ 20 000 |
+| Max heart rate | whole or decimal, rounded | whole bpm | 0 → empty, ≤ 250 |
+| Aerobic TE | decimal | one decimal | 0.0–5.0, **0.0 kept** (a real reading) |
+| Avg / max cadence | whole or decimal, rounded | whole spm | 0 → empty, ≤ 400 |
+| Best pace | the average-pace grammar | s/km | 0 → empty, ≤ 36 000 |
+| Total descent | `,` thousands | whole m | ≤ 20 000, **0 kept** |
+| Avg stride length | **metres**, `"1.04"` | **cm**, one decimal (`104.0`) | 0 → empty, ≤ 5 m (500 cm); read at three decimals before converting |
+| Avg vertical ratio | decimal | one decimal, % | 0 → empty, ≤ 100 |
+| Avg vertical oscillation | decimal, cm (`"9.6"`) | one decimal, cm | 0 → empty, ≤ 50 |
+| Avg ground contact time | whole | whole ms | 0 → empty, ≤ 2 000 |
+| Avg GCT balance | `49.8% S / 50.2% D` or `49.8% L / 50.2% R` | the **left** share, one decimal | the left side is found by its letter (`S`, `L`), not its position; 0 or > 100 → empty |
+| Steps | `,` thousands (`"8,240"`) | whole | 0 → empty, ≤ 1 000 000 |
+| Laps | whole | whole | 0 → empty, ≤ 10 000 |
+| Elapsed time | the duration grammar | whole seconds | 0 → empty, ≤ 36 000 000 |
+| Min / max elevation | `,` thousands, **signed** (`"-12"`) | whole m | −500…9 000, **0 and negatives kept** |
+| Training stress score | decimal | one decimal | **`0.0` → empty** (every real local export writes `0.0` when there is no power data), ≤ 10 000 |
+
+The CSV carries no heart-rate zones, fastest splits or place name: those columns stay
+null for a CSV run. No coordinate is ever read.
+
 Implausible values are not recorded either (pace above 36 000 s/km, ascent above
 20 000 m, heart rate above 250 bpm): the file is untrusted input and the
 values are drawn on the owner's map.
@@ -124,7 +174,12 @@ session `GarminCsvRow::fromSessionArray()` reads the three keys with `?? null`,
 so an upload parked before `US-012` shipped can still be confirmed afterwards.
 `GarminCsvRow::toAttributes()` and `metricAttributes()` carry **only the metrics
 the file recorded** — an empty one is left out, not nulled, so writing the
-attributes onto a stored run can never blank a value it already holds.
+attributes onto a stored run can never blank a value it already holds. The extended
+metrics ride the same two methods: `GarminCsvRow` holds one `ExtendedRunMetrics
+$extendedMetrics`, `metricAttributes()` spreads its `toAttributes()` (non-null values
+only), and `toSessionArray()` parks them under one compact `extended` key that
+`fromSessionArray()` reads with `?? []`, so an upload parked before `US-023` still
+confirms. They stay out of the run's identity like the three metrics above.
 
 ### 2. Target and planning (`PlanGarminImport`)
 
@@ -269,7 +324,9 @@ an owner with no password yet to the first-password page. CSRF comes from the `w
 | Piece | Where | Role |
 | --- | --- | --- |
 | Parser | `app/Support/Garmin/ParseGarminCsv.php` | File → `ParsedGarminCsv`; `SplFileObject`, no package |
-| Header sets | `app/Support/Garmin/GarminCsvColumns.php` | Language detection, column lookup by name |
+| Header sets | `app/Support/Garmin/GarminCsvColumns.php` | Language detection, column lookup by name; a list of accepted texts per key; `EXTENDED_KEYS` (`US-023`) |
+| Cell parsers | `app/Support/Garmin/GarminCsvValues.php` | Static, pure parsers per value shape — whole number (signed when asked), one decimal, duration, pace, left balance — shared by the row parser and `ExtendedRunMetrics`, so there is one reading of each shape (`US-023`) |
+| Extended metrics | `app/Data/Garmin/ExtendedRunMetrics.php` | Final readonly DTO of the 27 nullable values; `fromCsvValues()`, `toAttributes()` (non-null only), compact `toSessionArray()` / `fromSessionArray()`; the API factory arrives in `US-023` TASK-06 |
 | Type map | `app/Support/Garmin/GarminRunningTypes.php` | Garmin type name → `SportType` |
 | Row DTO | `app/Data/Garmin/GarminCsvRow.php` | `toAttributes()`, `toSessionArray()` / `fromSessionArray()`, `isIdenticalTo(Activity)` |
 | Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, future-dated count, invalid list; session round-trip (`fromSessionArray()` tolerates the pre-`US-013` `outside_window` key and reads the missing `future_dated` as 0, so an upload or summary in flight across the deploy still opens) |
@@ -288,7 +345,7 @@ an owner with no password yet to the first-password page. CSRF comes from the `w
 | Formatting | `app/Support/Garmin/GarminImportFormat.php` | Shared by the review's stored and CSV sides |
 | Views / assets | `resources/views/garmin/{create,review,summary}.blade.php`, "Garmin import" block in `resources/css/app.css`, `data-resolve-all` in `resources/js/app.js` | |
 | Tests | `tests/Feature/Garmin/*`, `tests/Unit/Support/Garmin/*`, `tests/Feature/Database/RemoveStravaMigrationTest.php` | |
-| Fixtures | `tests/Fixtures/Garmin/activities-it.csv` (client sample, verbatim), `activities-en.csv` | |
+| Fixtures | `tests/Fixtures/Garmin/activities-it.csv` (client sample, verbatim), `activities-en.csv`; `activities-it-extended.csv`, `activities-en-extended.csv` (`US-023`: synthetic values in the formats real exports use, one row of `--`, one of unreadable values) | |
 
 ### Data model (`activities`)
 
