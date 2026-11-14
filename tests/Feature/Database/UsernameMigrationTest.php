@@ -23,12 +23,19 @@ class UsernameMigrationTest extends TestCase
      */
     private const REMOVE_STRAVA_MIGRATION = 'database/migrations/2026_10_26_210040_remove_strava_from_schema.php';
 
+    /**
+     * Applied later still and owning `activities.source`, which rolling back the Strava
+     * removal adds again: undone first so the column is not added twice.
+     */
+    private const GARMIN_SYNC_MIGRATION = 'database/migrations/2026_11_14_123827_add_garmin_sync_to_activities_table.php';
+
     protected function setUp(): void
     {
         parent::setUp();
 
         // Start from the schema as it was before this migration, with the users
         // each test arranges; migrateUp() is what the test then runs.
+        Artisan::call('migrate:rollback', ['--path' => self::GARMIN_SYNC_MIGRATION, '--force' => true]);
         Artisan::call('migrate:rollback', ['--path' => self::REMOVE_STRAVA_MIGRATION, '--force' => true]);
         $this->migrateDown();
     }

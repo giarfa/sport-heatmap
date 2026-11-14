@@ -26,20 +26,13 @@ final readonly class GarminCsvRow
         public ?int $averagePaceSecondsPerKm = null,
         public ?int $totalAscentMeters = null,
         public ?int $averageHeartRate = null,
+        public ExtendedRunMetrics $extendedMetrics = new ExtendedRunMetrics,
     ) {}
 
     /**
-     * @return array{
-     *     sport_type: SportType,
-     *     name: string,
-     *     distance_meters: int,
-     *     moving_time_seconds: int,
-     *     start_date_local: CarbonImmutable,
-     *     activity_date: CarbonImmutable,
-     *     average_pace_seconds_per_km?: int,
-     *     total_ascent_meters?: int,
-     *     average_heart_rate?: int,
-     * }
+     * The run's identity columns and every recorded metric, keyed by `activities` column.
+     *
+     * @return array<string, mixed>
      */
     public function toAttributes(): array
     {
@@ -63,21 +56,28 @@ final readonly class GarminCsvRow
      * identity (isIdenticalTo() / identityKey()), so re-importing a file whose
      * metrics changed still recognises its runs.
      *
-     * @return array{average_pace_seconds_per_km?: int, total_ascent_meters?: int, average_heart_rate?: int}
+     * The extended metrics ride along under the same rule: each of them is left out when
+     * the file did not record it, so an Overwrite, or the enrichment of an already-imported
+     * run, fills what the file has and keeps what it does not.
+     *
+     * @return array<string, int|float|string>
      */
     public function metricAttributes(): array
     {
-        return array_filter([
-            'average_pace_seconds_per_km' => $this->averagePaceSecondsPerKm,
-            'total_ascent_meters' => $this->totalAscentMeters,
-            'average_heart_rate' => $this->averageHeartRate,
-        ], static fn (?int $value): bool => $value !== null);
+        return [
+            ...array_filter([
+                'average_pace_seconds_per_km' => $this->averagePaceSecondsPerKm,
+                'total_ascent_meters' => $this->totalAscentMeters,
+                'average_heart_rate' => $this->averageHeartRate,
+            ], static fn (?int $value): bool => $value !== null),
+            ...$this->extendedMetrics->toAttributes(),
+        ];
     }
 
     /**
      * Scalars only, so the session never holds a serialized object.
      *
-     * @return array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string, average_pace_seconds_per_km?: int|null, total_ascent_meters?: int|null, average_heart_rate?: int|null}
+     * @return array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string, average_pace_seconds_per_km?: int|null, total_ascent_meters?: int|null, average_heart_rate?: int|null, extended?: array<string, mixed>}
      */
     public function toSessionArray(): array
     {
@@ -90,11 +90,12 @@ final readonly class GarminCsvRow
             'average_pace_seconds_per_km' => $this->averagePaceSecondsPerKm,
             'total_ascent_meters' => $this->totalAscentMeters,
             'average_heart_rate' => $this->averageHeartRate,
+            'extended' => $this->extendedMetrics->toSessionArray(),
         ];
     }
 
     /**
-     * @param  array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string, average_pace_seconds_per_km?: int|null, total_ascent_meters?: int|null, average_heart_rate?: int|null}  $row
+     * @param  array{sport_type: string, name: string, distance_meters: int, moving_time_seconds: int, start_date_local: string, average_pace_seconds_per_km?: int|null, total_ascent_meters?: int|null, average_heart_rate?: int|null, extended?: array<string, mixed>}  $row
      */
     public static function fromSessionArray(array $row): self
     {
@@ -116,6 +117,8 @@ final readonly class GarminCsvRow
             averagePaceSecondsPerKm: $row['average_pace_seconds_per_km'] ?? null,
             totalAscentMeters: $row['total_ascent_meters'] ?? null,
             averageHeartRate: $row['average_heart_rate'] ?? null,
+            /* Same for the extended metrics, which a pending upload of an earlier deploy lacks. */
+            extendedMetrics: ExtendedRunMetrics::fromSessionArray($row['extended'] ?? []),
         );
     }
 

@@ -55,6 +55,18 @@ class EnvironmentExampleTest extends TestCase
     }
 
     /**
+     * The sync is opt-in: a host built from the example has no key, so it makes no Garmin
+     * call until the owner pastes one, and a real key can never be committed through it.
+     */
+    public function test_the_example_ships_an_empty_garmin_api_key(): void
+    {
+        $values = $this->exampleValues();
+
+        $this->assertArrayHasKey('GARMIN_API_KEY', $values, 'GARMIN_API_KEY is missing from .env.example.');
+        $this->assertSame('', $values['GARMIN_API_KEY'], 'GARMIN_API_KEY must be empty in .env.example.');
+    }
+
+    /**
      * @return array<string, string>
      */
     private function exampleValues(): array

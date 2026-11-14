@@ -3,6 +3,7 @@
 namespace Tests\Feature\Dashboard;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -34,6 +35,21 @@ class EmptyStateTest extends TestCase
         $response->assertSee('No runs imported yet');
         $response->assertDontSee('Connect with Strava');
         $response->assertDontSee('role="alert"', escape: false);
+        $response->assertDontSee('Sync now');
+    }
+
+    public function test_with_a_garmin_key_the_empty_state_also_offers_sync_now_as_a_secondary_button(): void
+    {
+        Config::set('services.garmin.api_key', 'GCDC_empty-test-key');
+        $this->signInOwner();
+
+        $response = $this->get('/');
+
+        $response->assertOk();
+        $response->assertSee('action="'.route('garmin.sync').'"', escape: false);
+        $response->assertSee('class="btn btn--secondary w-full">Sync now</button>', escape: false);
+        $response->assertSee('Not synced yet');
+        $response->assertSee('Import a Garmin Connect CSV export to build your 16-week heatmap.');
     }
 
     public function test_a_signed_out_visitor_is_sent_to_the_login(): void

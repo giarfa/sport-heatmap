@@ -22,7 +22,7 @@ class DashboardController extends Controller
      *
      * An owner with no run gets the empty screen, which renders rather than
      * redirects: the dashboard is where a redirect would loop. It offers the
-     * Garmin CSV import, the only way a run enters.
+     * Garmin CSV import and, when a Garmin key is set, Sync now.
      */
     public function __invoke(
         Request $request,
@@ -92,8 +92,8 @@ class DashboardController extends Controller
          * It always reads the CURRENT window, never the one shown: the status
          * describes the data, not the period on screen, so the chip and the
          * import card are the same whichever window the reader has navigated to.
-         * There is no warning state: nothing runs in the background, so nothing
-         * can fall behind.
+         * The only warning is the Garmin sync's: with a key set, the latest finished
+         * attempt's failure. With no key there is no warning state at all.
          */
         $status = $resolveImportStatus($athlete, HeatmapWindow::current($today));
 

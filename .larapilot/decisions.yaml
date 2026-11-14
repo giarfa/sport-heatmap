@@ -1195,4 +1195,238 @@ decisions:
     source: chat
     spec: US-021
     supersedes: null
-updated_at: '2026-10-26T20:54:34+00:00'
+  -
+    id: 631b5ca1b1568830
+    ts: '2026-10-26T21:25:56+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'vite 8.2.2 advisories at v3.0.0 ship'
+    label: 'vite 8.2.2 advisories at v3.0.0 ship'
+    value: 'Waived; bump vite to 8.2.4 in 3.0.1'
+    question: null
+    rationale: 'Dev-server-only Windows flaw; host never runs vite'
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 1d6fc208073785bb
+    ts: '2026-10-26T21:25:56+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'production deploy target'
+    label: 'production deploy target'
+    value: 'Cipi 5.7 on Oracle Cloud ARM VM (app heatmap), Deployer-based; private behind Cipi basic auth'
+    question: null
+    rationale: "Actual host since 2026-10-26; refines 'Custom VPS / Deployer'"
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: d1f01065b5b010de
+    ts: '2026-10-26T21:31:00+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'deployment exposure'
+    label: 'deployment exposure'
+    value: "Basic auth removed on 2026-10-26: the app's own sign-in is the only gate; turned off before the owner password was set, risk accepted"
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: e4697a86c99e976f
+  -
+    id: ef574a4d5ad74bbd
+    ts: '2026-11-14T12:16:54+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin api data scope'
+    label: 'garmin api data scope'
+    value: 'Runs plus extended run metrics; wellness data (sleep, HRV, body battery, VO2max) deferred to Future Phases'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 1ec5e6c53f941ac5
+    ts: '2026-11-14T12:16:54+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin api sync trigger'
+    label: 'garmin api sync trigger'
+    value: 'Daily scheduled sync plus a Sync now button on the dashboard'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: e9e056784ef79685
+    ts: '2026-11-14T12:16:54+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin api spec shape'
+    label: 'garmin api spec shape'
+    value: 'Two specs: US-022 API sync with current metrics; US-023 extended metrics from API and CSV'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: f2da37623ac25989
+    ts: '2026-11-14T12:16:54+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin api first sync backfill'
+    label: 'garmin api first sync backfill'
+    value: 'All history on the first sync; later syncs re-read the last days'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: c78851e80470f53b
+    ts: '2026-11-14T12:16:55+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin api match with csv runs'
+    label: 'garmin api match with csv runs'
+    value: 'Link and refresh automatically from the API (same date, ±2 min), no review'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: b9fd0832e755e598
+    ts: '2026-11-14T12:16:55+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'dashboard freshness status line'
+    label: 'dashboard freshness status line'
+    value: 'Last sync or import N ago, with a warning while the latest Garmin sync failed (key rejected / Garmin unreachable)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: 5ff0e2c7fde3d8fd
+  -
+    id: e550f42f98848e78
+    ts: '2026-11-14T12:16:55+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'extended metrics in day cell detail'
+    label: 'extended metrics in day cell detail'
+    value: 'Keep the day cell detail as is: extended metrics stored, not displayed for now'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 7e08a68f0c32cd8d
+    ts: '2026-11-14T12:16:55+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin api sync release placement'
+    label: 'garmin api sync release placement'
+    value: 'New release 3.1.0 Garmin Connect sync, EP-002, priority HIGH, MoSCoW Must'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 028265bd8218ac54
+    ts: '2026-11-14T12:16:55+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'garmin api readback'
+    label: 'garmin api readback'
+    value: 'Add US-022 and US-023 to backlog with PRD change request (FR-002, FR-010 revived; FR-007 changed; FR-022 added)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: dffd4adf33c2d285
+    ts: '2026-11-14T12:25:43+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'garmin access token cache store'
+    label: 'garmin access token cache store'
+    value: "Cache::store('file') under storage/framework/cache — never the default database cache; tests use the array store"
+    question: null
+    rationale: "CACHE_STORE=database would write the token into SQLite, breaking 'the token never appears in the database'"
+    source: askquestion
+    spec: US-022
+    supersedes: null
+  -
+    id: aad88aa01db73362
+    ts: '2026-11-14T12:25:44+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'us-022 sync ui design source'
+    label: 'US-022 sync UI design source'
+    value: 'reuse existing patterns: Sync now in the action line under the map and as a secondary button in the empty state; warning reuses heatmap-dashboard/states.html section 3 banner without the Strava button; Last sync row in the rail card — no new mockup'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-022
+    supersedes: null
+  -
+    id: 111ae07a9c8cd7d2
+    ts: '2026-11-14T14:13:17+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'us-023 english garmin extended headers'
+    label: 'us-023 english garmin extended headers'
+    value: 'Standard Garmin English names with aliases where spellings vary (Min Elev / Min Elevation); unconfirmed by a real English export'
+    question: null
+    rationale: 'Every local export is Italian; same approach as US-012; a real export later is a one-line fix in GarminCsvColumns'
+    source: askquestion
+    spec: US-023
+    supersedes: null
+  -
+    id: 444d580573ec52c7
+    ts: '2026-11-14T14:13:17+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'us-022 merge before us-023'
+    label: 'us-022 merge before us-023'
+    value: 'TASK-00 commits pending US-022 artifacts and merges feature/US-022 into release/3.1.0 locally (no push) before release-feature'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-023
+    supersedes: null
+  -
+    id: cfec518d81774931
+    ts: '2026-11-14T14:28:12+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-implement
+    topic: 'mockup deviation'
+    label: 'mockup deviation'
+    value: 'US-008 summary: Enriched tally row and lede clause for US-023'
+    question: null
+    rationale: 'US-023 acceptance criteria require re-import to report enriched runs on the summary; same tally markup and tokens, no new styles'
+    source: chat
+    spec: US-023
+    supersedes: null
+  -
+    id: e4172fd19e27df7f
+    ts: '2026-11-14T14:56:27+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-vendor-check
+    topic: 'vendor check 2026-11-14 dependency updates'
+    label: 'vendor check 2026-11-14 dependency updates'
+    value: 'Update now: laravel/framework 13.30.1→13.42.0 (GHSA-63hm-g96r-2m2q) and vite 8.2.2→8.3.8, ending the 2026-10-26 vite waiver'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-11-14T14:56:27+00:00'

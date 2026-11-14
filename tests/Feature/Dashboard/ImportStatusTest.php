@@ -69,7 +69,11 @@ class ImportStatusTest extends TestCase
         $response->assertSee('Runs in window');
     }
 
-    public function test_no_state_renders_a_warning(): void
+    /**
+     * The sync is the only source of a warning, and with no GARMIN_API_KEY it does not exist
+     * for this instance (the test environment pins the key empty).
+     */
+    public function test_with_no_garmin_key_no_state_renders_a_warning(): void
     {
         $owner = $this->signInOwner();
         $this->importedRun($owner, '2026-09-03', now()->subDays(40));

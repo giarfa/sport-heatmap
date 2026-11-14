@@ -2,6 +2,7 @@
 
 namespace App\Support\Garmin;
 
+use App\Data\Garmin\ExtendedRunMetrics;
 use App\Data\Garmin\GarminCsvRow;
 use App\Data\Garmin\ParsedGarminCsv;
 use App\Exceptions\Garmin\GarminCsvRejectedException;
@@ -33,12 +34,10 @@ final readonly class ParseGarminCsv
     private const MAX_RUNS = 5_000;
 
     /*
-     * Plausibility bounds on the run metrics: the file is untrusted input and the
-     * values are drawn on the map, so a reading no run can have counts as
-     * "not recorded".
+     * Plausibility bounds on the run metrics: the file is untrusted input and the values
+     * are drawn on the map, so a reading no run can have counts as "not recorded". The
+     * pace bound lives with the pace parser in GarminCsvValues.
      */
-    private const MAX_PACE_SECONDS_PER_KM = 36_000;
-
     private const MAX_ASCENT_METERS = 20_000;
 
     private const MAX_HEART_RATE = 250;
@@ -128,8 +127,8 @@ final readonly class ParseGarminCsv
                 continue;
             }
 
-            $movingTimeSeconds = $this->durationSeconds((string) ($cells[$columns['moving_time']] ?? ''))
-                ?? (isset($columns['time']) ? $this->durationSeconds((string) ($cells[$columns['time']] ?? '')) : null);
+            $movingTimeSeconds = GarminCsvValues::durationSeconds((string) ($cells[$columns['moving_time']] ?? ''))
+                ?? (isset($columns['time']) ? GarminCsvValues::durationSeconds((string) ($cells[$columns['time']] ?? '')) : null);
 
             if ($movingTimeSeconds === null) {
                 $invalid[] = ['line' => $line, 'reason' => 'missing moving time'];
@@ -145,9 +144,10 @@ final readonly class ParseGarminCsv
                 movingTimeSeconds: $movingTimeSeconds,
                 startDateLocal: $startDateLocal,
                 activityDate: $startDateLocal->startOfDay(),
-                averagePaceSecondsPerKm: $this->paceSecondsPerKm($this->cell($cells, $columns, 'avg_pace')),
-                totalAscentMeters: $this->ascentMeters($this->cell($cells, $columns, 'total_ascent')),
-                averageHeartRate: $this->heartRate($this->cell($cells, $columns, 'avg_hr')),
+                averagePaceSecondsPerKm: GarminCsvValues::paceSecondsPerKm($this->cell($cells, $columns, 'avg_pace')),
+                totalAscentMeters: GarminCsvValues::wholeNumber($this->cell($cells, $columns, 'total_ascent'), 0, self::MAX_ASCENT_METERS, false),
+                averageHeartRate: GarminCsvValues::wholeNumber($this->cell($cells, $columns, 'avg_hr'), 0, self::MAX_HEART_RATE, true),
+                extendedMetrics: ExtendedRunMetrics::fromCsvValues($this->extendedCells($cells, $columns)),
             );
 
             /*
@@ -248,18 +248,6 @@ final readonly class ParseGarminCsv
     }
 
     /**
-     * HH:MM:SS, MM:SS, or either with fractional seconds, to whole seconds.
-     */
-    private function durationSeconds(string $raw): ?int
-    {
-        if (! preg_match('/^(?:(\d{1,4}):)?(\d{1,2}):(\d{1,2}(?:\.\d+)?)$/', trim($raw), $parts)) {
-            return null;
-        }
-
-        return (int) round((int) $parts[1] * 3_600 + (int) $parts[2] * 60 + (float) $parts[3]);
-    }
-
-    /**
      * The raw text of an optional column, or '' when this file has no such column.
      *
      * @param  array<int, string|null>  $cells
@@ -271,49 +259,24 @@ final readonly class ParseGarminCsv
     }
 
     /**
-     * Average pace as whole seconds per kilometre: "5:23" → 323, "1:05:10" → 3910.
+     * The raw text of every extended-metric column this file has, keyed by canonical key.
+     * A column the file lacks is absent, which the DTO reads as "not recorded".
      *
-     * Garmin writes "--" when it did not record one. A metric that is unreadable or
-     * zero is null, never 0 — a stored 0 would read on the dashboard as a real
-     * measurement — and it never makes the row invalid: the run itself is fine.
+     * @param  array<int, string|null>  $cells
+     * @param  array<string, int>  $columns
+     * @return array<string, string>
      */
-    private function paceSecondsPerKm(string $raw): ?int
+    private function extendedCells(array $cells, array $columns): array
     {
-        $seconds = $this->durationSeconds($raw);
+        $extended = [];
 
-        return $seconds === null || $seconds === 0 || $seconds > self::MAX_PACE_SECONDS_PER_KM ? null : $seconds;
-    }
-
-    /**
-     * Total ascent as whole metres, "," thousands separators handled ("1,234" → 1234),
-     * with an optional decimal part rounded. A flat run's 0 is a real reading and stays 0.
-     */
-    private function ascentMeters(string $raw): ?int
-    {
-        $metres = str_replace(',', '', $raw);
-
-        if (! preg_match('/^\d{1,6}(\.\d+)?$/', $metres)) {
-            return null;
+        foreach (GarminCsvColumns::EXTENDED_KEYS as $key) {
+            if (isset($columns[$key])) {
+                $extended[$key] = trim((string) ($cells[$columns[$key]] ?? ''));
+            }
         }
 
-        $ascent = (int) round((float) $metres);
-
-        return $ascent > self::MAX_ASCENT_METERS ? null : $ascent;
-    }
-
-    /**
-     * Average heart rate as whole bpm. Up to three digits keeps a malformed cell from
-     * becoming an absurd reading; 0 means the strap was off, so it is not recorded.
-     */
-    private function heartRate(string $raw): ?int
-    {
-        if (! preg_match('/^\d{1,3}(\.\d+)?$/', $raw)) {
-            return null;
-        }
-
-        $bpm = (int) round((float) $raw);
-
-        return $bpm === 0 || $bpm > self::MAX_HEART_RATE ? null : $bpm;
+        return $extended;
     }
 
     private function name(string $raw): string

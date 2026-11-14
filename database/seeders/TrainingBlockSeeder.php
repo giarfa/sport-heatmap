@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Activity;
+use App\Models\GarminSync;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -16,7 +17,10 @@ use Illuminate\Support\Carbon;
  * and a peak week give the intensity scale a real distribution to bucket, and the
  * current week stays partial so future days render as out-of-range.
  *
- * Every run is what a Garmin Connect CSV import writes. Before the block sit seven
+ * The block's last four weeks are what the Garmin Connect sync writes: those runs carry a
+ * Garmin activity id, and one succeeded full-history scheduled sync finished this
+ * morning, so the dashboard shows "last sync" out of the box. Everything older is what a
+ * Garmin Connect CSV import writes. Before the block sit seven
  * weeks of history, so Previous has something to show after `migrate:fresh --seed`
  * (US-013). Its weekly totals are the ones the US-014 mockup draws, so both specs
  * share one fixture.
@@ -42,10 +46,20 @@ class TrainingBlockSeeder extends Seeder
     private const WITHOUT_HEART_RATE_PERCENT = 15;
 
     /**
+     * How many CSV-imported runs carry a Training Stress Score, as a percentage.
+     */
+    private const WITH_TRAINING_STRESS_SCORE_PERCENT = 20;
+
+    /**
      * How many of the block's first weeks come from an older export whose metric columns
      * hold `--`, so the demo shows a run that lacks every metric.
      */
     private const EXPORT_WITHOUT_METRICS_WEEKS = 2;
+
+    /**
+     * How many of the block's last weeks, the current one included, the Garmin sync wrote.
+     */
+    private const API_SYNCED_WEEKS = 4;
 
     /**
      * Weekly distance of the seven weeks right before the block, oldest first. The sixth
@@ -82,13 +96,20 @@ class TrainingBlockSeeder extends Seeder
             'password' => null,
         ]))->save();
 
+        $apiSyncedFrom = Carbon::today()->startOfWeek()->subWeeks(self::API_SYNCED_WEEKS - 1);
+        $apiSyncedRuns = 0;
+
         foreach ($this->trainingBlock() as $weekIndex => $runs) {
             foreach ($runs as $run) {
+                $isApiSynced = $run['date']->greaterThanOrEqualTo($apiSyncedFrom);
+                $apiSyncedRuns += (int) $isApiSynced;
+
                 $this->createActivity(
                     $athlete,
                     $run['date'],
                     $run['distance_meters'],
                     hasMetrics: $weekIndex >= self::EXPORT_WITHOUT_METRICS_WEEKS,
+                    isApiSynced: $isApiSynced,
                 );
             }
         }
@@ -96,6 +117,25 @@ class TrainingBlockSeeder extends Seeder
         foreach ($this->historyBeforeBlock() as $run) {
             $this->createActivity($athlete, $run['date'], $run['distance_meters'], hasMetrics: false);
         }
+
+        $this->createFullHistorySync($apiSyncedRuns);
+    }
+
+    /**
+     * The one attempt behind the synced runs: scheduled, full history, finished at 05:00
+     * this morning — or a minute ago when the seeder runs before that, so it never ends
+     * in the future.
+     */
+    private function createFullHistorySync(int $newRuns): void
+    {
+        $finishedAt = Carbon::today()->setTime(5, 0, 12)->min(Carbon::now()->subMinute());
+
+        GarminSync::factory()->succeeded()->scheduled()->fullHistory()->create([
+            'started_at' => $finishedAt->copy()->subSeconds(18),
+            'finished_at' => $finishedAt,
+            'new_count' => $newRuns,
+            'linked_count' => 0,
+        ]);
     }
 
     /**
@@ -334,12 +374,18 @@ class TrainingBlockSeeder extends Seeder
     }
 
     /**
-     * One run as a Garmin import writes it. The history before the block, and the block's
-     * first weeks, come from an older export whose metric columns hold `--`, so those runs
-     * have none; a few later runs lack a heart rate, as a run without a strap does.
+     * One run as a Garmin import writes it, or as the Garmin sync does when `$isApiSynced`.
+     * The history before the block, and the block's first weeks, come from an older export
+     * whose metric columns hold `--`, so those runs have none; a few later runs lack a
+     * heart rate, as a run without a strap does.
      */
-    private function createActivity(User $athlete, Carbon $date, int $distanceMeters, bool $hasMetrics = true): void
-    {
+    private function createActivity(
+        User $athlete,
+        Carbon $date,
+        int $distanceMeters,
+        bool $hasMetrics = true,
+        bool $isApiSynced = false,
+    ): void {
         $factory = Activity::factory()->for($athlete)->onDate($date);
 
         $factory = match (true) {
@@ -350,6 +396,10 @@ class TrainingBlockSeeder extends Seeder
 
         // Applied last, so Garmin's place-and-type name wins over the sport-type state's.
         $factory = $factory->garminImported();
+
+        if ($isApiSynced) {
+            $factory = $factory->garminSynced();
+        }
 
         $factory = match (true) {
             ! $hasMetrics => $factory->withoutMetrics(),
@@ -368,6 +418,30 @@ class TrainingBlockSeeder extends Seeder
             $attributes['average_pace_seconds_per_km'] = $secondsPerKilometre;
         }
 
-        $factory->create($attributes);
+        /*
+         * The run's distance and time go in as a state before the extended states, not into
+         * create() after them: a state closure reads the attributes built so far, and a
+         * create() override is applied last, so the extended metrics would otherwise be
+         * derived from the factory's random distance and contradict the run they sit on.
+         */
+        $factory = $factory->state($attributes);
+
+        /*
+         * Extended metrics follow where the run came from: the Garmin sync writes the
+         * CSV-and-API set plus the API-only one, a CSV import the CSV set and, now and then,
+         * a Training Stress Score. Runs of the older export, whose columns hold `--`, keep
+         * none, so a re-import has something to enrich.
+         */
+        if ($hasMetrics) {
+            $factory = $factory->withExtendedMetrics();
+
+            $factory = match (true) {
+                $isApiSynced => $factory->withApiOnlyMetrics(),
+                fake()->boolean(self::WITH_TRAINING_STRESS_SCORE_PERCENT) => $factory->withTrainingStressScore(),
+                default => $factory,
+            };
+        }
+
+        $factory->create();
     }
 }

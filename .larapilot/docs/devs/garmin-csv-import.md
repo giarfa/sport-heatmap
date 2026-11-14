@@ -4,12 +4,12 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-008` |
-| **Last updated by** | `US-021` — 2026-10-26 |
+| **Last updated by** | `US-023` — 2026-11-14 |
 | **Owner persona** | 🔧 Alex |
 
 ## Purpose
 
-Lets the owner load their runs, the only way a run enters the app, by uploading the "Activities" CSV exported from the Garmin Connect website
+Lets the owner load their runs, one of the two ways a run enters the app (the other is the Garmin API sync, `garmin-api-sync.md`), by uploading the "Activities" CSV exported from the Garmin Connect website
 (FR-018). Since `US-020` the import requires the owner's session and always
 imports into the signed-in owner (`giarfa`): there is no guest import and no
 CSV-only athlete creation, and the heatmap works from imports alone. The file is parsed into running rows of any age (dated today or earlier, so the
@@ -79,16 +79,40 @@ rows still parse.
 | average pace | `Passo medio` | `Avg Pace` | no — `US-012` |
 | total ascent | `Ascesa totale` | `Total Ascent` | no — `US-012` |
 | average heart rate | `FC Media` | `Avg HR` | no — `US-012` |
+| calories | `Calorie` | `Calories` | no — `US-023` |
+| max heart rate | `FC max` | `Max HR` | no — `US-023` |
+| aerobic training effect | `TE aerobico` | `Aerobic TE` | no — `US-023` |
+| average / max running cadence | `Cadenza di corsa media` / `Cadenza di corsa max` | `Avg Run Cadence` / `Max Run Cadence` | no — `US-023` |
+| best pace | `Passo migliore` | `Best Pace` | no — `US-023` |
+| total descent | `Discesa totale` | `Total Descent` | no — `US-023` |
+| average stride length | `Lunghezza media passo` | `Avg Stride Length` | no — `US-023` |
+| average vertical ratio | `Rapporto verticale medio` | `Avg Vertical Ratio` | no — `US-023` |
+| average vertical oscillation | `Oscillazione verticale media` | `Avg Vertical Oscillation` | no — `US-023` |
+| average ground contact time | `Tempo medio di contatto con il suolo` | `Avg Ground Contact Time` | no — `US-023` |
+| average GCT balance | `Bilanciamento TCS medio` | `Avg GCT Balance` | no — `US-023` |
+| steps | `Passi` | `Steps` | no — `US-023` |
+| laps | `Numero di Lap` | `Number of Laps` | no — `US-023` |
+| elapsed time | `Tempo trascorso` | `Elapsed Time` | no — `US-023` |
+| minimum elevation | `Quota minima` | `Min Elev` **or** `Min Elevation` | no — `US-023` |
+| maximum elevation | `Quota massima` | `Max Elev` **or** `Max Elevation` | no — `US-023` |
+| training stress score | `Training Stress Score®` | `Training Stress Score®` | no — `US-023`, CSV only |
 
 Columns are located **by name**, never by position. A UTF-8 BOM on the first
 cell is stripped. Optional columns are skipped when absent and never count
 toward language detection, so a file without them parses exactly as before.
+`GarminCsvColumns::HEADER_SETS` maps each key to a **list** of accepted header
+texts, the first being canonical; the aliases (`Min Elev` / `Min Elevation`,
+`Max Elev` / `Max Elevation`) are the only keys with more than one.
 
 **English metric headers are an assumption** (decision `98fe4bd16f3263d6`): the
 Italian names come from a real export; `Avg Pace` / `Total Ascent` / `Avg HR`
 follow the existing English fixture and are unconfirmed by a real English export.
 If a real one differs, the fix is one line in `GarminCsvColumns::HEADER_SETS`;
 until then an English file imports with empty metrics, which is safe.
+
+**The extended English headers are unconfirmed too** (`US-023`, decision "us-023
+english garmin extended headers"): they are Garmin's standard English names, not read
+off a real English export. The Italian ones were read off nine real exports.
 
 ### Running types
 
@@ -111,6 +135,32 @@ Matched trimmed and case-insensitively (`GarminRunningTypes`):
 | Total ascent | metres, `,` thousands, optional decimal rounded; up to six integer digits; a flat run's `0` stays `0` | `"1,234"` → 1234 · `"45.6"` → 46 |
 | Average heart rate | up to three digits, optional decimal rounded; `0` is not recorded | `"152"` → 152 · `"148.6"` → 149 |
 
+The extended metrics (`US-023`) are parsed by `ExtendedRunMetrics::fromCsvValues()`
+through the shared parsers of `GarminCsvValues`. **Empty means null, never `0`**, except where
+Garmin really reports a zero (marked "0 kept"):
+
+| Metric | Format read | Stored as | Bound / empty rule |
+| --- | --- | --- | --- |
+| Calories | `,` thousands (`"1,028"`) | whole kcal | 0 → empty, ≤ 20 000 |
+| Max heart rate | whole or decimal, rounded | whole bpm | 0 → empty, ≤ 250 |
+| Aerobic TE | decimal | one decimal | 0.0–5.0, **0.0 kept** (a real reading) |
+| Avg / max cadence | whole or decimal, rounded | whole spm | 0 → empty, ≤ 400 |
+| Best pace | the average-pace grammar | s/km | 0 → empty, ≤ 36 000 |
+| Total descent | `,` thousands | whole m | ≤ 20 000, **0 kept** |
+| Avg stride length | **metres**, `"1.04"` | **cm**, one decimal (`104.0`) | 0 → empty, ≤ 5 m (500 cm); read at three decimals before converting |
+| Avg vertical ratio | decimal | one decimal, % | 0 → empty, ≤ 100 |
+| Avg vertical oscillation | decimal, cm (`"9.6"`) | one decimal, cm | 0 → empty, ≤ 50 |
+| Avg ground contact time | whole | whole ms | 0 → empty, ≤ 2 000 |
+| Avg GCT balance | `49.8% S / 50.2% D` or `49.8% L / 50.2% R` | the **left** share, one decimal | the left side is found by its letter (`S`, `L`), not its position; 0 or > 100 → empty |
+| Steps | `,` thousands (`"8,240"`) | whole | 0 → empty, ≤ 1 000 000 |
+| Laps | whole | whole | 0 → empty, ≤ 10 000 |
+| Elapsed time | the duration grammar | whole seconds | 0 → empty, ≤ 36 000 000 |
+| Min / max elevation | `,` thousands, **signed** (`"-12"`) | whole m | −500…9 000, **0 and negatives kept** |
+| Training stress score | decimal | one decimal | **`0.0` → empty** (every real local export writes `0.0` when there is no power data), ≤ 10 000 |
+
+The CSV carries no heart-rate zones, fastest splits or place name: those columns stay
+null for a CSV run. No coordinate is ever read.
+
 Implausible values are not recorded either (pace above 36 000 s/km, ascent above
 20 000 m, heart rate above 250 bpm): the file is untrusted input and the
 values are drawn on the owner's map.
@@ -124,7 +174,16 @@ session `GarminCsvRow::fromSessionArray()` reads the three keys with `?? null`,
 so an upload parked before `US-012` shipped can still be confirmed afterwards.
 `GarminCsvRow::toAttributes()` and `metricAttributes()` carry **only the metrics
 the file recorded** — an empty one is left out, not nulled, so writing the
-attributes onto a stored run can never blank a value it already holds.
+attributes onto a stored run can never blank a value it already holds. The extended
+metrics ride the same two methods: `GarminCsvRow` holds one `ExtendedRunMetrics
+$extendedMetrics`, `metricAttributes()` spreads its `toAttributes()` (non-null values
+only), and `toSessionArray()` parks them under one compact `extended` key that
+`fromSessionArray()` reads with `?? []`, so an upload parked before `US-023` still
+confirms. They stay out of the run's identity like the three metrics above. **Session size:**
+only recorded values are parked, keyed by column name, so a 5,000-row export with every metric
+costs a few MB of session payload (the 5 MB upload and 5,000-row caps bound it); shorten the
+keys if the session column or the database packet size ever gets tight. Enrichment is one
+`UPDATE` per run that gained a value, inside the confirm's single transaction.
 
 ### 2. Target and planning (`PlanGarminImport`)
 
@@ -184,25 +243,37 @@ already-imported row indexes — what the owner was shown.
 
 - each new row → `$user->activities()->create()`;
 - **Overwrite** → the stored row takes the CSV's name, distance, moving time,
-  start, `activity_date` and sport type. The three run metrics are replaced by the
-  CSV's **except where the CSV recorded none**: `GarminCsvRow::toAttributes()`
-  omits an empty metric, so a `--` keeps the stored value. Blanking a pace the
-  owner already has because the new export lacks it would be data loss;
+  start, `activity_date` and sport type. Every metric — the three run metrics and
+  the 27 extended ones of `US-023` — is replaced by the CSV's **except where the CSV
+  recorded none**: `GarminCsvRow::toAttributes()` omits an empty metric, so a `--`
+  keeps the stored value. Blanking a pace (or a cadence, or a Training Stress Score) the
+  owner already has because the new export lacks it would be data loss. It also sets
+  `source = garmin_csv` (the source records who wrote the run's current values) and
+  **never touches `garmin_activity_id`**: a run the Garmin sync wrote or linked keeps its
+  Garmin identity, so the next sync still recognises it. A CSV row that matches an
+  API-synced run (same date, start within ±2 minutes) is a conflict like any other and goes
+  through the same review, counts and throttle (`US-022`);
 - **Skip**, or no answer at all → nothing is written;
 - **Already imported** (same start, distance and moving time) → only the
   metrics its stored run **lacks** are filled from the row
-  (`fillEmptyMetricsOfAlreadyImportedRuns()`); a metric already stored is never
+  (`fillEmptyMetricsOfAlreadyImportedRuns()`, no review and no extra query: it
+  reuses the stored runs the plan already holds); a metric already stored is never
   touched and the row is saved only when something was filled. So a run
-  imported before `US-012` gains its pace, ascent and heart rate from a fresh
-  export, and re-importing the same file again changes nothing. These rows
-  still count as "already imported" in the summary — backfilling adds no new
-  count.
+  imported before `US-012` gains its pace, ascent and heart rate, and one imported
+  before `US-023` gains its extended metrics, from a fresh export — one code path for
+  all 30 — and re-importing the same file again changes nothing. A run that gained at
+  least one metric is **enriched**, counted once however many it gained; one that
+  gained nothing stays "already imported". The two counts partition the
+  already-imported rows, so `alreadyImported + enriched` is what the file held of
+  them. The stored `source` is not touched: an API run that gains a CSV-only Training
+  Stress Score stays `garmin_api`.
 
 The passed owner is only read, never `save()`d. After the commit it retires every
 cached window grid of the owner (`HeatmapGridCache::forgetAthlete()`), so the dashboard shows the import on the next
 request, whichever window is opened — also after a backfill-only import, whose metrics the cached day
 detail carries. It returns a `GarminImportSummary`: imported, overwritten, skipped,
-already imported, ignored by type, future-dated, invalid. The action does not
+already imported, enriched, ignored by type, future-dated, invalid (`fromSessionArray()`
+reads a missing `enriched` as 0, so a summary flashed before `US-023` still renders). The action does not
 authorize (`.ai/rules/actions.md`); the caller has.
 
 ### 4. HTTP flow
@@ -218,7 +289,7 @@ an owner with no password yet to the first-password page. CSRF comes from the `w
 | `GET /import/garmin/review` | `review` | Throttled `garmin-import`, the same limiter as upload and confirm (`US-018`). Plans the pending rows for the owner against the DB **as it is now**, reusing the plan remembered from the previous render while the stored runs on the upload's dates are unchanged (see *The review reuses its plan*); renders conflicts, new rows, counts, `token`, `fingerprint` |
 | `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under the **instance-wide** `Cache::lock('garmin-import:confirm')`, re-plans for the owner; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
 | `POST /import/garmin/cancel` | `cancel` | Forgets the pending import → dashboard, "Import cancelled. Nothing was written." |
-| `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary`; without one → dashboard |
+| `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary` — the tally has an `Enriched` row after `Already imported`, and the lede adds " {n} existing run(s) gained missing metrics." when n > 0 and says "Nothing new" only when imported, overwritten and enriched are all 0 (a deviation from the `US-008` mockup, logged in its README); without one → dashboard |
 
 - **Instance-wide confirm lock**: one confirm at a time on the whole instance
   (one owner, so serialising costs nothing); a second concurrent confirm (a
@@ -264,14 +335,16 @@ an owner with no password yet to the first-password page. CSRF comes from the `w
 | Piece | Where | Role |
 | --- | --- | --- |
 | Parser | `app/Support/Garmin/ParseGarminCsv.php` | File → `ParsedGarminCsv`; `SplFileObject`, no package |
-| Header sets | `app/Support/Garmin/GarminCsvColumns.php` | Language detection, column lookup by name |
+| Header sets | `app/Support/Garmin/GarminCsvColumns.php` | Language detection, column lookup by name; a list of accepted texts per key; `EXTENDED_KEYS` (`US-023`) |
+| Cell parsers | `app/Support/Garmin/GarminCsvValues.php` | Static, pure parsers per value shape — whole number (signed when asked), one decimal, duration, pace, left balance — shared by the row parser and `ExtendedRunMetrics`, so there is one reading of each shape (`US-023`) |
+| Extended metrics | `app/Data/Garmin/ExtendedRunMetrics.php` | Final readonly DTO of the 27 nullable values; `fromCsvValues()`, `toAttributes()` (non-null only), compact `toSessionArray()` / `fromSessionArray()`; `fromApiPayload()` is the API half (`garmin-api-sync.md`) |
 | Type map | `app/Support/Garmin/GarminRunningTypes.php` | Garmin type name → `SportType` |
 | Row DTO | `app/Data/Garmin/GarminCsvRow.php` | `toAttributes()`, `toSessionArray()` / `fromSessionArray()`, `isIdenticalTo(Activity)` |
 | Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, future-dated count, invalid list; session round-trip (`fromSessionArray()` tolerates the pre-`US-013` `outside_window` key and reads the missing `future_dated` as 0, so an upload or summary in flight across the deploy still opens) |
 | Rejection | `app/Exceptions/Garmin/GarminCsvRejectedException.php` | Owner-facing messages; no file content beyond a column name |
 | Remembered plan | `app/Support/Garmin/RememberedGarminImportPlan.php`, `PendingGarminImport::rememberPlan()` / `rememberedPlan()` | The review's plan, kept in the session with a stamp of the planner's database inputs and reused while it holds (`US-018`) |
 | Planner | `app/Support/Garmin/PlanGarminImport.php` | New / conflict / already imported, one query through `Activity::onDates()`, per-date indexes, claiming |
-| Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id |
+| Matcher | `app/Support/Garmin/StartTimeMatcher.php` | Same date, ±120 s inclusive, closest, ties to the lowest id. Two callers: the import plan and the API sync (`garmin-api-sync.md`), which links a CSV run to its Garmin activity with it |
 | Plan DTOs | `app/Data/Garmin/GarminImportPlan.php`, `GarminImportConflict.php` | The plan and its `fingerprint()` |
 | Apply action | `app/Actions/Garmin/ApplyGarminImport.php` | One transaction; Overwrite and the already-imported metric backfill; every cached window grid of the athlete retired after commit (`forgetAthlete()`) |
 | Answer | `app/Enums/ConflictResolution.php` | `overwrite`, `skip` |
@@ -282,8 +355,8 @@ an owner with no password yet to the first-password page. CSRF comes from the `w
 | Session binding | `app/Support/Garmin/PendingGarminImport.php` | The one reader/writer of `garmin_import.pending` |
 | Formatting | `app/Support/Garmin/GarminImportFormat.php` | Shared by the review's stored and CSV sides |
 | Views / assets | `resources/views/garmin/{create,review,summary}.blade.php`, "Garmin import" block in `resources/css/app.css`, `data-resolve-all` in `resources/js/app.js` | |
-| Tests | `tests/Feature/Garmin/*`, `tests/Unit/Support/Garmin/*`, `tests/Feature/Database/RemoveStravaMigrationTest.php` | |
-| Fixtures | `tests/Fixtures/Garmin/activities-it.csv` (client sample, verbatim), `activities-en.csv` | |
+| Tests | `tests/Feature/Garmin/*` (`ParseGarminCsvTest`, `GarminImportFlowTest`, `GarminImportEnrichmentTest`), `tests/Unit/Support/Garmin/*` (`GarminCsvValuesTest`, `GarminCsvColumnsTest`), `tests/Unit/Data/Garmin/ExtendedRunMetricsTest.php`, `GarminImportSummaryTest.php`, `tests/Feature/Database/ExtendedRunMetricsMigrationTest.php`, `RemoveStravaMigrationTest.php`, `tests/Feature/Dashboard/ExtendedMetricsNotDisplayedTest.php` | |
+| Fixtures | `tests/Fixtures/Garmin/activities-it.csv` (client sample, verbatim), `activities-en.csv`; `activities-it-extended.csv`, `activities-en-extended.csv` (`US-023`: synthetic values in the formats real exports use, one row of `--`, one of unreadable values) | |
 
 ### Data model (`activities`)
 
@@ -302,10 +375,67 @@ with the run's own row, so they carry **no index**: every query filters on
 `(user_id, activity_date)` first. `activities.user_id` is not mass-assignable; write
 through `$user->activities()`.
 
-There is no `source` and no `strava_activity_id` column: `US-021` deleted every
-Strava-sourced run and dropped both, together with the Strava columns of `users` and
-the `sync_runs` table (`remove_strava_from_schema`). The migration is irreversible: its
-`down()` restores the schema, never the deleted rows or the tokens.
+### Extended run metrics (`US-023`, `add_extended_metrics_to_activities_table`)
+
+27 more nullable columns on `activities` hold the extended metrics of FR-022. Same rule as
+the three above: **NULL means "not recorded"**, no default, no index, plain `#[Fillable]`
+values read only with the run's own row, and no writer stores `0` for a missing value. The
+only zeros kept are the ones Garmin really reports (descent, elevation, time in an HR zone,
+aerobic training effect); the DTO that writes them decides, not the schema. Decimal columns
+are cast `float` and rounded to one decimal before they are stored, so a re-import or a
+second sync compares equal. **No coordinate column exists**: start and end positions are
+never read or stored.
+
+| Column | Type | Unit / shape | Source |
+| --- | --- | --- | --- |
+| `calories` | unsigned int | kcal | CSV + API |
+| `max_heart_rate` | unsigned small int | bpm | CSV + API |
+| `aerobic_training_effect` | decimal(3,1) | 0.0–5.0 | CSV + API |
+| `average_running_cadence`, `max_running_cadence` | unsigned small int | steps per minute | CSV + API |
+| `best_pace_seconds_per_km` | unsigned int | s/km (API: from `maxSpeed`) | CSV + API |
+| `total_descent_meters` | unsigned int | m | CSV + API |
+| `average_stride_length_cm` | decimal(5,1) | **cm** (the CSV writes metres, converted) | CSV + API |
+| `average_vertical_ratio_percent` | decimal(4,1) | % | CSV + API |
+| `average_vertical_oscillation_cm` | decimal(4,1) | cm | CSV + API |
+| `average_ground_contact_time_ms` | unsigned small int | ms | CSV + API |
+| `average_ground_contact_balance_left_percent` | decimal(4,1) | the **left** share, % | CSV + API |
+| `steps`, `lap_count` | unsigned int / small int | count | CSV + API |
+| `elapsed_time_seconds` | unsigned int | s (never below the moving time) | CSV + API |
+| `min_elevation_meters`, `max_elevation_meters` | **signed** int | m (0 and negatives are real) | CSV + API |
+| `training_stress_score` | decimal(6,1) | one decimal | **CSV only** |
+| `hr_zone_1_seconds` … `hr_zone_5_seconds` | unsigned int | s | **API only** |
+| `fastest_1k_seconds`, `fastest_mile_seconds`, `fastest_5k_seconds` | unsigned int | s | **API only** |
+| `location_name` | string(255) | trimmed place name | **API only** |
+
+The migration is additive: `up()` adds only these columns, so every stored run and value
+survives and reads NULL for them; `down()` drops exactly these 27 and nothing else. The
+parsing rules per column, the accepted headers, and the enrichment of stored runs are in
+the flow sections of this file.
+
+Two columns say where a run came from (`US-022`, `add_garmin_sync_to_activities_table`):
+
+- `source` — string, not null, default `garmin_csv` (`app/Enums/ActivitySource.php`:
+  `garmin_csv`, `garmin_api`). Every row stored before the column existed is a CSV import,
+  which is exactly what the default backfills. A new CSV row takes the default, and an
+  Overwrite sets it to `garmin_csv` explicitly, because from then on the CSV wrote the run's values.
+- `garmin_activity_id` — unsigned big integer, nullable, **unique**. Set only by the
+  Garmin sync (`garmin-api-sync.md`) when it creates or links a run; a CSV-only run keeps
+  NULL, and SQLite allows any number of NULLs under the unique index. An integer, not a
+  string: Garmin's ids are 11 digits today and the API answers them as JSON numbers, so
+  both sides compare without a cast.
+
+Both stay **out of `#[Fillable]`**: they say which Garmin activity a run is, so only the
+code that does the linking assigns them, explicitly. A CSV row, an import payload or a
+request body can never plant an id that would make a later sync overwrite — or refuse to
+create — an unrelated run. For the same reason the CSV import's `toAttributes()` carries
+neither, so Overwrite keeps a run's `garmin_activity_id`.
+
+There is no `strava_activity_id` column: `US-021` deleted every Strava-sourced run and
+dropped it, together with the Strava columns of `users` and the `sync_runs` table
+(`remove_strava_from_schema`). That migration is irreversible: its `down()` restores the
+schema, never the deleted rows or the tokens. It also owned an earlier `source` column;
+`US-022` brings a column of that name back with a different meaning (CSV vs API), so
+rolling back the Strava removal in a test first needs the `US-022` migration undone.
 
 ## Architectural choices
 
@@ -332,6 +462,7 @@ the `sync_runs` table (`remove_strava_from_schema`). The migration is irreversib
 | Throttle the review with the upload's and confirm's `garmin-import` limiter, and index stored runs by date (US-018) | A looser limit for the review; a cached plan alone; leave the scan | Each render re-plans every row against the stored runs, so a route repeated in a loop was unbounded work: rows × stored runs per reload. One shared limiter means the three routes cannot be hammered in turn to get ten of each. Indexing makes the work rows × runs-of-that-date, and the plan keeps the same results because the matcher already required the same date |
 | Remember the review's plan in the session, stamped with the planner's inputs (US-018) | Cache it; stamp by `updated_at` or a count / `MAX(updated_at)` aggregate; re-plan every render | The plan belongs to the pending upload, which already lives in the session, so it dies with the upload and needs no key or TTL. `updated_at` has one-second resolution and a query-builder write does not touch it; an aggregate cannot see a run whose distance changed. A stamp over exactly the columns the planner compares can. The stored runs are loaded once per render and feed the stamp, the planner and a reused plan alike, so the review costs one activities query hit or miss, and the runs it renders (name, metrics, link) are always current |
 | The confirm still plans fresh (US-018) | Confirm from the remembered plan | The confirm's fingerprint exists to compare the review against the database at write time, inside the lock; a remembered plan would compare it with itself |
+| Extended metrics as 27 nullable columns (US-023) | One JSON `extended_metrics` column; a separate 1:1 `activity_metrics` table | JSON has no per-metric "fill only empty", no casts, and is opaque to Larastan, and the acceptance criteria ask for nullable columns. A 1:1 table adds a join for data no page reads yet; the columns ride the row every query already loads, and `DailyRuns` selects only the columns it renders, so no extended value reaches the grid cache |
 | Wall-clock dates built in UTC | Parse with the app timezone | Garmin exports the runner's local wall-clock time; a conversion moves late-evening runs to the wrong day |
 
 ## Key decisions & invariants
@@ -341,11 +472,18 @@ the `sync_runs` table (`remove_strava_from_schema`). The migration is irreversib
   no longer leave the database untouched.
 - **Invariant — one definition of "the same run".** Conflicts use
   `StartTimeMatcher`: same local date, ±2 minutes **inclusive**, closest wins.
-  _Breaks if:_ the review and the confirm inline their own rule — a run the review
-  called "stored" could be one the write calls "new", and the day is counted twice.
+  _Breaks if:_ the review, the confirm or the API sync inline their own rule — a run the
+  review called "stored" could be one the write calls "new", and the day is counted twice
+  (the sync links a CSV run with it instead of creating a twin).
 - **Invariant — a stored run is never replaced by a re-read of the file.** Only an
   explicit Overwrite changes one, and an already-imported row fills only the metrics
-  its stored run lacks. Nothing else writes a run: no background job exists.
+  its stored run lacks — the same rule for all 30 metrics, which is also what makes a
+  second re-import enrich 0 runs and write nothing. On Overwrite a `--` extended cell
+  keeps the stored value, because `toAttributes()` leaves an unrecorded metric out
+  instead of nulling it. Nothing else writes a run but the Garmin sync (`garmin-api-sync.md`).
+  Accepted trade-off: for a run that has a Garmin id the API is authoritative, so a CSV
+  Overwrite of a run dated within the next sync's re-read span (the last 7 days before the
+  newest synced run) is replaced by the API values at that sync.
 - **Invariant — all or nothing.** Every write of one confirm is in one
   transaction. _Breaks if:_ rows are created outside it — a failure halfway
   would leave half an import that a re-upload then reports as part new, part
@@ -401,8 +539,8 @@ the `sync_runs` table (`remove_strava_from_schema`). The migration is irreversib
 
 ## Related
 
-- Specs: `US-008`, `US-011`, `US-012`, `US-013`, `US-018`, `US-020`, `US-021`
+- Specs: `US-008`, `US-011`, `US-012`, `US-013`, `US-018`, `US-020`, `US-021`, `US-022`
 - Plans: `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-011-plan.yaml`, `.larapilot/plans/US-013-plan.yaml`, `.larapilot/plans/US-020-plan.yaml`
 - Mockups: `.larapilot/mockups/US-008/`
 - Decisions: `56c5683061907ab8` (running type names; unknowns surfaced)
-- Other domains: `heatmap-dashboard.md`, `owner-authentication.md`
+- Other domains: `garmin-api-sync.md`, `heatmap-dashboard.md`, `owner-authentication.md`

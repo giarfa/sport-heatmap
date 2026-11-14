@@ -4,6 +4,17 @@
 <div class="import-detail">
     <h3 class="text-xs font-semibold">{{ $status->detailHeading() }}</h3>
     <dl>
+        @if ($status->syncConfigured)
+            <div class="import-detail-row">
+                <dt>Last sync</dt>
+                <dd class="import-detail-value">
+                    {{ $status->lastSyncLabel() }}
+                    @if ($status->lastSyncRelative() !== null)
+                        <span class="block" style="color: var(--ink-muted);">{{ $status->lastSyncRelative() }}</span>
+                    @endif
+                </dd>
+            </div>
+        @endif
         <div class="import-detail-row">
             <dt>Last import</dt>
             <dd class="import-detail-value">
