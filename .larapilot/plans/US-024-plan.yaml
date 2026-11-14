@@ -210,7 +210,7 @@ tasks:
     id: TASK-03
     title: 'Pest coverage for the efficiency calculation'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
@@ -238,14 +238,20 @@ tasks:
       4. Do **not** add Playwright, Dusk, Pest browser or viewport suites
 
       ## Completion Criteria
-      - [ ] Every rule in the plan's Calculation contract has a test that fails when the rule is broken
-      - [ ] Tests pass locally
-      - [ ] Coverage matches the NORMAL bar
+      - [x] Every rule in the plan's Calculation contract has a test that fails when the rule is broken
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-024): TASK-03 cover the aerobic efficiency calculation`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
+    commit:
+      sha: 17bd53090986d924263d5c9b010905a86145db4e
+      short_sha: 17bd530
+      subject: 'test(US-024): TASK-03 cover the aerobic efficiency calculation'
+      committed_at: '2026-11-14T18:47:05+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/17bd53090986d924263d5c9b010905a86145db4e'
   -
     id: TASK-04
     title: 'BuildAerobicEfficiency: card strings, axis and chart geometry'
@@ -562,4 +568,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:45:57+00:00'
+updated_at: '2026-11-14T17:47:05+00:00'

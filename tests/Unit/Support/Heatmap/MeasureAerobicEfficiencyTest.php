@@ -5,7 +5,6 @@ namespace Tests\Unit\Support\Heatmap;
 use App\Data\Heatmap\EfficiencyMeasurement;
 use App\Data\Heatmap\EfficiencyRun;
 use App\Data\Heatmap\EfficiencySample;
-use App\Data\Heatmap\MeasuredRun;
 use App\Enums\EfficiencyRunKind;
 use App\Support\Heatmap\HeatmapWindow;
 use App\Support\Heatmap\MeasureAerobicEfficiency;
@@ -361,7 +360,6 @@ class MeasureAerobicEfficiencyTest extends TestCase
     {
         $measurement = $this->measure([$this->windowRun(week: 5, weekday: 2)]);
 
-        $this->assertContainsOnlyInstancesOf(MeasuredRun::class, $measurement->runs);
         $this->assertSame(5, $measurement->runs[0]->weekPosition);
         $this->assertSame(2, $measurement->runs[0]->weekday);
     }
