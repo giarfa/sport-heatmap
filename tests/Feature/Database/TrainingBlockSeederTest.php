@@ -2,14 +2,21 @@
 
 namespace Tests\Feature\Database;
 
+use App\Data\Heatmap\MeasuredRun;
 use App\Enums\ActivitySource;
+use App\Enums\AerobicEfficiencyState;
+use App\Enums\EfficiencyRunKind;
 use App\Enums\GarminSyncOutcome;
 use App\Enums\GarminSyncTrigger;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\GarminSync;
 use App\Models\User;
+use App\Support\Heatmap\BuildAerobicEfficiency;
+use App\Support\Heatmap\EfficiencyRuns;
+use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapWindow;
+use App\Support\Heatmap\MeasureAerobicEfficiency;
 use Database\Seeders\TrainingBlockSeeder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,14 +59,14 @@ class TrainingBlockSeederTest extends TestCase
 
     /**
      * A volume sanity check, not a spec. The seeder can construct 52-94 activities
-     * (13 normal weeks of 3-6 runs, 3 double-run days, 1 illness run, 8 peak runs and
-     * 1-4 runs in the partial current week), so the bounds have to cover that whole
-     * range or the suite goes red at random.
+     * (13 normal weeks of 3-6 runs, 3 double-run days, 1 illness run, 8 peak runs,
+     * 1-4 runs in the partial current week, and the one run under 3 km), so the bounds
+     * have to cover that whole range or the suite goes red at random.
      */
     public function test_it_seeds_enough_activities_to_exercise_the_dashboard(): void
     {
         $this->assertGreaterThanOrEqual(50, $this->activities()->count());
-        $this->assertLessThanOrEqual(95, $this->activities()->count());
+        $this->assertLessThanOrEqual(96, $this->activities()->count());
     }
 
     public function test_the_block_spans_sixteen_consecutive_iso_weeks_ending_with_the_current_one(): void
@@ -351,6 +358,63 @@ class TrainingBlockSeederTest extends TestCase
         $this->assertTrue($oldest->lessThan(HeatmapWindow::current()->startsOn));
     }
 
+    public function test_the_current_window_measures_aerobic_efficiency_with_every_kind_of_run(): void
+    {
+        $window = HeatmapWindow::current();
+        $sample = (new EfficiencyRuns)(User::sole(), $window);
+        $measurement = (new MeasureAerobicEfficiency)($window, $sample);
+
+        $this->assertGreaterThanOrEqual(MeasureAerobicEfficiency::MIN_QUALIFYING_RUNS, $measurement->qualifyingCount);
+        $this->assertGreaterThanOrEqual(146, $measurement->referenceHeartRate);
+        $this->assertLessThanOrEqual(150, $measurement->referenceHeartRate);
+        $this->assertNotEmpty(array_filter($measurement->linePoints, fn (?float $point): bool => $point !== null));
+
+        $kinds = array_map(fn (MeasuredRun $run): EfficiencyRunKind => $run->kind, $measurement->runs);
+
+        $this->assertContains(EfficiencyRunKind::Flat, $kinds);
+        $this->assertContains(EfficiencyRunKind::Hilly, $kinds);
+        $this->assertContains(EfficiencyRunKind::Steep, $kinds);
+    }
+
+    public function test_the_block_has_a_run_well_above_the_median_heart_rate_and_a_run_under_three_kilometres(): void
+    {
+        $measurement = (new MeasureAerobicEfficiency)(
+            HeatmapWindow::current(),
+            (new EfficiencyRuns)(User::sole(), HeatmapWindow::current()),
+        );
+
+        $this->assertTrue($this->activities()->contains(
+            fn (Activity $activity): bool => $activity->average_heart_rate > $measurement->referenceHeartRate + 10,
+        ));
+        $this->assertTrue($this->activities()->contains(
+            fn (Activity $activity): bool => $activity->distance_meters < 3_000 && $activity->average_pace_seconds_per_km !== null,
+        ));
+    }
+
+    public function test_the_same_weeks_one_year_earlier_draw_last_years_line_with_a_break(): void
+    {
+        $window = HeatmapWindow::current();
+        $measurement = (new MeasureAerobicEfficiency)($window, (new EfficiencyRuns)(User::sole(), $window));
+
+        $this->assertTrue($measurement->hasLastYear);
+        $this->assertNotEmpty(array_filter($measurement->lastYearPoints, fn (?float $point): bool => $point !== null));
+        $this->assertContains(null, $measurement->lastYearPoints, 'The year-earlier gap leaves a week with no point.');
+    }
+
+    public function test_the_card_is_measured_and_shows_every_key_entry(): void
+    {
+        $window = HeatmapWindow::current();
+        $measurement = (new MeasureAerobicEfficiency)($window, (new EfficiencyRuns)(User::sole(), $window));
+        $grid = app(HeatmapBuilder::class)($window, [], Carbon::now());
+        $card = (new BuildAerobicEfficiency)($measurement, $grid->weeks, $grid->label());
+
+        $this->assertSame(AerobicEfficiencyState::Measured, $card->state);
+        $this->assertTrue($card->hasHilly);
+        $this->assertTrue($card->hasSteep);
+        $this->assertTrue($card->hasLastYear);
+        $this->assertTrue($card->hasMedianLine());
+    }
+
     private function blockStart(): Carbon
     {
         return Carbon::today()->startOfWeek()->subWeeks(15);
@@ -367,13 +431,16 @@ class TrainingBlockSeederTest extends TestCase
     }
 
     /**
-     * The history before the block.
+     * The seven weeks of history right before the block. The runs one year earlier sit
+     * further back and are not part of it.
      *
      * @return Collection<int, Activity>
      */
     private function historyActivities(): Collection
     {
-        return Activity::where('activity_date', '<', $this->blockStart()->toDateString())->get();
+        return Activity::where('activity_date', '>=', $this->blockStart()->subWeeks(7)->toDateString())
+            ->where('activity_date', '<', $this->blockStart()->toDateString())
+            ->get();
     }
 
     /**

@@ -499,6 +499,15 @@ and its Last year column exists only with last-year data.
   before the extended states: a `create()` override is applied last and the metrics would be
   derived from the factory's random run. The legend over the current window does not change. Do not run `migrate:fresh --seed` on a
   database that holds real imports — point `DB_DATABASE` at a scratch file.
+- **The demo data shape the aerobic-efficiency card relies on** (`US-024`, `TrainingBlockSeeder`): from the block's third
+  week on, runs carry a heart rate around 148 bpm and a pace that follows from it (higher heart rate, faster pace) and
+  improves by ~1.6 s per km a week at that heart rate; a fifth are hilly, one (week 11) is steep, one (week 13) is at
+  162 bpm, one 2.4 km run is added to week 5, and the first two weeks stay metric-free like an older export. The same
+  weeks 52 weeks earlier (and the 3 weeks before them) hold three runs a week, slower, with weeks 6–9 empty so last year's
+  line breaks. Because of that, Previous from the current window passes empty windows before it reaches them. Climb comes
+  from the `ActivityFactory` states `flat()`, `hilly()`, `steep()` (set the distance with `state()` first: the ascent is
+  derived from it) and `atHeartRate()`. `TrainingBlockSeederTest` verifies the shape on the in-memory database; never run
+  `migrate:fresh --seed` on the dev database.
 - **A new card DTO or enum that rides in the grid must join `cache.serializable_classes` in `config/cache.php` and bump the
   `v` segment of the cache key** (`HeatmapGridCache::key()`). The database store restores a missing class as
   `__PHP_Incomplete_Class` (a 500 on every hit) and restores a readonly property an old entry never had as uninitialized.

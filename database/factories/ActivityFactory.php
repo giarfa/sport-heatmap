@@ -77,6 +77,63 @@ class ActivityFactory extends Factory
     }
 
     /**
+     * A flat run for the aerobic-efficiency measure: under 5 m of climb per km. The ascent
+     * is derived from the distance already built, so set the distance with a state or with
+     * make()/create() attributes passed to `state()` before this one: a `create()` override
+     * is applied last and would leave the ascent describing a different run.
+     */
+    public function flat(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'total_ascent_meters' => fake()->numberBetween(0, (int) floor(4.9 * $this->kilometres($attributes))),
+        ]);
+    }
+
+    /**
+     * A hilly run: 5 to 10 m of climb per km, the band FR-023 converts to a flat equivalent.
+     */
+    public function hilly(): static
+    {
+        return $this->state(function (array $attributes): array {
+            $kilometres = $this->kilometres($attributes);
+            $least = (int) ceil(5.1 * $kilometres);
+
+            return ['total_ascent_meters' => fake()->numberBetween($least, max($least, (int) floor(9.9 * $kilometres)))];
+        });
+    }
+
+    /**
+     * A steep run: 11 to 15 m of climb per km, drawn by the card as a cross and never counted.
+     */
+    public function steep(): static
+    {
+        return $this->state(function (array $attributes): array {
+            $kilometres = $this->kilometres($attributes);
+            $least = (int) ceil(11 * $kilometres);
+
+            return ['total_ascent_meters' => fake()->numberBetween($least, max($least, (int) floor(15 * $kilometres)))];
+        });
+    }
+
+    /**
+     * A run at a given average heart rate.
+     */
+    public function atHeartRate(int $beatsPerMinute): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'average_heart_rate' => $beatsPerMinute,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function kilometres(array $attributes): float
+    {
+        return (int) $attributes['distance_meters'] / 1_000;
+    }
+
+    /**
      * A run carrying the extended metrics both Garmin sources record, every value
      * derived from the run's own distance, moving time, and pace so the record never
      * contradicts itself: the elapsed time is never shorter than the moving time, the
