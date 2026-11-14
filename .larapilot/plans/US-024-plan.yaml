@@ -519,7 +519,7 @@ tasks:
     id: TASK-09
     title: 'Factory states and demo data for aerobic efficiency'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 3
     dependencies:
@@ -541,24 +541,30 @@ tasks:
       5. Verify through `php artisan test --filter=TrainingBlockSeederTest` on the in-memory test DB. **Do not run `migrate:fresh` or `db:seed` against the dev database** — it is the owner's real data
 
       ## Completion Criteria
-      - [ ] Factory states produce runs that classify as Flat / Hilly / Steep under the FR-023 thresholds
-      - [ ] Seeded demo shows dots, the median line, last year's line, and every key entry
-      - [ ] Existing seeder assertions still hold (weekly totals, double-run days, rest week)
-      - [ ] Tests pass
+      - [x] Factory states produce runs that classify as Flat / Hilly / Steep under the FR-023 thresholds
+      - [x] Seeded demo shows dots, the median line, last year's line, and every key entry
+      - [x] Existing seeder assertions still hold (weekly totals, double-run days, rest week)
+      - [x] Tests pass
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` gains `flat()`, `hilly()`, `steep()`, `atHeartRate()`
-      - [ ] `TrainingBlockSeeder` seeds correlated metrics and the year-earlier weeks
-      - [ ] Verified by `TrainingBlockSeederTest`, not by seeding the dev database
+      - [x] `database/factories/ActivityFactory.php` gains `flat()`, `hilly()`, `steep()`, `atHeartRate()`
+      - [x] `TrainingBlockSeeder` seeds correlated metrics and the year-earlier weeks
+      - [x] Verified by `TrainingBlockSeederTest`, not by seeding the dev database
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — Extension points & gotchas: the demo data shape the efficiency card relies on
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — Extension points & gotchas: the demo data shape the efficiency card relies on
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-09 seed runs for aerobic efficiency`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: ae106133663053d1107e2a324e173236a159757f
+      short_sha: ae10613
+      subject: 'feat(US-024): TASK-09 seed runs for aerobic efficiency'
+      committed_at: '2026-11-14T18:58:42+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ae106133663053d1107e2a324e173236a159757f'
   -
     id: TASK-10
     title: 'Quality gate and handoff checks'
@@ -592,4 +598,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:55:02+00:00'
+updated_at: '2026-11-14T17:58:43+00:00'
