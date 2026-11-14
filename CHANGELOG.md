@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With no `GARMIN_API_KEY` nothing changes: no Sync now, no sync status, no warning, nothing scheduled
   that calls out.
 
+### Security
+
+- `laravel/framework` updated to 13.42.0 (GHSA-63hm-g96r-2m2q) and `vite` to 8.3.8 (six advisories
+  against its dev server). The dependency check reports no open vulnerability.
+
 ## [3.0.0] - 2026-10-26
 
 **Upgrade warning: the migration that ships with this release permanently deletes every run that
