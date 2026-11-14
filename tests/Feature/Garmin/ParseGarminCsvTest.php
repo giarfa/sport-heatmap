@@ -431,6 +431,177 @@ class ParseGarminCsvTest extends TestCase
         $this->assertSame(20, $partial['total_ascent_meters']);
     }
 
+    public function test_the_italian_extended_columns_are_stored_with_their_real_formats(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-extended.csv'));
+
+        $this->assertCount(4, $parsed->rows);
+        $this->assertSame([], $parsed->invalid);
+
+        $this->assertSame([
+            'calories' => 1_028,
+            'max_heart_rate' => 171,
+            'aerobic_training_effect' => 3.8,
+            'average_running_cadence' => 168,
+            'max_running_cadence' => 181,
+            'best_pace_seconds_per_km' => 252,
+            'total_descent_meters' => 139,
+            'average_stride_length_cm' => 100.0,
+            'average_vertical_ratio_percent' => 9.4,
+            'average_vertical_oscillation_cm' => 9.6,
+            'average_ground_contact_time_ms' => 302,
+            'average_ground_contact_balance_left_percent' => 49.8,
+            'steps' => 15_490,
+            'lap_count' => 17,
+            'elapsed_time_seconds' => 5_620,
+            'min_elevation_meters' => 1_065,
+            'max_elevation_meters' => 1_100,
+        ], $this->rowNamed($parsed, 'Paese Corsa')->extendedMetrics->toAttributes());
+    }
+
+    public function test_the_english_extended_columns_give_the_same_values_as_the_italian_ones(): void
+    {
+        $italian = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-extended.csv'));
+        $english = $this->parse(base_path('tests/Fixtures/Garmin/activities-en-extended.csv'));
+
+        $this->assertCount(4, $english->rows);
+
+        foreach ($italian->rows as $index => $row) {
+            $this->assertEquals($row->extendedMetrics, $english->rows[$index]->extendedMetrics);
+            $this->assertSame($row->identityKey(), $english->rows[$index]->identityKey());
+        }
+
+        $this->assertSame(49.8, $english->rows[0]->extendedMetrics->averageGroundContactBalanceLeftPercent);
+        $this->assertSame(-12, $english->rows[1]->extendedMetrics->minElevationMeters);
+    }
+
+    public function test_the_long_english_elevation_headers_are_read_too(): void
+    {
+        $header = 'Activity Type,Date,Favorite,Title,Distance,Time,Moving Time,Min Elevation,Max Elevation';
+        $parsed = $this->parse($this->csv($header, ['Running,2026-10-10 09:33:27,false,"Run","5.00","00:30:00","00:30:00","1,065","-3"']));
+
+        $this->assertSame(1_065, $parsed->rows[0]->extendedMetrics->minElevationMeters);
+        $this->assertSame(-3, $parsed->rows[0]->extendedMetrics->maxElevationMeters);
+    }
+
+    public function test_a_real_training_stress_score_is_kept_and_a_zero_one_is_not_recorded(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-extended.csv'));
+
+        $this->assertNull($this->rowNamed($parsed, 'Paese Corsa')->extendedMetrics->trainingStressScore);
+        $this->assertSame(48.3, $this->rowNamed($parsed, 'Collina Corsa')->extendedMetrics->trainingStressScore);
+    }
+
+    public function test_zero_descent_zero_elevation_zero_effect_and_a_negative_elevation_are_kept(): void
+    {
+        $metrics = $this->rowNamed($this->parse(base_path('tests/Fixtures/Garmin/activities-it-extended.csv')), 'Collina Corsa')->extendedMetrics;
+
+        $this->assertSame(0.0, $metrics->aerobicTrainingEffect);
+        $this->assertSame(0, $metrics->totalDescentMeters);
+        $this->assertSame(-12, $metrics->minElevationMeters);
+        $this->assertSame(0, $metrics->maxElevationMeters);
+        $this->assertSame(104.0, $metrics->averageStrideLengthCm);
+    }
+
+    public function test_a_row_of_double_dashes_is_still_a_run_with_no_extended_metric_but_its_elapsed_time(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-extended.csv'));
+        $row = $this->rowNamed($parsed, 'Senza estese Corsa');
+
+        $this->assertSame(6_000, $row->distanceMeters);
+        $this->assertSame(['elapsed_time_seconds' => 2_100], $row->extendedMetrics->toAttributes());
+    }
+
+    public function test_unreadable_and_out_of_bound_extended_cells_are_empty_and_never_reject_the_row(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-extended.csv'));
+        $row = $this->rowNamed($parsed, 'Valori illeggibili Corsa');
+
+        $this->assertSame([], $parsed->invalid);
+        $this->assertSame(5_000, $row->distanceMeters);
+        $this->assertTrue($row->extendedMetrics->isEmpty());
+        $this->assertSame(['total_ascent_meters' => 20, 'average_heart_rate' => 140], $row->metricAttributes());
+    }
+
+    public function test_a_file_with_none_of_the_extended_columns_imports_as_before(): void
+    {
+        $parsed = $this->parse($this->csv(self::IT_HEADER, ['Corsa,2026-10-10 09:33:27,false,"Run","5.00","00:30:00","00:30:00"']));
+
+        $this->assertCount(1, $parsed->rows);
+        $this->assertTrue($parsed->rows[0]->extendedMetrics->isEmpty());
+        $this->assertSame([], $parsed->rows[0]->metricAttributes());
+    }
+
+    public function test_the_client_sample_stores_only_the_elapsed_time_of_each_corsa_row(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it.csv'));
+
+        $this->assertCount(37, $parsed->rows);
+
+        foreach ($parsed->rows as $row) {
+            $attributes = $row->extendedMetrics->toAttributes();
+
+            $this->assertSame(['elapsed_time_seconds'], array_keys($attributes), "Run {$row->name} on {$row->startDateLocal} carries another extended metric.");
+            $this->assertGreaterThanOrEqual($row->movingTimeSeconds, $attributes['elapsed_time_seconds']);
+        }
+
+        $this->assertSame(3_264, $parsed->rows[0]->extendedMetrics->elapsedTimeSeconds);
+    }
+
+    public function test_the_extended_metrics_survive_the_session_round_trip_and_an_older_pending_upload_still_rebuilds(): void
+    {
+        $parsed = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-extended.csv'));
+        $session = $parsed->toSessionArray();
+
+        $this->assertEquals($parsed->rows, ParsedGarminCsv::fromSessionArray($session)->rows);
+        $this->assertSame(['elapsed_time_seconds' => 2_100], $session['rows'][2]['extended']);
+
+        foreach (array_keys($session['rows']) as $index) {
+            unset($session['rows'][$index]['extended']);
+        }
+
+        $old = ParsedGarminCsv::fromSessionArray($session);
+
+        $this->assertCount(4, $old->rows);
+        $this->assertTrue($old->rows[0]->extendedMetrics->isEmpty());
+        $this->assertSame($parsed->rows[0]->identityKey(), $old->rows[0]->identityKey());
+    }
+
+    public function test_the_extended_metrics_are_not_part_of_a_runs_identity(): void
+    {
+        $row = $this->parse(base_path('tests/Fixtures/Garmin/activities-it-extended.csv'))->rows[0];
+
+        $twin = new GarminCsvRow(
+            $row->sportType,
+            $row->name,
+            $row->distanceMeters,
+            $row->movingTimeSeconds,
+            $row->startDateLocal,
+            $row->activityDate,
+        );
+
+        $this->assertSame($row->identityKey(), $twin->identityKey());
+
+        $twiceTheSameRun = $this->parse($this->csv(
+            'Tipo di attività,Data,Preferita,Titolo,Distanza,Calorie,Tempo,Tempo in movimento',
+            [
+                'Corsa,2026-10-10 09:33:27,false,"Run","5.00","400","00:30:00","00:30:00"',
+                'Corsa,2026-10-10 09:33:27,false,"Run","5.00","900","00:30:00","00:30:00"',
+            ],
+        ));
+
+        $this->assertCount(1, $twiceTheSameRun->rows);
+        $this->assertSame(400, $twiceTheSameRun->rows[0]->extendedMetrics->calories);
+    }
+
+    public function test_extended_headers_alone_do_not_make_an_unknown_file_pass(): void
+    {
+        $this->assertRejected(
+            GarminCsvRejectedException::unrecognisedHeaders()->getMessage(),
+            $this->csv('Calorie,FC max,Passi,Numero di Lap', ['"500","171","8,240","5"']),
+        );
+    }
+
     private function parse(string $path): ParsedGarminCsv
     {
         return app(ParseGarminCsv::class)($path, now());

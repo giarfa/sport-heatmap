@@ -279,7 +279,7 @@ tasks:
     dependencies:
       - TASK-01
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Read the extended metrics out of Italian and English Garmin CSV exports into a typed DTO that rides on `GarminCsvRow`. A missing column, `--`, or an unreadable or out-of-bound value leaves that metric null and never rejects the row (FR-022, FR-018).
@@ -331,26 +331,32 @@ tasks:
       6. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Italian and English extended headers are read wherever they sit; a file without them imports exactly as before
-      - [ ] `--`, empty, unreadable, and out-of-bound values become null; no row is rejected for an extended metric
-      - [ ] Stride is normalised to cm; balance is the left share; elevations may be negative; TSS `0.0` is null
-      - [ ] A pending upload parked in the session before this deploy still confirms (missing `extended` reads as empty)
-      - [ ] Existing CSV tests pass unchanged
+      - [x] Italian and English extended headers are read wherever they sit; a file without them imports exactly as before
+      - [x] `--`, empty, unreadable, and out-of-bound values become null; no row is rejected for an extended metric
+      - [x] Stride is normalised to cm; balance is the left share; elevations may be negative; TSS `0.0` is null
+      - [x] A pending upload parked in the session before this deploy still confirms (missing `extended` reads as empty)
+      - [x] Existing CSV tests pass unchanged
 
       ## Test Data
       - N/A — no model/schema change; new CSV fixtures only
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`:
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`:
         - `### Accepted headers` lists every extended header in both languages, with aliases, and flags the English ones as unconfirmed
         - `### Value rules` lists formats, units, bounds, and the empty rule per metric
         - `Technical design` names `ExtendedRunMetrics` and `GarminCsvValues`
-      - [ ] English, committed with this task
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-023): TASK-02 parse extended run metrics from Garmin CSV exports`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: 0423f3fa2eed97aa5fe044e4f8f61168bc8315de
+      short_sha: 0423f3f
+      subject: 'feat(US-023): TASK-02 parse extended run metrics from Garmin CSV exports'
+      committed_at: '2026-11-14T15:24:57+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0423f3fa2eed97aa5fe044e4f8f61168bc8315de'
   -
     id: TASK-03
     title: 'Tests: extended CSV parsing — Italian, English, `--`, missing columns, units, bounds, session round-trip'
@@ -684,4 +690,4 @@ tasks:
       - Commit: `test(US-023): TASK-09 verification and manual test handoff`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
-updated_at: '2026-11-14T14:21:22+00:00'
+updated_at: '2026-11-14T14:24:58+00:00'
