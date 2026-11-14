@@ -1420,11 +1420,11 @@ specs:
       title: 'Activity sync'
     priority: HIGH
     points: 5
-    status: PLANNED
+    status: DONE
     body: |
       #### US-023: Extended run metrics from the Garmin API and the Garmin CSV
 
-      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** PLANNED
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** DONE
       **Blocked by:** US-022
       **Type:** Feature
       **Release:** 3.1.0
@@ -1467,15 +1467,24 @@ specs:
       English header names are confirmed against a real English export during planning; units of stride length and vertical oscillation are normalised to one unit per metric across both sources.
 
       **Acceptance Criteria**
-      - [ ] Each run stores the extended metrics in the table above when its source carries them; a missing column, a `--` placeholder, a null API field, or an unreadable value leaves that metric empty, never 0, and never rejects the row
-      - [ ] Importing the sample export (`client-materials/Activities (1).csv`) stores the extended values of its `Corsa` rows from the Italian headers; an English export stores the same values from the English headers
-      - [ ] Re-importing an export over runs that are already stored and lack extended metrics fills them without a conflict review; the summary reports them as **enriched**; a second re-import of the same file changes nothing
-      - [ ] On Overwrite a `--` extended metric keeps the stored value, as for pace, ascent, and heart rate today
-      - [ ] A Garmin sync (US-022) stores the extended metrics of every run it reads, a linked CSV run included; the CSV-only Training Stress Score of a linked run is kept
-      - [ ] No start or end coordinates are stored from either source
-      - [ ] The day cell detail, grid, legend, scale, and trend render exactly as before; no extended metric is displayed
-      - [ ] The migration adds only nullable columns, keeps every stored run and value, and its `down()` drops only the new columns
-      - [ ] Tests cover Italian and English extended columns, `--` and missing columns, enrichment and its idempotence, Overwrite keeping stored values on `--`, and the API mapping from a faked search response; the developer domain doc for activity import lists the extended metrics
+      - [x] Each run stores the extended metrics in the table above when its source carries them; a missing column, a `--` placeholder, a null API field, or an unreadable value leaves that metric empty, never 0, and never rejects the row
+      - [x] Importing the sample export (`client-materials/Activities (1).csv`) stores the extended values of its `Corsa` rows from the Italian headers; an English export stores the same values from the English headers
+      - [x] Re-importing an export over runs that are already stored and lack extended metrics fills them without a conflict review; the summary reports them as **enriched**; a second re-import of the same file changes nothing
+      - [x] On Overwrite a `--` extended metric keeps the stored value, as for pace, ascent, and heart rate today
+      - [x] A Garmin sync (US-022) stores the extended metrics of every run it reads, a linked CSV run included; the CSV-only Training Stress Score of a linked run is kept
+      - [x] No start or end coordinates are stored from either source
+      - [x] The day cell detail, grid, legend, scale, and trend render exactly as before; no extended metric is displayed
+      - [x] The migration adds only nullable columns, keeps every stored run and value, and its `down()` drops only the new columns
+      - [x] Tests cover Italian and English extended columns, `--` and missing columns, enrichment and its idempotence, Overwrite keeping stored values on `--`, and the API mapping from a faked search response; the developer domain doc for activity import lists the extended metrics
     status_history:
       - { status: PLANNED, at: '2026-11-14T14:17:06+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-11-14T14:18:54+00:00' }
+      - { status: REVIEW, at: '2026-11-14T14:37:23+00:00' }
+      - { status: DONE, at: '2026-11-14T14:52:41+00:00' }
     rework: false
+    merge_commit:
+      sha: 71804ec1793b72086ada7ea08917a451549016b4
+      short_sha: 71804ec
+      subject: 'docs(US-023): review artifact and manual test handoff'
+      committed_at: '2026-11-14T15:37:26+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/71804ec1793b72086ada7ea08917a451549016b4'

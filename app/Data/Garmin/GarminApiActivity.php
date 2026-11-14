@@ -33,6 +33,7 @@ final readonly class GarminApiActivity
         public ?int $averagePaceSecondsPerKm = null,
         public ?int $totalAscentMeters = null,
         public ?int $averageHeartRate = null,
+        public ExtendedRunMetrics $extendedMetrics = new ExtendedRunMetrics,
     ) {}
 
     /**
@@ -101,23 +102,21 @@ final readonly class GarminApiActivity
             averagePaceSecondsPerKm: self::paceFor($payload['averageSpeed'] ?? null),
             totalAscentMeters: self::wholeNumber($payload['elevationGain'] ?? null, allowZero: true),
             averageHeartRate: self::wholeNumber($payload['averageHR'] ?? null, allowZero: false),
+            /*
+             * An extended field never invalidates an activity: a null, a missing or an
+             * unreadable one leaves that metric empty and the run is stored anyway. The
+             * payload's start and end coordinates (startLatitude, startLongitude,
+             * endLatitude, endLongitude) are deliberately not read here or anywhere else:
+             * no position of the owner's runs is stored.
+             */
+            extendedMetrics: ExtendedRunMetrics::fromApiPayload($payload),
         );
     }
 
     /**
      * Every column the API owns, for creating a run or comparing it with a stored one.
      *
-     * @return array{
-     *     sport_type: SportType,
-     *     name: string,
-     *     distance_meters: int,
-     *     moving_time_seconds: int,
-     *     start_date_local: CarbonImmutable,
-     *     activity_date: CarbonImmutable,
-     *     average_pace_seconds_per_km?: int,
-     *     total_ascent_meters?: int,
-     *     average_heart_rate?: int,
-     * }
+     * @return array<string, mixed>
      */
     public function toRunAttributes(): array
     {
@@ -138,16 +137,21 @@ final readonly class GarminApiActivity
      * A missing metric is left out rather than carried as null: on a link or an update
      * a null must keep what is stored — a metric backfilled from the CSV is never
      * blanked — and a new run simply has no value, never a 0 that reads as a measurement.
+     * The extended metrics follow the same rule, which is also why a sync can never blank
+     * the Training Stress Score of a linked CSV run: the API never carries that key.
      *
-     * @return array{average_pace_seconds_per_km?: int, total_ascent_meters?: int, average_heart_rate?: int}
+     * @return array<string, int|float|string>
      */
     public function metricAttributes(): array
     {
-        return array_filter([
-            'average_pace_seconds_per_km' => $this->averagePaceSecondsPerKm,
-            'total_ascent_meters' => $this->totalAscentMeters,
-            'average_heart_rate' => $this->averageHeartRate,
-        ], static fn (?int $value): bool => $value !== null);
+        return [
+            ...array_filter([
+                'average_pace_seconds_per_km' => $this->averagePaceSecondsPerKm,
+                'total_ascent_meters' => $this->totalAscentMeters,
+                'average_heart_rate' => $this->averageHeartRate,
+            ], static fn (?int $value): bool => $value !== null),
+            ...$this->extendedMetrics->toAttributes(),
+        ];
     }
 
     /**

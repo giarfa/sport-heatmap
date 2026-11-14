@@ -157,7 +157,7 @@ tasks:
     estimate_hours: 1
     dependencies: {}
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Bootstrap Gitflow for US-023 on release `3.1.0`. US-023 is blocked by US-022, which is approved (DONE) but **not yet merged** into `release/3.1.0` (12 commits ahead), and its approval artifacts are uncommitted. Merge it locally first (decision journal: *us-022 merge before us-023*), then create `feature/US-023-extended-run-metrics` from `release/3.1.0` and prepare the internal PR toward `release/3.1.0`. Do **not** push.
@@ -174,11 +174,11 @@ tasks:
       6. Dev DB note for later tasks: `php artisan config:show database.connections.sqlite.database` names the real dev file. Never `migrate:fresh` / `db:seed` it.
 
       ## Completion Criteria
-      - [ ] Pending `.larapilot/` artifacts committed on the US-022 branch
-      - [ ] `release/3.1.0` contains `feature/US-022-garmin-connect-sync` (merge commit, no push)
-      - [ ] Test suite green on `release/3.1.0`
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true` on `feature/US-023-extended-run-metrics`
-      - [ ] PR title/body drafted toward `release/3.1.0`
+      - [x] Pending `.larapilot/` artifacts committed on the US-022 branch
+      - [x] `release/3.1.0` contains `feature/US-022-garmin-connect-sync` (merge commit, no push)
+      - [x] Test suite green on `release/3.1.0`
+      - [x] `release-feature` returned `ok: true` and `checked_out: true` on `feature/US-023-extended-run-metrics`
+      - [x] PR title/body drafted toward `release/3.1.0`
 
       ## Test Data
       - N/A — git only
@@ -192,6 +192,12 @@ tasks:
       - Commit: `chore(US-023): TASK-00 bootstrap feature branch for release/3.1.0` (empty commit optional)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: ffe6a0c4251d1be44410803cb9c51bfbdf6eef46
+      short_sha: ffe6a0c
+      subject: 'chore(US-023): TASK-00 bootstrap feature branch for release/3.1.0'
+      committed_at: '2026-11-14T15:18:55+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ffe6a0c4251d1be44410803cb9c51bfbdf6eef46'
   -
     id: TASK-01
     title: 'Schema: 27 nullable extended-metric columns on activities, model casts, factory states, seeder'
@@ -200,7 +206,7 @@ tasks:
     dependencies:
       - TASK-00
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Add the extended run metrics of FR-022 to `activities`: only nullable columns, no default, no index, every stored run and value kept. Make them mass-assignable and typed on `Activity`. Keep the factory and the demo dataset coherent in this same task. Column names, types, and units follow the **Columns** table of the plan body.
@@ -238,27 +244,33 @@ tasks:
       7. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Migration adds only the 27 nullable columns; `down()` drops only them; existing runs and values are kept (test)
-      - [ ] `Activity` fillable, casts, and `@property` docblock are in sync with the migration (Larastan level 5 clean)
-      - [ ] Factory states produce coherent, domain-realistic extended metrics; the default definition is unchanged
-      - [ ] Seeder yields runs with CSV+API metrics, CSV-only TSS, and no metrics, and its test asserts each
-      - [ ] No coordinate column exists
-      - [ ] Targeted tests pass on the in-memory DB
+      - [x] Migration adds only the 27 nullable columns; `down()` drops only them; existing runs and values are kept (test)
+      - [x] `Activity` fillable, casts, and `@property` docblock are in sync with the migration (Larastan level 5 clean)
+      - [x] Factory states produce coherent, domain-realistic extended metrics; the default definition is unchanged
+      - [x] Seeder yields runs with CSV+API metrics, CSV-only TSS, and no metrics, and its test asserts each
+      - [x] No coordinate column exists
+      - [x] Targeted tests pass on the in-memory DB
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` updated (`withExtendedMetrics()`, `withApiOnlyMetrics()`, `withTrainingStressScore()`)
-      - [ ] `TrainingBlockSeeder` composes the new states with meaningful volumes
-      - [ ] Factory and seeder updated in **this same task** as the migration
+      - [x] `database/factories/ActivityFactory.php` updated (`withExtendedMetrics()`, `withApiOnlyMetrics()`, `withTrainingStressScore()`)
+      - [x] `TrainingBlockSeeder` composes the new states with meaningful volumes
+      - [x] Factory and seeder updated in **this same task** as the migration
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — `### Data model (activities)` lists the 27 columns with unit, type, and empty rule; the `Architectural choices` section records columns vs JSON vs 1:1 table and why
-      - [ ] `.larapilot/docs/devs/README.md` index row for `garmin-csv-import` → last touched by `US-023`
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — `### Data model (activities)` lists the 27 columns with unit, type, and empty rule; the `Architectural choices` section records columns vs JSON vs 1:1 table and why
+      - [x] `.larapilot/docs/devs/README.md` index row for `garmin-csv-import` → last touched by `US-023`
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-023): TASK-01 add extended run metric columns with factory and seeder`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: 898a07abe00a6f87ebd3bbe76a9ec9e749e86b0f
+      short_sha: 898a07a
+      subject: 'feat(US-023): TASK-01 add extended run metric columns with factory and seeder'
+      committed_at: '2026-11-14T15:21:22+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/898a07abe00a6f87ebd3bbe76a9ec9e749e86b0f'
   -
     id: TASK-02
     title: 'ExtendedRunMetrics DTO, shared CSV value parsers, extended headers (it/en with aliases), CSV row wiring'
@@ -267,7 +279,7 @@ tasks:
     dependencies:
       - TASK-01
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Read the extended metrics out of Italian and English Garmin CSV exports into a typed DTO that rides on `GarminCsvRow`. A missing column, `--`, or an unreadable or out-of-bound value leaves that metric null and never rejects the row (FR-022, FR-018).
@@ -319,26 +331,32 @@ tasks:
       6. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Italian and English extended headers are read wherever they sit; a file without them imports exactly as before
-      - [ ] `--`, empty, unreadable, and out-of-bound values become null; no row is rejected for an extended metric
-      - [ ] Stride is normalised to cm; balance is the left share; elevations may be negative; TSS `0.0` is null
-      - [ ] A pending upload parked in the session before this deploy still confirms (missing `extended` reads as empty)
-      - [ ] Existing CSV tests pass unchanged
+      - [x] Italian and English extended headers are read wherever they sit; a file without them imports exactly as before
+      - [x] `--`, empty, unreadable, and out-of-bound values become null; no row is rejected for an extended metric
+      - [x] Stride is normalised to cm; balance is the left share; elevations may be negative; TSS `0.0` is null
+      - [x] A pending upload parked in the session before this deploy still confirms (missing `extended` reads as empty)
+      - [x] Existing CSV tests pass unchanged
 
       ## Test Data
       - N/A — no model/schema change; new CSV fixtures only
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`:
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`:
         - `### Accepted headers` lists every extended header in both languages, with aliases, and flags the English ones as unconfirmed
         - `### Value rules` lists formats, units, bounds, and the empty rule per metric
         - `Technical design` names `ExtendedRunMetrics` and `GarminCsvValues`
-      - [ ] English, committed with this task
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-023): TASK-02 parse extended run metrics from Garmin CSV exports`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: 0423f3fa2eed97aa5fe044e4f8f61168bc8315de
+      short_sha: 0423f3f
+      subject: 'feat(US-023): TASK-02 parse extended run metrics from Garmin CSV exports'
+      committed_at: '2026-11-14T15:24:57+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/0423f3fa2eed97aa5fe044e4f8f61168bc8315de'
   -
     id: TASK-03
     title: 'Tests: extended CSV parsing — Italian, English, `--`, missing columns, units, bounds, session round-trip'
@@ -347,7 +365,7 @@ tasks:
     dependencies:
       - TASK-02
     type: Test
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Add PHPUnit coverage for reading extended metrics out of Garmin CSV exports, at the NORMAL bar.
@@ -375,13 +393,19 @@ tasks:
       4. Do **not** add Playwright, Dusk, browser, or viewport suites.
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every CSV-side acceptance case above is covered at the NORMAL bar
+      - [x] Tests pass locally
+      - [x] Every CSV-side acceptance case above is covered at the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-023): TASK-03 cover extended metric parsing from Garmin CSV`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: 5a123ef3b09879ea0a8185f551bdaef5708c0a27
+      short_sha: 5a123ef
+      subject: 'test(US-023): TASK-03 cover extended metric parsing from Garmin CSV'
+      committed_at: '2026-11-14T15:26:44+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5a123ef3b09879ea0a8185f551bdaef5708c0a27'
   -
     id: TASK-04
     title: 'Import enrichment count, Overwrite rule on extended metrics, summary page Enriched row'
@@ -390,7 +414,7 @@ tasks:
     dependencies:
       - TASK-02
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Re-importing an export over runs that lack metrics fills them without a conflict review, and the summary reports those runs as **enriched**. A second re-import changes nothing. On Overwrite a `--` extended metric keeps the stored value. The import summary page gains one `Enriched` tally row; no other screen changes.
@@ -422,28 +446,34 @@ tasks:
       6. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] A re-import over stored runs that lack metrics fills them with no conflict review and reports them under **Enriched**
-      - [ ] A second re-import of the same file reports 0 enriched and writes nothing (`updated_at` unchanged)
-      - [ ] Overwrite with a `--` extended cell keeps the stored value
-      - [ ] Summary page shows the `Enriched` row; the deviation is logged in the journal and the README
-      - [ ] Day cell detail, grid, legend, scale, trend, and review page unchanged
-      - [ ] Summary usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
-      - [ ] Tests pass
+      - [x] A re-import over stored runs that lack metrics fills them with no conflict review and reports them under **Enriched**
+      - [x] A second re-import of the same file reports 0 enriched and writes nothing (`updated_at` unchanged)
+      - [x] Overwrite with a `--` extended cell keeps the stored value
+      - [x] Summary page shows the `Enriched` row; the deviation is logged in the journal and the README
+      - [x] Day cell detail, grid, legend, scale, trend, and review page unchanged
+      - [x] Summary usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema change in this task (states from TASK-01 are reused)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`:
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`:
         - `### 3. Applying (ApplyGarminImport)` describes enrichment, the enriched/already-imported partition, and idempotence
         - `### 4. HTTP flow` notes the summary `Enriched` row
         - `Key decisions & invariants` covers the "never replace a stored metric on re-import" and "`--` keeps stored on Overwrite" rules for all 30 metrics
-      - [ ] English, committed with this task
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-023): TASK-04 report enriched runs on Garmin CSV re-import`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: 1416eb24ddde3dc029b18e446f5f71207700cc34
+      short_sha: 1416eb2
+      subject: 'feat(US-023): TASK-04 report enriched runs on Garmin CSV re-import'
+      committed_at: '2026-11-14T15:28:32+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1416eb24ddde3dc029b18e446f5f71207700cc34'
   -
     id: TASK-05
     title: 'Tests: enrichment and idempotence, Overwrite keeps stored on `--`, summary row, dashboard unchanged'
@@ -453,7 +483,7 @@ tasks:
       - TASK-03
       - TASK-04
     type: Test
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Add feature coverage for the import side of FR-022 through the real HTTP flow (upload → review → confirm → summary), at the NORMAL bar.
@@ -478,13 +508,19 @@ tasks:
       4. Do **not** add Playwright, Dusk, browser, or viewport suites.
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Enrichment, idempotence, Overwrite-on-`--`, the summary row, and the unchanged dashboard are each asserted
+      - [x] Tests pass locally
+      - [x] Enrichment, idempotence, Overwrite-on-`--`, the summary row, and the unchanged dashboard are each asserted
 
       ## Git Deliverables
       - Commit: `test(US-023): TASK-05 cover enrichment, overwrite and unchanged dashboard`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: d27b38b499d3aea7c22f949ffacd6edebd0d8c36
+      short_sha: d27b38b
+      subject: 'test(US-023): TASK-05 cover enrichment, overwrite and unchanged dashboard'
+      committed_at: '2026-11-14T15:30:06+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d27b38b499d3aea7c22f949ffacd6edebd0d8c36'
   -
     id: TASK-06
     title: 'Map extended metrics from the Garmin API search response into GarminApiActivity'
@@ -493,7 +529,7 @@ tasks:
     dependencies:
       - TASK-02
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       A Garmin sync stores the extended metrics of every run it reads (FR-022, FR-002), a linked CSV run included. A null or unreadable API field leaves the metric empty and never makes the activity invalid. The CSV-only Training Stress Score of a linked run is kept. No start or end coordinates are read.
@@ -527,28 +563,34 @@ tasks:
       5. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Every API field in the spec table maps to its column, with units normalised to the CSV side
-      - [ ] Null, missing, or unreadable API fields ⇒ the metric is empty, and the activity is still stored
-      - [ ] A linked CSV run gains the API values and keeps its TSS and any CSV-only value
-      - [ ] No coordinate is read or stored
-      - [ ] Existing sync tests pass unchanged; a second sync changes nothing
+      - [x] Every API field in the spec table maps to its column, with units normalised to the CSV side
+      - [x] Null, missing, or unreadable API fields ⇒ the metric is empty, and the activity is still stored
+      - [x] A linked CSV run gains the API values and keeps its TSS and any CSV-only value
+      - [x] No coordinate is read or stored
+      - [x] Existing sync tests pass unchanged; a second sync changes nothing
 
       ## Test Data
       - N/A — no model/schema change; API fixture JSON extended only
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-api-sync.md`:
+      - [x] `.larapilot/docs/devs/garmin-api-sync.md`:
         - `Functional flow` covers the extended metrics read per activity
         - `Technical design` covers the API field ⇒ column map and units
         - `Key decisions & invariants` covers: no coordinates, the API never blanks a CSV-only metric, TSS is CSV-only
         - `Extension points & gotchas` covers runs synced before US-023 outside the 7-day window, which keep empty API-only metrics
-      - [ ] `.larapilot/docs/devs/README.md` index row for `garmin-api-sync` → `US-023`
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/README.md` index row for `garmin-api-sync` → `US-023`
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-023): TASK-06 map extended run metrics from the Garmin API`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: bbfc9f107a6ef0abbb2e939d098e0dd5acf2ead5
+      short_sha: bbfc9f1
+      subject: 'feat(US-023): TASK-06 map extended run metrics from the Garmin API'
+      committed_at: '2026-11-14T15:32:25+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/bbfc9f107a6ef0abbb2e939d098e0dd5acf2ead5'
   -
     id: TASK-07
     title: 'Tests: API mapping from a faked search response, sync create/link/update, TSS kept, no coordinates'
@@ -557,7 +599,7 @@ tasks:
     dependencies:
       - TASK-06
     type: Test
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Add coverage for the API side of FR-022, at the NORMAL bar, with HTTP faked and stray requests forbidden.
@@ -587,13 +629,19 @@ tasks:
       4. Do **not** add Playwright, Dusk, browser, or viewport suites.
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] API mapping, create/link/update, TSS kept, second-sync no-op, and no coordinates are each asserted
+      - [x] Tests pass locally
+      - [x] API mapping, create/link/update, TSS kept, second-sync no-op, and no coordinates are each asserted
 
       ## Git Deliverables
       - Commit: `test(US-023): TASK-07 cover extended metrics from the Garmin API sync`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: ee9c50ca1efb6e8661398915f65526a2c4a4a756
+      short_sha: ee9c50c
+      subject: 'test(US-023): TASK-07 cover extended metrics from the Garmin API sync'
+      committed_at: '2026-11-14T15:34:07+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ee9c50ca1efb6e8661398915f65526a2c4a4a756'
   -
     id: TASK-08
     title: 'CHANGELOG, README, and domain-doc consistency pass'
@@ -603,7 +651,7 @@ tasks:
       - TASK-05
       - TASK-07
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Leave the baseline docs current for 3.1.0. Make sure the two touched domain docs agree with the shipped code and with each other, and that the activity-import doc lists every extended metric (AC).
@@ -620,21 +668,27 @@ tasks:
       4. No PRD edit: FR-022 already describes the behaviour.
 
       ## Completion Criteria
-      - [ ] CHANGELOG entry present
-      - [ ] Domain docs match the code, list all 30 stored metrics with unit and empty rule, and carry the English-header and pre-US-023-sync caveats
-      - [ ] README index rows are current
+      - [x] CHANGELOG entry present
+      - [x] Domain docs match the code, list all 30 stored metrics with unit and empty rule, and carry the English-header and pre-US-023-sync caveats
+      - [x] README index rows are current
 
       ## Test Data
       - N/A — documentation only
 
       ## Domain Docs
-      - [ ] `garmin-csv-import.md`, `garmin-api-sync.md`, and (if touched) `heatmap-dashboard.md` current, plus the `README.md` index
-      - [ ] English, committed with this task
+      - [x] `garmin-csv-import.md`, `garmin-api-sync.md`, and (if touched) `heatmap-dashboard.md` current, plus the `README.md` index
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `chore(US-023): TASK-08 document extended run metrics`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: ec47f8322f3c6f6247b513d57bd8113f82b62dbe
+      short_sha: ec47f83
+      subject: 'chore(US-023): TASK-08 document extended run metrics'
+      committed_at: '2026-11-14T15:34:35+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ec47f8322f3c6f6247b513d57bd8113f82b62dbe'
   -
     id: TASK-09
     title: 'Verification: full suite, quality gate, acceptance walk-through, manual test handoff'
@@ -643,7 +697,7 @@ tasks:
     dependencies:
       - TASK-08
     type: Test
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Prove the spec end to end before review, and leave the owner manual steps for what automation cannot see: real exports and the real Garmin API.
@@ -663,13 +717,19 @@ tasks:
       5. Do **not** add Playwright, Dusk, browser, or viewport suites. Never run `migrate:fresh` / `db:seed` against the dev DB.
 
       ## Completion Criteria
-      - [ ] Full suite green
-      - [ ] Quality gate green
-      - [ ] Every acceptance criterion mapped to a passing test
-      - [ ] Manual test handoff written
+      - [x] Full suite green
+      - [x] Quality gate green
+      - [x] Every acceptance criterion mapped to a passing test
+      - [x] Manual test handoff written
 
       ## Git Deliverables
       - Commit: `test(US-023): TASK-09 verification and manual test handoff`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
-updated_at: '2026-11-14T14:17:06+00:00'
+    commit:
+      sha: 77def532fc9a0f2078ba57e5552a088a883cf416
+      short_sha: 77def53
+      subject: 'test(US-023): TASK-09 verification and manual test handoff'
+      committed_at: '2026-11-14T15:35:25+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/77def532fc9a0f2078ba57e5552a088a883cf416'
+updated_at: '2026-11-14T14:35:26+00:00'

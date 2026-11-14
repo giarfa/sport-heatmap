@@ -302,8 +302,11 @@ final readonly class SyncGarminActivities
                 /*
                  * The API is authoritative for a run that carries its id: every column it
                  * owns is compared, and the row is written only when one differs, so a
-                 * second sync moves no `updated_at`. A metric the API leaves empty is not
-                 * in the attributes, so a value backfilled from the CSV is never blanked.
+                 * second sync moves no `updated_at`. A metric the API leaves empty — one of
+                 * the three run metrics or one of the extended ones — is not in the
+                 * attributes, so a value backfilled from the CSV is never blanked. The
+                 * extended values are rounded at the DTO boundary, so a second sync sees
+                 * no difference and counts nothing `updated`.
                  */
                 $existing->fill($activity->toRunAttributes())->forceFill(['source' => ActivitySource::GarminApi]);
 
@@ -320,7 +323,9 @@ final readonly class SyncGarminActivities
             if ($twin !== null) {
                 /*
                  * The same run, imported from the CSV before the API knew it: it gains the
-                 * id and Garmin's values, and no review is shown. Taken out of the
+                 * id and Garmin's values, and no review is shown. A metric the API does not
+                 * carry, the CSV-only Training Stress Score above all, is not in the
+                 * attributes and so is kept. Taken out of the
                  * candidates so a second activity in the same minute cannot claim it too.
                  */
                 $twin->fill($activity->toRunAttributes())->forceFill($this->identity($activity))->save();

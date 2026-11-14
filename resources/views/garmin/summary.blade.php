@@ -4,9 +4,11 @@
 
 @php
     $added = $summary->imported;
-    $lede = $added + $summary->overwritten === 0 && $summary->alreadyImported > 0
+    $enriched = $summary->enriched;
+    $lede = $added + $summary->overwritten + $enriched === 0 && $summary->alreadyImported > 0
         ? 'Nothing new — every run was already imported.'
-        : ($added === 1 ? '1 run added' : "{$added} runs added").", {$summary->overwritten} overwritten. The heatmap is up to date.";
+        : ($added === 1 ? '1 run added' : "{$added} runs added").", {$summary->overwritten} overwritten. The heatmap is up to date."
+            .($enriched === 0 ? '' : ($enriched === 1 ? ' 1 existing run gained missing metrics.' : " {$enriched} existing runs gained missing metrics."));
 @endphp
 
 @section('content')
@@ -21,6 +23,7 @@
                 <div><dt>Overwritten</dt><dd>{{ $summary->overwritten }}</dd></div>
                 <div><dt>Skipped</dt><dd>{{ $summary->skipped }}</dd></div>
                 <div><dt>Already imported</dt><dd>{{ $summary->alreadyImported }}</dd></div>
+                <div><dt>Enriched</dt><dd>{{ $summary->enriched }}</dd></div>
                 <div><dt>Not runs, ignored</dt><dd>{{ $summary->ignoredTotal() }}</dd></div>
                 <div><dt>Future-dated</dt><dd>{{ $summary->futureDated }}</dd></div>
                 <div><dt>Unreadable rows</dt><dd>{{ count($summary->invalid) }}</dd></div>

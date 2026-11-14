@@ -5,6 +5,7 @@ namespace Tests\Unit\Data\Garmin;
 use App\Data\Garmin\GarminApiActivity;
 use App\Enums\SportType;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\Database\ExtendedRunMetricsMigrationTest;
 use Tests\TestCase;
 
 class GarminApiActivityTest extends TestCase
@@ -77,9 +78,12 @@ class GarminApiActivityTest extends TestCase
     {
         $attributes = GarminApiActivity::fromApiPayload($this->payload(0))->toRunAttributes();
 
+        // The fixture's first activity carries every API field, so every API-owned column is here —
+        // all the extended ones but the Training Stress Score, which only a CSV carries.
         $this->assertEqualsCanonicalizing([
             'sport_type', 'name', 'distance_meters', 'moving_time_seconds', 'start_date_local', 'activity_date',
             'average_pace_seconds_per_km', 'total_ascent_meters', 'average_heart_rate',
+            ...array_diff(ExtendedRunMetricsMigrationTest::EXTENDED_COLUMNS, ['training_stress_score']),
         ], array_keys($attributes));
         $this->assertArrayNotHasKey('garmin_activity_id', $attributes);
         $this->assertArrayNotHasKey('source', $attributes);
@@ -148,6 +152,42 @@ class GarminApiActivityTest extends TestCase
 
         $this->assertSame('Garmin activity', GarminApiActivity::fromApiPayload($payload)->name);
         $this->assertSame('Evening jog', GarminApiActivity::fromApiPayload([...$this->payload(0), 'activityName' => '  Evening jog '])->name);
+    }
+
+    public function test_the_extended_metrics_of_a_full_payload_ride_on_the_run(): void
+    {
+        $run = GarminApiActivity::fromApiPayload($this->payload(0));
+
+        $this->assertSame(612, $run->extendedMetrics->calories);
+        $this->assertSame(252, $run->extendedMetrics->bestPaceSecondsPerKm);
+        $this->assertSame('Verona', $run->extendedMetrics->locationName);
+        $this->assertSame(612, $run->metricAttributes()['calories']);
+        $this->assertSame(323, $run->metricAttributes()['average_pace_seconds_per_km']);
+        $this->assertArrayNotHasKey('training_stress_score', $run->metricAttributes());
+    }
+
+    public function test_an_activity_with_every_extended_field_null_is_still_a_run_with_no_extended_metric(): void
+    {
+        $run = GarminApiActivity::fromApiPayload($this->payload(5));
+
+        $this->assertInstanceOf(GarminApiActivity::class, $run);
+        $this->assertSame(6_400, $run->distanceMeters);
+        $this->assertTrue($run->extendedMetrics->isEmpty());
+        $this->assertSame([], $run->metricAttributes());
+    }
+
+    public function test_an_activity_with_garbage_extended_fields_is_still_a_run_with_no_extended_metric(): void
+    {
+        $run = GarminApiActivity::fromApiPayload($this->payload(6));
+
+        $this->assertInstanceOf(GarminApiActivity::class, $run);
+        $this->assertSame(4_000, $run->distanceMeters);
+        $this->assertTrue($run->extendedMetrics->isEmpty());
+    }
+
+    public function test_an_extended_field_never_makes_an_activity_invalid(): void
+    {
+        $this->assertInstanceOf(GarminApiActivity::class, GarminApiActivity::fromApiPayload([...$this->payload(0), 'calories' => 'x', 'steps' => [], 'locationName' => new \stdClass]));
     }
 
     /**

@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-022` |
-| **Last updated by** | `US-022` — 2026-11-14 |
+| **Last updated by** | `US-023` — 2026-11-14 |
 | **Owner persona** | 🔧 Alex |
 
 ## Purpose
@@ -69,6 +69,17 @@ of the activity search as a list; paging until a short page is the action's job.
 invalid instead of ignored. `GarminApiActivity::fromApiPayload()` returns the run or null
 when the id, local start, distance or moving time is missing or unreadable.
 
+**Extended metrics per activity (`US-023`).** The same call also builds an
+`ExtendedRunMetrics` (`ExtendedRunMetrics::fromApiPayload()`) from the activity's extended
+fields, so a run created, linked or updated by the sync carries its calories, max heart rate,
+training effect, cadence, best pace, descent, running dynamics, steps, laps, elapsed time,
+elevation range, **time in each heart-rate zone, the fastest 1 km / mile / 5 km and the place
+name** (the last three groups are API-only). An extended field is never required: a null, a
+missing, a non-numeric (a string, a boolean, an array) or an out-of-bound value leaves that
+metric empty and the activity is stored anyway. The values flow through
+`toRunAttributes()` like the three run metrics, so create, link and update need no extra
+code. `SyncGarminActivities` is unchanged.
+
 **Failure mapping** (cause is a `GarminSyncFailure`, carried by `GarminApiException`):
 
 | What happened | Cause |
@@ -89,14 +100,45 @@ when the id, local start, distance or moving time is missing or unreadable.
 | Owner | `app/Support/Garmin/ResolveSyncOwner.php` | The `giarfa` account, found by username (no session in a command) |
 | Client | `app/Support/Garmin/GarminPersonalApiClient.php` | Key to token, token reuse, one activity-search page, one retry on a data-call 401 |
 | Exception | `app/Exceptions/Garmin/GarminApiException.php` | A `GarminSyncFailure` cause and an HTTP status; fixed messages only |
-| DTO | `app/Data/Garmin/GarminApiActivity.php` | One running activity as run values; rounding and empty metrics |
+| DTO | `app/Data/Garmin/GarminApiActivity.php` | One running activity as run values; rounding and empty metrics; carries an `ExtendedRunMetrics` |
+| DTO | `app/Data/Garmin/ExtendedRunMetrics.php` | The 27 extended values; `fromApiPayload()` is the API half (the CSV half is in `garmin-csv-import.md`) |
 | Type map | `app/Support/Garmin/GarminRunningTypes.php` | `sportTypeForTypeKey()` beside the CSV label map |
 | Config keys | `config/services.php` → `garmin`, `GARMIN_API_KEY` in `.env.example` | Key (env); host, paths, page size, re-read span, token store, timeouts (literals) |
 | Run columns | `app/Models/Activity.php`, `add_garmin_sync_to_activities_table` migration | `source`, `garmin_activity_id` (see `garmin-csv-import.md` → Data model) |
 | Enums | `app/Enums/ActivitySource.php`, `GarminSyncTrigger.php`, `GarminSyncOutcome.php`, `GarminSyncFailure.php` | The closed vocabularies of the two tables |
-| Factories | `database/factories/GarminSyncFactory.php`, `ActivityFactory::garminSynced()` | `succeeded()`, `failed()`, `running()`, `manual()`, `scheduled()`, `fullHistory()` |
-| Seeder | `database/seeders/TrainingBlockSeeder.php` | Last four weeks as API-synced runs, one succeeded full-history scheduled sync finished this morning |
+| Factories | `database/factories/GarminSyncFactory.php`, `ActivityFactory::garminSynced()`, `withExtendedMetrics()`, `withApiOnlyMetrics()`, `withTrainingStressScore()` | `succeeded()`, `failed()`, `running()`, `manual()`, `scheduled()`, `fullHistory()`; the activity states give coherent extended metrics (`US-023`) |
+| Seeder | `database/seeders/TrainingBlockSeeder.php` | Last four weeks as API-synced runs carrying the CSV-and-API and API-only extended metrics, one succeeded full-history scheduled sync finished this morning |
 | Tests | `tests/Feature/Database/SchemaTest.php`, `GarminSyncMigrationTest.php`, `tests/Unit/Models/ActivityTest.php`, `tests/Feature/Garmin/GarminPersonalApiClientTest.php`, `GarminSyncTest.php`, `GarminSyncCommandTest.php`, `tests/Feature/Console/ScheduleTest.php` | Schema, client, the sync, the command, the schedule |
+
+### API field → column (`ExtendedRunMetrics::fromApiPayload()`)
+
+Only a JSON number is read (an int or a float); anything else is empty. Values are rounded
+to the column's precision here, so a second sync compares equal. Bounds and "0 is empty"
+follow the same table as the CSV (`garmin-csv-import.md` → Extended run metrics).
+
+| API field | Column | Unit / rule |
+| --- | --- | --- |
+| `calories` | `calories` | whole kcal, 0 → empty, ≤ 20 000 |
+| `maxHR` | `max_heart_rate` | whole bpm, 0 → empty, ≤ 250 |
+| `aerobicTrainingEffect` | `aerobic_training_effect` | one decimal, 0.0–5.0, **0.0 kept** |
+| `averageRunningCadenceInStepsPerMinute` / `maxRunningCadenceInStepsPerMinute` | `average_running_cadence` / `max_running_cadence` | whole spm, 0 → empty, ≤ 400 |
+| `maxSpeed` (m/s) | `best_pace_seconds_per_km` | `round(1000 / v)`; null or ≤ 0 speed → empty; ≤ 36 000 s/km |
+| `elevationLoss` | `total_descent_meters` | whole m, **0 kept**, ≤ 20 000 |
+| `avgStrideLength` | `average_stride_length_cm` | **already centimetres** (the CSV is the side converted from metres), one decimal, 0 → empty, ≤ 500 |
+| `avgVerticalRatio` | `average_vertical_ratio_percent` | one decimal, 0 → empty, ≤ 100 |
+| `avgVerticalOscillation` | `average_vertical_oscillation_cm` | one decimal, cm, 0 → empty, ≤ 50 |
+| `avgGroundContactTime` | `average_ground_contact_time_ms` | whole ms, 0 → empty, ≤ 2 000 |
+| `avgGroundContactBalance` | `average_ground_contact_balance_left_percent` | the left share, one decimal, 0 → empty, ≤ 100 |
+| `steps` / `lapCount` | `steps` / `lap_count` | whole, 0 → empty, ≤ 1 000 000 / 10 000 |
+| `elapsedDuration` | `elapsed_time_seconds` | whole s, 0 → empty, ≤ 36 000 000 |
+| `minElevation` / `maxElevation` | `min_elevation_meters` / `max_elevation_meters` | whole m, −500…9 000, **0 and negatives kept** |
+| `hrTimeInZone_1` … `hrTimeInZone_5` | `hr_zone_1_seconds` … `hr_zone_5_seconds` | whole s, **0 kept** (the run never reached the zone), ≤ 36 000 000 — API only |
+| `fastestSplit_1000` / `_1609` / `_5000` | `fastest_1k_seconds` / `fastest_mile_seconds` / `fastest_5k_seconds` | whole s, 0 → empty — API only |
+| `locationName` | `location_name` | trimmed, blank → empty, cut at 255 — API only |
+| — | `training_stress_score` | **not an API field**: CSV only, so a sync never writes or blanks it |
+
+`startLatitude`, `startLongitude`, `endLatitude` and `endLongitude` are in the payload and are
+**never read**: no column holds a position.
 
 ### Data model (`garmin_syncs`)
 
@@ -146,6 +188,17 @@ the dashboard copy lives: "Garmin key rejected — renew it", "Garmin unreachabl
 - **Invariant —** a missing metric is stored as NULL, never 0: no pace for a null or zero
   speed, none for a null elevation or heart rate (a heart rate of 0 is Garmin's "no strap").
   _Breaks if:_ a 0 reads as a measurement on the dashboard.
+- **Invariant —** no coordinate is read or stored. _Breaks if:_ `fromApiPayload()` ever reads
+  `startLatitude` / `startLongitude` / `endLatitude` / `endLongitude`, or a latitude/longitude
+  column is added: the owner's routes would sit in the database. `SchemaTest` fails on such a
+  column.
+- **Invariant —** the API never blanks a CSV-only or already-stored metric, and the Training
+  Stress Score is CSV only. `metricAttributes()` leaves an empty metric out and the API has no
+  TSS key, so a link or an update keeps a CSV run's TSS. _Breaks if:_ a null is carried into
+  `fill()`, or a TSS is derived from API fields.
+- **Invariant —** extended values are rounded at the DTO boundary. _Breaks if:_ a raw float
+  reaches `fill()`: a second sync sees a difference, counts the run `updated` every time and
+  moves its `updated_at`.
 - **Invariant —** only one sync runs at a time, and the lock is released in `finally`.
   _Breaks if:_ two syncs write the same page and the unique index turns the second into a
   failed attempt.
@@ -171,8 +224,16 @@ the dashboard copy lives: "Garmin key rejected — renew it", "Garmin unreachabl
   `max_execution_time`, which skips `finally`. The row stays `running` and the lock refuses
   syncs until it expires; the next attempt closes any `running` row older than the lock
   lifetime as `unexpected`. Run the first sync with `garmin:sync` on the host.
-- `US-023` extends the API-owned columns: add the column to `GarminApiActivity::toRunAttributes()`
-  / `metricAttributes()` and the comparison in `SyncGarminActivities::writeRuns()` follows.
+- A new API-owned metric: add its column, its entry in `ExtendedRunMetrics::COLUMNS`, its
+  constructor argument and its line in `fromApiPayload()` (and `fromCsvValues()` when the CSV
+  has it); `toRunAttributes()` and the comparison in `SyncGarminActivities::writeRuns()` follow.
+- **Runs synced before `US-023` keep empty API-only metrics.** A later sync re-reads only the
+  last 7 days, so an API run synced before this deploy and older than that window never gets its
+  heart-rate zones, fastest splits or place name. Production is unaffected: `3.1.0` ships
+  `US-022` and `US-023` together, so the first production sync reads the whole history. Only
+  a development database that already holds API-synced runs has them. There is no switch to force
+  a full-history read: it happens only while no `full_history` attempt has succeeded, so on a
+  development database empty the `garmin_syncs` table and the next sync reads everything.
 - A new sync trigger is a `GarminSyncTrigger` case; the action never authorizes, so the
   caller (command, controller) is where access is decided.
 

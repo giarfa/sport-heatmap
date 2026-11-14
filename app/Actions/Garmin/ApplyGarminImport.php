@@ -24,7 +24,7 @@ final readonly class ApplyGarminImport
      */
     public function __invoke(User $athlete, GarminImportPlan $plan, array $resolutions, ParsedGarminCsv $parsed): GarminImportSummary
     {
-        [$imported, $overwritten, $skipped] = DB::transaction(function () use ($athlete, $plan, $resolutions): array {
+        [$imported, $overwritten, $skipped, $enriched] = DB::transaction(function () use ($athlete, $plan, $resolutions): array {
             foreach ($plan->newRows as $row) {
                 $athlete->activities()->create($row->toAttributes());
             }
@@ -46,9 +46,10 @@ final readonly class ApplyGarminImport
 
                 /*
                  * Every field the CSV carries wins, so the row really is Garmin's.
-                 * The metrics follow the same rule except for one:
-                 * toAttributes() leaves out a metric the file recorded as "--",
-                 * so an empty cell keeps the stored value instead of blanking it.
+                 * The metrics — the three run metrics and the extended ones of US-023 —
+                 * follow the same rule except for one: toAttributes() leaves out a metric
+                 * the file recorded as "--", so an empty cell keeps the stored value
+                 * instead of blanking it.
                  *
                  * `source` records who wrote the run's current values, so it becomes the CSV;
                  * `garmin_activity_id` is the run's identity on Garmin and a CSV row has none,
@@ -61,9 +62,9 @@ final readonly class ApplyGarminImport
                 $overwritten++;
             }
 
-            $this->fillEmptyMetricsOfAlreadyImportedRuns($plan);
+            $enriched = $this->fillEmptyMetricsOfAlreadyImportedRuns($plan);
 
-            return [count($plan->newRows), $overwritten, $skipped];
+            return [count($plan->newRows), $overwritten, $skipped, $enriched];
         });
 
         /*
@@ -77,7 +78,13 @@ final readonly class ApplyGarminImport
             imported: $imported,
             overwritten: $overwritten,
             skipped: $skipped,
-            alreadyImported: count($plan->alreadyImported),
+            /*
+             * The two counts partition the already-imported rows: an enriched run gained
+             * something, an already-imported one changed nothing. A run is never in both,
+             * so the summary adds up to the rows the file held.
+             */
+            alreadyImported: count($plan->alreadyImported) - $enriched,
+            enriched: $enriched,
             ignoredByType: $parsed->ignoredByType,
             futureDated: $parsed->futureDated,
             invalid: $parsed->invalid,
@@ -86,25 +93,39 @@ final readonly class ApplyGarminImport
 
     /**
      * A file row that is already imported (same start, distance and moving time) fills
-     * only the metrics its stored run lacks.
+     * only the metrics its stored run lacks — the three run metrics and the extended
+     * ones alike, through this one path — and the runs that gained at least one are the
+     * enriched count of the summary.
      *
      * Re-importing the same export must stay a no-op, and a stored value — one the owner
-     * overwrote — is never replaced by a re-read of the file. The
-     * only thing a repeat import may add is a metric that was empty, which is how a run
-     * imported before the metrics existed gets them from a fresh export.
+     * overwrote, or one a Garmin sync wrote — is never replaced by a re-read of the file.
+     * The only thing a repeat import may add is a metric that was empty, which is how a
+     * run imported before the metrics existed gets them from a fresh export. That is
+     * also why a second re-import enriches nothing and writes nothing. The stored
+     * `source` is left alone: an API run that gains a CSV-only Training Stress Score
+     * stays an API run.
+     *
+     * No query per row: the stored runs are the ones the plan already holds.
+     *
+     * @return int How many runs gained at least one metric
      */
-    private function fillEmptyMetricsOfAlreadyImportedRuns(GarminImportPlan $plan): void
+    private function fillEmptyMetricsOfAlreadyImportedRuns(GarminImportPlan $plan): int
     {
+        $enriched = 0;
+
         foreach ($plan->alreadyImportedActivities as $index => $stored) {
             $emptyMetrics = array_filter(
                 $plan->alreadyImported[$index]->metricAttributes(),
-                static fn (int $value, string $column): bool => $stored->{$column} === null,
+                static fn (int|float|string $value, string $column): bool => $stored->{$column} === null,
                 ARRAY_FILTER_USE_BOTH,
             );
 
             if ($emptyMetrics !== []) {
                 $stored->fill($emptyMetrics)->save();
+                $enriched++;
             }
         }
+
+        return $enriched;
     }
 }
