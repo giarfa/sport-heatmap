@@ -16,6 +16,7 @@ final readonly class GarminImportSummary
         public int $overwritten,
         public int $skipped,
         public int $alreadyImported,
+        public int $enriched,
         public array $ignoredByType,
         public int $futureDated,
         public array $invalid,
@@ -32,6 +33,7 @@ final readonly class GarminImportSummary
      *     overwritten: int,
      *     skipped: int,
      *     already_imported: int,
+     *     enriched: int,
      *     ignored_by_type: array<string, int>,
      *     future_dated: int,
      *     invalid: array<int, array{line: int, reason: string}>,
@@ -44,6 +46,7 @@ final readonly class GarminImportSummary
             'overwritten' => $this->overwritten,
             'skipped' => $this->skipped,
             'already_imported' => $this->alreadyImported,
+            'enriched' => $this->enriched,
             'ignored_by_type' => $this->ignoredByType,
             'future_dated' => $this->futureDated,
             'invalid' => $this->invalid,
@@ -56,6 +59,7 @@ final readonly class GarminImportSummary
      *     overwritten: int,
      *     skipped: int,
      *     already_imported: int,
+     *     enriched?: int,
      *     ignored_by_type: array<string, int>,
      *     future_dated?: int,
      *     outside_window?: int,
@@ -69,13 +73,15 @@ final readonly class GarminImportSummary
          * `outside_window`, the count of rows the old importer dropped for being outside the
          * 112 days. It must still open, so the missing `future_dated` reads as 0: the old
          * number counted a different thing, and showing it under "Future-dated" would be false.
-         * The session lives for one visit, so this branch dies out by itself.
+         * The session lives for one visit, so this branch dies out by itself. A summary
+         * stored before US-023 has no `enriched` either, and reads it as 0 for the same reason.
          */
         return new self(
             imported: $summary['imported'],
             overwritten: $summary['overwritten'],
             skipped: $summary['skipped'],
             alreadyImported: $summary['already_imported'],
+            enriched: $summary['enriched'] ?? 0,
             ignoredByType: $summary['ignored_by_type'],
             futureDated: $summary['future_dated'] ?? 0,
             invalid: $summary['invalid'],

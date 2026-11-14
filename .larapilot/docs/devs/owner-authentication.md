@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-020` |
-| **Last updated by** | `US-021` — 2026-10-26 |
+| **Last updated by** | `US-022` — 2026-11-14 |
 | **Owner persona** | 🗄️ Mike |
 
 ## Purpose
@@ -35,8 +35,8 @@ group:
 
 1. `guest` — `GET /login`, `POST /login`.
 2. `auth` — `GET|PUT /password/change`, `POST /logout`.
-3. `auth` + `password.set` — everything else: `/` (the dashboard), and every
-   `import/garmin/*` route.
+3. `auth` + `password.set` — everything else: `/` (the dashboard), every
+   `import/garmin/*` route and `POST /sync/garmin` (Sync now, `US-022`).
 
 `bootstrap/app.php` sends guests to `route('login')` and signed-in users who open a
 guest route to the dashboard. The `auth` middleware stores the intended URL for

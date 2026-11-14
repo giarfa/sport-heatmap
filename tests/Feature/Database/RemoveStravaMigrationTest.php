@@ -20,12 +20,19 @@ class RemoveStravaMigrationTest extends TestCase
 
     private const MIGRATION = 'database/migrations/2026_10_26_210040_remove_strava_from_schema.php';
 
+    /**
+     * The later migration that gives `activities` its own `source` column: it has to be
+     * undone first, or rolling back the Strava removal would add `source` a second time.
+     */
+    private const GARMIN_SYNC_MIGRATION = 'database/migrations/2026_11_14_123827_add_garmin_sync_to_activities_table.php';
+
     private int $userId;
 
     protected function setUp(): void
     {
         parent::setUp();
 
+        Artisan::call('migrate:rollback', ['--path' => self::GARMIN_SYNC_MIGRATION, '--force' => true]);
         Artisan::call('migrate:rollback', ['--path' => self::MIGRATION, '--force' => true]);
 
         $this->userId = DB::table('users')->insertGetId([

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -26,6 +27,35 @@ use Illuminate\Support\Carbon;
  * @property int|null $average_pace_seconds_per_km
  * @property int|null $total_ascent_meters
  * @property int|null $average_heart_rate
+ * @property int|null $calories
+ * @property int|null $max_heart_rate
+ * @property float|null $aerobic_training_effect
+ * @property int|null $average_running_cadence
+ * @property int|null $max_running_cadence
+ * @property int|null $best_pace_seconds_per_km
+ * @property int|null $total_descent_meters
+ * @property float|null $average_stride_length_cm
+ * @property float|null $average_vertical_ratio_percent
+ * @property float|null $average_vertical_oscillation_cm
+ * @property int|null $average_ground_contact_time_ms
+ * @property float|null $average_ground_contact_balance_left_percent
+ * @property int|null $steps
+ * @property int|null $lap_count
+ * @property int|null $elapsed_time_seconds
+ * @property int|null $min_elevation_meters
+ * @property int|null $max_elevation_meters
+ * @property float|null $training_stress_score
+ * @property int|null $hr_zone_1_seconds
+ * @property int|null $hr_zone_2_seconds
+ * @property int|null $hr_zone_3_seconds
+ * @property int|null $hr_zone_4_seconds
+ * @property int|null $hr_zone_5_seconds
+ * @property int|null $fastest_1k_seconds
+ * @property int|null $fastest_mile_seconds
+ * @property int|null $fastest_5k_seconds
+ * @property string|null $location_name
+ * @property ActivitySource $source
+ * @property int|null $garmin_activity_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $user
@@ -33,7 +63,11 @@ use Illuminate\Support\Carbon;
 /*
  * user_id is deliberately not mass-assignable: activity ownership must come from the
  * relation the import is writing through ($user->activities()->create(...)), never
- * from an attribute array that a request could reach.
+ * from an attribute array that a request could reach. `source` and `garmin_activity_id`
+ * are left out for the same reason: they say where a run came from and which Garmin
+ * activity it is, so only the code that does the linking assigns them, explicitly. An
+ * import row or a request body can never plant an id that would make a later sync
+ * overwrite, or refuse to create, an unrelated run.
  */
 #[Fillable([
     'sport_type',
@@ -45,6 +79,33 @@ use Illuminate\Support\Carbon;
     'average_pace_seconds_per_km',
     'total_ascent_meters',
     'average_heart_rate',
+    'calories',
+    'max_heart_rate',
+    'aerobic_training_effect',
+    'average_running_cadence',
+    'max_running_cadence',
+    'best_pace_seconds_per_km',
+    'total_descent_meters',
+    'average_stride_length_cm',
+    'average_vertical_ratio_percent',
+    'average_vertical_oscillation_cm',
+    'average_ground_contact_time_ms',
+    'average_ground_contact_balance_left_percent',
+    'steps',
+    'lap_count',
+    'elapsed_time_seconds',
+    'min_elevation_meters',
+    'max_elevation_meters',
+    'training_stress_score',
+    'hr_zone_1_seconds',
+    'hr_zone_2_seconds',
+    'hr_zone_3_seconds',
+    'hr_zone_4_seconds',
+    'hr_zone_5_seconds',
+    'fastest_1k_seconds',
+    'fastest_mile_seconds',
+    'fastest_5k_seconds',
+    'location_name',
 ])]
 class Activity extends Model
 {
@@ -121,6 +182,35 @@ class Activity extends Model
             'average_pace_seconds_per_km' => 'integer',
             'total_ascent_meters' => 'integer',
             'average_heart_rate' => 'integer',
+            'calories' => 'integer',
+            'max_heart_rate' => 'integer',
+            'aerobic_training_effect' => 'float',
+            'average_running_cadence' => 'integer',
+            'max_running_cadence' => 'integer',
+            'best_pace_seconds_per_km' => 'integer',
+            'total_descent_meters' => 'integer',
+            'average_stride_length_cm' => 'float',
+            'average_vertical_ratio_percent' => 'float',
+            'average_vertical_oscillation_cm' => 'float',
+            'average_ground_contact_time_ms' => 'integer',
+            'average_ground_contact_balance_left_percent' => 'float',
+            'steps' => 'integer',
+            'lap_count' => 'integer',
+            'elapsed_time_seconds' => 'integer',
+            'min_elevation_meters' => 'integer',
+            'max_elevation_meters' => 'integer',
+            'training_stress_score' => 'float',
+            'hr_zone_1_seconds' => 'integer',
+            'hr_zone_2_seconds' => 'integer',
+            'hr_zone_3_seconds' => 'integer',
+            'hr_zone_4_seconds' => 'integer',
+            'hr_zone_5_seconds' => 'integer',
+            'fastest_1k_seconds' => 'integer',
+            'fastest_mile_seconds' => 'integer',
+            'fastest_5k_seconds' => 'integer',
+            'location_name' => 'string',
+            'source' => ActivitySource::class,
+            'garmin_activity_id' => 'integer',
         ];
     }
 }

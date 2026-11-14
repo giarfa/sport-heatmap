@@ -98,3 +98,27 @@ history:
     medium: 0
     low: 0
     unknown: 0
+  -
+    checked_at: '2026-11-14T14:56:22+00:00'
+    components: 238
+    critical: 0
+    high: 0
+    medium: 0
+    low: 0
+    unknown: 0
+  -
+    checked_at: '2026-11-14T14:58:14+00:00'
+    components: 238
+    critical: 0
+    high: 0
+    medium: 0
+    low: 0
+    unknown: 0
+  -
+    checked_at: '2026-11-14T15:02:38+00:00'
+    components: 238
+    critical: 0
+    high: 0
+    medium: 0
+    low: 0
+    unknown: 0

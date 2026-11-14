@@ -2,8 +2,12 @@
 
 namespace Tests\Feature\Database;
 
+use App\Enums\ActivitySource;
+use App\Enums\GarminSyncOutcome;
+use App\Enums\GarminSyncTrigger;
 use App\Enums\SportType;
 use App\Models\Activity;
+use App\Models\GarminSync;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapWindow;
 use Database\Seeders\TrainingBlockSeeder;
@@ -200,11 +204,112 @@ class TrainingBlockSeederTest extends TestCase
         });
     }
 
-    public function test_the_demo_has_no_sync_history_and_no_strava_columns(): void
+    public function test_recent_synced_runs_carry_the_api_only_metrics(): void
+    {
+        $synced = $this->activities()->where('source', ActivitySource::GarminApi);
+
+        $this->assertNotEmpty($synced);
+        $synced->each(function (Activity $activity): void {
+            $this->assertNotNull($activity->location_name);
+            $this->assertNotNull($activity->hr_zone_1_seconds);
+            $this->assertNotNull($activity->hr_zone_5_seconds);
+            $this->assertNotNull($activity->calories);
+            $this->assertNull($activity->training_stress_score);
+        });
+        $this->assertTrue($synced->contains(fn (Activity $activity): bool => $activity->fastest_5k_seconds !== null));
+    }
+
+    public function test_some_csv_runs_carry_a_training_stress_score_and_none_carry_api_only_metrics(): void
+    {
+        $csvRuns = $this->activities()->where('source', ActivitySource::GarminCsv)
+            ->filter(fn (Activity $activity): bool => $activity->calories !== null);
+
+        $this->assertNotEmpty($csvRuns);
+        $this->assertTrue($csvRuns->contains(fn (Activity $activity): bool => $activity->training_stress_score !== null));
+        $csvRuns->each(function (Activity $activity): void {
+            $this->assertNull($activity->hr_zone_1_seconds);
+            $this->assertNull($activity->fastest_1k_seconds);
+            $this->assertNull($activity->location_name);
+        });
+    }
+
+    public function test_the_oldest_runs_carry_no_extended_metric(): void
+    {
+        $oldest = $this->historyActivities()->merge($this->activities()->filter(
+            fn (Activity $activity): bool => $activity->activity_date->lessThan($this->blockStart()->addWeeks(2)),
+        ));
+
+        $this->assertNotEmpty($oldest);
+        $oldest->each(function (Activity $activity): void {
+            foreach (ExtendedRunMetricsMigrationTest::EXTENDED_COLUMNS as $column) {
+                $this->assertNull($activity->{$column}, "{$column} must be empty on a run of the older export.");
+            }
+        });
+    }
+
+    public function test_every_seeded_run_is_coherent(): void
+    {
+        Activity::all()->each(function (Activity $activity): void {
+            if ($activity->elapsed_time_seconds !== null) {
+                $this->assertGreaterThanOrEqual($activity->moving_time_seconds, $activity->elapsed_time_seconds);
+            }
+
+            if ($activity->min_elevation_meters !== null) {
+                $this->assertLessThanOrEqual($activity->max_elevation_meters, $activity->min_elevation_meters);
+            }
+
+            if ($activity->best_pace_seconds_per_km !== null) {
+                $this->assertLessThan(
+                    $activity->moving_time_seconds / ($activity->distance_meters / 1_000),
+                    $activity->best_pace_seconds_per_km,
+                );
+            }
+
+            if ($activity->hr_zone_1_seconds !== null) {
+                $zones = $activity->hr_zone_1_seconds + $activity->hr_zone_2_seconds + $activity->hr_zone_3_seconds
+                    + $activity->hr_zone_4_seconds + $activity->hr_zone_5_seconds;
+
+                $this->assertLessThanOrEqual($activity->elapsed_time_seconds, $zones);
+            }
+        });
+    }
+
+    public function test_the_demo_has_no_strava_columns_and_one_succeeded_garmin_sync(): void
     {
         $this->assertFalse(Schema::hasTable('sync_runs'));
         $this->assertFalse(Schema::hasColumn('users', 'strava_athlete_id'));
         $this->assertFalse(Schema::hasColumn('activities', 'strava_activity_id'));
+
+        $sync = GarminSync::sole();
+
+        $this->assertSame(GarminSyncOutcome::Succeeded, $sync->outcome);
+        $this->assertSame(GarminSyncTrigger::Scheduled, $sync->trigger);
+        $this->assertTrue($sync->full_history);
+        $this->assertNull($sync->failure_cause);
+        $this->assertTrue($sync->finished_at->isToday());
+        $this->assertTrue($sync->finished_at->lessThanOrEqualTo(Carbon::now()));
+        $this->assertTrue($sync->started_at->lessThan($sync->finished_at));
+    }
+
+    /**
+     * The last four weeks are what the sync wrote and carry Garmin ids; everything older
+     * is a CSV import with none. The sync row counts exactly the runs it wrote.
+     */
+    public function test_the_last_four_weeks_are_api_synced_and_older_runs_are_csv_imports(): void
+    {
+        $syncedFrom = Carbon::today()->startOfWeek()->subWeeks(3);
+
+        $synced = Activity::where('activity_date', '>=', $syncedFrom->toDateString())->get();
+        $imported = Activity::where('activity_date', '<', $syncedFrom->toDateString())->get();
+
+        $this->assertNotEmpty($synced);
+        $this->assertNotEmpty($imported);
+        $this->assertTrue($synced->every(fn (Activity $activity): bool => $activity->source === ActivitySource::GarminApi
+            && $activity->garmin_activity_id !== null));
+        $this->assertTrue($imported->every(fn (Activity $activity): bool => $activity->source === ActivitySource::GarminCsv
+            && $activity->garmin_activity_id === null));
+        $this->assertCount($synced->count(), $synced->pluck('garmin_activity_id')->unique());
+        $this->assertSame($synced->count(), GarminSync::sole()->new_count);
     }
 
     public function test_every_activity_belongs_to_the_seeded_athlete(): void

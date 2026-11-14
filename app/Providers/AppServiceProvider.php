@@ -26,7 +26,7 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * The Garmin upload, review and confirm are limited per signed-in owner.
+     * The Garmin upload, review, confirm and Sync now are limited per signed-in owner.
      */
     private function registerRateLimiters(): void
     {
@@ -39,5 +39,14 @@ class AppServiceProvider extends ServiceProvider
          * by dropping its cookie.
          */
         RateLimiter::for('garmin-import', fn (Request $request): Limit => Limit::perMinute(10)->by((string) $request->user()?->getAuthIdentifier()));
+
+        /*
+         * Sync now runs the whole sync inside the request, up to 20 s per Garmin call.
+         * The one-at-a-time lock already refuses overlap; this bounds how often a
+         * finished sync can be started again, so a held-down button cannot turn the
+         * owner's key into a stream of calls to Garmin. Three a minute is more than a
+         * person needs, and the key is per user id for the same reason as above.
+         */
+        RateLimiter::for('garmin-sync', fn (Request $request): Limit => Limit::perMinute(3)->by((string) $request->user()?->getAuthIdentifier()));
     }
 }

@@ -97,8 +97,8 @@ tasks:
       3. Draft the internal PR title/body toward `base` (`release/3.1.0`): title `US-022: Automatic Garmin Connect sync: daily schedule and Sync now`
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] PR title/body drafted toward `release/3.1.0` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] PR title/body drafted toward `release/3.1.0` (not `develop`)
 
       ## Test Data
       - N/A — git only
@@ -111,7 +111,7 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally toward `release/3.1.0` — open remote only if the owner asks
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
@@ -141,33 +141,39 @@ tasks:
       5. Verify with `php artisan test --filter='SchemaTest|ActivityTest|TrainingBlockSeederTest|SeederMeetsMigrationOwnerTest'` on the in-memory DB. **Do not run `migrate:fresh --seed`** on the dev DB; to try it on dev, copy `database/database.sqlite` aside and run `php artisan migrate`
 
       ## Completion Criteria
-      - [ ] Existing rows read back with `source = garmin_csv` after the migration; `garmin_activity_id` is unique and nullable
-      - [ ] `garmin_syncs` has no column able to hold a key, token, URL or response body
-      - [ ] `source` and `garmin_activity_id` are not mass-assignable (a test asserts `fill()` ignores them)
-      - [ ] Factories produce valid, domain-realistic records; seeder yields CSV + API runs and one succeeded sync
-      - [ ] Migration rolls back one step cleanly
-      - [ ] Tests pass; `php artisan larapilot:quality` green
+      - [x] Existing rows read back with `source = garmin_csv` after the migration; `garmin_activity_id` is unique and nullable
+      - [x] `garmin_syncs` has no column able to hold a key, token, URL or response body
+      - [x] `source` and `garmin_activity_id` are not mass-assignable (a test asserts `fill()` ignores them)
+      - [x] Factories produce valid, domain-realistic records; seeder yields CSV + API runs and one succeeded sync
+      - [x] Migration rolls back one step cleanly
+      - [x] Tests pass; `php artisan larapilot:quality` green
 
       ## Test Data
-      - [ ] `ActivityFactory` `garminSynced()` / `garminImported()` updated in this task
-      - [ ] `GarminSyncFactory` created with the states above
-      - [ ] `TrainingBlockSeeder` composes both sources and a sync history (no orphan rows)
+      - [x] `ActivityFactory` `garminSynced()` / `garminImported()` updated in this task
+      - [x] `GarminSyncFactory` created with the states above
+      - [x] `TrainingBlockSeeder` composes both sources and a sync history (no orphan rows)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — **Data model (`activities`)** section: `source`, `garmin_activity_id`, why both stay out of `#[Fillable]`, why integer ids
-      - [ ] `.larapilot/docs/devs/garmin-api-sync.md` created from `TEMPLATE.md` with its **Data model** (`garmin_syncs`, the enums) — the rest is filled by TASK-02/04
-      - [ ] Folder `README.md` index row added for `garmin-api-sync`; English; committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — **Data model (`activities`)** section: `source`, `garmin_activity_id`, why both stay out of `#[Fillable]`, why integer ids
+      - [x] `.larapilot/docs/devs/garmin-api-sync.md` created from `TEMPLATE.md` with its **Data model** (`garmin_syncs`, the enums) — the rest is filled by TASK-02/04
+      - [x] Folder `README.md` index row added for `garmin-api-sync`; English; committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-022): TASK-01 add Garmin sync schema with factories and seeder`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 3
     dependencies:
       - TASK-00
+    commit:
+      sha: cc7e3436da482a163a066b08380a57cfb608cb3c
+      short_sha: cc7e343
+      subject: 'feat(US-022): TASK-01 add Garmin sync schema with factories and seeder'
+      committed_at: '2026-11-14T13:41:34+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cc7e3436da482a163a066b08380a57cfb608cb3c'
   -
     id: TASK-02
     title: 'Garmin Personal API client, config, and the activity DTO'
@@ -194,28 +200,34 @@ tasks:
       6. Block comments for every non-obvious choice (raw JWT, `exp` − 1 h, file store, chained message)
 
       ## Completion Criteria
-      - [ ] No key, token, response body, or query URL in any exception message or log context
-      - [ ] Token reused from the file store until one hour before `exp`; never written to the default cache
-      - [ ] `GARMIN_API_KEY` empty in `.env.example` and `phpunit.xml`
-      - [ ] `php artisan larapilot:quality` green
+      - [x] No key, token, response body, or query URL in any exception message or log context
+      - [x] Token reused from the file store until one hour before `exp`; never written to the default cache
+      - [x] `GARMIN_API_KEY` empty in `.env.example` and `phpunit.xml`
+      - [x] `php artisan larapilot:quality` green
 
       ## Test Data
       - N/A — no model/schema changes in this task (fixtures for the API live in TASK-03)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-api-sync.md` — **Technical design** (client, DTO, config keys), **Architectural choices** (no package — Python-only official client; raw JWT read without verification; file store over the database cache, decision dffd4adf33c2d285; rejected: storing the token in a column, encrypting it in the database cache), **Key decisions & invariants** (failure mapping table, secret hygiene)
-      - [ ] Folder `README.md` index row refreshed; English; committed with this task
+      - [x] `.larapilot/docs/devs/garmin-api-sync.md` — **Technical design** (client, DTO, config keys), **Architectural choices** (no package — Python-only official client; raw JWT read without verification; file store over the database cache, decision dffd4adf33c2d285; rejected: storing the token in a column, encrypting it in the database cache), **Key decisions & invariants** (failure mapping table, secret hygiene)
+      - [x] Folder `README.md` index row refreshed; English; committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-022): TASK-02 add the Garmin Personal API client and activity DTO`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Matt
     estimate_hours: 4
     dependencies:
       - TASK-01
+    commit:
+      sha: e1e963aed85a3a04bc44b882e80962cdd8d0717c
+      short_sha: e1e963a
+      subject: 'feat(US-022): TASK-02 add the Garmin Personal API client and activity DTO'
+      committed_at: '2026-11-14T13:43:35+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e1e963aed85a3a04bc44b882e80962cdd8d0717c'
   -
     id: TASK-03
     title: 'Tests: API client token lifecycle, failure mapping, DTO mapping'
@@ -239,8 +251,8 @@ tasks:
       7. No Playwright, Dusk, browser or viewport suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Coverage matches the `NORMAL` bar (happy path, failure modes, secret hygiene)
+      - [x] Tests pass locally
+      - [x] Coverage matches the `NORMAL` bar (happy path, failure modes, secret hygiene)
 
       ## Test Data
       - N/A — JSON fixtures only, no model changes
@@ -253,11 +265,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-02
+    commit:
+      sha: 4e0bbb23517fe5c81a90ef9fd588ff7ff20cfff3
+      short_sha: 4e0bbb2
+      subject: 'test(US-022): TASK-03 cover the Garmin API client and activity mapping'
+      committed_at: '2026-11-14T13:45:42+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/4e0bbb23517fe5c81a90ef9fd588ff7ff20cfff3'
   -
     id: TASK-04
     title: 'SyncGarminActivities action, garmin:sync command, daily schedule'
@@ -283,32 +301,38 @@ tasks:
       8. `php artisan schedule:list` shows `garmin:sync --scheduled`; `php artisan test`
 
       ## Completion Criteria
-      - [ ] Whole history on the first sync; later syncs from newest Garmin run − 7 days to today
-      - [ ] Re-running changes nothing (no `updated_at` moves); a run gone from Garmin stays
-      - [ ] A CSV run on the same date within ±2 min gains the id and API values; no duplicate, no review
-      - [ ] A failure mid-way keeps earlier pages and records cause + counts
-      - [ ] One sync at a time; no-key run calls and records nothing
-      - [ ] No N+1: one candidate query per page
-      - [ ] Tests pass; `php artisan larapilot:quality` green
+      - [x] Whole history on the first sync; later syncs from newest Garmin run − 7 days to today
+      - [x] Re-running changes nothing (no `updated_at` moves); a run gone from Garmin stays
+      - [x] A CSV run on the same date within ±2 min gains the id and API values; no duplicate, no review
+      - [x] A failure mid-way keeps earlier pages and records cause + counts
+      - [x] One sync at a time; no-key run calls and records nothing
+      - [x] No N+1: one candidate query per page
+      - [x] Tests pass; `php artisan larapilot:quality` green
 
       ## Test Data
       - N/A — no model/schema changes in this task (uses TASK-01 factories)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-api-sync.md` — **Purpose**, **Functional flow** step by step (lock → record → window → page → match/link/create/update → cache → finalise), failure paths, the schedule and its time, **Extension points & gotchas** (US-023 extends the API-owned columns; never move the lock to the default-store-free path)
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — shared matching rule now has two callers
-      - [ ] Folder `README.md` index row refreshed; English; committed with this task
+      - [x] `.larapilot/docs/devs/garmin-api-sync.md` — **Purpose**, **Functional flow** step by step (lock → record → window → page → match/link/create/update → cache → finalise), failure paths, the schedule and its time, **Extension points & gotchas** (US-023 extends the API-owned columns; never move the lock to the default-store-free path)
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — shared matching rule now has two callers
+      - [x] Folder `README.md` index row refreshed; English; committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-022): TASK-04 sync Garmin runs daily with garmin:sync`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
       - TASK-02
+    commit:
+      sha: 75e0695a56d9c6d4ec7d31bfcfbe82d6b013108c
+      short_sha: '75e0695'
+      subject: 'feat(US-022): TASK-04 sync Garmin runs daily with garmin:sync'
+      committed_at: '2026-11-14T13:51:22+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/75e0695a56d9c6d4ec7d31bfcfbe82d6b013108c'
   -
     id: TASK-05
     title: 'Tests: sync behaviour, idempotence, linking, failures, schedule, secret hygiene'
@@ -338,8 +362,8 @@ tasks:
       14. `php artisan test --filter='GarminSync|ScheduleTest'`; no browser/E2E suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every _Sync (FR-002, FR-003)_ criterion has at least one assertion
+      - [x] Tests pass locally
+      - [x] Every _Sync (FR-002, FR-003)_ criterion has at least one assertion
 
       ## Test Data
       - N/A — factories from TASK-01, JSON fixtures from TASK-03
@@ -352,12 +376,18 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 4
     dependencies:
       - TASK-03
       - TASK-04
+    commit:
+      sha: e33f28d841c5203025a56b941c75133a1b66146c
+      short_sha: e33f28d
+      subject: 'test(US-022): TASK-05 cover the Garmin sync and its schedule'
+      committed_at: '2026-11-14T13:51:22+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e33f28d841c5203025a56b941c75133a1b66146c'
   -
     id: TASK-06
     title: 'Sync now route, sync status, failure warning on the dashboard'
@@ -387,31 +417,37 @@ tasks:
       6. `php artisan test`
 
       ## Completion Criteria
-      - [ ] Sync now visible only with a key; signed-out `POST` redirects to `/login` and calls nothing; throttled; refused while a sync runs
-      - [ ] Summary or failure cause reported after Sync now
-      - [ ] Chip/footer show the more recent of last sync and last import; warning shown while the newest finished attempt failed, gone after a success
-      - [ ] With no key the dashboard renders exactly as before (no button, no sync row, no warning)
-      - [ ] UI usable at mobile/tablet/desktop in both themes (manual smoke OK under `NORMAL`)
-      - [ ] Tests pass; `php artisan larapilot:quality` green
+      - [x] Sync now visible only with a key; signed-out `POST` redirects to `/login` and calls nothing; throttled; refused while a sync runs
+      - [x] Summary or failure cause reported after Sync now
+      - [x] Chip/footer show the more recent of last sync and last import; warning shown while the newest finished attempt failed, gone after a success
+      - [x] With no key the dashboard renders exactly as before (no button, no sync row, no warning)
+      - [x] UI usable at mobile/tablet/desktop in both themes (manual smoke OK under `NORMAL`)
+      - [x] Tests pass; `php artisan larapilot:quality` green
 
       ## Test Data
       - N/A — no model/schema changes in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — status resolution (sync vs import, the warning, no-key behaviour), Sync now entry points, the `garmin-sync` throttle; remove "no warning state"
-      - [ ] `.larapilot/docs/devs/garmin-api-sync.md` — **Functional flow** of Sync now (request-time, flash messages, refusal)
-      - [ ] Folder `README.md` index rows refreshed; English; committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — status resolution (sync vs import, the warning, no-key behaviour), Sync now entry points, the `garmin-sync` throttle; remove "no warning state"
+      - [x] `.larapilot/docs/devs/garmin-api-sync.md` — **Functional flow** of Sync now (request-time, flash messages, refusal)
+      - [x] Folder `README.md` index rows refreshed; English; committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-022): TASK-06 add Sync now and the Garmin sync status to the dashboard`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 5
     dependencies:
       - TASK-04
+    commit:
+      sha: e62e40b0d2035d39cddb1aa0869c5fc359c49040
+      short_sha: e62e40b
+      subject: 'feat(US-022): TASK-06 add Sync now and the Garmin sync status to the dashboard'
+      committed_at: '2026-11-14T13:55:18+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/e62e40b0d2035d39cddb1aa0869c5fc359c49040'
   -
     id: TASK-07
     title: 'Tests: Sync now HTTP flow, status line, failure warnings, no-key dashboard'
@@ -434,8 +470,8 @@ tasks:
       6. `php artisan test`; no browser/E2E suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every _Sync now_ and _Status and failures_ criterion has at least one assertion
+      - [x] Tests pass locally
+      - [x] Every _Sync now_ and _Status and failures_ criterion has at least one assertion
 
       ## Test Data
       - N/A — `GarminSyncFactory` states from TASK-01
@@ -448,11 +484,17 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
       - TASK-06
+    commit:
+      sha: 1f9e59046dc0d259dd15c1f23bfee6ac71186b0d
+      short_sha: 1f9e590
+      subject: 'test(US-022): TASK-07 cover Sync now and the sync status'
+      committed_at: '2026-11-14T13:55:18+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1f9e59046dc0d259dd15c1f23bfee6ac71186b0d'
   -
     id: TASK-08
     title: 'CSV import coexistence with API-synced runs'
@@ -470,27 +512,33 @@ tasks:
       3. `php artisan test --filter=GarminImport`
 
       ## Completion Criteria
-      - [ ] CSV upload, review, summary counts, throttle and idempotent re-import behave as before
-      - [ ] Overwrite of an API-synced run keeps its `garmin_activity_id`
-      - [ ] Tests pass; `php artisan larapilot:quality` green
+      - [x] CSV upload, review, summary counts, throttle and idempotent re-import behave as before
+      - [x] Overwrite of an API-synced run keeps its `garmin_activity_id`
+      - [x] Tests pass; `php artisan larapilot:quality` green
 
       ## Test Data
       - N/A — no schema change; uses `ActivityFactory::garminSynced()` from TASK-01
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — **Applying** section: `source` on Overwrite, Garmin id kept, the accepted trade-off that the next sync re-applies API values to a run it re-reads; the stale "only way a run enters" wording replaced
-      - [ ] Folder `README.md` index row refreshed; English; committed with this task
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md` — **Applying** section: `source` on Overwrite, Garmin id kept, the accepted trade-off that the next sync re-applies API values to a run it re-reads; the stale "only way a run enters" wording replaced
+      - [x] Folder `README.md` index row refreshed; English; committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-022): TASK-08 keep the CSV import consistent with Garmin-synced runs`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 2
     dependencies:
       - TASK-01
+    commit:
+      sha: c3374969c40a6c8d9d78156cfcfcf982772d1098
+      short_sha: c337496
+      subject: 'feat(US-022): TASK-08 keep the CSV import consistent with Garmin-synced runs'
+      committed_at: '2026-11-14T13:56:29+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/c3374969c40a6c8d9d78156cfcfcf982772d1098'
   -
     id: TASK-09
     title: 'README, CHANGELOG, and domain-doc consistency pass'
@@ -508,28 +556,34 @@ tasks:
       2. `php artisan test` (EnvironmentExampleTest and any README-referencing test)
 
       ## Completion Criteria
-      - [ ] README explains creating and renewing the key and the scheduler cron entry needed on the host
-      - [ ] CHANGELOG Unreleased lists the user-facing changes
-      - [ ] Domain docs consistent with the code; index current
+      - [x] README explains creating and renewing the key and the scheduler cron entry needed on the host
+      - [x] CHANGELOG Unreleased lists the user-facing changes
+      - [x] Domain docs consistent with the code; index current
 
       ## Test Data
       - N/A — docs only
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-api-sync.md`, `garmin-csv-import.md`, `heatmap-dashboard.md`, `README.md` — final consistency pass; English; committed with this task
+      - [x] `.larapilot/docs/devs/garmin-api-sync.md`, `garmin-csv-import.md`, `heatmap-dashboard.md`, `README.md` — final consistency pass; English; committed with this task
 
       ## Git Deliverables
       - Commit: `chore(US-022): TASK-09 document the Garmin Connect sync`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Albert
     estimate_hours: 2
     dependencies:
       - TASK-05
       - TASK-07
       - TASK-08
+    commit:
+      sha: ec21476c1b2e6feb068225c0cacceb60af3929ac
+      short_sha: ec21476
+      subject: 'chore(US-022): TASK-09 document the Garmin Connect sync'
+      committed_at: '2026-11-14T13:57:30+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ec21476c1b2e6feb068225c0cacceb60af3929ac'
   -
     id: TASK-10
     title: 'Verification: full suite, quality gate, acceptance walk-through, manual handoff'
@@ -549,9 +603,9 @@ tasks:
       6. Write the **manual test handoff** (see plan Test Strategy) into the local PR notes for the owner; do not call the real Garmin API from an automated step
 
       ## Completion Criteria
-      - [ ] Suite and quality gate green
-      - [ ] Every acceptance criterion mapped to a test
-      - [ ] Manual handoff written in the PR notes
+      - [x] Suite and quality gate green
+      - [x] Every acceptance criterion mapped to a test
+      - [x] Manual handoff written in the PR notes
 
       ## Test Data
       - N/A
@@ -564,9 +618,15 @@ tasks:
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: finalise the local PR description toward `release/3.1.0`
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 1.5
     dependencies:
       - TASK-09
-updated_at: '2026-11-14T12:29:45+00:00'
+    commit:
+      sha: be61d543c60b9a567d92c1f11d1ba5f638da6092
+      short_sha: be61d54
+      subject: 'fix(US-022): TASK-10 prove no secret reaches a Sync now response'
+      committed_at: '2026-11-14T13:58:31+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/be61d543c60b9a567d92c1f11d1ba5f638da6092'
+updated_at: '2026-11-14T12:58:31+00:00'

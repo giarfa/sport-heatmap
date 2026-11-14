@@ -2,12 +2,14 @@
 
 namespace Tests\Unit\Models;
 
+use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Tests\Feature\Database\ExtendedRunMetricsMigrationTest;
 use Tests\TestCase;
 
 class ActivityTest extends TestCase
@@ -94,6 +96,64 @@ class ActivityTest extends TestCase
         $this->assertSame(152, $activity->average_heart_rate);
     }
 
+    public function test_the_default_definition_carries_no_extended_metric(): void
+    {
+        $activity = Activity::factory()->create()->refresh();
+
+        foreach (ExtendedRunMetricsMigrationTest::EXTENDED_COLUMNS as $column) {
+            $this->assertNull($activity->{$column}, "{$column} must stay empty by default.");
+        }
+    }
+
+    public function test_the_extended_metrics_state_is_coherent_with_the_run(): void
+    {
+        Activity::factory()->count(25)->withExtendedMetrics()->create();
+
+        Activity::all()->each(function (Activity $activity): void {
+            $averagePace = $activity->moving_time_seconds / ($activity->distance_meters / 1_000);
+
+            $this->assertGreaterThanOrEqual($activity->moving_time_seconds, $activity->elapsed_time_seconds);
+            $this->assertLessThan($averagePace, $activity->best_pace_seconds_per_km);
+            $this->assertLessThanOrEqual($activity->max_elevation_meters, $activity->min_elevation_meters);
+            $this->assertGreaterThan($activity->average_running_cadence, $activity->max_running_cadence);
+            $this->assertGreaterThan($activity->average_heart_rate, $activity->max_heart_rate);
+            $this->assertEqualsWithDelta(
+                $activity->average_running_cadence * $activity->moving_time_seconds / 60,
+                $activity->steps,
+                1.0,
+            );
+            $this->assertIsFloat($activity->aerobic_training_effect);
+            $this->assertNull($activity->training_stress_score);
+            $this->assertNull($activity->hr_zone_1_seconds);
+        });
+    }
+
+    public function test_the_api_only_state_keeps_zones_within_the_elapsed_time_and_splits_within_the_distance(): void
+    {
+        Activity::factory()->state(['distance_meters' => 800, 'moving_time_seconds' => 260])->withExtendedMetrics()->withApiOnlyMetrics()->create();
+        Activity::factory()->state(['distance_meters' => 3_000, 'moving_time_seconds' => 900])->withExtendedMetrics()->withApiOnlyMetrics()->create();
+        Activity::factory()->count(20)->withExtendedMetrics()->withApiOnlyMetrics()->create();
+
+        Activity::all()->each(function (Activity $activity): void {
+            $zones = $activity->hr_zone_1_seconds + $activity->hr_zone_2_seconds + $activity->hr_zone_3_seconds
+                + $activity->hr_zone_4_seconds + $activity->hr_zone_5_seconds;
+
+            $this->assertLessThanOrEqual($activity->elapsed_time_seconds, $zones);
+            $this->assertContains($activity->location_name, ['Lazise', 'Verona', 'Bolzano']);
+            $this->assertSame($activity->distance_meters >= 1_000, $activity->fastest_1k_seconds !== null);
+            $this->assertSame($activity->distance_meters >= 1_609, $activity->fastest_mile_seconds !== null);
+            $this->assertSame($activity->distance_meters >= 5_000, $activity->fastest_5k_seconds !== null);
+        });
+    }
+
+    public function test_the_training_stress_score_state_sets_only_the_score(): void
+    {
+        $activity = Activity::factory()->withTrainingStressScore()->create()->refresh();
+
+        $this->assertGreaterThan(0, $activity->training_stress_score);
+        $this->assertNull($activity->calories);
+    }
+
     public function test_it_belongs_to_a_user(): void
     {
         $user = User::factory()->create();
@@ -133,12 +193,48 @@ class ActivityTest extends TestCase
         $this->assertSame('2026-03-14', $activity->start_date_local->toDateString());
     }
 
-    public function test_an_activity_has_no_strava_attribute_and_no_source(): void
+    public function test_an_activity_has_no_strava_attribute(): void
     {
         $activity = Activity::factory()->create()->fresh();
 
         $this->assertArrayNotHasKey('strava_activity_id', $activity->getAttributes());
-        $this->assertArrayNotHasKey('source', $activity->getAttributes());
+    }
+
+    public function test_a_run_is_a_csv_import_with_no_garmin_id_unless_it_was_synced(): void
+    {
+        $activity = Activity::factory()->create()->fresh();
+
+        $this->assertSame(ActivitySource::GarminCsv, $activity->source);
+        $this->assertNull($activity->garmin_activity_id);
+        $this->assertSame(ActivitySource::GarminCsv, Activity::factory()->garminImported()->create()->fresh()->source);
+    }
+
+    public function test_the_garmin_synced_state_carries_a_unique_eleven_digit_garmin_id(): void
+    {
+        $runs = Activity::factory()->garminSynced()->count(3)->create();
+
+        foreach ($runs as $run) {
+            $this->assertSame(ActivitySource::GarminApi, $run->fresh()->source);
+            $this->assertIsInt($run->fresh()->garmin_activity_id);
+            $this->assertSame(11, strlen((string) $run->garmin_activity_id));
+        }
+
+        $this->assertCount(3, $runs->pluck('garmin_activity_id')->unique());
+    }
+
+    public function test_the_source_and_the_garmin_id_are_not_mass_assignable(): void
+    {
+        $activity = Activity::factory()->create();
+
+        $activity->fill([
+            'source' => ActivitySource::GarminApi->value,
+            'garmin_activity_id' => 12_345_678_901,
+            'name' => 'Renamed',
+        ]);
+
+        $this->assertSame('Renamed', $activity->name);
+        $this->assertSame(ActivitySource::GarminCsv, $activity->source);
+        $this->assertNull($activity->garmin_activity_id);
     }
 
     public function test_the_sport_type_enum_exposes_exactly_the_three_running_types(): void

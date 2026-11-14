@@ -443,7 +443,8 @@ class GarminImportFlowTest extends TestCase
 
         $this->actingAs($this->owner)
             ->get(route('garmin.import.summary'))
-            ->assertSee('<div><dt>Already imported</dt><dd>1</dd></div>', escape: false);
+            ->assertSee('<div><dt>Already imported</dt><dd>0</dd></div>', escape: false)
+            ->assertSee('<div><dt>Enriched</dt><dd>1</dd></div>', escape: false);
     }
 
     public function test_a_backfill_only_import_forgets_the_cached_grid(): void
