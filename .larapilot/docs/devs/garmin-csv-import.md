@@ -239,9 +239,10 @@ already-imported row indexes — what the owner was shown.
 
 - each new row → `$user->activities()->create()`;
 - **Overwrite** → the stored row takes the CSV's name, distance, moving time,
-  start, `activity_date` and sport type. The three run metrics are replaced by the
-  CSV's **except where the CSV recorded none**: `GarminCsvRow::toAttributes()`
-  omits an empty metric, so a `--` keeps the stored value. Blanking a pace the
+  start, `activity_date` and sport type. Every metric — the three run metrics and
+  the 27 extended ones of `US-023` — is replaced by the CSV's **except where the CSV
+  recorded none**: `GarminCsvRow::toAttributes()` omits an empty metric, so a `--`
+  keeps the stored value. Blanking a pace (or a cadence, or a Training Stress Score) the
   owner already has because the new export lacks it would be data loss. It also sets
   `source = garmin_csv` (the source records who wrote the run's current values) and
   **never touches `garmin_activity_id`**: a run the Garmin sync wrote or linked keeps its
@@ -251,18 +252,24 @@ already-imported row indexes — what the owner was shown.
 - **Skip**, or no answer at all → nothing is written;
 - **Already imported** (same start, distance and moving time) → only the
   metrics its stored run **lacks** are filled from the row
-  (`fillEmptyMetricsOfAlreadyImportedRuns()`); a metric already stored is never
+  (`fillEmptyMetricsOfAlreadyImportedRuns()`, no review and no extra query: it
+  reuses the stored runs the plan already holds); a metric already stored is never
   touched and the row is saved only when something was filled. So a run
-  imported before `US-012` gains its pace, ascent and heart rate from a fresh
-  export, and re-importing the same file again changes nothing. These rows
-  still count as "already imported" in the summary — backfilling adds no new
-  count.
+  imported before `US-012` gains its pace, ascent and heart rate, and one imported
+  before `US-023` gains its extended metrics, from a fresh export — one code path for
+  all 30 — and re-importing the same file again changes nothing. A run that gained at
+  least one metric is **enriched**, counted once however many it gained; one that
+  gained nothing stays "already imported". The two counts partition the
+  already-imported rows, so `alreadyImported + enriched` is what the file held of
+  them. The stored `source` is not touched: an API run that gains a CSV-only Training
+  Stress Score stays `garmin_api`.
 
 The passed owner is only read, never `save()`d. After the commit it retires every
 cached window grid of the owner (`HeatmapGridCache::forgetAthlete()`), so the dashboard shows the import on the next
 request, whichever window is opened — also after a backfill-only import, whose metrics the cached day
 detail carries. It returns a `GarminImportSummary`: imported, overwritten, skipped,
-already imported, ignored by type, future-dated, invalid. The action does not
+already imported, enriched, ignored by type, future-dated, invalid (`fromSessionArray()`
+reads a missing `enriched` as 0, so a summary flashed before `US-023` still renders). The action does not
 authorize (`.ai/rules/actions.md`); the caller has.
 
 ### 4. HTTP flow
@@ -278,7 +285,7 @@ an owner with no password yet to the first-password page. CSRF comes from the `w
 | `GET /import/garmin/review` | `review` | Throttled `garmin-import`, the same limiter as upload and confirm (`US-018`). Plans the pending rows for the owner against the DB **as it is now**, reusing the plan remembered from the previous render while the stored runs on the upload's dates are unchanged (see *The review reuses its plan*); renders conflicts, new rows, counts, `token`, `fingerprint` |
 | `POST /import/garmin/confirm` | `confirm` | `ConfirmGarminImportRequest`; throttled `garmin-import`; under the **instance-wide** `Cache::lock('garmin-import:confirm')`, re-plans for the owner; token + fingerprint must match; every conflict needs an answer; `ApplyGarminImport`; forgets the pending import; summary flashed |
 | `POST /import/garmin/cancel` | `cancel` | Forgets the pending import → dashboard, "Import cancelled. Nothing was written." |
-| `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary`; without one → dashboard |
+| `GET /import/garmin/summary` | `summary` | Renders the flashed `GarminImportSummary` — the tally has an `Enriched` row after `Already imported`, and the lede adds " {n} existing run(s) gained missing metrics." when n > 0 and says "Nothing new" only when imported, overwritten and enriched are all 0 (a deviation from the `US-008` mockup, logged in its README); without one → dashboard |
 
 - **Instance-wide confirm lock**: one confirm at a time on the whole instance
   (one owner, so serialising costs nothing); a second concurrent confirm (a
@@ -466,7 +473,10 @@ rolling back the Strava removal in a test first needs the `US-022` migration und
   (the sync links a CSV run with it instead of creating a twin).
 - **Invariant — a stored run is never replaced by a re-read of the file.** Only an
   explicit Overwrite changes one, and an already-imported row fills only the metrics
-  its stored run lacks. Nothing else writes a run but the Garmin sync (`garmin-api-sync.md`).
+  its stored run lacks — the same rule for all 30 metrics, which is also what makes a
+  second re-import enrich 0 runs and write nothing. On Overwrite a `--` extended cell
+  keeps the stored value, because `toAttributes()` leaves an unrecorded metric out
+  instead of nulling it. Nothing else writes a run but the Garmin sync (`garmin-api-sync.md`).
   Accepted trade-off: for a run that has a Garmin id the API is authoritative, so a CSV
   Overwrite of a run dated within the next sync's re-read span (the last 7 days before the
   newest synced run) is replaced by the API values at that sync.

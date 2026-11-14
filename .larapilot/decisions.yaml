@@ -1403,4 +1403,17 @@ decisions:
     source: askquestion
     spec: US-023
     supersedes: null
-updated_at: '2026-11-14T14:13:17+00:00'
+  -
+    id: cfec518d81774931
+    ts: '2026-11-14T14:28:12+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-implement
+    topic: 'mockup deviation'
+    label: 'mockup deviation'
+    value: 'US-008 summary: Enriched tally row and lede clause for US-023'
+    question: null
+    rationale: 'US-023 acceptance criteria require re-import to report enriched runs on the summary; same tally markup and tokens, no new styles'
+    source: chat
+    spec: US-023
+    supersedes: null
+updated_at: '2026-11-14T14:28:12+00:00'

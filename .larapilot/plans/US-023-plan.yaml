@@ -365,7 +365,7 @@ tasks:
     dependencies:
       - TASK-02
     type: Test
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Add PHPUnit coverage for reading extended metrics out of Garmin CSV exports, at the NORMAL bar.
@@ -393,13 +393,19 @@ tasks:
       4. Do **not** add Playwright, Dusk, browser, or viewport suites.
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Every CSV-side acceptance case above is covered at the NORMAL bar
+      - [x] Tests pass locally
+      - [x] Every CSV-side acceptance case above is covered at the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-023): TASK-03 cover extended metric parsing from Garmin CSV`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: 5a123ef3b09879ea0a8185f551bdaef5708c0a27
+      short_sha: 5a123ef
+      subject: 'test(US-023): TASK-03 cover extended metric parsing from Garmin CSV'
+      committed_at: '2026-11-14T15:26:44+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5a123ef3b09879ea0a8185f551bdaef5708c0a27'
   -
     id: TASK-04
     title: 'Import enrichment count, Overwrite rule on extended metrics, summary page Enriched row'
@@ -690,4 +696,4 @@ tasks:
       - Commit: `test(US-023): TASK-09 verification and manual test handoff`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
-updated_at: '2026-11-14T14:24:58+00:00'
+updated_at: '2026-11-14T14:26:44+00:00'

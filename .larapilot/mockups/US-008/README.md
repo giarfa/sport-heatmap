@@ -86,3 +86,4 @@ dates as `Sat 10 Oct 2026`.
 | Date | Screen | What | Why | Decision |
 | --- | --- | --- | --- | --- |
 | 2026-10-26 | `review.html` | The stored side of a conflict shows the run's name only: the "Strava · View on Strava" link and the "Garmin import" source label are gone | Strava is removed (US-021): every stored run is an imported one and there is nowhere to link to | Accepted with the spec; decision `c022654e858f07e5` |
+| 2026-11-14 | `summary.html` | Added an `Enriched` tally row after `Already imported`, and a lede clause " {n} existing run(s) gained missing metrics." when n > 0; "Nothing new — every run was already imported." now also requires 0 enriched | US-023 (FR-022) acceptance criterion: a re-import over runs that lack extended metrics must be reported as enriched. Same `tally` markup and tokens, no new styles | Accepted with the spec; decision `cfec518d81774931` |
