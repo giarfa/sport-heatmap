@@ -890,6 +890,94 @@ html.dark {
     }
 }
 
+/* ---- Aerobic efficiency -----------------------------------------------------
+   The twin of the weekly trend: the card reuses every .trend-* rule (title, note, chart grid,
+   y and x labels, gridlines, baseline, the 4-week line and its halo, key, figures table) and
+   adds the headline, the run markers and last year's dashed line. Tokens only, no new colour. */
+/* The headline: the latest 4-week median, the one number to read at a glance. */
+.eff-headline {
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 0.375rem;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.eff-headline strong {
+    font-size: 1.5rem;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.eff-unit {
+    font-size: 0.875rem;
+    color: var(--ink-muted);
+    margin-left: -0.25rem;
+}
+
+.eff-at {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Runs are HTML, not SVG circles: the plot stretches with
+   preserveAspectRatio="none", which would turn circles into ellipses. They
+   sit in percent, the same coordinate as the SVG (see .trend-partial-tag). */
+.eff-dot,
+.eff-key-dot {
+    display: inline-block;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 9999px;
+}
+
+.eff-dot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+}
+
+/* Flat run: filled. --lv-2 clears 3:1 on both cards (see the trend notes). */
+.eff-dot--flat {
+    background: var(--lv-2);
+}
+
+/* Hilly run, adjusted: a ring — shape, not hue, tells it apart. */
+.eff-dot--hilly {
+    background: var(--surface-card);
+    border: 1.5px solid var(--lv-2);
+}
+
+/* Steep run (> 10 m/km), shown but never counted: a muted cross. */
+.eff-dot--steep {
+    border-radius: 0;
+    background:
+        linear-gradient(45deg, transparent 42%, var(--ink-muted) 42%, var(--ink-muted) 58%, transparent 58%),
+        linear-gradient(-45deg, transparent 42%, var(--ink-muted) 42%, var(--ink-muted) 58%, transparent 58%);
+    width: 0.5625rem;
+    height: 0.5625rem;
+}
+
+/* Same weeks last year: dashed and muted, under the median line. */
+.eff-lastyear {
+    fill: none;
+    stroke: var(--ink-muted);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 3;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.eff-key-lastyear {
+    flex: none;
+    display: inline-block;
+    width: 1rem;
+    height: 0;
+    border-top: 1.5px dashed var(--ink-muted);
+}
+
 /* ---- Import status ----------------------------------------------------------
    The header chip and the rail's import detail card. */
 .import-chip {

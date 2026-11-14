@@ -59,7 +59,7 @@ class WeeklyTrendTest extends TestCase
         $this->assertNotFalse($legend);
         $this->assertGreaterThan($legend, $trend);
         $this->assertGreaterThan($trend, $import);
-        $this->assertStringContainsString('aria-label="Legend, weekly trend and import detail"', $html);
+        $this->assertStringContainsString('aria-label="Legend, weekly trend, aerobic efficiency and import detail"', $html);
 
         $card = $this->trendCard();
 

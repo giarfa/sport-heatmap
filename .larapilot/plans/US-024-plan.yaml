@@ -363,7 +363,7 @@ tasks:
     id: TASK-06
     title: 'Wire efficiency into the cached grid and the dashboard controller'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
@@ -388,23 +388,29 @@ tasks:
       5. `php artisan test` (full suite — grid shape touches many tests)
 
       ## Completion Criteria
-      - [ ] A cached `v6` grid is never read; `v7` entries round-trip through the database cache store with every new class
-      - [ ] Cache hit runs no efficiency query; miss runs exactly two
-      - [ ] Rendering the dashboard writes nothing
-      - [ ] Tests pass
+      - [x] A cached `v6` grid is never read; `v7` entries round-trip through the database cache store with every new class
+      - [x] Cache hit runs no efficiency query; miss runs exactly two
+      - [x] Rendering the dashboard writes nothing
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: efficiency rides in the cached HeatmapGrid; cache key v7 and why; Extension points & gotchas: add new card DTOs to cache.serializable_classes and bump the key
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: efficiency rides in the cached HeatmapGrid; cache key v7 and why; Extension points & gotchas: add new card DTOs to cache.serializable_classes and bump the key
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-06 cache aerobic efficiency with the grid`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: 5d02c728ec3e65d2f8aa147b8abbf05021295b95
+      short_sha: 5d02c72
+      subject: 'feat(US-024): TASK-06 cache aerobic efficiency with the grid'
+      committed_at: '2026-11-14T18:52:54+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5d02c728ec3e65d2f8aa147b8abbf05021295b95'
   -
     id: TASK-07
     title: 'Aerobic efficiency card: Blade component, CSS port, rail placement'
@@ -580,4 +586,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:51:03+00:00'
+updated_at: '2026-11-14T17:52:55+00:00'
