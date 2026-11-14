@@ -13,7 +13,7 @@ The single screen of the product, served at `/` and **private to the signed-in
 owner** (`US-020`): a 16-week × 7-day grid of daily running distance with weekly
 totals, a self-calibrating intensity legend, a data status ("last sync N ago" or
 "last import N ago", whichever is more recent: header chip, footer line, detail card), and a day detail that lists each run of a tapped day with
-its pace, ascent and heart rate. A signed-out browser is redirected to `/login`
+its pace, ascent and heart rate, beside two charts of the window: weekly distance and aerobic efficiency (pace at the usual heart rate, `US-024`). A signed-out browser is redirected to `/login`
 (see `owner-authentication.md`); there is no public view and no displayed-athlete
 selection. It must never present stale data as current. If it stops working, the
 owner loses the only view of their training.
@@ -67,7 +67,7 @@ owner loses the only view of their training.
       Next is a link only on an earlier window, and points at plain `/` when it
       reaches the current one, so the current window has one address.
    5. `dashboard.blade.php` renders the chip, the grid, `<x-day-detail>`, and the
-      rail: legend → weekly trend → import detail card (`US-014`). An empty
+      rail: legend → weekly trend (`US-014`) → aerobic efficiency (`US-024`) → import detail card. An empty
       current window says "No runs found in the last 16 weeks. The map fills in
       after your next import."; an empty earlier window says "No runs stored in
       these 16 weeks." (`$grid->hasRuns()`).

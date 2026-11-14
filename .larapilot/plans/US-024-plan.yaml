@@ -477,7 +477,7 @@ tasks:
     id: TASK-08
     title: 'Feature tests: dashboard card, navigation, freshness, accessibility'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 4
     dependencies:
@@ -507,14 +507,20 @@ tasks:
       4. Do **not** add Playwright, Dusk, Pest browser or viewport suites
 
       ## Completion Criteria
-      - [ ] Every acceptance criterion of US-024 testable at the HTTP level has a test
-      - [ ] Tests pass locally
-      - [ ] Manual test handoff notes (widths and themes, see plan Test Strategy) written into the PR description
+      - [x] Every acceptance criterion of US-024 testable at the HTTP level has a test
+      - [x] Tests pass locally
+      - [x] Manual test handoff notes (widths and themes, see plan Test Strategy) written into the PR description
 
       ## Git Deliverables
       - Commit: `test(US-024): TASK-08 cover the aerobic efficiency card on the dashboard`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
+    commit:
+      sha: cf74fc8f7416136734eb2d0f0b0c6dedd3e0c8ad
+      short_sha: cf74fc8
+      subject: 'test(US-024): TASK-08 cover the aerobic efficiency card on the dashboard'
+      committed_at: '2026-11-14T19:00:14+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cf74fc8f7416136734eb2d0f0b0c6dedd3e0c8ad'
   -
     id: TASK-09
     title: 'Factory states and demo data for aerobic efficiency'
@@ -598,4 +604,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:58:43+00:00'
+updated_at: '2026-11-14T18:00:14+00:00'
