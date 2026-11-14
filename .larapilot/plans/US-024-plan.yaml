@@ -575,7 +575,7 @@ tasks:
     id: TASK-10
     title: 'Quality gate and handoff checks'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 1
     dependencies:
@@ -597,11 +597,17 @@ tasks:
       5. Confirm the mockup README `## Deviations` row for the NoMedian state exists
 
       ## Completion Criteria
-      - [ ] Pint clean, Larastan clean, full suite green
-      - [ ] Domain doc and index current
+      - [x] Pint clean, Larastan clean, full suite green
+      - [x] Domain doc and index current
 
       ## Git Deliverables
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T18:00:14+00:00'
+    commit:
+      sha: 45bde52a86a9b183228f0430626c7b7f4ca9bf58
+      short_sha: 45bde52
+      subject: 'chore(US-024): TASK-10 domain doc and index current'
+      committed_at: '2026-11-14T19:00:34+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/45bde52a86a9b183228f0430626c7b7f4ca9bf58'
+updated_at: '2026-11-14T18:00:34+00:00'

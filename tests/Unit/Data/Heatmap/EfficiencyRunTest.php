@@ -33,12 +33,6 @@ class EfficiencyRunTest extends TestCase
         $this->assertNull($run->ascentMeters);
     }
 
-    public function test_climb_is_metres_per_kilometre_and_a_missing_ascent_is_flat(): void
-    {
-        $this->assertSame(8.0, $this->efficiencyRun(distanceMeters: 5_000, ascentMeters: 40)->climbMetersPerKm());
-        $this->assertSame(0.0, $this->efficiencyRun(distanceMeters: 5_000, ascentMeters: null)->climbMetersPerKm());
-    }
-
     public function test_the_weekday_counts_from_monday(): void
     {
         $this->assertSame(0, $this->efficiencyRun(date: '2026-10-12')->weekday());

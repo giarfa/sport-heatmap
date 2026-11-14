@@ -34,20 +34,6 @@ final readonly class EfficiencyRun
     }
 
     /**
-     * Metres climbed per kilometre run. A run with no recorded ascent counts as flat:
-     * the column is absent for runs the watch recorded without an altimeter, and
-     * excluding them would drop most treadmill and indoor runs from the measure.
-     */
-    public function climbMetersPerKm(): float
-    {
-        if ($this->distanceMeters <= 0) {
-            return 0.0;
-        }
-
-        return ($this->ascentMeters ?? 0) / ($this->distanceMeters / 1_000);
-    }
-
-    /**
      * The day of the week, Monday = 0, matching the grid's Monday-first rows.
      */
     public function weekday(): int

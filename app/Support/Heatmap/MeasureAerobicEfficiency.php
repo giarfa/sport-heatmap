@@ -141,9 +141,13 @@ final readonly class MeasureAerobicEfficiency
 
     private function isMeasurable(EfficiencyRun $run): bool
     {
+        /*
+         * A stored 0 is "not recorded" for pace and heart rate, exactly as a null is: a 0 bpm
+         * run would scale every pace to nothing and drag the axis and the medians with it.
+         */
         return $run->distanceMeters >= self::MIN_DISTANCE_METERS
-            && $run->paceSecondsPerKm !== null
-            && $run->heartRate !== null;
+            && $run->paceSecondsPerKm !== null && $run->paceSecondsPerKm > 0
+            && $run->heartRate !== null && $run->heartRate > 0;
     }
 
     /**

@@ -133,6 +133,18 @@ class MeasureAerobicEfficiencyTest extends TestCase
         }
     }
 
+    public function test_a_stored_zero_pace_or_heart_rate_is_not_a_recorded_value(): void
+    {
+        $measurement = $this->measure([
+            ...$this->flatRuns(weeks: [8, 9, 10, 11, 12, 13, 14, 15]),
+            $this->windowRun(week: 15, weekday: 1, pace: 0),
+            $this->windowRun(week: 15, weekday: 2, heartRate: 0),
+        ]);
+
+        $this->assertSame(8, $measurement->qualifyingCount);
+        $this->assertCount(8, $measurement->runs);
+    }
+
     public function test_a_run_that_climbs_is_converted_to_its_flat_equivalent_distance(): void
     {
         $measurement = $this->measure([$this->windowRun(week: 15, distance: 5_000, pace: 360, heartRate: 150, ascent: 40)]);
