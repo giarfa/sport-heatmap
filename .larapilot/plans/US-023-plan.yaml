@@ -651,7 +651,7 @@ tasks:
       - TASK-05
       - TASK-07
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Leave the baseline docs current for 3.1.0. Make sure the two touched domain docs agree with the shipped code and with each other, and that the activity-import doc lists every extended metric (AC).
@@ -668,21 +668,27 @@ tasks:
       4. No PRD edit: FR-022 already describes the behaviour.
 
       ## Completion Criteria
-      - [ ] CHANGELOG entry present
-      - [ ] Domain docs match the code, list all 30 stored metrics with unit and empty rule, and carry the English-header and pre-US-023-sync caveats
-      - [ ] README index rows are current
+      - [x] CHANGELOG entry present
+      - [x] Domain docs match the code, list all 30 stored metrics with unit and empty rule, and carry the English-header and pre-US-023-sync caveats
+      - [x] README index rows are current
 
       ## Test Data
       - N/A — documentation only
 
       ## Domain Docs
-      - [ ] `garmin-csv-import.md`, `garmin-api-sync.md`, and (if touched) `heatmap-dashboard.md` current, plus the `README.md` index
-      - [ ] English, committed with this task
+      - [x] `garmin-csv-import.md`, `garmin-api-sync.md`, and (if touched) `heatmap-dashboard.md` current, plus the `README.md` index
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `chore(US-023): TASK-08 document extended run metrics`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: ec47f8322f3c6f6247b513d57bd8113f82b62dbe
+      short_sha: ec47f83
+      subject: 'chore(US-023): TASK-08 document extended run metrics'
+      committed_at: '2026-11-14T15:34:35+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ec47f8322f3c6f6247b513d57bd8113f82b62dbe'
   -
     id: TASK-09
     title: 'Verification: full suite, quality gate, acceptance walk-through, manual test handoff'
@@ -720,4 +726,4 @@ tasks:
       - Commit: `test(US-023): TASK-09 verification and manual test handoff`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
-updated_at: '2026-11-14T14:34:08+00:00'
+updated_at: '2026-11-14T14:34:36+00:00'
