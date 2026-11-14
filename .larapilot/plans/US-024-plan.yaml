@@ -415,7 +415,7 @@ tasks:
     id: TASK-07
     title: 'Aerobic efficiency card: Blade component, CSS port, rail placement'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 5
     dependencies:
@@ -448,25 +448,31 @@ tasks:
       10. `php artisan test`
 
       ## Completion Criteria
-      - [ ] Card sits directly under Weekly distance in the rail at every width; two columns from 1024 px
-      - [ ] Flat filled / hilly ring / steep cross, median solid / last year dashed — never told apart by colour alone
-      - [ ] No horizontal scroll at 375 px; `summary` 44 px row with the layout's focus ring
-      - [ ] Light and dark match the mockups; contrast as the README measures (no new token)
-      - [ ] Every visible difference from the mockups was agreed in chat first
-      - [ ] Tests pass
+      - [x] Card sits directly under Weekly distance in the rail at every width; two columns from 1024 px
+      - [x] Flat filled / hilly ring / steep cross, median solid / last year dashed — never told apart by colour alone
+      - [x] No horizontal scroll at 375 px; `summary` 44 px row with the layout's focus ring
+      - [x] Light and dark match the mockups; contrast as the README measures (no new token)
+      - [x] Every visible difference from the mockups was agreed in chat first
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Functional flow: where the card sits and what each state shows; Technical design: the aerobic-efficiency component and its CSS block
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Functional flow: where the card sits and what each state shows; Technical design: the aerobic-efficiency component and its CSS block
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-07 render the aerobic efficiency card`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: a66b2201470cfa4616e88d637444e2330dace2f2
+      short_sha: a66b220
+      subject: 'feat(US-024): TASK-07 render the aerobic efficiency card'
+      committed_at: '2026-11-14T18:55:02+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/a66b2201470cfa4616e88d637444e2330dace2f2'
   -
     id: TASK-08
     title: 'Feature tests: dashboard card, navigation, freshness, accessibility'
@@ -586,4 +592,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:52:55+00:00'
+updated_at: '2026-11-14T17:55:02+00:00'

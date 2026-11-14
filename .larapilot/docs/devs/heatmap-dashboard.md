@@ -235,7 +235,7 @@ calibrated bands, upper-inclusive.
 | Grid cache | `app/Support/Heatmap/HeatmapGridCache.php`, `config/cache.php` (`serializable_classes`) | Key `heatmap:grid:v7:{user id}:g{generation}:{window start}:{today}`, the generation read from `heatmap:grid:generation:{user id}`; `forgetAthlete()` bumps it; TTL `heatmap.grid_cache_ttl`; the grid's classes are the cache unserialize allowlist |
 | Import status | `app/Support/Garmin/ResolveImportStatus.php`, `app/Data/ImportStatus.php` | Fresh on every request; every user-facing import and sync string |
 | Sync now | `app/Http/Controllers/Garmin/SyncGarminNowController.php`, `routes/web.php` (`garmin.sync`), `AppServiceProvider` (`garmin-sync` limiter), `resources/views/components/sync-warning.blade.php` | The button, its flash, the failure banner (`US-022`) |
-| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `dashboard-empty.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `weekly-trend`, `import-chip`, `import-detail`, `session-notices` | Markup only |
+| Views | `resources/views/dashboard.blade.php`, `layouts/app.blade.php`, `dashboard-empty.blade.php`, `components/heatmap-grid`, `window-nav`, `day-detail`, `run-metric`, `heatmap-legend`, `weekly-trend`, `aerobic-efficiency`, `import-chip`, `import-detail`, `session-notices` | Markup only |
 | Theme | inline head script in `layouts/app.blade.php`, `resources/js/app.js`, `resources/css/app.css` | Light / dark / system, persisted in `localStorage` |
 | Security headers | `app/Http/Middleware/SetSecurityHeaders.php`, registered with `$middleware->prepend()` in `bootstrap/app.php` (`US-018`) | Global: the four headers on every response, HSTS when `isSecure()`; a header already on the response is left alone |
 | Config | `config/heatmap.php` | Literals `window_weeks` (16), `navigation_step_weeks` (4) and `grid_cache_ttl` (86 400); `display_timezone` from `HEATMAP_DISPLAY_TIMEZONE` (a deployment choice) |
@@ -299,6 +299,18 @@ deviation from the mockups, which never drew it (decision `7b05de091be150ce`).
 - **Text alternative**: the SVG title names the reference heart rate, the window and the median's first and latest value; the
   weekly figures table lists, per week, its dates, drawn runs, median and last year's pace (`null` prints "none", never
   `0:00`). Last year's column and key entry exist only when `hasLastYear`.
+
+**Where it shows** (`components/aerobic-efficiency.blade.php`, markup only, mirroring `.larapilot/mockups/US-024/`): the
+fourth rail card, directly under Weekly distance (the aside's name reads "Legend, weekly trend, aerobic efficiency and
+… detail"). It reuses the weekly trend's frame classes (`trend-*`) and adds `eff-*` (`resources/css/app.css`, after the
+"Weekly trend" block; tokens only, no new colour). Per state: **Empty** and **NotEnoughRuns** print their sentence in
+`.trend-empty` under the title and nothing else; **NoMedian** prints its sentence where the headline would be, then the
+chart and figures; **Measured** prints the headline (`6:29 /km at 148 bpm`), the note, the chart, the key and the figures.
+The SVG is `role="img"` named by its `<title>`; its gridlines and lines are `aria-hidden`; run dots are `<span class="eff-dot
+eff-dot--flat|hilly|steep">` in percent over the SVG (flat filled, hilly ring, steep cross — shape, never colour alone);
+last year is a dashed `.eff-lastyear` polyline drawn under the median. The key lists Hilly, Steep and Same weeks last year
+only when present, 4-week median only when a line exists; the "Weekly figures" `<details>` table is the text alternative
+and its Last year column exists only with last-year data.
 
 ## Architectural choices
 
