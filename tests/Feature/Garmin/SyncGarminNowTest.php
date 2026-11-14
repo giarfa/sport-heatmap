@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -83,6 +84,28 @@ class SyncGarminNowTest extends TestCase
         $this->assertSame(1, GarminSync::count());
 
         $this->followRedirects($response)->assertSee('Sync finished: 1 new, 0 updated, 0 linked, 1 ignored, 0 future-dated.');
+    }
+
+    public function test_neither_the_key_nor_the_token_is_in_the_response_of_a_successful_sync(): void
+    {
+        $this->withKey([$this->apiRun(1, '2026-11-10 07:00:00')], key: 'GCDC_response-test-key');
+        $this->signInOwner();
+
+        $response = $this->post(route('garmin.sync'));
+
+        $this->assertResponseHoldsNoSecret($response, (string) $this->followRedirects($response)->getContent());
+    }
+
+    public function test_neither_the_key_nor_the_token_is_in_the_response_of_a_failed_sync(): void
+    {
+        $this->withKey(key: 'GCDC_response-test-key', tokenStatus: 401);
+        $this->signInOwner();
+
+        $response = $this->post(route('garmin.sync'));
+        $page = (string) $this->followRedirects($response)->getContent();
+
+        $this->assertResponseHoldsNoSecret($response, $page);
+        $this->assertStringContainsString('Garmin key rejected — renew it', $page);
     }
 
     public function test_unreadable_activities_are_reported_only_when_there_are_some(): void
@@ -181,6 +204,13 @@ class SyncGarminNowTest extends TestCase
         $dashboard = (string) $this->get('/')->getContent();
         $this->assertStringContainsString('action="'.route('garmin.sync').'"', $dashboard);
         $this->assertMatchesRegularExpression('/<form method="POST" action="[^"]*sync\/garmin"[^>]*>\s*<input type="hidden" name="_token"/', $dashboard);
+    }
+
+    private function assertResponseHoldsNoSecret(TestResponse $response, string $page): void
+    {
+        $this->assertStringNotContainsString('GCDC_response-test-key', $page);
+        $this->assertStringNotContainsString('GCDC_response-test-key', (string) json_encode($response->headers->all()));
+        $this->assertStringNotContainsString('eyJ', $page, 'No JWT-looking token in the page.');
     }
 
     /**
