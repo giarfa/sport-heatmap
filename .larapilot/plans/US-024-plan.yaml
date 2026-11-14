@@ -62,7 +62,7 @@ tasks:
     id: TASK-00
     title: 'Bootstrap feature branch on release/3.2.0'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
@@ -80,9 +80,9 @@ tasks:
       4. Draft the internal PR title/body toward `base` (`release/3.2.0`)
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] Release 3.2.0 is `in_progress` with branch `release/3.2.0`
-      - [ ] PR title/body drafted toward `release/3.2.0` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] Release 3.2.0 is `in_progress` with branch `release/3.2.0`
+      - [x] PR title/body drafted toward `release/3.2.0` (not `develop`)
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
@@ -94,6 +94,12 @@ tasks:
       - Commit: `chore(US-024): TASK-00 bootstrap feature branch for release/3.2.0` (only if the command did not already leave a commit — an empty commit is optional)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally toward `release/3.2.0` — open remote only if the user asks
+    commit:
+      sha: 9c4e285eb68aca2fca91260c6343c0bda07c2d09
+      short_sha: 9c4e285
+      subject: 'chore(US-024): TASK-00 bootstrap feature branch for release/3.2.0'
+      committed_at: '2026-11-14T18:43:07+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9c4e285eb68aca2fca91260c6343c0bda07c2d09'
   -
     id: TASK-01
     title: 'EfficiencyRuns query and EfficiencyRun DTO'
@@ -544,4 +550,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:40:50+00:00'
+updated_at: '2026-11-14T17:43:08+00:00'

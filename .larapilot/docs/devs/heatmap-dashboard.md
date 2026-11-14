@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-023` — 2026-11-14 |
+| **Last updated by** | `US-024` — 2026-11-14 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -201,6 +201,7 @@ calibrated bands, upper-inclusive.
 | Navigation | `app/Support/Heatmap/OldestRunDate.php`, `app/Data/Heatmap/WindowNavigation.php` | The oldest stored run (one `MIN`, outside the cache) and the heading, title, empty note and Previous / Next URLs of the shown window |
 | Weekly trend | `app/Support/Heatmap/BuildWeeklyTrend.php`, `app/Data/Heatmap/WeeklyTrend.php`, `TrendBar.php`, `TrendTick.php` | `US-014`: turns the window's `WeekRow`s into the chart's bars, 4-week average, y axis and every string it prints (below) |
 | Lead-in | `app/Support/Heatmap/LeadInDistance.php` | `US-014`: the three weeks before the window in one grouped query, feeding the first averages |
+| Efficiency reads | `app/Support/Heatmap/EfficiencyRuns.php`, `app/Data/Heatmap/EfficiencyRun.php`, `EfficiencySample.php` | `US-024`: two selective queries per cache miss — the window plus its 3 lead-in weeks (`startsOn − 3 weeks … endsOn`), and the same range shifted back exactly 52 weeks — through `Activity::onDaysBetween()` (never `whereDate()`, so the `(user_id, activity_date)` index serves both). `EfficiencyRun` is scalars only; a metric that was not recorded stays null and a missing ascent counts as flat in `climbMetersPerKm()`. Kept apart from `DailyRunningDistance` / `DailyRuns` / `LeadInDistance` because those feed the grid and its intensity scale (FR-006): widening them by three weeks or a year would let weeks the reader cannot see move the legend and every cell's level |
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
