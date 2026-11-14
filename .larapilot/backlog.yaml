@@ -1331,3 +1331,139 @@ specs:
       subject: 'chore(US-021): log usage'
       committed_at: '2026-10-26T22:08:15+01:00'
       url: 'https://github.com/giarfa/sport-heatmap/commit/efb88de8d008b30cca08eafcd1b24c43de9374b1'
+  -
+    code: US-022
+    title: 'Automatic Garmin Connect sync: daily schedule and Sync now'
+    epic:
+      code: EP-002
+      title: 'Activity sync'
+    priority: HIGH
+    points: 8
+    status: PLANNED
+    body: |
+      #### US-022: Automatic Garmin Connect sync: daily schedule and Sync now
+
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 8 | **Status:** PLANNED
+      **Blocked by:** -
+      **Type:** Change request
+      **Release:** 3.1.0
+      **Supersedes:** US-021 criteria "`php artisan schedule:list` lists no task" and "no stale, failed, or reconnect warning exists in any state" · FR-007 "Last import visibility" as shipped in US-021
+      **Traces to:** FR-002 (changed: Once-daily automated Garmin sync — Won't → Must) · FR-010 (changed: Sync now — Won't → Must) · FR-007 (changed: Last sync and import visibility, Must) · FR-003 · FR-017 · FR-018 · Technical Architecture (Data import, Data model, Security, Deploy, CLI tooling, Documentation)
+      **Journey:** none — the PRD has no journeys; a second data source behind the existing dashboard
+      **Prior art:** custom on Laravel's HTTP client — Garmin's only official client is Python (`garmin/connect-personal-api-python`, Apache-2.0) and no maintained PHP package exists
+
+      **User Story**
+      As the Committed Amateur Runner, owner and only user of this instance,
+      I want my runs pulled from Garmin Connect automatically every day, and on demand with a Sync now button,
+      so that the heatmap is current without exporting and uploading a CSV after every run.
+
+      **Demonstrates**
+      After implementing this spec, with `GARMIN_API_KEY` set, `php artisan garmin:sync` (and the scheduled run, and Sync now) stores the owner's whole Garmin running history as runs, a second run changes nothing, CSV-imported runs are linked rather than duplicated, and the dashboard reads "last sync N ago" — or names the cause when the latest sync failed.
+
+      **API facts (probed 2026-11-14 with the owner's key)**
+      - Base `https://personal.connectapi.garmin.com`. `POST /personalapitoken-service/personal-api/personal-api-key/token` with `Authorization: ApiKey {key}` answers a **raw JWT body** (not JSON) with an `exp` claim, valid 24 h, no refresh token
+      - Data calls: `Authorization: Bearer {token}`, `Accept: application/json`
+      - `GET /activitylist-service/activities/search/activities?start=&limit=&startDate=&endDate=` answers a JSON array; fields used here: `activityId`, `activityName`, `activityType.typeKey`, `startTimeLocal` (`Y-m-d H:i:s`), `distance` (m, float), `movingDuration` (s, float), `averageSpeed` (m/s), `elevationGain` (m), `averageHR` (bpm)
+      - Running `typeKey` values: `running`, `street_running`, `track_running`, `indoor_running`, `treadmill_running`, `ultra_run`, `obstacle_run` → `Run`; `trail_running` → `TrailRun`; `virtual_run` → `VirtualRun`
+      - No rate limit or maximum window is published
+
+      **Acceptance Criteria**
+
+      _Sync (FR-002, FR-003)_
+      - [ ] With `GARMIN_API_KEY` set, `php artisan garmin:sync` exchanges the key for a token, reuses a cached token until one hour before its `exp`, and reads the owner's activities through the activity search, paging with `start`/`limit` until a page comes back short
+      - [ ] The command is scheduled once a day; `php artisan schedule:list` shows it
+      - [ ] Only the running `typeKey` values above are stored, mapped to `Run`, `TrailRun`, or `VirtualRun`; every other type is ignored and counted; an activity whose local start is after today is skipped and counted as future-dated
+      - [ ] Each stored run carries `source` `garmin_api`, the unique `garmin_activity_id`, name, `distance_meters` (rounded integer), `moving_time_seconds` (rounded), `start_date_local` and `activity_date` from `startTimeLocal`, pace as `round(1000 / averageSpeed)` s/km, ascent and average heart rate as rounded integers; a null or zero `averageSpeed`, a null `elevationGain` or `averageHR` stores an empty metric, never 0
+      - [ ] The first sync (no run with a Garmin id stored) reads the whole history; later syncs re-read at least the last 7 days, and a run renamed or edited on Garmin in that span is updated
+      - [ ] A synced activity on the same date within ±2 minutes of a stored run with no Garmin id is the same run: it gains the Garmin id and the API values, no second run is created, and no review is shown
+      - [ ] Running the sync twice in a row changes nothing; a run deleted on Garmin stays stored
+      - [ ] After a sync that writes at least one run, every cached window, the intensity scale, and the trend show the new data
+
+      _Sync now (FR-010)_
+      - [ ] The dashboard shows a "Sync now" button only when `GARMIN_API_KEY` is set; it is a CSRF-protected, throttled `POST`, and a signed-out request is redirected to `/login` and calls nothing
+      - [ ] After it finishes, the dashboard reports new, updated, linked, ignored, and future-dated counts, or the failure cause
+      - [ ] Only one sync runs at a time: a Sync now while the scheduled or another sync runs is refused with a message and starts nothing
+
+      _Status and failures (FR-007, FR-017)_
+      - [ ] Every attempt is recorded in `garmin_syncs` with trigger (scheduled / manual), start and end time, outcome, failure cause, and counts
+      - [ ] The status line shows the more recent of "last sync N ago" (a successful sync, even one that wrote nothing) and "last import N ago" (a confirmed CSV import that wrote a row)
+      - [ ] While the latest attempt failed, a warning reads "Garmin key rejected — renew it" when the token exchange answers 401 or 403, or "Garmin unreachable" on a timeout, connection error, or 5xx; the next successful sync removes it
+      - [ ] A 401 on a data call re-exchanges the token once and retries; a second refusal records the key-rejected failure
+      - [ ] A failed or partial sync keeps every run written before the failure
+      - [ ] With no `GARMIN_API_KEY`, the scheduled run calls nothing and records nothing, no Sync now or sync status appears, and the dashboard behaves exactly as today
+
+      _Coexistence with the CSV import (FR-018)_
+      - [ ] The CSV upload, conflict review, summary counts, throttle, and idempotent re-import behave as before; a CSV row matching an API-synced run goes through the same review, and Overwrite keeps its `garmin_activity_id`
+
+      _Security, docs, tests_
+      - [ ] The key and the token never appear in the database, a log line, an exception message, or a response; `.env.example` carries an empty `GARMIN_API_KEY`
+      - [ ] `README.md` explains creating and renewing the key (connect.garmin.com → Settings → Personal API token, expiry 30 days to one year) and the scheduler cron entry needed on the host (Cipi production)
+      - [ ] Feature tests fake every Garmin HTTP call (no test reaches Garmin): raw-JWT token exchange and reuse, paging, type mapping, metric rounding and empty metrics, linking a CSV run, idempotence, the 401 retry, both failure warnings, no-key behaviour, the concurrency refusal, and the signed-out redirect
+      - [ ] The developer domain doc for activity import under `.larapilot/docs/devs/` describes the Garmin sync
+    status_history:
+      - { status: PLANNED, at: '2026-11-14T12:29:45+00:00' }
+    rework: false
+  -
+    code: US-023
+    title: 'Extended run metrics from the Garmin API and the Garmin CSV'
+    epic:
+      code: EP-002
+      title: 'Activity sync'
+    priority: HIGH
+    points: 5
+    status: TODO
+    body: |
+      #### US-023: Extended run metrics from the Garmin API and the Garmin CSV
+
+      **Epic:** EP-002 | **Priority:** HIGH | **Points:** 5 | **Status:** TODO
+      **Blocked by:** US-022
+      **Type:** Feature
+      **Release:** 3.1.0
+      **Traces to:** FR-022 (new — Extended run metrics, MoSCoW: Must) · FR-002 · FR-018 · FR-003
+      **Journey:** none — the PRD has no journeys; data enrichment behind the existing import and sync
+      **Prior art:** built-in — PHP's CSV reader and the US-022 client; no package
+
+      **User Story**
+      As the Committed Amateur Runner, owner and only user of this instance,
+      I want every run to keep the richer values Garmin records — effort, running form, course, and bests — whether it came from the sync or the CSV, including runs I imported before,
+      so that my history is complete and ready for later views without re-exporting anything.
+
+      **Demonstrates**
+      After implementing this spec, re-importing the sample export reports its runs as enriched and they carry calories, max HR, cadence, and the other extended values; a Garmin sync stores the same values plus HR zones, fastest splits, and the location name; the dashboard looks exactly as before.
+
+      **Extended metrics (empty when the source does not carry them, never 0)**
+
+      | Metric | CSV (Italian / English) | API field |
+      | --- | --- | --- |
+      | Calories | `Calorie` / `Calories` | `calories` |
+      | Max heart rate (bpm) | `FC max` / `Max HR` | `maxHR` |
+      | Aerobic training effect (one decimal) | `TE aerobico` / `Aerobic TE` | `aerobicTrainingEffect` |
+      | Avg / max running cadence (spm) | `Cadenza di corsa media` / `Cadenza di corsa max` · `Avg Run Cadence` / `Max Run Cadence` | `averageRunningCadenceInStepsPerMinute` / `maxRunningCadenceInStepsPerMinute` |
+      | Best pace (s/km) | `Passo migliore` / `Best Pace` | from `maxSpeed` |
+      | Total descent (m) | `Discesa totale` / `Total Descent` | `elevationLoss` |
+      | Avg stride length | `Lunghezza media passo` / `Avg Stride Length` | `avgStrideLength` |
+      | Avg vertical ratio (%) | `Rapporto verticale medio` / `Avg Vertical Ratio` | `avgVerticalRatio` |
+      | Avg vertical oscillation | `Oscillazione verticale media` / `Avg Vertical Oscillation` | `avgVerticalOscillation` |
+      | Avg ground contact time (ms) | `Tempo medio di contatto con il suolo` / `Avg Ground Contact Time` | `avgGroundContactTime` |
+      | Avg GCT balance (%) | `Bilanciamento TCS medio` / `Avg GCT Balance` | `avgGroundContactBalance` |
+      | Steps | `Passi` / `Steps` | `steps` |
+      | Laps | `Numero di Lap` / `Number of Laps` | `lapCount` |
+      | Elapsed time (s) | `Tempo trascorso` / `Elapsed Time` | `elapsedDuration` |
+      | Min / max elevation (m) | `Quota minima` / `Quota massima` · `Min Elev` / `Max Elev` | `minElevation` / `maxElevation` |
+      | Training Stress Score | `Training Stress Score®` | — (CSV only) |
+      | Time in HR zones 1–5 (s) | — | `hrTimeInZone_1` … `hrTimeInZone_5` (API only) |
+      | Fastest 1 km / 1 mile / 5 km (s) | — | `fastestSplit_1000` / `fastestSplit_1609` / `fastestSplit_5000` (API only) |
+      | Location name | — | `locationName` (API only) |
+
+      English header names are confirmed against a real English export during planning; units of stride length and vertical oscillation are normalised to one unit per metric across both sources.
+
+      **Acceptance Criteria**
+      - [ ] Each run stores the extended metrics in the table above when its source carries them; a missing column, a `--` placeholder, a null API field, or an unreadable value leaves that metric empty, never 0, and never rejects the row
+      - [ ] Importing the sample export (`client-materials/Activities (1).csv`) stores the extended values of its `Corsa` rows from the Italian headers; an English export stores the same values from the English headers
+      - [ ] Re-importing an export over runs that are already stored and lack extended metrics fills them without a conflict review; the summary reports them as **enriched**; a second re-import of the same file changes nothing
+      - [ ] On Overwrite a `--` extended metric keeps the stored value, as for pace, ascent, and heart rate today
+      - [ ] A Garmin sync (US-022) stores the extended metrics of every run it reads, a linked CSV run included; the CSV-only Training Stress Score of a linked run is kept
+      - [ ] No start or end coordinates are stored from either source
+      - [ ] The day cell detail, grid, legend, scale, and trend render exactly as before; no extended metric is displayed
+      - [ ] The migration adds only nullable columns, keeps every stored run and value, and its `down()` drops only the new columns
+      - [ ] Tests cover Italian and English extended columns, `--` and missing columns, enrichment and its idempotence, Overwrite keeping stored values on `--`, and the API mapping from a faked search response; the developer domain doc for activity import lists the extended metrics

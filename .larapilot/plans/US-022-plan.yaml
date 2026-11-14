@@ -1,0 +1,572 @@
+code: US-022
+plan_body: |-
+  **Release:** 3.1.0
+
+  ## Technical Solution
+
+  A second way runs enter: the owner's Garmin Connect Personal API, read once a day by the scheduler and on demand by a "Sync now" button. The CSV import stays as it is; both sources share `StartTimeMatcher` (±2 min, same local date) and the `activities` table.
+
+  ### Components (all under the Garmin sub-namespace of each layer, `.ai/rules/app.md`)
+
+  | Layer | Class | Job |
+  | --- | --- | --- |
+  | Enums | `ActivitySource` (`garmin_csv`, `garmin_api`), `GarminSyncTrigger` (`scheduled`, `manual`), `GarminSyncOutcome` (`running`, `succeeded`, `failed`), `GarminSyncFailure` (`key_rejected`, `unreachable`, `unexpected`) | Data-model vocabulary |
+  | Model | `GarminSync` (`garmin_syncs`) | One row per attempt: trigger, started_at, finished_at, outcome, failure_cause, `full_history` flag, counts `new` / `updated` / `linked` / `ignored` / `future_dated` / `invalid` |
+  | Support | `GarminPersonalApiClient` | Key → raw-JWT token exchange, token reuse from the **file** cache store until one hour before `exp`, activity search page, one re-exchange + retry on a data-call 401, HTTP failures mapped to `GarminApiException(GarminSyncFailure)` |
+  | Data | `GarminApiActivity::fromApiPayload()`, `GarminSyncCounts`, `GarminSyncResult` | Readonly DTOs at the API boundary (`.ai/rules/data.md`); no raw payload reaches the action or Eloquent |
+  | Support | `GarminRunningTypes::sportTypeForTypeKey()` | API `typeKey` → `Run` / `TrailRun` / `VirtualRun`, beside the existing CSV label map |
+  | Action | `SyncGarminActivities` | Lock, record the attempt, choose the window, page, match / link / create / update, per-page transactions, grid-cache invalidation, finalise the row |
+  | Console | `garmin:sync` (`app/Console/Commands/GarminSyncCommand`), scheduled daily in `routes/console.php` | Thin wrapper over the action; `--scheduled` marks the scheduler's trigger, a bare CLI run is `manual` |
+  | HTTP | `POST /sync/garmin` → `Garmin\SyncGarminNowController`, `throttle:garmin-sync` | Sync now, in the `auth` + `password.set` group |
+  | Status | `ImportStatus` + `ResolveImportStatus` extended | Last sync vs last import, latest failure, whether the sync is configured |
+  | Views | `x-sync-warning`, action line, empty state, rail card | UI per decision aad88aa01db73362 |
+
+  ### Key rules the implementation must hold
+
+  1. **Token storage (decision dffd4adf33c2d285):** the access token lives only in `Cache::store(config('services.garmin.token_cache_store'))`, a literal `'file'` in `config/services.php`; never the default store (`CACHE_STORE=database` would put it in SQLite). Tests `Config::set()` it to `array`. The key is read only from `config('services.garmin.api_key')` (`env('GARMIN_API_KEY')` inside `config/` only).
+  2. **Token lifetime:** the body of the token call is a raw JWT (trim whitespace and quotes); `exp` is read by base64url-decoding the payload segment (no signature check — we are the client, not the verifier). Cached until `exp - 3600`. An unreadable token or a missing `exp` is an `unexpected` failure, never a guessed TTL.
+  3. **Failure mapping:** token call 401/403 → `key_rejected`; data call 401 → forget the token, re-exchange once, retry once; a second 401/403 → `key_rejected`; `ConnectionException`, timeout, 5xx, 429 → `unreachable`; any other status or an unreadable JSON body → `unexpected`. Exception messages and log context carry only the cause and the HTTP status — never the key, the token, a response body, or a URL with query (`.ai/rules/app.md`, **Never let credentials reach logs**). Chain the previous exception with a fresh message.
+  4. **Window:** full history (no `startDate`) when no run carries a `garmin_activity_id` **or** no `succeeded` sync with `full_history = true` exists — so a first sync that failed half-way is re-run in full rather than shrinking to the last 7 days of what it stored. Otherwise `startDate` = (newest `activity_date` of a run with a Garmin id) − 7 days, `endDate` = today; this always covers at least the last 7 days and also bridges a run of failed nightly syncs. Paging: `start` += `limit` (literal page size 100) until a page returns fewer than `limit` items.
+  5. **Matching, per API activity:** (a) a stored run with the same `garmin_activity_id` → compare every API-owned column, write only when something differs (`updated`), else untouched; (b) else the `StartTimeMatcher::closest()` among the owner's runs on that date **with no Garmin id** → gains the id, the API values, `source = garmin_api` (`linked`, no review); (c) else create (`new`). Candidates for one page are loaded in **one query** (owner's runs whose `activity_date` falls within the page's min/max date, on the `(user_id, activity_date)` index) — no per-activity query. A run absent from Garmin is never deleted.
+  6. **Filtering:** non-running `typeKey` → `ignored`; local start date after today (same `now()` rule as `ParseGarminCsv`) → `future_dated`; missing `activityId`, `startTimeLocal`, `distance`, or `movingDuration` → `invalid` (counted, skipped, never aborts the sync).
+  7. **Values:** `distance_meters = round(distance)`, `moving_time_seconds = round(movingDuration)`, `start_date_local` / `activity_date` from `startTimeLocal` (wall clock, built in UTC like `GarminCsvRow`), `average_pace_seconds_per_km = round(1000 / averageSpeed)` or null when `averageSpeed` is null or 0, `total_ascent_meters = round(elevationGain)` or null, `average_heart_rate = round(averageHR)` or null — never 0 for a missing metric. On an update or a link, a null API metric keeps the stored value (the same rule as a `--` cell on CSV Overwrite), so a metric backfilled from the CSV is never blanked.
+  8. **Partial writes:** each page is written in its own `DB::transaction`; a failure on page N keeps pages 1..N-1, records `failed` with the cause and the counts so far. After any attempt that wrote at least one row (success or failure), `HeatmapGridCache::forgetAthlete()` runs, so every window, the intensity scale and the trend show the new data.
+  9. **One sync at a time:** `Cache::lock('garmin:sync', 1800)->get()` on the default store (the lock holds no secret; `cache_locks` already exists). Not acquired → `GarminSyncAlreadyRunning`: Sync now flashes "A Garmin sync is already running — nothing started.", the command prints the same and exits 1; nothing is recorded, nothing is called. The lock is released in `finally`.
+  10. **No key:** with an empty `GARMIN_API_KEY` the command prints that nothing is configured and exits 0, calls nothing, records nothing; the dashboard shows no Sync now, no sync status, no warning — exactly today's behaviour; `POST /sync/garmin` redirects to the dashboard with a notice and calls nothing.
+  11. **CSV coexistence:** CSV rows keep `source = garmin_csv` (column default + explicit on Overwrite); Overwrite never touches `garmin_activity_id` (it is not in `toAttributes()` and not `#[Fillable]`). Accepted trade-off, documented in the domain doc: for a run with a Garmin id the API is authoritative, so a CSV Overwrite of a run dated within the next sync's re-read span is replaced by the API values at that sync.
+  12. **Status (FR-007):** "last sync" = `finished_at` of the newest `succeeded` attempt (even one that wrote nothing); "last import" = newest `updated_at` among runs with `source = garmin_csv`; the chip shows the more recent. Warning while the newest **finished** attempt is `failed`: "Garmin key rejected — renew it" (`key_rejected`), "Garmin unreachable" (`unreachable`), "Garmin sync failed" (`unexpected`). Read fresh per request, outside the grid cache, two indexed queries on `garmin_syncs`.
+
+  ### Data model (Mike)
+
+  - `activities`: add `source` (string, not null, default `garmin_csv` — every existing row is a CSV import) and `garmin_activity_id` (unsigned big integer, nullable, unique). Both stay **out of `#[Fillable]`** (`.ai/rules/models.md`): the action assigns them explicitly.
+  - `garmin_syncs`: `id`, `trigger`, `started_at`, `finished_at` (nullable while running), `outcome`, `failure_cause` (nullable), `full_history` (bool), six unsigned integer counts default 0, timestamps; index `(outcome, finished_at)` for the two status queries. No key, token, URL or response body column exists.
+  - Integer primary keys, not UUIDs: the existing schema uses auto-increment ids and the PRD data model keeps them (Security baseline UUID default intentionally not applied — existing codebase opt-out).
+
+  ### Scheduling & runtime
+
+  - `Schedule::command('garmin:sync --scheduled')->dailyAt('05:00')->timezone(config('heatmap.display_timezone'))` — early morning in the owner's wall clock so yesterday's evening run is there at breakfast; Sync now covers the rest. `php artisan schedule:list` lists it.
+  - No queue: the PRD records Sync now as synchronous inside its request. HTTP timeouts: connect 5 s, request 20 s. README recommends running the very first full-history sync from the CLI (`php artisan garmin:sync`) on the host, because a long history can exceed the web server's request timeout; a cut-off first sync is safe (rule 4 re-reads in full).
+
+  ## Git & Branching
+  - Mode: `GITFLOW` (no automatic push), release mode on
+  - Branch: `feature/US-022-garmin-connect-sync` from `release/3.1.0`, opened by `php artisan larapilot:release-feature --semver=3.1.0 --spec=US-022 --slug=garmin-connect-sync`
+  - TASK-00: bootstrap via `release-feature`
+  - Per task: one Conventional Commit `type(US-022): TASK-NN …` with code, tests and domain docs together; no push, no remote PR unless the owner asks
+  - PR base: `release/3.1.0` (not `develop`), drafted locally
+  - Merge after `larapilot-review` approval (auto-approve is on)
+
+  ## Test Data Strategy
+  - Mike/Alex keep factories and seeders current in the same task as the schema change
+  - `ActivityFactory`: new `garminSynced()` state (`source = garmin_api`, unique `garmin_activity_id` from a realistic 11-digit sequence); `garminImported()` sets `source = garmin_csv` explicitly
+  - `GarminSyncFactory` (new): states `succeeded()`, `failed(GarminSyncFailure)`, `running()`, `manual()`, `scheduled()`, `fullHistory()`
+  - `TrainingBlockSeeder`: the last 4 weeks of the 16-week block become API-synced runs (with Garmin ids), the rest stay CSV-imported; one `succeeded`, `full_history` scheduled sync row finished this morning, so the dashboard shows "Last sync" out of the box
+  - **Never `migrate:fresh --seed` on the dev database** (`database/database.sqlite` holds the owner's real runs and there is no `.env.testing`): seeders are verified by `TrainingBlockSeederTest` / `SeederMeetsMigrationOwnerTest` on the in-memory test database; the additive migration is applied to dev with `php artisan migrate` only after copying `database/database.sqlite` aside
+
+  ## Test Strategy
+  - Bar: `NORMAL` — Pest/PHPUnit feature and unit tests (the project's existing class-based `Tests\TestCase` style); no Playwright, Dusk, browser or viewport suites
+  - Every test touching the client: `Http::preventStrayRequests()` in `setUp()` + `Http::fake()` (`.ai/rules/tests.md`); `phpunit.xml` pins `GARMIN_API_KEY` to empty so the owner's real key in `.env` never reaches a test; the token store is `Config::set('services.garmin.token_cache_store', 'array')`
+  - Signed-in tests use `signInOwner()`
+  - Interleaved: client tests (TASK-03) right after the client, sync tests (TASK-05) right after the action, HTTP/status tests (TASK-07) right after the UI, coexistence tests inside TASK-08
+  - Existing tests superseded by this spec are rewritten, not deleted silently: `ScheduleTest::test_nothing_is_scheduled`, `ImportStatusTest::test_no_state_renders_a_warning` (kept, scoped to no key), the `role="alert"` assertions in `StravaRemovedTest` (still valid with no key — keep them green)
+  - Secret leakage is asserted, not assumed: after a sync, the `cache`, `garmin_syncs`, `activities` tables and every `Log` call contain neither the fake key nor the fake token
+  - `RouteAccessTest` walks the route table, so the new `POST /sync/garmin` is covered by the signed-out and no-password gates automatically
+  - **Manual test handoff (owner, after TASK-10):** with the real `GARMIN_API_KEY` in `.env`, back up `database/database.sqlite`, run `php artisan garmin:sync`, check the counts and that CSV runs were linked not duplicated, run it again (all zero), press Sync now on the dashboard, temporarily set a wrong key and check "Garmin key rejected — renew it", restore it and check the warning clears; check 375 / 768 / 1280 px in light and dark
+
+  ## Quality
+  - `php artisan larapilot:quality` (Pint + Larastan level 5) green before every `task-done`; `vendor/bin/pint --dirty --format agent` after PHP edits
+  - `.ai/rules` honoured: single-action invokable controllers, no Form Request for a field-less POST, Actions never authorize, readonly DTOs at the boundary, block `/* … */` rationale comments, `#[Fillable]`/`#[Hidden]` attributes, full `@property` docblocks
+
+  ## Risks
+  - **Undocumented API:** no rate limit or max window is published — the client pages politely (sequential, 100 per page) and logs status codes only. A payload field that changes shape becomes `invalid` / `unexpected`, never a crash with a secret in the message.
+  - **Long first sync over HTTP** — mitigated by the CLI recommendation and by rule 4.
+  - **US-023** (same release) adds extended metrics to `GarminApiActivity` and the CSV row: keep `fromApiPayload()` and the API-owned column list in one place so US-023 extends them without touching the matching logic.
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch on release/3.1.0'
+    body: |-
+      ## Description
+      Bootstrap Gitflow for this spec on release `3.1.0`: create `feature/US-022-garmin-connect-sync` from `release/3.1.0` and prepare the internal PR description toward `release/3.1.0`. Do **not** push unless the owner asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. `php artisan larapilot:release-feature --semver=3.1.0 --spec=US-022 --slug=garmin-connect-sync` (it opens `release/3.1.0` from `develop` while the release is still `planned`)
+      2. Read `branch`, `base`, and `checked_out` from the JSON. Stop if `checked_out` is false and surface `reason` — `develop` currently carries uncommitted `.larapilot/` artifacts; commit them only with the owner's OK, the way the project already logs Larapilot sessions (`chore(release): …`)
+      3. Draft the internal PR title/body toward `base` (`release/3.1.0`): title `US-022: Automatic Garmin Connect sync: daily schedule and Sync now`
+
+      ## Completion Criteria
+      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
+      - [ ] PR title/body drafted toward `release/3.1.0` (not `develop`)
+
+      ## Test Data
+      - N/A — git only
+
+      ## Domain Docs
+      - N/A — no behaviour change
+
+      ## Git Deliverables
+      - Commit: `chore(US-022): TASK-00 bootstrap feature branch for release/3.1.0` (only if the command did not already leave a commit — an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/3.1.0` — open remote only if the owner asks
+    type: Impl
+    status: TODO
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+  -
+    id: TASK-01
+    title: 'Schema: activities.source + garmin_activity_id, garmin_syncs, enums, GarminSync model, factories and seeder'
+    body: |-
+      ## Description
+      Add the data model the sync writes into: re-introduce `activities.source` (`garmin_csv` default — every stored run today is a CSV import) and a nullable unique `garmin_activity_id`; create `garmin_syncs` with its model, enums, factory, and seed data, so the demo dataset carries API-synced runs and a successful sync.
+
+      ## Files Involved
+      - `database/migrations/xxxx_add_garmin_sync_to_activities_table.php` (`php artisan make:migration --no-interaction`)
+      - `database/migrations/xxxx_create_garmin_syncs_table.php`
+      - `app/Enums/ActivitySource.php`, `app/Enums/GarminSyncTrigger.php`, `app/Enums/GarminSyncOutcome.php`, `app/Enums/GarminSyncFailure.php` (TitleCase cases)
+      - `app/Models/Activity.php` — `source` cast to `ActivitySource`, `garmin_activity_id` integer cast, `@property` lines; both columns **stay out of `#[Fillable]`** (`.ai/rules/models.md`), with the block comment saying why
+      - `app/Models/GarminSync.php` (`php artisan make:model GarminSync -f --no-interaction`) — `#[Fillable]` for trigger/started_at/outcome/full_history/counts/finished_at/failure_cause, casts to the enums + datetimes + bool + ints, full `@property` docblock, `#[Scope]` `succeeded()` and `finished()` helpers
+      - `database/factories/ActivityFactory.php` — `garminSynced()` state (`source` api, unique 11-digit `garmin_activity_id`), `garminImported()` sets `source` csv
+      - `database/factories/GarminSyncFactory.php` — `succeeded()`, `failed(GarminSyncFailure)`, `running()`, `manual()`, `scheduled()`, `fullHistory()`
+      - `database/seeders/TrainingBlockSeeder.php` — last 4 weeks as API-synced runs with ids, one succeeded full-history scheduled sync finished this morning
+      - `tests/Feature/Database/SchemaTest.php`, `tests/Unit/Models/ActivityTest.php`, `tests/Feature/Database/TrainingBlockSeederTest.php` — extended
+
+      ## Steps
+      1. Migration on `activities`: `$table->string('source')->default('garmin_csv')`; `$table->unsignedBigInteger('garmin_activity_id')->nullable()->unique()`. `down()` drops the unique index first, then both columns (SQLite rebuild — see the comment in `remove_strava_from_schema`)
+      2. Migration `garmin_syncs`: columns per plan body **Data model**; index `['outcome', 'finished_at']`
+      3. Enums with string backing values exactly `garmin_csv`/`garmin_api`, `scheduled`/`manual`, `running`/`succeeded`/`failed`, `key_rejected`/`unreachable`/`unexpected`; `GarminSyncFailure::warning(): string` returns "Garmin key rejected — renew it" / "Garmin unreachable" / "Garmin sync failed" (the one place the copy lives)
+      4. Models, factories, seeder as listed
+      5. Verify with `php artisan test --filter='SchemaTest|ActivityTest|TrainingBlockSeederTest|SeederMeetsMigrationOwnerTest'` on the in-memory DB. **Do not run `migrate:fresh --seed`** on the dev DB; to try it on dev, copy `database/database.sqlite` aside and run `php artisan migrate`
+
+      ## Completion Criteria
+      - [ ] Existing rows read back with `source = garmin_csv` after the migration; `garmin_activity_id` is unique and nullable
+      - [ ] `garmin_syncs` has no column able to hold a key, token, URL or response body
+      - [ ] `source` and `garmin_activity_id` are not mass-assignable (a test asserts `fill()` ignores them)
+      - [ ] Factories produce valid, domain-realistic records; seeder yields CSV + API runs and one succeeded sync
+      - [ ] Migration rolls back one step cleanly
+      - [ ] Tests pass; `php artisan larapilot:quality` green
+
+      ## Test Data
+      - [ ] `ActivityFactory` `garminSynced()` / `garminImported()` updated in this task
+      - [ ] `GarminSyncFactory` created with the states above
+      - [ ] `TrainingBlockSeeder` composes both sources and a sync history (no orphan rows)
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — **Data model (`activities`)** section: `source`, `garmin_activity_id`, why both stay out of `#[Fillable]`, why integer ids
+      - [ ] `.larapilot/docs/devs/garmin-api-sync.md` created from `TEMPLATE.md` with its **Data model** (`garmin_syncs`, the enums) — the rest is filled by TASK-02/04
+      - [ ] Folder `README.md` index row added for `garmin-api-sync`; English; committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-022): TASK-01 add Garmin sync schema with factories and seeder`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Mike
+    estimate_hours: 3
+    dependencies:
+      - TASK-00
+  -
+    id: TASK-02
+    title: 'Garmin Personal API client, config, and the activity DTO'
+    body: |-
+      ## Description
+      Hand-rolled client on Laravel's HTTP client (no package — PRD prior art): key → raw-JWT token, token reuse from the file cache store until one hour before `exp`, one activity-search page, one re-exchange + retry on a data-call 401, and every HTTP failure mapped to a cause that carries no secret. Plus the DTO that turns one API activity into run values.
+
+      ## Files Involved
+      - `config/services.php` — `garmin` block: `api_key => env('GARMIN_API_KEY')`; literals `base_url` (`https://personal.connectapi.garmin.com`), `token_path`, `activities_path`, `page_size` (100), `resync_days` (7), `token_cache_store` (`'file'`, decision dffd4adf33c2d285), `connect_timeout` (5), `timeout` (20) — endpoint URLs are literals (`.ai/rules/config.md`)
+      - `.env.example` — empty `GARMIN_API_KEY=` under a `# Garmin Connect Personal API` comment
+      - `phpunit.xml` — `<env name="GARMIN_API_KEY" value=""/>` so the owner's real key in `.env` never reaches a test
+      - `app/Support/Garmin/GarminPersonalApiClient.php` (`php artisan make:class --no-interaction`)
+      - `app/Exceptions/Garmin/GarminApiException.php` — carries `GarminSyncFailure $cause` and `?int $status`; fixed messages only
+      - `app/Data/Garmin/GarminApiActivity.php` — final readonly; `fromApiPayload(array $payload): ?self` (null when a required field is missing/unreadable), `sportTypeKey`, `toRunAttributes()` + `metricAttributes()` (non-null metrics only)
+      - `app/Support/Garmin/GarminRunningTypes.php` — add `sportTypeForTypeKey(string $typeKey): ?SportType` with the nine API keys from FR-003
+      - `tests/Feature/Config/EnvironmentExampleTest.php` — `GARMIN_API_KEY` present and empty
+
+      ## Steps
+      1. Config + `.env.example` + `phpunit.xml`
+      2. Client: `Http::baseUrl()->connectTimeout()->timeout()`; `token()` → `POST` with `Authorization: ApiKey {key}`; trim the body; base64url-decode the payload segment; read `exp`; `Cache::store(config('services.garmin.token_cache_store'))->put($key, $token, exp - 3600 - now)`; never the default store
+      3. `activities(int $start, int $limit, ?CarbonInterface $startDate, ?CarbonInterface $endDate): array<int, array<string, mixed>>` with `Authorization: Bearer`, `Accept: application/json`; on 401: forget, re-exchange, retry once; second 401/403 → `key_rejected`
+      4. Failure mapping per plan body rule 3; catch `ConnectionException` and `RequestException`; new exception with a fixed message (`'Garmin token exchange refused (HTTP 401).'`), previous chained — never `$e->getMessage()` of the HTTP exception (it embeds the URL and body)
+      5. DTO per plan body rule 7: rounding, null for null/0 `averageSpeed`, null `elevationGain`/`averageHR`; `startTimeLocal` parsed `Y-m-d H:i:s` in UTC as wall clock (same as `GarminCsvRow::wallClock`)
+      6. Block comments for every non-obvious choice (raw JWT, `exp` − 1 h, file store, chained message)
+
+      ## Completion Criteria
+      - [ ] No key, token, response body, or query URL in any exception message or log context
+      - [ ] Token reused from the file store until one hour before `exp`; never written to the default cache
+      - [ ] `GARMIN_API_KEY` empty in `.env.example` and `phpunit.xml`
+      - [ ] `php artisan larapilot:quality` green
+
+      ## Test Data
+      - N/A — no model/schema changes in this task (fixtures for the API live in TASK-03)
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/garmin-api-sync.md` — **Technical design** (client, DTO, config keys), **Architectural choices** (no package — Python-only official client; raw JWT read without verification; file store over the database cache, decision dffd4adf33c2d285; rejected: storing the token in a column, encrypting it in the database cache), **Key decisions & invariants** (failure mapping table, secret hygiene)
+      - [ ] Folder `README.md` index row refreshed; English; committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-022): TASK-02 add the Garmin Personal API client and activity DTO`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Matt
+    estimate_hours: 4
+    dependencies:
+      - TASK-01
+  -
+    id: TASK-03
+    title: 'Tests: API client token lifecycle, failure mapping, DTO mapping'
+    body: |-
+      ## Description
+      Pin the client and the DTO against faked Garmin responses; no test reaches Garmin.
+
+      ## Files Involved
+      - `tests/Feature/Garmin/GarminPersonalApiClientTest.php`
+      - `tests/Unit/Data/Garmin/GarminApiActivityTest.php`
+      - `tests/Unit/Support/Garmin/GarminRunningTypesTest.php` (API keys)
+      - `tests/Fixtures/Garmin/api/` — `activities-page-*.json` built from the API facts in the spec (running, trail, virtual, cycling, a future-dated run, null metrics, `averageSpeed` 0)
+
+      ## Steps
+      1. `setUp()`: `Http::preventStrayRequests()`, `Config::set('services.garmin.api_key', 'test-key-…')`, `Config::set('services.garmin.token_cache_store', 'array')`
+      2. A helper builds an unsigned JWT with a chosen `exp` (header.payload.signature, base64url)
+      3. Cover: raw-JWT (non-JSON) body accepted; token reused across two calls (one exchange recorded); a token within one hour of `exp` is re-exchanged; `ApiKey` and `Bearer` headers sent; token call 401 and 403 → `key_rejected`; data 401 → one re-exchange + retry succeeds; data 401 twice → `key_rejected`; `Http::fake` connection exception, 500, 503, 429 → `unreachable`; 400 / malformed JSON / JWT without `exp` → `unexpected`
+      4. For every failure: the exception message and `Log` (spy) contain neither the key nor the token; the default cache store holds no token
+      5. DTO: every `typeKey` of FR-003 maps; `cycling`/`hiking` → null sport type; rounding of distance/moving time/ascent/HR; pace `round(1000 / averageSpeed)` (e.g. 3.0959 m/s → 323); null/0 speed → null pace; missing `activityId` / `startTimeLocal` → `fromApiPayload()` null
+      6. `php artisan test --filter=Garmin`
+      7. No Playwright, Dusk, browser or viewport suites
+
+      ## Completion Criteria
+      - [ ] Tests pass locally
+      - [ ] Coverage matches the `NORMAL` bar (happy path, failure modes, secret hygiene)
+
+      ## Test Data
+      - N/A — JSON fixtures only, no model changes
+
+      ## Domain Docs
+      - N/A — tests only
+
+      ## Git Deliverables
+      - Commit: `test(US-022): TASK-03 cover the Garmin API client and activity mapping`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-02
+  -
+    id: TASK-04
+    title: 'SyncGarminActivities action, garmin:sync command, daily schedule'
+    body: |-
+      ## Description
+      The sync itself: one lock, one recorded attempt, the window decision, paging, match / link / create / update with per-page transactions, grid-cache invalidation, and the Artisan command the scheduler runs once a day.
+
+      ## Files Involved
+      - `app/Actions/Garmin/SyncGarminActivities.php` — `__invoke(User $owner, GarminSyncTrigger $trigger): GarminSyncResult`; constructor-promoted private readonly `GarminPersonalApiClient`, `StartTimeMatcher`, `HeatmapGridCache`; no authorization inside (`.ai/rules/actions.md`)
+      - `app/Data/Garmin/GarminSyncCounts.php`, `app/Data/Garmin/GarminSyncResult.php` (outcome, counts, `?GarminSyncFailure`), `app/Exceptions/Garmin/GarminSyncAlreadyRunningException.php`
+      - `app/Console/Commands/GarminSyncCommand.php` (`php artisan make:command GarminSyncCommand --no-interaction`) — signature `garmin:sync {--scheduled}`
+      - `routes/console.php` — `Schedule::command('garmin:sync --scheduled')->dailyAt('05:00')->timezone(config('heatmap.display_timezone'))`; replace the "Nothing is scheduled" comment with the why of the schedule
+      - `app/Support/Garmin/` — owner resolution helper if needed (the single `giarfa` user, as the CSV import resolves it)
+
+      ## Steps
+      1. Lock: `Cache::lock('garmin:sync', 1800)->get()`; not acquired → throw `GarminSyncAlreadyRunningException` before any row or call; release in `finally`
+      2. Record `GarminSync` (`running`, trigger, `started_at`, `full_history` per plan rule 4)
+      3. Page loop: `start` += 100 until a short page. Per page: build DTOs; count `ignored` / `future_dated` / `invalid`; load candidates in **one query** (`$owner->activities()->onDaysBetween(min, max)->get()`), index by `garmin_activity_id`; then for each DTO apply plan rule 5 inside `DB::transaction` for the page; `garmin_activity_id` and `source` assigned explicitly (`forceFill` only for those two), API values through `fill()`; update only when `isDirty()`
+      4. On `GarminApiException`: finalise the row `failed` + cause + counts so far; return the result (never rethrow to the scheduler with a secret); log `warning` with `['cause' => …, 'status' => …]` only
+      5. Any written row → `HeatmapGridCache::forgetAthlete($owner)` (success or failure)
+      6. Command: empty key → info line "GARMIN_API_KEY is not set — nothing to sync.", exit 0, nothing recorded; already running → the refusal line, exit 1; else print the counts table or the failure warning, exit 0 on success, 1 on failure; trigger `scheduled` with `--scheduled`, `manual` otherwise
+      7. Block comments: why the window bridges failed nights, why candidates are loaded per page, why per-page transactions, why API-authoritative updates keep a stored metric the API leaves null
+      8. `php artisan schedule:list` shows `garmin:sync --scheduled`; `php artisan test`
+
+      ## Completion Criteria
+      - [ ] Whole history on the first sync; later syncs from newest Garmin run − 7 days to today
+      - [ ] Re-running changes nothing (no `updated_at` moves); a run gone from Garmin stays
+      - [ ] A CSV run on the same date within ±2 min gains the id and API values; no duplicate, no review
+      - [ ] A failure mid-way keeps earlier pages and records cause + counts
+      - [ ] One sync at a time; no-key run calls and records nothing
+      - [ ] No N+1: one candidate query per page
+      - [ ] Tests pass; `php artisan larapilot:quality` green
+
+      ## Test Data
+      - N/A — no model/schema changes in this task (uses TASK-01 factories)
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/garmin-api-sync.md` — **Purpose**, **Functional flow** step by step (lock → record → window → page → match/link/create/update → cache → finalise), failure paths, the schedule and its time, **Extension points & gotchas** (US-023 extends the API-owned columns; never move the lock to the default-store-free path)
+      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — shared matching rule now has two callers
+      - [ ] Folder `README.md` index row refreshed; English; committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-022): TASK-04 sync Garmin runs daily with garmin:sync`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Alex
+    estimate_hours: 5
+    dependencies:
+      - TASK-02
+  -
+    id: TASK-05
+    title: 'Tests: sync behaviour, idempotence, linking, failures, schedule, secret hygiene'
+    body: |-
+      ## Description
+      Pin every sync acceptance criterion through `php artisan garmin:sync` and the action, against faked Garmin responses.
+
+      ## Files Involved
+      - `tests/Feature/Garmin/GarminSyncTest.php`
+      - `tests/Feature/Garmin/GarminSyncCommandTest.php`
+      - `tests/Feature/Console/ScheduleTest.php` — `test_nothing_is_scheduled` becomes "only `garmin:sync --scheduled` is scheduled, daily"; the `strava:sync` assertion stays
+
+      ## Steps
+      1. `setUp()`: `Http::preventStrayRequests()`, fake key, `token_cache_store` = `array`, `travelTo()` a fixed Saturday
+      2. Paging: three faked pages (100, 100, 37) → three data calls with `start` 0/100/200, stops on the short page
+      3. Type mapping & counts: running/trail/virtual stored with the right `SportType`; cycling `ignored`; tomorrow `future_dated`; missing `startTimeLocal` `invalid`
+      4. Values: each stored column per plan rule 7, `source = garmin_api`, `garmin_activity_id` set; null metrics stored null, never 0
+      5. Window: first sync sends no `startDate`; second sync sends `startDate` = newest Garmin run − 7 days; a failed half-done first sync is followed by another full-history read
+      6. Edit on Garmin: a renamed activity within the span updates the run (`updated` = 1)
+      7. Linking: a CSV run at 07:01:00 and an API activity at 07:02:30 on the same date → one run, id set, API values, `linked` = 1; 07:04:00 → a new run
+      8. Idempotence: run twice → second result all zero, `Activity::max('updated_at')` unchanged; a run missing from the second response stays stored
+      9. Partial failure: page 2 answers 503 → page-1 runs kept, row `failed` / `unreachable` with counts
+      10. Cache: open `/` (grid cached), sync a new run in the window, open `/` again → the cell, intensity legend and trend show it
+      11. No key: `Http::assertNothingSent()`, no `garmin_syncs` row, exit 0
+      12. Concurrency: hold `Cache::lock('garmin:sync')` → refusal, exit 1, nothing sent, nothing recorded
+      13. Secret hygiene: after success and after each failure, no table (`cache`, `garmin_syncs`, `activities`) and no `Log` call contains the fake key or token
+      14. `php artisan test --filter='GarminSync|ScheduleTest'`; no browser/E2E suites
+
+      ## Completion Criteria
+      - [ ] Tests pass locally
+      - [ ] Every _Sync (FR-002, FR-003)_ criterion has at least one assertion
+
+      ## Test Data
+      - N/A — factories from TASK-01, JSON fixtures from TASK-03
+
+      ## Domain Docs
+      - N/A — tests only
+
+      ## Git Deliverables
+      - Commit: `test(US-022): TASK-05 cover the Garmin sync and its schedule`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 4
+    dependencies:
+      - TASK-03
+      - TASK-04
+  -
+    id: TASK-06
+    title: 'Sync now route, sync status, failure warning on the dashboard'
+    body: |-
+      ## Description
+      The owner-facing half: a CSRF-protected, throttled `POST` Sync now that runs the sync in the request and reports what it did; a status line that shows the more recent of the last sync and the last CSV import; the failure warning; all hidden when no key is configured.
+
+      **Design system:** Tailwind CSS (`.larapilot/mockups/heatmap-dashboard/README.md`), tokens already ported in `resources/css/app.css` (`--warn-bg`, `--warn-border`, `--warn-ink`, `.btn`, `.btn--secondary`, `.import-chip`). No new token, no new dependency.
+
+      **Mirrors:** `.larapilot/mockups/heatmap-dashboard/states.html` (§3 "Sync stale or failed" banner — same structure and `role="alert"`, without the Strava "Reconnect" button and with the new copy), `.larapilot/mockups/heatmap-dashboard/index.html` (header chip, rail card, the action line under the map), `.larapilot/mockups/heatmap-dashboard/dark.html` (dark theme), `.larapilot/mockups/heatmap-dashboard/breakpoints.html` (chip hidden < 640 px, footer carries it). Placement decided with the owner (decision aad88aa01db73362): Sync now joins the action line (`Import Garmin CSV · Sync now · Sign out`) and is a secondary button in the empty-state card; a "Last sync" row joins the rail card. Any further deviation is agreed in chat first.
+
+      ## Files Involved
+      - `routes/web.php` — `Route::post('/sync/garmin', SyncGarminNowController::class)->middleware('throttle:garmin-sync')->name('garmin.sync')` inside the `auth` + `password.set` group, with a block comment
+      - `app/Providers/AppServiceProvider.php` — `RateLimiter::for('garmin-sync', …)` `Limit::perMinute(3)` by user id, with the why
+      - `app/Http/Controllers/Garmin/SyncGarminNowController.php` — single-action `__invoke`, collaborators as parameters; no Form Request (no submitted fields — `.ai/rules/http.md`); no key → redirect with "Garmin sync is not configured." and no call; catches `GarminSyncAlreadyRunningException` → "A Garmin sync is already running — nothing started."; success → "Sync finished: N new, N updated, N linked, N ignored, N future-dated." (plus "N unreadable" only when > 0); failure → "Sync failed: {warning}"; all through the existing `session('status')` flash
+      - `app/Data/ImportStatus.php` — add `?CarbonInterface $lastSyncedAt`, `?GarminSyncFailure $syncFailure`, `bool $syncConfigured`; `chipLabel()` picks the more recent of "Last sync N ago" / "Last import N ago"; `syncWarning(): ?string`; `lastSyncLabel()` / `lastSyncRelative()`; `emptyWindowNote()` mentions the sync when configured
+      - `app/Support/Garmin/ResolveImportStatus.php` — last import from `source = garmin_csv` only; newest succeeded `finished_at`; newest finished attempt's outcome/cause; skip both sync queries when no key
+      - `resources/views/components/sync-warning.blade.php` (new), `dashboard.blade.php` (warning above the grid, action line), `dashboard-empty.blade.php` (Sync now secondary button + warning), `components/import-detail.blade.php` ("Last sync" row only when configured), rail `aria-label`
+      - `tests/Unit/Data/ImportStatusTest.php` — new label cases
+
+      ## Steps
+      1. Route, limiter, controller
+      2. `ImportStatus` / `ResolveImportStatus` changes; keep every user-facing string in `ImportStatus` / `GarminSyncFailure` — no date arithmetic in Blade
+      3. Views mobile-first: the Sync now control is a `<form method="POST">` with `@csrf` and a `<button>` styled like the existing Sign out link (min 44 px tall, `:focus-visible` kept); the empty state uses `.btn .btn--secondary w-full`; the banner is `role="alert"` above the grid on both screens
+      4. Copy (Marika): terse, factual, no exclamation marks — exact strings as above
+      5. Smoke-check 375 / 768 / 1280 px, light and dark, during implement (manual under `NORMAL`)
+      6. `php artisan test`
+
+      ## Completion Criteria
+      - [ ] Sync now visible only with a key; signed-out `POST` redirects to `/login` and calls nothing; throttled; refused while a sync runs
+      - [ ] Summary or failure cause reported after Sync now
+      - [ ] Chip/footer show the more recent of last sync and last import; warning shown while the newest finished attempt failed, gone after a success
+      - [ ] With no key the dashboard renders exactly as before (no button, no sync row, no warning)
+      - [ ] UI usable at mobile/tablet/desktop in both themes (manual smoke OK under `NORMAL`)
+      - [ ] Tests pass; `php artisan larapilot:quality` green
+
+      ## Test Data
+      - N/A — no model/schema changes in this task
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — status resolution (sync vs import, the warning, no-key behaviour), Sync now entry points, the `garmin-sync` throttle; remove "no warning state"
+      - [ ] `.larapilot/docs/devs/garmin-api-sync.md` — **Functional flow** of Sync now (request-time, flash messages, refusal)
+      - [ ] Folder `README.md` index rows refreshed; English; committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-022): TASK-06 add Sync now and the Garmin sync status to the dashboard`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Joe
+    estimate_hours: 5
+    dependencies:
+      - TASK-04
+  -
+    id: TASK-07
+    title: 'Tests: Sync now HTTP flow, status line, failure warnings, no-key dashboard'
+    body: |-
+      ## Description
+      Pin the _Sync now (FR-010)_ and _Status and failures (FR-007, FR-017)_ criteria at the HTTP boundary.
+
+      ## Files Involved
+      - `tests/Feature/Garmin/SyncGarminNowTest.php`
+      - `tests/Feature/Dashboard/SyncStatusTest.php`
+      - `tests/Feature/Dashboard/ImportStatusTest.php` — `test_no_state_renders_a_warning` kept and scoped to "no key"
+      - `tests/Feature/Dashboard/EmptyStateTest.php` — Sync now offered only with a key
+
+      ## Steps
+      1. `setUp()`: `Http::preventStrayRequests()`, `token_cache_store` = `array`, `signInOwner()` where signed in
+      2. Sync now: signed out → redirect `/login`, `Http::assertNothingSent()`, no row; signed in with key → redirect to `/` with the counts flash; the route carries the `web` group (CSRF) and `throttle:garmin-sync` (assert the 4th call in a minute answers 429); lock held → refusal message, nothing sent; no key → button absent and `POST` sends nothing
+      3. Status: a succeeded sync with no write → "Last sync … ago"; a later CSV import that wrote → "Last import … ago"; a later sync → "Last sync" again; a re-import writing nothing does not move the import time; API-synced rows do not move "last import"
+      4. Warnings: newest finished attempt `key_rejected` → "Garmin key rejected — renew it" with `role="alert"`; `unreachable` → "Garmin unreachable"; a following success removes it; a `running` row does not hide an earlier failure
+      5. No key: dashboard and empty state contain no "Sync now", no "Last sync", no `role="alert"`; `StravaRemovedTest` stays green
+      6. `php artisan test`; no browser/E2E suites
+
+      ## Completion Criteria
+      - [ ] Tests pass locally
+      - [ ] Every _Sync now_ and _Status and failures_ criterion has at least one assertion
+
+      ## Test Data
+      - N/A — `GarminSyncFactory` states from TASK-01
+
+      ## Domain Docs
+      - N/A — tests only
+
+      ## Git Deliverables
+      - Commit: `test(US-022): TASK-07 cover Sync now and the sync status`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-06
+  -
+    id: TASK-08
+    title: 'CSV import coexistence with API-synced runs'
+    body: |-
+      ## Description
+      Keep the CSV import exactly as it behaves today while API-synced runs exist: a CSV row matching an API-synced run goes through the same review, Overwrite keeps its `garmin_activity_id` and marks the run `garmin_csv`, new CSV runs are `garmin_csv`.
+
+      ## Files Involved
+      - `app/Actions/Garmin/ApplyGarminImport.php` — on Overwrite set `source = ActivitySource::GarminCsv` explicitly (block comment: the source records who wrote the current values; the Garmin id is identity and is never touched by a CSV row)
+      - `tests/Feature/Garmin/GarminImportFlowTest.php` (or a new `GarminImportWithSyncedRunsTest.php`)
+
+      ## Steps
+      1. Overwrite path: `fill($row->toAttributes())` + explicit `source`; assert `garmin_activity_id` survives
+      2. Tests: a CSV row within ±2 min of a `garminSynced()` run is a conflict in the review ("Clashes to decide 1"); Skip leaves it untouched; Overwrite keeps the Garmin id, writes CSV values, `source = garmin_csv`; new rows get `garmin_csv`; re-importing the same file changes nothing; upload/confirm throttle and summary counts unchanged (existing tests green)
+      3. `php artisan test --filter=GarminImport`
+
+      ## Completion Criteria
+      - [ ] CSV upload, review, summary counts, throttle and idempotent re-import behave as before
+      - [ ] Overwrite of an API-synced run keeps its `garmin_activity_id`
+      - [ ] Tests pass; `php artisan larapilot:quality` green
+
+      ## Test Data
+      - N/A — no schema change; uses `ActivityFactory::garminSynced()` from TASK-01
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/garmin-csv-import.md` — **Applying** section: `source` on Overwrite, Garmin id kept, the accepted trade-off that the next sync re-applies API values to a run it re-reads; the stale "only way a run enters" wording replaced
+      - [ ] Folder `README.md` index row refreshed; English; committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-022): TASK-08 keep the CSV import consistent with Garmin-synced runs`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Mike
+    estimate_hours: 2
+    dependencies:
+      - TASK-01
+  -
+    id: TASK-09
+    title: 'README, CHANGELOG, and domain-doc consistency pass'
+    body: |-
+      ## Description
+      Baseline docs for the new integration: how to create and renew the key, the scheduler cron the host needs, the first sync from the CLI, and the Unreleased changelog entry.
+
+      ## Files Involved
+      - `README.md` — new section **Syncing runs from Garmin Connect**: create the key at connect.garmin.com → Settings → Personal API token (expires after 30 days to one year — renew it and update `GARMIN_API_KEY` when the dashboard says "Garmin key rejected — renew it"); `php artisan garmin:sync` and why to run the first full-history sync from the CLI; Sync now; the daily 05:00 schedule in `HEATMAP_DISPLAY_TIMEZONE`; the scheduler cron entry `* * * * * cd {app path} && php artisan schedule:run >> /dev/null 2>&1` and that on the production host (Cipi) it is added as the app's cron job; `GARMIN_API_KEY` row in **Environment variables**; **Import status** section rewritten (last sync vs last import, warnings); Strava-era "no background job" wording removed
+      - `CHANGELOG.md` — `## [Unreleased]` → `### Added` (daily Garmin Connect sync, Sync now, sync status and warnings, `GARMIN_API_KEY`), `### Changed` (status line shows the more recent of last sync / last import; the CSV import is one of two ways runs enter)
+      - `.larapilot/docs/devs/*.md` — read-through so the three files agree; README index final rows
+
+      ## Steps
+      1. Write the sections; no secrets, no absolute machine paths, env var **names** only
+      2. `php artisan test` (EnvironmentExampleTest and any README-referencing test)
+
+      ## Completion Criteria
+      - [ ] README explains creating and renewing the key and the scheduler cron entry needed on the host
+      - [ ] CHANGELOG Unreleased lists the user-facing changes
+      - [ ] Domain docs consistent with the code; index current
+
+      ## Test Data
+      - N/A — docs only
+
+      ## Domain Docs
+      - [ ] `.larapilot/docs/devs/garmin-api-sync.md`, `garmin-csv-import.md`, `heatmap-dashboard.md`, `README.md` — final consistency pass; English; committed with this task
+
+      ## Git Deliverables
+      - Commit: `chore(US-022): TASK-09 document the Garmin Connect sync`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes
+    type: Impl
+    status: TODO
+    assignee: Albert
+    estimate_hours: 2
+    dependencies:
+      - TASK-05
+      - TASK-07
+      - TASK-08
+  -
+    id: TASK-10
+    title: 'Verification: full suite, quality gate, acceptance walk-through, manual handoff'
+    body: |-
+      ## Description
+      Close the spec: full test suite, the quality gate, a criterion-by-criterion walk through the spec, and the manual test handoff for the owner's real key.
+
+      ## Files Involved
+      - (no application files unless a gap is found — then a `fix(US-022)` commit names the task it completes)
+
+      ## Steps
+      1. `php artisan test` — whole suite green
+      2. `php artisan larapilot:quality` — Pint + Larastan level 5 green
+      3. Walk every acceptance criterion of US-022 and name the test that proves it; list any without one and close the gap
+      4. `php artisan schedule:list` shows `garmin:sync --scheduled`; `php artisan route:list --name=garmin.sync` shows `POST sync/garmin` behind `auth`, `password.set`, `throttle:garmin-sync`
+      5. `grep` the diff for the literal key/token patterns and for `env(` outside `config/`
+      6. Write the **manual test handoff** (see plan Test Strategy) into the local PR notes for the owner; do not call the real Garmin API from an automated step
+
+      ## Completion Criteria
+      - [ ] Suite and quality gate green
+      - [ ] Every acceptance criterion mapped to a test
+      - [ ] Manual handoff written in the PR notes
+
+      ## Test Data
+      - N/A
+
+      ## Domain Docs
+      - N/A — verification only
+
+      ## Git Deliverables
+      - Commit: none unless a gap is fixed (`fix(US-022): TASK-10 …`)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: finalise the local PR description toward `release/3.1.0`
+    type: Test
+    status: TODO
+    assignee: Anne
+    estimate_hours: 1.5
+    dependencies:
+      - TASK-09
+updated_at: '2026-11-14T12:29:45+00:00'
