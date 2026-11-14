@@ -5,8 +5,8 @@ namespace App\Data\Garmin;
 use App\Support\Garmin\GarminCsvValues;
 
 /**
- * The extended metrics of one run (FR-022), read from a Garmin CSV row or, from TASK-06
- * on, from a Garmin Connect API activity.
+ * The extended metrics of one run (FR-022), read from a Garmin CSV row or from a Garmin
+ * Connect API activity.
  *
  * Every value is nullable and every parser here answers null for what it cannot trust, so
  * "not recorded" is never stored as 0 and a bad cell never rejects the run it sits on.
@@ -65,6 +65,16 @@ final readonly class ExtendedRunMetrics
      * No stride is longer than five metres.
      */
     private const MAX_STRIDE_METRES = 5.0;
+
+    /**
+     * No pace slower than ten hours a kilometre is a real run.
+     */
+    private const MAX_PACE_SECONDS_PER_KM = 36_000;
+
+    /**
+     * The column is a varchar(255).
+     */
+    private const LOCATION_NAME_MAX_LENGTH = 255;
 
     public function __construct(
         public ?int $calories = null,
@@ -143,6 +153,62 @@ final readonly class ExtendedRunMetrics
     }
 
     /**
+     * Read the metrics a Garmin Connect API activity carries. The API has no Training
+     * Stress Score — it is a CSV-only column, so it stays null here and a sync never
+     * touches the one a linked CSV run already holds.
+     *
+     * Every numeric field must be a JSON number: a string, a boolean or an array is
+     * unreadable and the metric is empty. A null or missing field is empty too, and
+     * neither ever makes the activity invalid. The start and end coordinates the payload
+     * also carries are never read: no position is stored from either source.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public static function fromApiPayload(array $payload): self
+    {
+        $field = static fn (string $key): mixed => $payload[$key] ?? null;
+
+        /*
+         * `maxSpeed` is metres per second and the column is seconds per kilometre, the unit
+         * the CSV's best pace is in: 1000 / v, under the same ten-hours-a-kilometre bound as
+         * the average pace. A null, zero or negative speed has no pace.
+         */
+        $maxSpeed = self::number($field('maxSpeed'));
+        $bestPace = $maxSpeed !== null && $maxSpeed > 0 ? (int) round(1_000 / $maxSpeed) : null;
+
+        return new self(
+            calories: self::whole($field('calories'), 0, 20_000, true),
+            maxHeartRate: self::whole($field('maxHR'), 0, 250, true),
+            aerobicTrainingEffect: self::decimal($field('aerobicTrainingEffect'), 0.0, 5.0, false),
+            averageRunningCadence: self::whole($field('averageRunningCadenceInStepsPerMinute'), 0, 400, true),
+            maxRunningCadence: self::whole($field('maxRunningCadenceInStepsPerMinute'), 0, 400, true),
+            bestPaceSecondsPerKm: $bestPace !== null && $bestPace > 0 && $bestPace <= self::MAX_PACE_SECONDS_PER_KM ? $bestPace : null,
+            totalDescentMeters: self::whole($field('elevationLoss'), 0, 20_000, false),
+            /* Already centimetres, the unit of the column: the CSV is the one that is converted. */
+            averageStrideLengthCm: self::decimal($field('avgStrideLength'), 0.0, 500.0, true),
+            averageVerticalRatioPercent: self::decimal($field('avgVerticalRatio'), 0.0, 100.0, true),
+            averageVerticalOscillationCm: self::decimal($field('avgVerticalOscillation'), 0.0, 50.0, true),
+            averageGroundContactTimeMs: self::whole($field('avgGroundContactTime'), 0, 2_000, true),
+            averageGroundContactBalanceLeftPercent: self::decimal($field('avgGroundContactBalance'), 0.0, 100.0, true),
+            steps: self::whole($field('steps'), 0, 1_000_000, true),
+            lapCount: self::whole($field('lapCount'), 0, 10_000, true),
+            elapsedTimeSeconds: self::whole($field('elapsedDuration'), 0, GarminCsvValues::MAX_DURATION_SECONDS, true),
+            minElevationMeters: self::whole($field('minElevation'), -500, 9_000, false),
+            maxElevationMeters: self::whole($field('maxElevation'), -500, 9_000, false),
+            /* Time spent in a zone is a count of seconds, and 0 is a real reading: the run never reached it. */
+            hrZone1Seconds: self::whole($field('hrTimeInZone_1'), 0, GarminCsvValues::MAX_DURATION_SECONDS, false),
+            hrZone2Seconds: self::whole($field('hrTimeInZone_2'), 0, GarminCsvValues::MAX_DURATION_SECONDS, false),
+            hrZone3Seconds: self::whole($field('hrTimeInZone_3'), 0, GarminCsvValues::MAX_DURATION_SECONDS, false),
+            hrZone4Seconds: self::whole($field('hrTimeInZone_4'), 0, GarminCsvValues::MAX_DURATION_SECONDS, false),
+            hrZone5Seconds: self::whole($field('hrTimeInZone_5'), 0, GarminCsvValues::MAX_DURATION_SECONDS, false),
+            fastest1kSeconds: self::whole($field('fastestSplit_1000'), 0, GarminCsvValues::MAX_DURATION_SECONDS, true),
+            fastestMileSeconds: self::whole($field('fastestSplit_1609'), 0, GarminCsvValues::MAX_DURATION_SECONDS, true),
+            fastest5kSeconds: self::whole($field('fastestSplit_5000'), 0, GarminCsvValues::MAX_DURATION_SECONDS, true),
+            locationName: self::placeName($field('locationName')),
+        );
+    }
+
+    /**
      * Only the values that were recorded, keyed by `activities` column.
      *
      * A null is left out rather than carried: these attributes are written onto a stored
@@ -208,5 +274,59 @@ final readonly class ExtendedRunMetrics
         }
 
         return new self(...$values);
+    }
+
+    /**
+     * A JSON number as a float, or null for anything else (a numeric string is not a number
+     * here: the payload is untrusted and a field of the wrong type is unreadable).
+     */
+    private static function number(mixed $value): ?float
+    {
+        return (is_int($value) || is_float($value)) && is_finite((float) $value) ? (float) $value : null;
+    }
+
+    /**
+     * A number rounded to a whole value and kept only inside `[$min, $max]`; `$zeroIsEmpty`
+     * turns a 0 into "not recorded".
+     */
+    private static function whole(mixed $value, int $min, int $max, bool $zeroIsEmpty): ?int
+    {
+        $decimal = self::decimal($value, (float) $min, (float) $max, $zeroIsEmpty, 0);
+
+        return $decimal === null ? null : (int) $decimal;
+    }
+
+    /**
+     * A number rounded to `$decimals` places (one by default, the precision of the
+     * decimal columns) and kept only inside `[$min, $max]`.
+     */
+    private static function decimal(mixed $value, float $min, float $max, bool $zeroIsEmpty, int $decimals = 1): ?float
+    {
+        $number = self::number($value);
+
+        if ($number === null) {
+            return null;
+        }
+
+        $rounded = round($number, $decimals);
+
+        if ($rounded < $min || $rounded > $max || ($zeroIsEmpty && $rounded === 0.0)) {
+            return null;
+        }
+
+        return $rounded + 0.0;
+    }
+
+    /**
+     * The place name Garmin resolved for the run: trimmed, cut at the column's width, and
+     * "not recorded" when blank or not text.
+     */
+    private static function placeName(mixed $value): ?string
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return mb_substr(trim($value), 0, self::LOCATION_NAME_MAX_LENGTH);
     }
 }

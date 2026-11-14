@@ -483,7 +483,7 @@ tasks:
       - TASK-03
       - TASK-04
     type: Test
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Add feature coverage for the import side of FR-022 through the real HTTP flow (upload → review → confirm → summary), at the NORMAL bar.
@@ -508,13 +508,19 @@ tasks:
       4. Do **not** add Playwright, Dusk, browser, or viewport suites.
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Enrichment, idempotence, Overwrite-on-`--`, the summary row, and the unchanged dashboard are each asserted
+      - [x] Tests pass locally
+      - [x] Enrichment, idempotence, Overwrite-on-`--`, the summary row, and the unchanged dashboard are each asserted
 
       ## Git Deliverables
       - Commit: `test(US-023): TASK-05 cover enrichment, overwrite and unchanged dashboard`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: d27b38b499d3aea7c22f949ffacd6edebd0d8c36
+      short_sha: d27b38b
+      subject: 'test(US-023): TASK-05 cover enrichment, overwrite and unchanged dashboard'
+      committed_at: '2026-11-14T15:30:06+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d27b38b499d3aea7c22f949ffacd6edebd0d8c36'
   -
     id: TASK-06
     title: 'Map extended metrics from the Garmin API search response into GarminApiActivity'
@@ -702,4 +708,4 @@ tasks:
       - Commit: `test(US-023): TASK-09 verification and manual test handoff`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
-updated_at: '2026-11-14T14:28:32+00:00'
+updated_at: '2026-11-14T14:30:06+00:00'

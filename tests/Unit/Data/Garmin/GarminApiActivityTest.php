@@ -5,6 +5,7 @@ namespace Tests\Unit\Data\Garmin;
 use App\Data\Garmin\GarminApiActivity;
 use App\Enums\SportType;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\Database\ExtendedRunMetricsMigrationTest;
 use Tests\TestCase;
 
 class GarminApiActivityTest extends TestCase
@@ -77,9 +78,12 @@ class GarminApiActivityTest extends TestCase
     {
         $attributes = GarminApiActivity::fromApiPayload($this->payload(0))->toRunAttributes();
 
+        // The fixture's first activity carries every API field, so every API-owned column is here —
+        // all the extended ones but the Training Stress Score, which only a CSV carries.
         $this->assertEqualsCanonicalizing([
             'sport_type', 'name', 'distance_meters', 'moving_time_seconds', 'start_date_local', 'activity_date',
             'average_pace_seconds_per_km', 'total_ascent_meters', 'average_heart_rate',
+            ...array_diff(ExtendedRunMetricsMigrationTest::EXTENDED_COLUMNS, ['training_stress_score']),
         ], array_keys($attributes));
         $this->assertArrayNotHasKey('garmin_activity_id', $attributes);
         $this->assertArrayNotHasKey('source', $attributes);
