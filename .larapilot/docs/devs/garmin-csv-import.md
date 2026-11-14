@@ -187,7 +187,12 @@ already-imported row indexes — what the owner was shown.
   start, `activity_date` and sport type. The three run metrics are replaced by the
   CSV's **except where the CSV recorded none**: `GarminCsvRow::toAttributes()`
   omits an empty metric, so a `--` keeps the stored value. Blanking a pace the
-  owner already has because the new export lacks it would be data loss;
+  owner already has because the new export lacks it would be data loss. It also sets
+  `source = garmin_csv` (the source records who wrote the run's current values) and
+  **never touches `garmin_activity_id`**: a run the Garmin sync wrote or linked keeps its
+  Garmin identity, so the next sync still recognises it. A CSV row that matches an
+  API-synced run (same date, start within ±2 minutes) is a conflict like any other and goes
+  through the same review, counts and throttle (`US-022`);
 - **Skip**, or no answer at all → nothing is written;
 - **Already imported** (same start, distance and moving time) → only the
   metrics its stored run **lacks** are filled from the row
@@ -306,8 +311,8 @@ Two columns say where a run came from (`US-022`, `add_garmin_sync_to_activities_
 
 - `source` — string, not null, default `garmin_csv` (`app/Enums/ActivitySource.php`:
   `garmin_csv`, `garmin_api`). Every row stored before the column existed is a CSV import,
-  which is exactly what the default backfills. A CSV import never writes it: the default
-  is right for a CSV row, and Overwrite leaves an existing row's value alone.
+  which is exactly what the default backfills. A new CSV row takes the default, and an
+  Overwrite sets it to `garmin_csv` explicitly, because from then on the CSV wrote the run's values.
 - `garmin_activity_id` — unsigned big integer, nullable, **unique**. Set only by the
   Garmin sync (`garmin-api-sync.md`) when it creates or links a run; a CSV-only run keeps
   NULL, and SQLite allows any number of NULLs under the unique index. An integer, not a
@@ -366,7 +371,10 @@ rolling back the Strava removal in a test first needs the `US-022` migration und
   (the sync links a CSV run with it instead of creating a twin).
 - **Invariant — a stored run is never replaced by a re-read of the file.** Only an
   explicit Overwrite changes one, and an already-imported row fills only the metrics
-  its stored run lacks. Nothing else writes a run: no background job exists.
+  its stored run lacks. Nothing else writes a run but the Garmin sync (`garmin-api-sync.md`).
+  Accepted trade-off: for a run that has a Garmin id the API is authoritative, so a CSV
+  Overwrite of a run dated within the next sync's re-read span (the last 7 days before the
+  newest synced run) is replaced by the API values at that sync.
 - **Invariant — all or nothing.** Every write of one confirm is in one
   transaction. _Breaks if:_ rows are created outside it — a failure halfway
   would leave half an import that a re-upload then reports as part new, part
