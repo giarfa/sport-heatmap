@@ -317,7 +317,7 @@ tasks:
     id: TASK-05
     title: 'Pest coverage for the efficiency card builder'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
@@ -346,13 +346,19 @@ tasks:
       3. Do **not** add Playwright, Dusk, Pest browser or viewport suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Coverage matches the NORMAL bar
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-024): TASK-05 cover the aerobic efficiency card builder`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
+    commit:
+      sha: 2512ace09b2ce8a212fb61d12a8819af8f46b6f2
+      short_sha: 2512ace
+      subject: 'test(US-024): TASK-05 cover the aerobic efficiency card builder'
+      committed_at: '2026-11-14T18:51:03+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/2512ace09b2ce8a212fb61d12a8819af8f46b6f2'
   -
     id: TASK-06
     title: 'Wire efficiency into the cached grid and the dashboard controller'
@@ -574,4 +580,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:50:14+00:00'
+updated_at: '2026-11-14T17:51:03+00:00'
