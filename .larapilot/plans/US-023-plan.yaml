@@ -529,7 +529,7 @@ tasks:
     dependencies:
       - TASK-02
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       A Garmin sync stores the extended metrics of every run it reads (FR-022, FR-002), a linked CSV run included. A null or unreadable API field leaves the metric empty and never makes the activity invalid. The CSV-only Training Stress Score of a linked run is kept. No start or end coordinates are read.
@@ -563,28 +563,34 @@ tasks:
       5. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] Every API field in the spec table maps to its column, with units normalised to the CSV side
-      - [ ] Null, missing, or unreadable API fields ⇒ the metric is empty, and the activity is still stored
-      - [ ] A linked CSV run gains the API values and keeps its TSS and any CSV-only value
-      - [ ] No coordinate is read or stored
-      - [ ] Existing sync tests pass unchanged; a second sync changes nothing
+      - [x] Every API field in the spec table maps to its column, with units normalised to the CSV side
+      - [x] Null, missing, or unreadable API fields ⇒ the metric is empty, and the activity is still stored
+      - [x] A linked CSV run gains the API values and keeps its TSS and any CSV-only value
+      - [x] No coordinate is read or stored
+      - [x] Existing sync tests pass unchanged; a second sync changes nothing
 
       ## Test Data
       - N/A — no model/schema change; API fixture JSON extended only
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-api-sync.md`:
+      - [x] `.larapilot/docs/devs/garmin-api-sync.md`:
         - `Functional flow` covers the extended metrics read per activity
         - `Technical design` covers the API field ⇒ column map and units
         - `Key decisions & invariants` covers: no coordinates, the API never blanks a CSV-only metric, TSS is CSV-only
         - `Extension points & gotchas` covers runs synced before US-023 outside the 7-day window, which keep empty API-only metrics
-      - [ ] `.larapilot/docs/devs/README.md` index row for `garmin-api-sync` → `US-023`
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/README.md` index row for `garmin-api-sync` → `US-023`
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-023): TASK-06 map extended run metrics from the Garmin API`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: bbfc9f107a6ef0abbb2e939d098e0dd5acf2ead5
+      short_sha: bbfc9f1
+      subject: 'feat(US-023): TASK-06 map extended run metrics from the Garmin API'
+      committed_at: '2026-11-14T15:32:25+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/bbfc9f107a6ef0abbb2e939d098e0dd5acf2ead5'
   -
     id: TASK-07
     title: 'Tests: API mapping from a faked search response, sync create/link/update, TSS kept, no coordinates'
@@ -708,4 +714,4 @@ tasks:
       - Commit: `test(US-023): TASK-09 verification and manual test handoff`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
-updated_at: '2026-11-14T14:30:06+00:00'
+updated_at: '2026-11-14T14:32:25+00:00'

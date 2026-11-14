@@ -154,6 +154,42 @@ class GarminApiActivityTest extends TestCase
         $this->assertSame('Evening jog', GarminApiActivity::fromApiPayload([...$this->payload(0), 'activityName' => '  Evening jog '])->name);
     }
 
+    public function test_the_extended_metrics_of_a_full_payload_ride_on_the_run(): void
+    {
+        $run = GarminApiActivity::fromApiPayload($this->payload(0));
+
+        $this->assertSame(612, $run->extendedMetrics->calories);
+        $this->assertSame(252, $run->extendedMetrics->bestPaceSecondsPerKm);
+        $this->assertSame('Verona', $run->extendedMetrics->locationName);
+        $this->assertSame(612, $run->metricAttributes()['calories']);
+        $this->assertSame(323, $run->metricAttributes()['average_pace_seconds_per_km']);
+        $this->assertArrayNotHasKey('training_stress_score', $run->metricAttributes());
+    }
+
+    public function test_an_activity_with_every_extended_field_null_is_still_a_run_with_no_extended_metric(): void
+    {
+        $run = GarminApiActivity::fromApiPayload($this->payload(5));
+
+        $this->assertInstanceOf(GarminApiActivity::class, $run);
+        $this->assertSame(6_400, $run->distanceMeters);
+        $this->assertTrue($run->extendedMetrics->isEmpty());
+        $this->assertSame([], $run->metricAttributes());
+    }
+
+    public function test_an_activity_with_garbage_extended_fields_is_still_a_run_with_no_extended_metric(): void
+    {
+        $run = GarminApiActivity::fromApiPayload($this->payload(6));
+
+        $this->assertInstanceOf(GarminApiActivity::class, $run);
+        $this->assertSame(4_000, $run->distanceMeters);
+        $this->assertTrue($run->extendedMetrics->isEmpty());
+    }
+
+    public function test_an_extended_field_never_makes_an_activity_invalid(): void
+    {
+        $this->assertInstanceOf(GarminApiActivity::class, GarminApiActivity::fromApiPayload([...$this->payload(0), 'calories' => 'x', 'steps' => [], 'locationName' => new \stdClass]));
+    }
+
     /**
      * One activity of the fixture page.
      *

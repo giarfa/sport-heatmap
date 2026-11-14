@@ -168,4 +168,164 @@ class ExtendedRunMetricsTest extends TestCase
         $this->assertNull($metrics->locationName);
         $this->assertSame(8_240, $metrics->steps);
     }
+
+    /**
+     * The extended fields of an API payload, in the units the API uses.
+     *
+     * @return array<string, mixed>
+     */
+    private function apiPayload(): array
+    {
+        return [
+            'calories' => 612.0,
+            'maxHR' => 171.0,
+            'aerobicTrainingEffect' => 3.84,
+            'averageRunningCadenceInStepsPerMinute' => 168.4,
+            'maxRunningCadenceInStepsPerMinute' => 181.0,
+            'maxSpeed' => 3.968,
+            'elevationLoss' => 41.2,
+            'avgStrideLength' => 104.24,
+            'avgVerticalRatio' => 8.74,
+            'avgVerticalOscillation' => 9.63,
+            'avgGroundContactTime' => 287.4,
+            'avgGroundContactBalance' => 49.84,
+            'steps' => 7_312,
+            'lapCount' => 9,
+            'elapsedDuration' => 3_301.2,
+            'minElevation' => 61.2,
+            'maxElevation' => 98.8,
+            'hrTimeInZone_1' => 120.4,
+            'hrTimeInZone_2' => 1_450.9,
+            'hrTimeInZone_3' => 1_200.0,
+            'hrTimeInZone_4' => 480.3,
+            'hrTimeInZone_5' => 0.0,
+            'fastestSplit_1000' => 291.6,
+            'fastestSplit_1609' => 478.0,
+            'fastestSplit_5000' => 1_530.2,
+            'locationName' => '  Verona ',
+            'startLatitude' => 45.4384,
+            'startLongitude' => 10.9916,
+            'endLatitude' => 45.4391,
+            'endLongitude' => 10.9923,
+        ];
+    }
+
+    public function test_every_api_field_lands_in_its_column_with_its_unit_and_rounding(): void
+    {
+        $this->assertSame([
+            'calories' => 612,
+            'max_heart_rate' => 171,
+            'aerobic_training_effect' => 3.8,
+            'average_running_cadence' => 168,
+            'max_running_cadence' => 181,
+            'best_pace_seconds_per_km' => 252,
+            'total_descent_meters' => 41,
+            'average_stride_length_cm' => 104.2,
+            'average_vertical_ratio_percent' => 8.7,
+            'average_vertical_oscillation_cm' => 9.6,
+            'average_ground_contact_time_ms' => 287,
+            'average_ground_contact_balance_left_percent' => 49.8,
+            'steps' => 7_312,
+            'lap_count' => 9,
+            'elapsed_time_seconds' => 3_301,
+            'min_elevation_meters' => 61,
+            'max_elevation_meters' => 99,
+            'hr_zone_1_seconds' => 120,
+            'hr_zone_2_seconds' => 1_451,
+            'hr_zone_3_seconds' => 1_200,
+            'hr_zone_4_seconds' => 480,
+            'hr_zone_5_seconds' => 0,
+            'fastest_1k_seconds' => 292,
+            'fastest_mile_seconds' => 478,
+            'fastest_5k_seconds' => 1_530,
+            'location_name' => 'Verona',
+        ], ExtendedRunMetrics::fromApiPayload($this->apiPayload())->toAttributes());
+    }
+
+    public function test_the_api_never_carries_a_training_stress_score_and_no_coordinate_is_read(): void
+    {
+        $metrics = ExtendedRunMetrics::fromApiPayload([...$this->apiPayload(), 'trainingStressScore' => 88.0, 'tss' => 88.0]);
+
+        $this->assertNull($metrics->trainingStressScore);
+        $this->assertSame(
+            [],
+            array_filter(array_keys($metrics->toAttributes()), fn (string $column): bool => preg_match('/(^|_)(lat|latitude|lon|lng|longitude)(_|$)/', $column) === 1),
+        );
+    }
+
+    public function test_the_best_pace_comes_from_the_top_speed(): void
+    {
+        $pace = fn (mixed $speed): ?int => ExtendedRunMetrics::fromApiPayload(['maxSpeed' => $speed])->bestPaceSecondsPerKm;
+
+        $this->assertSame(250, $pace(4.0));
+        $this->assertSame(333, $pace(3));
+        $this->assertNull($pace(0));
+        $this->assertNull($pace(-2.0));
+        $this->assertNull($pace(null));
+        $this->assertNull($pace('4.0'));
+        $this->assertNull($pace(0.01), 'A pace slower than ten hours a kilometre is not a run.');
+    }
+
+    public function test_null_missing_wrong_typed_negative_and_out_of_bound_fields_are_empty_never_zero(): void
+    {
+        $this->assertTrue(ExtendedRunMetrics::fromApiPayload([])->isEmpty());
+
+        $garbage = [
+            'calories' => '612', 'maxHR' => [171], 'aerobicTrainingEffect' => true, 'averageRunningCadenceInStepsPerMinute' => null,
+            'maxRunningCadenceInStepsPerMinute' => 9_999, 'elevationLoss' => -5, 'avgStrideLength' => ['cm' => 100],
+            'avgVerticalRatio' => 250.0, 'avgVerticalOscillation' => '9.6', 'avgGroundContactTime' => 0, 'avgGroundContactBalance' => 0.0,
+            'steps' => '8,240', 'lapCount' => 0, 'elapsedDuration' => -1, 'minElevation' => -9_999, 'maxElevation' => 99_999,
+            'hrTimeInZone_1' => '120', 'hrTimeInZone_2' => -1, 'hrTimeInZone_3' => null, 'hrTimeInZone_4' => [], 'hrTimeInZone_5' => false,
+            'fastestSplit_1000' => 0, 'fastestSplit_1609' => '478', 'fastestSplit_5000' => -60.0, 'locationName' => 42,
+        ];
+
+        $this->assertTrue(ExtendedRunMetrics::fromApiPayload($garbage)->isEmpty());
+    }
+
+    public function test_a_real_zero_is_kept_for_the_time_in_a_zone_the_descent_the_effect_and_the_elevation(): void
+    {
+        $metrics = ExtendedRunMetrics::fromApiPayload([
+            'hrTimeInZone_1' => 0, 'elevationLoss' => 0.0, 'aerobicTrainingEffect' => 0.0, 'minElevation' => 0, 'maxElevation' => -2.0,
+        ]);
+
+        $this->assertSame(0, $metrics->hrZone1Seconds);
+        $this->assertSame(0, $metrics->totalDescentMeters);
+        $this->assertSame(0.0, $metrics->aerobicTrainingEffect);
+        $this->assertSame(0, $metrics->minElevationMeters);
+        $this->assertSame(-2, $metrics->maxElevationMeters);
+    }
+
+    public function test_the_place_name_is_trimmed_cut_at_255_and_empty_when_blank(): void
+    {
+        $name = fn (mixed $value): ?string => ExtendedRunMetrics::fromApiPayload(['locationName' => $value])->locationName;
+
+        $this->assertSame('Lazise', $name('  Lazise '));
+        $this->assertSame(255, mb_strlen((string) $name(str_repeat('è', 400))));
+        $this->assertNull($name(''));
+        $this->assertNull($name("  \t "));
+        $this->assertNull($name(null));
+    }
+
+    public function test_the_same_run_from_the_csv_and_from_the_api_has_the_same_units(): void
+    {
+        $fromCsv = ExtendedRunMetrics::fromCsvValues([
+            'stride_length' => '1.004',
+            'vertical_oscillation' => '9.6',
+            'vertical_ratio' => '8.7',
+            'gct_balance' => '49.8% S / 50.2% D',
+            'best_pace' => '4:12',
+            'elapsed_time' => '00:55:01',
+        ]);
+        $fromApi = ExtendedRunMetrics::fromApiPayload([
+            'avgStrideLength' => 100.4,
+            'avgVerticalOscillation' => 9.6,
+            'avgVerticalRatio' => 8.7,
+            'avgGroundContactBalance' => 49.8,
+            'maxSpeed' => 1_000 / 252,
+            'elapsedDuration' => 3_301.0,
+        ]);
+
+        $this->assertEquals($fromCsv, $fromApi);
+        $this->assertSame(100.4, $fromCsv->averageStrideLengthCm);
+    }
 }
