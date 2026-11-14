@@ -1416,4 +1416,17 @@ decisions:
     source: chat
     spec: US-023
     supersedes: null
-updated_at: '2026-11-14T14:28:12+00:00'
+  -
+    id: e4172fd19e27df7f
+    ts: '2026-11-14T14:56:27+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-vendor-check
+    topic: 'vendor check 2026-11-14 dependency updates'
+    label: 'vendor check 2026-11-14 dependency updates'
+    value: 'Update now: laravel/framework 13.30.1→13.42.0 (GHSA-63hm-g96r-2m2q) and vite 8.2.2→8.3.8, ending the 2026-10-26 vite waiver'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-11-14T14:56:27+00:00'
