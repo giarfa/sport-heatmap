@@ -228,6 +228,7 @@ calibrated bands, upper-inclusive.
 | Lead-in | `app/Support/Heatmap/LeadInDistance.php` | `US-014`: the three weeks before the window in one grouped query, feeding the first averages |
 | Efficiency reads | `app/Support/Heatmap/EfficiencyRuns.php`, `app/Data/Heatmap/EfficiencyRun.php`, `EfficiencySample.php` | `US-024`: two selective queries per cache miss — the window plus its 3 lead-in weeks (`startsOn − 3 weeks … endsOn`), and the same range shifted back exactly 52 weeks — through `Activity::onDaysBetween()` (never `whereDate()`, so the `(user_id, activity_date)` index serves both). `EfficiencyRun` is scalars only; a metric that was not recorded stays null and a missing ascent counts as flat in `climbMetersPerKm()`. Kept apart from `DailyRunningDistance` / `DailyRuns` / `LeadInDistance` because those feed the grid and its intensity scale (FR-006): widening them by three weeks or a year would let weeks the reader cannot see move the legend and every cell's level |
 | Efficiency measure | `app/Support/Heatmap/MeasureAerobicEfficiency.php`, `app/Data/Heatmap/EfficiencyMeasurement.php`, `MeasuredRun.php`, `app/Enums/EfficiencyRunKind.php` | `US-024`: every FR-023 rule as a pure calculation (no Eloquent, no clock; Functional flow above). Climb is compared as integers (`ascent × 1000` against `distance × limit`) so a run at exactly 10.0 m per km never becomes Steep through float error; week positions are counted from UTC calendar dates so a daylight-saving change cannot move a run to the wrong week. Paces stay floats until the card builder rounds them |
+| Efficiency card builder | `app/Support/Heatmap/BuildAerobicEfficiency.php`, `app/Data/Heatmap/AerobicEfficiency.php`, `EfficiencyDot.php`, `EfficiencyWeek.php`, `app/Enums/AerobicEfficiencyState.php` | `US-024`: turns an `EfficiencyMeasurement` and the grid's `WeekRow`s into the card — state, headline, note, y ticks (`TrendTick`, reused), x labels, dots, median and last-year polylines, weekly figures, SVG title and caption (below). `WeekRow::rangeLabel()` is the one week-range formatter, shared with `BuildWeeklyTrend` |
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
@@ -275,6 +276,29 @@ The y labels, x labels and `partial` tag are HTML positioned in percent **outsid
 it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or lines smear on a wide rail.
 - **Lead-in query**: `LeadInDistance` is one grouped query over the 21 days before the window, bounded `>= start` and
   `< window start`.
+
+### Aerobic efficiency card (`US-024`, FR-023)
+
+`BuildAerobicEfficiency` returns an `AerobicEfficiency` of strings and coordinates; Blade does no arithmetic. Four states
+(`AerobicEfficiencyState`), decided in this order: **Empty** (no stored run in the window — the Weekly distance sentence),
+**NotEnoughRuns** (fewer than `MeasureAerobicEfficiency::MIN_QUALIFYING_RUNS` = 8 qualifying runs; the count is stated, no
+chart), **NoMedian** (8 or more, but no week has a point: the sentence "No 4-week median yet: no 4 weeks hold 3 usable
+runs." replaces the headline and the dots and weekly figures are still drawn) and **Measured**. NoMedian is an agreed
+deviation from the mockups, which never drew it (decision `7b05de091be150ce`).
+
+- **Rounding happens once, at the edge**: paces stay floats, then round half-up to whole seconds and print as `m:ss`. The
+  note's change is `first − latest` on those rounded seconds, so "25 s/km faster" always agrees with the headline and the
+  table. A single point prints no comparison; equal rounded paces read "same pace as 16 weeks ago"; the week count is
+  `latest position − first position + 1`.
+- **Y axis**: paces run faster at the top; `top` is the fastest of the dots, the median and last year floored to 15 s,
+  `bottom` the slowest ceiled to 15 s (one step wider when equal); a tick every 15 s, only the first carrying ` /km`;
+  `y = (pace − top) / (bottom − top) × 100`.
+- **Dots** are HTML positioned over the SVG: `left = (10 × week + 1.5 + weekday × 7/6) / 160 × 100 %`, `top = y`. Lines are
+  polylines at `x = 10 × week + 5`, split into segments at every missing point, a lone point becoming a 4-unit tick (the
+  weekly trend's rule). Coordinates are plain two-decimal strings, as the mockup writes them.
+- **Text alternative**: the SVG title names the reference heart rate, the window and the median's first and latest value; the
+  weekly figures table lists, per week, its dates, drawn runs, median and last year's pace (`null` prints "none", never
+  `0:00`). Last year's column and key entry exist only when `hasLastYear`.
 
 ## Architectural choices
 

@@ -18,6 +18,9 @@ use Carbon\CarbonImmutable;
  */
 final readonly class MeasureAerobicEfficiency
 {
+    /** Fewer qualifying runs in a window than this and the card states the count instead of a figure. */
+    public const MIN_QUALIFYING_RUNS = 8;
+
     /** A shorter run says too little about aerobic fitness to count. */
     private const MIN_DISTANCE_METERS = 3_000;
 
