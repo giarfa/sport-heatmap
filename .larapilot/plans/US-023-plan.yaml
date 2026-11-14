@@ -414,7 +414,7 @@ tasks:
     dependencies:
       - TASK-02
     type: Impl
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Re-importing an export over runs that lack metrics fills them without a conflict review, and the summary reports those runs as **enriched**. A second re-import changes nothing. On Overwrite a `--` extended metric keeps the stored value. The import summary page gains one `Enriched` tally row; no other screen changes.
@@ -446,28 +446,34 @@ tasks:
       6. `vendor/bin/pint --dirty --format agent`
 
       ## Completion Criteria
-      - [ ] A re-import over stored runs that lack metrics fills them with no conflict review and reports them under **Enriched**
-      - [ ] A second re-import of the same file reports 0 enriched and writes nothing (`updated_at` unchanged)
-      - [ ] Overwrite with a `--` extended cell keeps the stored value
-      - [ ] Summary page shows the `Enriched` row; the deviation is logged in the journal and the README
-      - [ ] Day cell detail, grid, legend, scale, trend, and review page unchanged
-      - [ ] Summary usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
-      - [ ] Tests pass
+      - [x] A re-import over stored runs that lack metrics fills them with no conflict review and reports them under **Enriched**
+      - [x] A second re-import of the same file reports 0 enriched and writes nothing (`updated_at` unchanged)
+      - [x] Overwrite with a `--` extended cell keeps the stored value
+      - [x] Summary page shows the `Enriched` row; the deviation is logged in the journal and the README
+      - [x] Day cell detail, grid, legend, scale, trend, and review page unchanged
+      - [x] Summary usable at mobile/tablet/desktop (manual smoke OK under NORMAL)
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model/schema change in this task (states from TASK-01 are reused)
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/garmin-csv-import.md`:
+      - [x] `.larapilot/docs/devs/garmin-csv-import.md`:
         - `### 3. Applying (ApplyGarminImport)` describes enrichment, the enriched/already-imported partition, and idempotence
         - `### 4. HTTP flow` notes the summary `Enriched` row
         - `Key decisions & invariants` covers the "never replace a stored metric on re-import" and "`--` keeps stored on Overwrite" rules for all 30 metrics
-      - [ ] English, committed with this task
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-023): TASK-04 report enriched runs on Garmin CSV re-import`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: 1416eb24ddde3dc029b18e446f5f71207700cc34
+      short_sha: 1416eb2
+      subject: 'feat(US-023): TASK-04 report enriched runs on Garmin CSV re-import'
+      committed_at: '2026-11-14T15:28:32+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/1416eb24ddde3dc029b18e446f5f71207700cc34'
   -
     id: TASK-05
     title: 'Tests: enrichment and idempotence, Overwrite keeps stored on `--`, summary row, dashboard unchanged'
@@ -696,4 +702,4 @@ tasks:
       - Commit: `test(US-023): TASK-09 verification and manual test handoff`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
-updated_at: '2026-11-14T14:26:44+00:00'
+updated_at: '2026-11-14T14:28:32+00:00'
