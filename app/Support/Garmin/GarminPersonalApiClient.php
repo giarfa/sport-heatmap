@@ -120,7 +120,7 @@ final class GarminPersonalApiClient
         }
 
         $token = $this->exchangeKey();
-        $secondsLeft = $this->expiry($token) - time() - self::EXPIRY_MARGIN_SECONDS;
+        $secondsLeft = $this->expiry($token) - now()->getTimestamp() - self::EXPIRY_MARGIN_SECONDS;
 
         /*
          * A token already inside its margin is still good for this call, but caching it
