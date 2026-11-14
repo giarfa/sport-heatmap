@@ -333,7 +333,7 @@ an owner with no password yet to the first-password page. CSRF comes from the `w
 | Parser | `app/Support/Garmin/ParseGarminCsv.php` | File → `ParsedGarminCsv`; `SplFileObject`, no package |
 | Header sets | `app/Support/Garmin/GarminCsvColumns.php` | Language detection, column lookup by name; a list of accepted texts per key; `EXTENDED_KEYS` (`US-023`) |
 | Cell parsers | `app/Support/Garmin/GarminCsvValues.php` | Static, pure parsers per value shape — whole number (signed when asked), one decimal, duration, pace, left balance — shared by the row parser and `ExtendedRunMetrics`, so there is one reading of each shape (`US-023`) |
-| Extended metrics | `app/Data/Garmin/ExtendedRunMetrics.php` | Final readonly DTO of the 27 nullable values; `fromCsvValues()`, `toAttributes()` (non-null only), compact `toSessionArray()` / `fromSessionArray()`; the API factory arrives in `US-023` TASK-06 |
+| Extended metrics | `app/Data/Garmin/ExtendedRunMetrics.php` | Final readonly DTO of the 27 nullable values; `fromCsvValues()`, `toAttributes()` (non-null only), compact `toSessionArray()` / `fromSessionArray()`; `fromApiPayload()` is the API half (`garmin-api-sync.md`) |
 | Type map | `app/Support/Garmin/GarminRunningTypes.php` | Garmin type name → `SportType` |
 | Row DTO | `app/Data/Garmin/GarminCsvRow.php` | `toAttributes()`, `toSessionArray()` / `fromSessionArray()`, `isIdenticalTo(Activity)` |
 | Parse result | `app/Data/Garmin/ParsedGarminCsv.php` | Rows, ignored by type, future-dated count, invalid list; session round-trip (`fromSessionArray()` tolerates the pre-`US-013` `outside_window` key and reads the missing `future_dated` as 0, so an upload or summary in flight across the deploy still opens) |
@@ -351,7 +351,7 @@ an owner with no password yet to the first-password page. CSRF comes from the `w
 | Session binding | `app/Support/Garmin/PendingGarminImport.php` | The one reader/writer of `garmin_import.pending` |
 | Formatting | `app/Support/Garmin/GarminImportFormat.php` | Shared by the review's stored and CSV sides |
 | Views / assets | `resources/views/garmin/{create,review,summary}.blade.php`, "Garmin import" block in `resources/css/app.css`, `data-resolve-all` in `resources/js/app.js` | |
-| Tests | `tests/Feature/Garmin/*`, `tests/Unit/Support/Garmin/*`, `tests/Feature/Database/RemoveStravaMigrationTest.php` | |
+| Tests | `tests/Feature/Garmin/*` (`ParseGarminCsvTest`, `GarminImportFlowTest`, `GarminImportEnrichmentTest`), `tests/Unit/Support/Garmin/*` (`GarminCsvValuesTest`, `GarminCsvColumnsTest`), `tests/Unit/Data/Garmin/ExtendedRunMetricsTest.php`, `GarminImportSummaryTest.php`, `tests/Feature/Database/ExtendedRunMetricsMigrationTest.php`, `RemoveStravaMigrationTest.php`, `tests/Feature/Dashboard/ExtendedMetricsNotDisplayedTest.php` | |
 | Fixtures | `tests/Fixtures/Garmin/activities-it.csv` (client sample, verbatim), `activities-en.csv`; `activities-it-extended.csv`, `activities-en-extended.csv` (`US-023`: synthetic values in the formats real exports use, one row of `--`, one of unreadable values) | |
 
 ### Data model (`activities`)

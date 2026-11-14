@@ -189,7 +189,11 @@ on Garmin within that span is updated here; a run you delete on Garmin stays her
 **What it writes.** Only running activities (running, street, track, indoor, treadmill, ultra, obstacle,
 trail and virtual runs). A run on the same date starting within two minutes of one you imported from a
 CSV is the same run: it gains its Garmin id and Garmin's values, and no review is shown. Running the sync
-twice in a row changes nothing. A failed sync keeps every run it wrote before failing; the dashboard
+twice in a row changes nothing. Besides distance, time, pace, ascent and heart rate, a synced run keeps
+Garmin's extended values (calories, max heart rate, training effect, cadence, descent, running form,
+steps, laps, elapsed and elevation range, heart-rate zones, fastest 1 km / mile / 5 km, and the place
+name); they are stored for later views and not shown yet, and no start or end position is ever
+stored. A failed sync keeps every run it wrote before failing; the dashboard
 names the cause ("Garmin key rejected — renew it", "Garmin unreachable", "Garmin sync failed") until the
 next sync succeeds. Only one sync runs at a time, and Sync now is limited to three a minute.
 
@@ -224,13 +228,17 @@ Signed in as the owner, follow **Import Garmin CSV** under the map (or on the em
      sync wrote keeps its Garmin id; note that the next sync re-reads the last seven days and applies
      Garmin Connect's values again.
    Runs with no clash are added as they are. A row identical to a run already imported from Garmin
-   is not asked about, so re-importing the same file changes nothing.
+   is not asked about; it only fills the values the stored run is missing (the extended values of
+   an older import, for instance), and re-importing the same file again changes nothing.
 4. **Confirm import** writes everything in one transaction; **Cancel**, or simply leaving the page,
-   writes nothing. A summary shows imported, overwritten, skipped, already-imported, ignored,
-   outside-window and unreadable counts, and the map updates immediately.
+   writes nothing. A summary shows imported, overwritten, skipped, already-imported, enriched
+   (existing runs that gained missing values), ignored, future-dated and unreadable counts, and the
+   map updates immediately.
 
-A stored run is never replaced by a re-read of the file: only an explicit **Overwrite** changes one,
-and nothing else writes a run except the Garmin sync. The uploaded file itself is never stored: it is read during the request
+A stored run is never replaced by a re-read of the file: only an explicit **Overwrite** changes one
+(and a `--` cell in the file keeps the value already stored), and nothing else writes a run except
+the Garmin sync. Besides the three values shown on a day, the import reads Garmin's extended columns
+(Italian and English headers) when the file has them and stores them for later views. The uploaded file itself is never stored: it is read during the request
 and discarded. Imported runs carry no link anywhere.
 
 ## The dashboard

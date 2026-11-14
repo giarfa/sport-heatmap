@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A warning above the map while the latest sync failed — "Garmin key rejected — renew it",
   "Garmin unreachable" or "Garmin sync failed" — which goes away after the next successful sync.
 - `php artisan garmin:sync` to run the sync, or the first full-history read, from the command line.
+- Runs keep the extra values Garmin records: calories, max heart rate, training effect, cadence, best
+  pace, descent, running form, steps, laps, elapsed time, elevation range and Training Stress Score from
+  a CSV export, plus heart-rate zones, fastest splits and the location from the sync. Re-importing an
+  older export fills them in and reports those runs as **Enriched** on the import summary. Nothing new
+  is shown on the dashboard yet.
 
 ### Changed
 

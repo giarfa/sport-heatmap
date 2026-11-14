@@ -599,7 +599,7 @@ tasks:
     dependencies:
       - TASK-06
     type: Test
-    status: TODO
+    status: DONE
     body: |
       ## Description
       Add coverage for the API side of FR-022, at the NORMAL bar, with HTTP faked and stray requests forbidden.
@@ -629,13 +629,19 @@ tasks:
       4. Do **not** add Playwright, Dusk, browser, or viewport suites.
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] API mapping, create/link/update, TSS kept, second-sync no-op, and no coordinates are each asserted
+      - [x] Tests pass locally
+      - [x] API mapping, create/link/update, TSS kept, second-sync no-op, and no coordinates are each asserted
 
       ## Git Deliverables
       - Commit: `test(US-023): TASK-07 cover extended metrics from the Garmin API sync`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
+    commit:
+      sha: ee9c50ca1efb6e8661398915f65526a2c4a4a756
+      short_sha: ee9c50c
+      subject: 'test(US-023): TASK-07 cover extended metrics from the Garmin API sync'
+      committed_at: '2026-11-14T15:34:07+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ee9c50ca1efb6e8661398915f65526a2c4a4a756'
   -
     id: TASK-08
     title: 'CHANGELOG, README, and domain-doc consistency pass'
@@ -714,4 +720,4 @@ tasks:
       - Commit: `test(US-023): TASK-09 verification and manual test handoff`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.1.0`; open or update the remote only if the user asks
-updated_at: '2026-11-14T14:32:25+00:00'
+updated_at: '2026-11-14T14:34:08+00:00'

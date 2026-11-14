@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-004` |
-| **Last updated by** | `US-022` — 2026-11-14 |
+| **Last updated by** | `US-023` — 2026-11-14 |
 | **Owner persona** | ✨ Joe |
 
 ## Purpose
@@ -197,7 +197,7 @@ calibrated bands, upper-inclusive.
 | Controller | `app/Http/Controllers/DashboardController.php` | The signed-in owner → grid + status; no run → the empty state |
 | Window | `app/Support/Heatmap/HeatmapWindow.php` | ISO-week anchored 112-day window: `current()`, `endingInWeekOf()`, strict `fromRequestedEnd()`, `previous()`, `next()` (clamped to the current window), `isCurrent()` |
 | Daily totals | `app/Support/Heatmap/DailyRunningDistance.php` | One grouped aggregate query, ranged by `Activity::onDaysBetween()` |
-| Day runs | `app/Support/Heatmap/DailyRuns.php`, `app/Data/Heatmap/DayRun.php` | One query per cache miss for the window's runs, grouped by day in start order; `DayRun` is a scalars-only run with its formatting (`kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()` — null when not recorded; it has no link and no source, `US-021`) |
+| Day runs | `app/Support/Heatmap/DailyRuns.php`, `app/Data/Heatmap/DayRun.php` | One query per cache miss for the window's runs, grouped by day in start order; `DayRun` is a scalars-only run with its formatting (`kilometres()`, `movingTime()`, `pace()`, `ascent()`, `heartRate()` — null when not recorded; it has no link and no source, `US-021`). `DailyRuns` selects only the columns `DayRun` reads, so the 27 extended metrics of `US-023` (`garmin-csv-import.md`) never reach the grid cache or a view: they are stored for later screens and deliberately not displayed |
 | Navigation | `app/Support/Heatmap/OldestRunDate.php`, `app/Data/Heatmap/WindowNavigation.php` | The oldest stored run (one `MIN`, outside the cache) and the heading, title, empty note and Previous / Next URLs of the shown window |
 | Weekly trend | `app/Support/Heatmap/BuildWeeklyTrend.php`, `app/Data/Heatmap/WeeklyTrend.php`, `TrendBar.php`, `TrendTick.php` | `US-014`: turns the window's `WeekRow`s into the chart's bars, 4-week average, y axis and every string it prints (below) |
 | Lead-in | `app/Support/Heatmap/LeadInDistance.php` | `US-014`: the three weeks before the window in one grouped query, feeding the first averages |
@@ -367,6 +367,11 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   Future cell never opens a detail and the detail never lists a run the colour
   does not account for. `DailyRuns` and `DailyRunningDistance` read the same
   window of the same rows.
+- **Invariant — no extended metric is displayed or cached.** `DailyRuns` selects the columns of
+  `DayRun` only, so calories, cadence, zones, splits, location and the rest stay out of the grid
+  cache and every view. _Breaks if:_ `DailyRuns` switches to `select *` or `DayRun` gains an
+  extended field without a mockup: the page would show data nobody designed.
+  `ExtendedMetricsNotDisplayedTest` renders the page with and without them and compares.
 - **Invariant — the weekly trend lives inside the cached grid, never in a cache of
   its own.** _Breaks if:_ the chart is cached or built outside `HeatmapGridCache::remember()`
   — an import that calls `forgetAthlete()` would then retire the grid but leave
