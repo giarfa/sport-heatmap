@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ActivitySource;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
@@ -47,6 +48,7 @@ class ActivityFactory extends Factory
             'average_pace_seconds_per_km' => $secondsPerKilometre,
             'total_ascent_meters' => fake()->numberBetween(5, 180),
             'average_heart_rate' => fake()->numberBetween(135, 172),
+            'source' => ActivitySource::GarminCsv,
         ];
     }
 
@@ -75,14 +77,29 @@ class ActivityFactory extends Factory
     }
 
     /**
-     * A run imported from a Garmin Connect CSV, which is what every stored run is. The
-     * default definition already is one; this reads better where a test is about the
-     * import.
+     * A run imported from a Garmin Connect CSV: no Garmin activity id, a place-and-type
+     * name. The default definition already is one; this states it where a test or the
+     * seeder is about the source.
      */
     public function garminImported(): static
     {
         return $this->state(fn (array $attributes): array => [
             'name' => fake()->randomElement(self::RUN_NAMES),
+            'source' => ActivitySource::GarminCsv,
+            'garmin_activity_id' => null,
+        ]);
+    }
+
+    /**
+     * A run the Garmin Connect API supplied: it carries its Garmin activity id, a
+     * realistic 11-digit one, unique within the process so two runs never collide on
+     * the unique index.
+     */
+    public function garminSynced(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'source' => ActivitySource::GarminApi,
+            'garmin_activity_id' => fake()->unique()->numberBetween(10_000_000_000, 99_999_999_999),
         ]);
     }
 

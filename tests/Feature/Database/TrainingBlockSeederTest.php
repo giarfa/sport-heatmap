@@ -2,8 +2,12 @@
 
 namespace Tests\Feature\Database;
 
+use App\Enums\ActivitySource;
+use App\Enums\GarminSyncOutcome;
+use App\Enums\GarminSyncTrigger;
 use App\Enums\SportType;
 use App\Models\Activity;
+use App\Models\GarminSync;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapWindow;
 use Database\Seeders\TrainingBlockSeeder;
@@ -200,11 +204,42 @@ class TrainingBlockSeederTest extends TestCase
         });
     }
 
-    public function test_the_demo_has_no_sync_history_and_no_strava_columns(): void
+    public function test_the_demo_has_no_strava_columns_and_one_succeeded_garmin_sync(): void
     {
         $this->assertFalse(Schema::hasTable('sync_runs'));
         $this->assertFalse(Schema::hasColumn('users', 'strava_athlete_id'));
         $this->assertFalse(Schema::hasColumn('activities', 'strava_activity_id'));
+
+        $sync = GarminSync::sole();
+
+        $this->assertSame(GarminSyncOutcome::Succeeded, $sync->outcome);
+        $this->assertSame(GarminSyncTrigger::Scheduled, $sync->trigger);
+        $this->assertTrue($sync->full_history);
+        $this->assertNull($sync->failure_cause);
+        $this->assertTrue($sync->finished_at->isToday());
+        $this->assertTrue($sync->finished_at->lessThanOrEqualTo(Carbon::now()));
+        $this->assertTrue($sync->started_at->lessThan($sync->finished_at));
+    }
+
+    /**
+     * The last four weeks are what the sync wrote and carry Garmin ids; everything older
+     * is a CSV import with none. The sync row counts exactly the runs it wrote.
+     */
+    public function test_the_last_four_weeks_are_api_synced_and_older_runs_are_csv_imports(): void
+    {
+        $syncedFrom = Carbon::today()->startOfWeek()->subWeeks(3);
+
+        $synced = Activity::where('activity_date', '>=', $syncedFrom->toDateString())->get();
+        $imported = Activity::where('activity_date', '<', $syncedFrom->toDateString())->get();
+
+        $this->assertNotEmpty($synced);
+        $this->assertNotEmpty($imported);
+        $this->assertTrue($synced->every(fn (Activity $activity): bool => $activity->source === ActivitySource::GarminApi
+            && $activity->garmin_activity_id !== null));
+        $this->assertTrue($imported->every(fn (Activity $activity): bool => $activity->source === ActivitySource::GarminCsv
+            && $activity->garmin_activity_id === null));
+        $this->assertCount($synced->count(), $synced->pluck('garmin_activity_id')->unique());
+        $this->assertSame($synced->count(), GarminSync::sole()->new_count);
     }
 
     public function test_every_activity_belongs_to_the_seeded_athlete(): void

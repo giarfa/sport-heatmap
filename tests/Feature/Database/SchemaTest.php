@@ -66,13 +66,58 @@ class SchemaTest extends TestCase
     }
 
     /**
-     * Strava is removed: no identifier of an outside activity and no source column
-     * remain, so no `strava` value is possible in activities.
+     * Strava is removed, and the Garmin sync adds its own pair: where a run came from,
+     * and which Garmin activity it is. Every row that existed is a CSV import.
      */
-    public function test_activities_has_no_strava_id_and_no_source(): void
+    public function test_activities_has_no_strava_id_and_a_source_defaulting_to_the_csv_import(): void
     {
         $this->assertFalse(Schema::hasColumn('activities', 'strava_activity_id'));
-        $this->assertFalse(Schema::hasColumn('activities', 'source'));
+        $this->assertSame('varchar', $this->columnTypeName('activities', 'source'));
+        $this->assertFalse($this->columnIsNullable('activities', 'source'));
+        $this->assertStringContainsString('garmin_csv', (string) $this->columnDefault('activities', 'source'));
+    }
+
+    public function test_the_garmin_activity_id_is_a_nullable_unique_integer(): void
+    {
+        $this->assertSame('integer', $this->columnTypeName('activities', 'garmin_activity_id'));
+        $this->assertTrue($this->columnIsNullable('activities', 'garmin_activity_id'));
+        $this->assertNull($this->columnDefault('activities', 'garmin_activity_id'));
+        $this->assertTrue(
+            $this->hasIndexOn('activities', ['garmin_activity_id'], unique: true),
+            'activities.garmin_activity_id must carry a unique index: it is what keeps a second sync from duplicating a run.',
+        );
+    }
+
+    public function test_garmin_syncs_records_each_attempt_and_the_status_index_exists(): void
+    {
+        foreach ([
+            'trigger', 'started_at', 'finished_at', 'outcome', 'failure_cause', 'full_history',
+            'new_count', 'updated_count', 'linked_count', 'ignored_count', 'future_dated_count', 'invalid_count',
+        ] as $column) {
+            $this->assertTrue(Schema::hasColumn('garmin_syncs', $column), "garmin_syncs.{$column} is missing.");
+        }
+
+        $this->assertTrue($this->columnIsNullable('garmin_syncs', 'finished_at'));
+        $this->assertTrue($this->columnIsNullable('garmin_syncs', 'failure_cause'));
+        $this->assertTrue($this->hasIndexOn('garmin_syncs', ['outcome', 'finished_at']));
+    }
+
+    /**
+     * The failure is a cause from a closed list. A column able to hold a key, a token,
+     * a URL or a response body would give a secret somewhere to be stored.
+     */
+    public function test_garmin_syncs_has_no_column_able_to_hold_a_secret(): void
+    {
+        $allowed = [
+            'id', 'trigger', 'started_at', 'finished_at', 'outcome', 'failure_cause', 'full_history',
+            'new_count', 'updated_count', 'linked_count', 'ignored_count', 'future_dated_count', 'invalid_count',
+            'created_at', 'updated_at',
+        ];
+
+        $columns = Schema::getColumnListing('garmin_syncs');
+
+        $this->assertEqualsCanonicalizing($allowed, $columns);
+        $this->assertSame('varchar', $this->columnTypeName('garmin_syncs', 'failure_cause'));
     }
 
     /**

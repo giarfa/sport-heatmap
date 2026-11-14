@@ -4,7 +4,7 @@
 | --- | --- |
 | **Status** | Active |
 | **Introduced by** | `US-008` |
-| **Last updated by** | `US-021` — 2026-10-26 |
+| **Last updated by** | `US-022` — 2026-11-14 |
 | **Owner persona** | 🔧 Alex |
 
 ## Purpose
@@ -302,10 +302,30 @@ with the run's own row, so they carry **no index**: every query filters on
 `(user_id, activity_date)` first. `activities.user_id` is not mass-assignable; write
 through `$user->activities()`.
 
-There is no `source` and no `strava_activity_id` column: `US-021` deleted every
-Strava-sourced run and dropped both, together with the Strava columns of `users` and
-the `sync_runs` table (`remove_strava_from_schema`). The migration is irreversible: its
-`down()` restores the schema, never the deleted rows or the tokens.
+Two columns say where a run came from (`US-022`, `add_garmin_sync_to_activities_table`):
+
+- `source` — string, not null, default `garmin_csv` (`app/Enums/ActivitySource.php`:
+  `garmin_csv`, `garmin_api`). Every row stored before the column existed is a CSV import,
+  which is exactly what the default backfills. A CSV import never writes it: the default
+  is right for a CSV row, and Overwrite leaves an existing row's value alone.
+- `garmin_activity_id` — unsigned big integer, nullable, **unique**. Set only by the
+  Garmin sync (`garmin-api-sync.md`) when it creates or links a run; a CSV-only run keeps
+  NULL, and SQLite allows any number of NULLs under the unique index. An integer, not a
+  string: Garmin's ids are 11 digits today and the API answers them as JSON numbers, so
+  both sides compare without a cast.
+
+Both stay **out of `#[Fillable]`**: they say which Garmin activity a run is, so only the
+code that does the linking assigns them, explicitly. A CSV row, an import payload or a
+request body can never plant an id that would make a later sync overwrite — or refuse to
+create — an unrelated run. For the same reason the CSV import's `toAttributes()` carries
+neither, so Overwrite keeps a run's `garmin_activity_id`.
+
+There is no `strava_activity_id` column: `US-021` deleted every Strava-sourced run and
+dropped it, together with the Strava columns of `users` and the `sync_runs` table
+(`remove_strava_from_schema`). That migration is irreversible: its `down()` restores the
+schema, never the deleted rows or the tokens. It also owned an earlier `source` column;
+`US-022` brings a column of that name back with a different meaning (CSV vs API), so
+rolling back the Strava removal in a test first needs the `US-022` migration undone.
 
 ## Architectural choices
 
@@ -401,8 +421,8 @@ the `sync_runs` table (`remove_strava_from_schema`). The migration is irreversib
 
 ## Related
 
-- Specs: `US-008`, `US-011`, `US-012`, `US-013`, `US-018`, `US-020`, `US-021`
+- Specs: `US-008`, `US-011`, `US-012`, `US-013`, `US-018`, `US-020`, `US-021`, `US-022`
 - Plans: `.larapilot/plans/US-008-plan.yaml`, `.larapilot/plans/US-011-plan.yaml`, `.larapilot/plans/US-013-plan.yaml`, `.larapilot/plans/US-020-plan.yaml`
 - Mockups: `.larapilot/mockups/US-008/`
 - Decisions: `56c5683061907ab8` (running type names; unknowns surfaced)
-- Other domains: `heatmap-dashboard.md`, `owner-authentication.md`
+- Other domains: `garmin-api-sync.md`, `heatmap-dashboard.md`, `owner-authentication.md`
