@@ -104,7 +104,7 @@ tasks:
     id: TASK-01
     title: 'EfficiencyRuns query and EfficiencyRun DTO'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2
     dependencies:
@@ -127,23 +127,29 @@ tasks:
       5. `php artisan test --filter=EfficiencyRun`
 
       ## Completion Criteria
-      - [ ] Two queries per call, each served by the `(user_id, activity_date)` index (no function on the column)
-      - [ ] A run with null pace, heart rate or ascent comes back with null, never 0
-      - [ ] The window's last Sunday and the lead-in's first Monday are inside the ranges; the day before is not
-      - [ ] Tests pass
+      - [x] Two queries per call, each served by the `(user_id, activity_date)` index (no function on the column)
+      - [x] A run with null pace, heart rate or ascent comes back with null, never 0
+      - [x] The window's last Sunday and the lead-in's first Monday are inside the ranges; the day before is not
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: the two efficiency reads, their date ranges and why they are separate from DailyRunningDistance / LeadInDistance
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: the two efficiency reads, their date ranges and why they are separate from DailyRunningDistance / LeadInDistance
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-01 read runs for aerobic efficiency`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: d043812dab9b4231d73ee5f31f52ba31a59b37b0
+      short_sha: d043812
+      subject: 'feat(US-024): TASK-01 read runs for aerobic efficiency'
+      committed_at: '2026-11-14T18:44:20+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d043812dab9b4231d73ee5f31f52ba31a59b37b0'
   -
     id: TASK-02
     title: 'MeasureAerobicEfficiency: FR-023 calculation'
@@ -550,4 +556,4 @@ tasks:
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:43:08+00:00'
+updated_at: '2026-11-14T17:44:21+00:00'

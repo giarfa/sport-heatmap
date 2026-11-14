@@ -72,6 +72,31 @@ owner loses the only view of their training.
       after your next import."; an empty earlier window says "No runs stored in
       these 16 weeks." (`$grid->hasRuns()`).
 
+### Aerobic efficiency (`US-024`, FR-023)
+
+How fast the owner runs at their usual heart rate, week by week, against the same weeks a year earlier.
+`MeasureAerobicEfficiency` is a pure calculation over an `EfficiencySample`; the rules, in order:
+
+1. **Qualifying run** (the shown window's runs only): distance ≥ 3 km, pace and heart rate both recorded, climb
+   (`total_ascent ÷ distance`, a missing ascent counting as flat) ≤ 10 m per km. A null metric disqualifies the run; it is
+   never read as 0. `qualifyingCount` is the number found, before the outlier guard.
+2. **Reference heart rate**: the median `average_heart_rate` of those runs, rounded half-up to whole bpm. One value per
+   window, used for every pace, the tile's two points and last year's line. No qualifying run, no reference, no points.
+3. **Outlier guard**: a run more than 10 bpm above the reference is neither drawn nor pooled, in the window, the lead-in
+   and last year alike. Exactly reference + 10 stays.
+4. **Kind by climb**: under 5 m per km `Flat`, 5 to 10 `Hilly`, over 10 `Steep`.
+5. **Pace at reference heart rate** = stored pace, converted to its flat-equivalent distance (distance + 8 × ascent) for
+   `Hilly` and `Steep`, then × run heart rate ÷ reference heart rate. A 5.0 km run with 40 m of climb at 6:00 /km counts as
+   5.32 km at the same 30:00.
+6. **Line point per window week** (positions 0–15): the median over that week and the three before it, lead-in weeks
+   included, of `Flat` runs; when those four weeks hold fewer than 4, the `Hilly` runs join; fewer than 3 usable runs, no
+   point (`null`). An even count takes the mean of the two middle values. `Steep` runs never enter.
+7. **Last year**: the same loop over the runs stored 52 weeks earlier, with the **window's** reference heart rate.
+   `hasLastYear` is true when any run, with or without metrics, is stored in those 16 weeks.
+
+`runsPerWeek` counts the drawn runs (flat, hilly and steep) of each window week for the card's weekly figures. Lead-in runs
+feed the medians and are never drawn.
+
 ### Window navigation (`US-013`, FR-019)
 
 `<x-window-nav>` sits between the heading's range line and the grid: a
@@ -202,6 +227,7 @@ calibrated bands, upper-inclusive.
 | Weekly trend | `app/Support/Heatmap/BuildWeeklyTrend.php`, `app/Data/Heatmap/WeeklyTrend.php`, `TrendBar.php`, `TrendTick.php` | `US-014`: turns the window's `WeekRow`s into the chart's bars, 4-week average, y axis and every string it prints (below) |
 | Lead-in | `app/Support/Heatmap/LeadInDistance.php` | `US-014`: the three weeks before the window in one grouped query, feeding the first averages |
 | Efficiency reads | `app/Support/Heatmap/EfficiencyRuns.php`, `app/Data/Heatmap/EfficiencyRun.php`, `EfficiencySample.php` | `US-024`: two selective queries per cache miss — the window plus its 3 lead-in weeks (`startsOn − 3 weeks … endsOn`), and the same range shifted back exactly 52 weeks — through `Activity::onDaysBetween()` (never `whereDate()`, so the `(user_id, activity_date)` index serves both). `EfficiencyRun` is scalars only; a metric that was not recorded stays null and a missing ascent counts as flat in `climbMetersPerKm()`. Kept apart from `DailyRunningDistance` / `DailyRuns` / `LeadInDistance` because those feed the grid and its intensity scale (FR-006): widening them by three weeks or a year would let weeks the reader cannot see move the legend and every cell's level |
+| Efficiency measure | `app/Support/Heatmap/MeasureAerobicEfficiency.php`, `app/Data/Heatmap/EfficiencyMeasurement.php`, `MeasuredRun.php`, `app/Enums/EfficiencyRunKind.php` | `US-024`: every FR-023 rule as a pure calculation (no Eloquent, no clock; Functional flow above). Climb is compared as integers (`ascent × 1000` against `distance × limit`) so a run at exactly 10.0 m per km never becomes Steep through float error; week positions are counted from UTC calendar dates so a daylight-saving change cannot move a run to the wrong week. Paces stay floats until the card builder rounds them |
 | Grid builder | `app/Support/Heatmap/HeatmapBuilder.php` | Cells, weeks, totals; attaches each Ran day's runs to its `DayCell` |
 | Scale | `app/Support/Heatmap/CalibrateIntensityScale.php`, `app/Data/Heatmap/IntensityScale.php` | Percentiles (R-7, pinned by `.ai/rules/heatmap.md`) and fallbacks |
 | Grid DTOs | `app/Data/Heatmap/HeatmapGrid.php`, `WeekRow.php`, `DayCell.php`, `LegendRow.php`, `app/Enums/DayCellState.php` | All formatting and accessible names |
@@ -264,6 +290,11 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
 | A per-athlete generation counter in the cache key; one `forgetAthlete()` bumps it (US-013) | Cache tags; forgetting each window's key in a loop; one entry holding every window | Navigation means an athlete has one cached grid per window they opened, and `cache.default` is `database`, which has no tags. A loop would have to guess which windows were cached; a single entry would rebuild every window on any miss. A counter makes one write retire every window at once; the orphans expire through `grid_cache_ttl`. The counter is created with `add()` then `increment()`d, because a bare `increment()` on a missing key answers `false` on the database store and a `forever(…, 1)` fallback lets two overlapping writes both land on 1. If the counter cannot be read the request builds the grid and leaves the cache alone, so a grid is never served or stored under a guessed generation; a failed bump is reported, not thrown, since the write it follows is already committed |
 | Only windows that can hold a run are cached (US-013) | Cache every requested window; clamp `to` to the oldest run; throttle `/` | `to` takes any past date and each week is a key, so a request could fill the cache table with empty grids back to year 0. A window that ends before the oldest run is built uncached (two small queries); the current window is always cached. Clamping would change what a shared link shows, and a throttle would hit the owner too |
 | A `v2` segment in the cache key (US-012; `v3` since US-013, when the key gained the generation; `v4` since US-014, when the grid gained its `trend`; `v5` since US-015, when a fix changed what a grid contains; `v6` since US-021, when `DayRun` lost its Strava link) | Reuse the key and rely on the unserialize `Throwable` catch; prove the TTL covers a content fix | A readonly property an old entry never saw comes back *uninitialized*, not as a failed read: the entry passes `instanceof HeatmapGrid` and then throws on first access, outside the catch. A new key means old entries are never read. A content fix needs the same: the key carries `$today` and the TTL is 86 400 s, so a past window cached before the deploy would keep hiding its Sunday until midnight |
+| Aerobic efficiency is a median, not a mean (US-024) | Mean pace; a regression of pace on heart rate | One slow recovery jog or one hard session must not move a week's point; a median of 3 or more runs ignores it with no tuning knob. A regression would need a model the owner cannot check against a calendar |
+| The reference heart rate comes from the shown window only (US-024) | A fixed heart rate; all stored runs; the lead-in too | The reading is "your usual heart rate for what is on screen". A lead-in or last-year run in the reference would let weeks the reader cannot see move it, and last year's line must use the window's value so the two lines differ in pace, not in effort |
+| Speed comes from the stored pace, not from moving time (US-024) | `distance ÷ moving_time_seconds` | The qualifying rule already requires the pace column, and the day detail prints that same number; computing from moving time would print a pace the run list does not show |
+| 10 m per km and the 8× factor are FR-023's own numbers (US-024) | A calibrated hill factor; total descent | The spec fixes both and puts a calibration readout out of scope; they are named constants in `MeasureAerobicEfficiency`, so a later spec changes one place |
+| Steep runs are drawn at their adjusted pace and never enter a median (US-024, decision `8a053a5ea5155d84`) | Leave them out of the chart; let them move the line | The owner still ran them, so they appear as a third marker shape; a climb that steep is not comparable with a flat run even after the 8× conversion, so the line ignores them |
 | Run formatting reuses `GarminImportFormat` | A second formatter in the heatmap layer | Pace, ascent, heart rate, distance and duration print the same on the review and in the day detail; one copy cannot drift |
 | The URL names the window's **end** week, as a `Y-m-d` query value (`/?to=2026-09-06`, `US-013`) | A path segment; the window's start date in the URL; a page number | A query value keeps `/` the one route and the one cache key shape; the end is what the reader navigates by and survives a change of `window_weeks`, where a start date would shift every shared link; a page number says nothing in a shared link |
 | A bad `to` renders the current window silently (`US-013`) | 404; 422; a redirect to `/` | The spec asks for a bad or future link to render "without an error"; an old bookmark is better served by today's map than by an error page, and the guest path stays free of any new response |
@@ -378,6 +409,12 @@ it would distort, and every stroke needs `vector-effect: non-scaling-stroke` or 
   — an import that calls `forgetAthlete()` would then retire the grid but leave
   a chart that disagrees with its rows. Its lead-in query runs inside the build closure, so
   a cache hit costs the chart no query.
+- **Invariant — one reference heart rate per window** (US-024), taken from the window's qualifying runs and used by the
+  window's points, the hilly and steep dots, and last year's line. _Breaks if:_ a lead-in or last-year run is allowed into
+  the median, or last year is measured at its own median: the two lines would then compare different efforts.
+- **Invariant — a steep run never moves a line point, and a null metric is never 0** (US-024). _Breaks if:_ `Steep` joins
+  the pooled runs or a missing pace or heart rate is cast to an integer: a run at 0 bpm would read as an infinite
+  efficiency.
 - **Invariant — the scale is calibrated once per grid build**, so cells and legend
   cannot disagree.
 - **Invariant — `noindex, nofollow` stays in the layout**, so no view change can
