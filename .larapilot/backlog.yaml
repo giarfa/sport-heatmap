@@ -1496,11 +1496,11 @@ specs:
       title: 'Heatmap dashboard'
     priority: MEDIUM
     points: 8
-    status: 'IN PROGRESS'
+    status: REVIEW
     body: |
       #### US-024: Aerobic efficiency: pace at the usual heart rate across the window, with last year's line
 
-      **Epic:** EP-003 | **Priority:** MEDIUM | **Points:** 8 | **Status:** IN PROGRESS
+      **Epic:** EP-003 | **Priority:** MEDIUM | **Points:** 8 | **Status:** REVIEW
       **Blocked by:** -
       **Type:** Feature
       **Release:** 3.2.0
@@ -1545,4 +1545,5 @@ specs:
     status_history:
       - { status: PLANNED, at: '2026-11-14T17:40:50+00:00' }
       - { status: 'IN PROGRESS', at: '2026-11-14T17:42:53+00:00' }
+      - { status: REVIEW, at: '2026-11-14T18:02:30+00:00' }
     rework: false
