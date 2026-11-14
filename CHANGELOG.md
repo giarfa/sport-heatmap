@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-11-14
+
 ### Added
 
 - Garmin Connect sync: with a personal API key in `GARMIN_API_KEY`, your running activities are read
