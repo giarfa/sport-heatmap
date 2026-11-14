@@ -16,15 +16,43 @@ stays (`garmin-csv-import.md`); both write the same `activities` table.
 
 ## Functional flow
 
-> Filled as the spec lands: the client and the DTO (TASK-02), the sync action, command and
-> schedule (TASK-04), Sync now and the status line (TASK-06). Only the data model exists so
-> far.
+> Filled as the spec lands. So far: the client and the DTO exist and nothing calls them yet;
+> the sync action, command and schedule (TASK-04) and Sync now and the status line (TASK-06)
+> are still to come.
+
+**Token lifecycle (`GarminPersonalApiClient`).** With a key configured, the client
+`POST`s `Authorization: ApiKey {key}` to the token path. The answer is a **raw JWT**, not
+JSON. The `exp` claim is read from its payload segment and the token is cached in the
+`file` store until one hour before `exp`. Every data call sends `Authorization: Bearer`
+and `Accept: application/json`. A `401` on a data call drops the cached token,
+exchanges once more and retries once; a second refusal is `key_rejected`.
+
+**Activity page.** `activities($start, $limit, $startDate, $endDate)` returns one page
+of the activity search as a list; paging until a short page is the action's job.
+`GarminApiActivity::typeKeyOf()` classifies a payload before a run is built
+(`GarminRunningTypes::sportTypeForTypeKey()`: nine keys to `Run` / `TrailRun` /
+`VirtualRun`), because a strength session has no distance and would otherwise be counted
+invalid instead of ignored. `GarminApiActivity::fromApiPayload()` returns the run or null
+when the id, local start, distance or moving time is missing or unreadable.
+
+**Failure mapping** (cause is a `GarminSyncFailure`, carried by `GarminApiException`):
+
+| What happened | Cause |
+| --- | --- |
+| Token call `401` / `403`; data call `403`; data call `401` twice | `key_rejected` |
+| `ConnectionException` (including a timeout), `429`, any `5xx` | `unreachable` |
+| Any other status, an unreadable token or `exp`, a body that is not a JSON list | `unexpected` |
 
 ## Technical design
 
 | Piece | Where | Role |
 | --- | --- | --- |
 | Model / table | `app/Models/GarminSync.php`, `create_garmin_syncs_table` migration | One row per sync attempt |
+| Client | `app/Support/Garmin/GarminPersonalApiClient.php` | Key to token, token reuse, one activity-search page, one retry on a data-call 401 |
+| Exception | `app/Exceptions/Garmin/GarminApiException.php` | A `GarminSyncFailure` cause and an HTTP status; fixed messages only |
+| DTO | `app/Data/Garmin/GarminApiActivity.php` | One running activity as run values; rounding and empty metrics |
+| Type map | `app/Support/Garmin/GarminRunningTypes.php` | `sportTypeForTypeKey()` beside the CSV label map |
+| Config keys | `config/services.php` → `garmin`, `GARMIN_API_KEY` in `.env.example` | Key (env); host, paths, page size, re-read span, token store, timeouts (literals) |
 | Run columns | `app/Models/Activity.php`, `add_garmin_sync_to_activities_table` migration | `source`, `garmin_activity_id` (see `garmin-csv-import.md` → Data model) |
 | Enums | `app/Enums/ActivitySource.php`, `GarminSyncTrigger.php`, `GarminSyncOutcome.php`, `GarminSyncFailure.php` | The closed vocabularies of the two tables |
 | Factories | `database/factories/GarminSyncFactory.php`, `ActivityFactory::garminSynced()` | `succeeded()`, `failed()`, `running()`, `manual()`, `scheduled()`, `fullHistory()` |
@@ -56,12 +84,23 @@ the dashboard copy lives: "Garmin key rejected — renew it", "Garmin unreachabl
 | --- | --- | --- |
 | No column can hold a key, token, URL or response body; the failure is a cause from `GarminSyncFailure` | A free-text `error_message`, as the retired `sync_runs` table had | A free-text message is where a request URL or a response body ends up. With a closed list a secret has nowhere to be stored, and the warning copy cannot drift from the cause |
 | Integer primary keys on `garmin_syncs` | UUIDs (the Larapilot default for new models) | The existing schema uses auto-increment ids and the PRD data model keeps them; one owner, one table of attempts, nothing exposed by id |
+| A hand-rolled client on the HTTP client | `garmin/connect-personal-api-python` (Python only); a community PHP package | The only official client is Python and no maintained PHP package exists (PRD prior art) |
+| The JWT's `exp` is read without verifying the signature | Verifying it; a fixed 24 h lifetime | This is the client, not the verifier — the API checks the token on every call. A fixed lifetime would expire mid-sync or never renew; a missing `exp` is a failure, not a guess |
+| The token is cached until one hour before `exp`, in `Cache::store('file')` (decision `dffd4adf33c2d285`) | The default store; a column; encrypting it in the database cache | `CACHE_STORE=database` would write the token into SQLite, and "the token never appears in the database" is a requirement. A token inside its last hour is used once and not kept |
+| Exception messages are fixed text; the previous exception is chained, never its message | Rethrowing the HTTP exception's message | That message embeds the request URL and can embed a response body |
+| Endpoint URLs are literals in `config/services.php`; only the key is `env()` | Env-driven base URL | No environment file can send the key to another host (`.ai/rules/config.md`) |
 | `garmin_activity_id` is an unsigned big integer with a unique index | A string; a lookup table | Ids are 11-digit JSON numbers; the unique index makes a second sync idempotent in the database itself, not only in the action |
 
 ## Key decisions & invariants
 
 - **Invariant —** `source` and `garmin_activity_id` are never mass-assigned. _Breaks if:_ a
   request or import payload can plant an id, making a sync overwrite an unrelated run.
+- **Invariant —** the API key and the token appear in no exception message, log context,
+  cache default store, column or response. _Breaks if:_ a catch block rethrows
+  `$exception->getMessage()` or the token is put in the default cache store.
+- **Invariant —** a missing metric is stored as NULL, never 0: no pace for a null or zero
+  speed, none for a null elevation or heart rate (a heart rate of 0 is Garmin's "no strap").
+  _Breaks if:_ a 0 reads as a measurement on the dashboard.
 - **Invariant —** `garmin_syncs` holds no secret and no response text. _Breaks if:_ a column
   of free text is added; a failure would then be able to store the key or a URL.
 
