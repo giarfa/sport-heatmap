@@ -29,11 +29,12 @@
             <x-heatmap-grid :grid="$grid" />
         </section>
         <x-day-detail :grid="$grid" />
-        <aside class="rail" aria-label="Legend, weekly trend and {{ $status->syncConfigured ? 'sync' : 'import' }} detail">
+        <aside class="rail" aria-label="Legend, weekly trend, aerobic efficiency and {{ $status->syncConfigured ? 'sync' : 'import' }} detail">
             <div class="card p-4">
                 <x-heatmap-legend :scale="$grid->scale" />
             </div>
             <x-weekly-trend :trend="$grid->trend" />
+            <x-aerobic-efficiency :efficiency="$grid->efficiency" />
             <div class="card p-4">
                 <x-import-detail :status="$status" />
             </div>

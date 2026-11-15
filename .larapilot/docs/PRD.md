@@ -138,7 +138,7 @@ Colour is never the sole carrier of meaning: every cell exposes its date and exa
 - no run carries an external link
 - opening the detail writes nothing (FR-017)
 - after a confirmed import the detail agrees with the grid
-**Out of this FR:** charts, splits, or per-kilometre data; training-load scores or any derived metric (Out of Scope); editing an activity
+**Out of this FR:** charts, splits, or per-kilometre data; training-load scores (Out of Scope) or any derived metric (FR-023); editing an activity
 **Depends on:** FR-003, FR-018 (stored metrics), FR-009, FR-017
 **Source:** interview — larapilot-feature US-012, 2026-10-12 · change request US-021, 2026-10-26
 
@@ -275,9 +275,27 @@ Displaying non-running sports (rides, swims, strength) on the same map, and supp
 - a Garmin sync stores the extended metrics of every run it reads, a linked CSV run included
 - no start or end coordinates are stored
 - the day cell detail, grid, legend, and trend are unchanged
-**Out of this FR:** showing the extended metrics (Future Phases); training-load scores or any derived metric the product computes itself (Out of Scope); laps, splits, or samples beyond the summary values
+**Out of this FR:** showing the extended metrics (Future Phases); training-load scores (Out of Scope) or any derived metric the product computes itself (FR-023); laps, splits, or samples beyond the summary values
 **Depends on:** FR-002, FR-003, FR-018
 **Source:** interview — larapilot-feature US-023, 2026-11-14 · client-materials/Activities (1).csv headers · Garmin Connect Personal API activity search response (probed 2026-11-14)
+
+### FR-023: Aerobic efficiency
+
+**MoSCoW:** Should · **Persona:** The Committed Amateur Runner
+**Actor & trigger:** the signed-in owner (FR-021) opening any window
+**Behavior:** a tile and a server-rendered chart beside the weekly mileage trend (FR-020) show how fast the owner runs at their usual heart rate, and how that changed across the shown 16-week window (FR-019) and against the same weeks a year earlier. A run qualifies when it is at least 3 km long, has both an average pace and an average heart rate, and climbs at most 10 m per km. The reference heart rate is the median average heart rate of the window's qualifying runs, rounded to whole bpm — one value for the whole window, used on both sides of every comparison; a run more than 10 bpm above it is left out. A run's efficiency is its speed divided by its average heart rate; a run climbing 5–10 m per km uses its flat-equivalent distance (distance plus 8 × total ascent). A run's pace at the reference heart rate is one kilometre divided by its efficiency times the reference heart rate. Each week's line point is the median over that week and the three before it, weeks before the window included: flat runs (under 5 m per km) only, unless those four weeks hold fewer than 4 flat runs, when the adjusted hilly runs join.
+**Done means:**
+- the tile reads the latest line point as "m:ss /km at N bpm" and the difference from the window's first line point in seconds per km, worded "faster" or "slower" — never a colour, verdict, or score
+- every qualifying run is a dot at its pace at the reference heart rate; adjusted hilly runs are drawn hollow; runs above 10 m per km are drawn with a third marker and never move the line; faster paces sit higher on the chart
+- a four-week span with fewer than 3 usable runs has no line point; the line breaks there and is never interpolated
+- the same weeks 52 weeks earlier are drawn as a dashed line computed with the shown window's reference heart rate, broken where it has no point, and hidden when no run is stored a year earlier
+- with fewer than 8 qualifying runs in the window, the tile and the chart state that there are not enough runs to measure efficiency, with the count; a window with no stored run shows the empty state
+- a run without a pace or a heart rate is never drawn and never reads as 0
+- after an import or sync that writes, the tile and chart show the new data; rendering them writes nothing (FR-017)
+- the chart has an accessible name and a text alternative with each week's dates, pace, last year's pace, and run count; markers and lines are never told apart by colour alone; no horizontal page scroll at 375 px; WCAG 2.2 AA in light and dark themes (FR-009)
+**Out of this FR:** total descent or point-to-point adjustment; a calibration readout for the hill factor; temperature or weather; VO2max or race predictions; training-load scores, targets, or advice (Out of Scope); changing the window length (FR-014); any JavaScript charting library
+**Depends on:** FR-003, FR-009, FR-017, FR-019, FR-020
+**Source:** interview — larapilot-feature US-024, 2026-11-14 (hill factor checked on the owner's whole history against the flat runs within two weeks of each run: 8 m per m of climb lands within 0.3% on runs climbing 5–10 m per km and over-corrects runs climbing 10–15 m per km by ~8%, so the adjustment stops at 10 m per km — larapilot-design US-024, 2026-11-14)
 
 ## MVP Scope
 
@@ -302,11 +320,12 @@ Displaying non-running sports (rides, swims, strength) on the same map, and supp
 - Day-cell detail with per-run distance, moving time, average pace, total ascent, and average heart rate (FR-011).
 - Previous / Next navigation moving the 16-week window by 4 weeks, back to the oldest stored run (FR-019).
 - Weekly mileage trend chart — weekly-total bars with a 4-week rolling average, beside the grid (FR-020).
+- Aerobic efficiency tile and chart — pace at the owner's usual heart rate across the window, with last year's same weeks (FR-023).
 
 ### Out of Scope
 
 - **Multi-sport display and multi-athlete support (FR-016)** — the intensity scale is only meaningful across comparable efforts, and a 60 km ride in the same cell as an 8 km run destroys it. Multi-athlete would turn a personal dashboard into an application with signup, quotas, and a full privacy surface; that is a different product.
-- **Any social, coaching, or advisory layer** — no training-load scores, no recommendations, no comparisons against other athletes. The product is a mirror.
+- **Any social, coaching, or advisory layer** — no training-load scores, no targets, no recommendations, no comparisons against other athletes. The product is a mirror: descriptive trends computed from the owner's own runs (FR-023) are allowed, and they state numbers, never verdicts.
 - **Strava** (FR-001, FR-008, FR-012, FR-015 — withdrawn 2026-10-26, US-021) — no Strava connection, token, webhook, attribution, or deep-link remains, and the runs once synced from Strava were deleted. Runs enter through the Garmin sync (FR-002, FR-010) and the Garmin CSV import (FR-018).
 - **Garmin webhooks and push** — the Personal API is pulled once a day and on demand; nothing listens for Garmin.
 - **Miles, or any imperial unit anywhere in the interface.**
@@ -420,6 +439,7 @@ Self-supported. Repository issues are the intake; no SLA, no runbook beyond the 
 - `HeatmapBuilder` — assembles the 16 × 7 grid plus week totals from daily aggregates; owns week boundaries, the partial current week, and out-of-range future days.
 - `IntensityScale` — computes percentile thresholds over non-zero days, applies the sparse-window fallback, and produces the legend ranges.
 - `DashboardController` + Blade view — renders the grid, legend, and last-import indicator.
+- Aerobic efficiency calculator — qualifies runs, derives the reference heart rate, hill-adjusts, and builds the rolling-median line for the window and the year before (FR-023).
 - Sign-in and change-password controllers + Blade views, and the middleware that forces the first password change (FR-021).
 
 ### Performance & Scalability
@@ -443,3 +463,5 @@ Not a constraint at this scale: one athlete, ~100 rows in the window, one page, 
 | 2026-10-18 | larapilot-feature US-020 | Added FR-021 Single-owner password login (MoSCoW: Must): one `giarfa` account seeded by a migration with no password, forced change at first sign-in. Change request FR-001: Strava OAuth connects the signed-in owner and never signs in (before: "on callback … establishes the local session"). Change request FR-017, renamed Private owner dashboard: every page needs a session and shows the owner's runs (before: public read-only, displayed-athlete fallback rules). Change request FR-018: only the signed-in owner imports (before: any visitor; guest imports into the displayed or a new CSV-only athlete). FR-011, FR-019, FR-020 actors become the signed-in owner. Auth, Data model (`username`), SEO, Out of Scope, Core Components updated; Privacy: the three public-display risks resolved; Security: open-import risk resolved, empty-password-until-first-sign-in risk accepted (release 3.0.0) |
 | 2026-10-26 | larapilot-feature US-021 | Strava removed; the Garmin CSV import is the only way runs enter the instance. Withdrawn (MoSCoW → Won't): FR-001 Strava OAuth connection, FR-002 Once-daily sync (before: Must), FR-008 Strava attribution and deep-links (before: Must), FR-010 Manual re-sync, FR-012 Disconnect and purge (before: Should), FR-015 Strava webhooks (before: Could). Change request FR-007, renamed Last import visibility (before: "Sync status visibility" — last successful sync with a stale/failed warning). FR-003, FR-004, FR-006, FR-011, FR-017, FR-018, FR-019, FR-020, FR-021 lose their Strava clauses (no Strava link, no "Connect with Strava", no sync). Existing Strava-sourced runs, Strava token columns, `sync_runs`, and `activities.strava_activity_id` are deleted. Elevator Pitch, Persona, MVP Scope, Technical Architecture (Auth, data model, Strava integration → Data import, security, privacy, docs, testing, components, performance) updated (release 3.0.0) |
 | 2026-11-14 | larapilot-feature US-022, US-023 | Garmin Connect Personal API sync. Change request FR-002, renamed Once-daily automated Garmin sync (Won't → Must; before: withdrawn with Strava — "No scheduled job reads runs from anywhere"). Change request FR-010, renamed Sync now (Won't → Must). Change request FR-007, renamed Last sync and import visibility (before: last CSV import only, "no stale, failed, or reconnect warning appears in any state"). Change request FR-017 (Sync now entry point and sync warning; before: "offering the Garmin CSV import only", "never shows a sync warning") and FR-018 (before: "the only way runs enter the instance", API out of scope). FR-003, FR-004, FR-006 name the API source. Added FR-022 Extended run metrics (MoSCoW: Must), stored from the API and the CSV, not displayed. Elevator Pitch, MVP Scope (In/Out/Future Phases: extended-metric display and wellness data), Technical Architecture (credential, scheduler cron, `garmin:sync`, data model `garmin_activity_id` and `garmin_syncs`, Garmin Personal API integration, privacy, security, docs, testing, components, performance) updated (release 3.1.0) |
+| 2026-11-14 | larapilot-feature US-024 | Added FR-023 Aerobic efficiency (MoSCoW: Should): pace at the owner's median heart rate across the window, hill-adjusted, with a 4-week rolling median and last year's same weeks. Out of Scope narrowed (before: no derived metric the product computes itself; now descriptive trends are allowed, training-load scores, targets, and advice stay out). FR-011 and FR-022 out-of-FR lines point to FR-023. In Scope and Core Components updated (release 3.2.0) |
+| 2026-11-14 | larapilot-design US-024 | FR-023: hill adjustment capped at 10 m per km (before: 15). Runs climbing 10–15 m per km over-corrected by ~8% at the 8 m factor; they are now drawn as steep runs and never counted |

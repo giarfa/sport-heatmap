@@ -24,4 +24,7 @@ versions:
         title: 'Private sign-in for the owner'
       US-021:
         title: 'Strava removed: runs come only from the Garmin export'
-updated_at: '2026-10-26T21:17:50+00:00'
+  3.1.0:
+    title: 'Garmin Connect sync'
+    summary: 'Runs arrive from Garmin Connect on their own, daily or on demand, and keep the richer values Garmin records.'
+updated_at: '2026-11-14T15:08:24+00:00'

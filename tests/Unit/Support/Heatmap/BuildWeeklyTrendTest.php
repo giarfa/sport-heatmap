@@ -3,10 +3,12 @@
 namespace Tests\Unit\Support\Heatmap;
 
 use App\Data\Heatmap\WeeklyTrend;
+use App\Support\Heatmap\BuildAerobicEfficiency;
 use App\Support\Heatmap\BuildWeeklyTrend;
 use App\Support\Heatmap\CalibrateIntensityScale;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapWindow;
+use App\Support\Heatmap\MeasureAerobicEfficiency;
 use Carbon\CarbonImmutable;
 use Tests\TestCase;
 
@@ -49,7 +51,7 @@ class BuildWeeklyTrendTest extends TestCase
             $dailyMeters[$window->startsOn->addWeeks($position)->toDateString()] = (int) round($kilometres * 1000);
         }
 
-        $grid = (new HeatmapBuilder(new CalibrateIntensityScale, new BuildWeeklyTrend))($window, $dailyMeters, $today);
+        $grid = (new HeatmapBuilder(new CalibrateIntensityScale, new BuildWeeklyTrend, new MeasureAerobicEfficiency, new BuildAerobicEfficiency))($window, $dailyMeters, $today);
 
         return (new BuildWeeklyTrend)(
             $grid->weeks,
@@ -314,7 +316,7 @@ class BuildWeeklyTrendTest extends TestCase
         $window = HeatmapWindow::current($today);
 
         // 41,230 m prints as 41.2 km: the bar must be 41.2 tall, not 41.23.
-        $grid = (new HeatmapBuilder(new CalibrateIntensityScale, new BuildWeeklyTrend))($window, [$window->startsOn->toDateString() => 41_230], $today);
+        $grid = (new HeatmapBuilder(new CalibrateIntensityScale, new BuildWeeklyTrend, new MeasureAerobicEfficiency, new BuildAerobicEfficiency))($window, [$window->startsOn->toDateString() => 41_230], $today);
         $trend = (new BuildWeeklyTrend)($grid->weeks, [0, 0, 0], null, $grid->label());
 
         $this->assertSame($grid->weeks[0]->kilometres(), $trend->bars[0]->kilometres);

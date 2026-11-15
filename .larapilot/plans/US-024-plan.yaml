@@ -1,0 +1,613 @@
+code: US-024
+plan_body: |
+  **Release:** 3.2.0
+
+  ## Technical Solution
+
+  US-024 adds an **Aerobic efficiency** card to the dashboard rail, directly under Weekly distance (FR-023). It is computed server-side from columns `activities` already stores (`distance_meters`, `average_pace_seconds_per_km`, `average_heart_rate`, `total_ascent_meters`, `activity_date`, `start_date_local`) — **no migration, no new package, no JavaScript**. It follows the shape US-014 set for the weekly trend: a read query, a pure calculation, a pure chart builder that emits every coordinate and string, readonly DTOs that ride in the cached `HeatmapGrid`, and a markup-only Blade component.
+
+  ### Layers (Controller → Support → Data → Blade)
+
+  1. **`App\Support\Heatmap\EfficiencyRuns`** (read, invokable) — two range queries per grid build through `Activity::onDaysBetween` (the half-open range that keeps the `(user_id, activity_date)` index usable): the shown window plus its 3 lead-in weeks, and the same 19 weeks exactly 52 weeks earlier. Selective columns only; no relation is loaded, so no N+1 risk. Rows become `App\Data\Heatmap\EfficiencyRun` (final readonly) via a named factory that keeps null metrics null — never 0.
+  2. **`App\Support\Heatmap\MeasureAerobicEfficiency`** (pure) — every FR-023 rule: qualifying runs, the window's reference heart rate, the outlier guard, the hill adjustment, pace at the reference heart rate, the rolling 4-week medians with the flat-first fallback, last year's series. Returns `App\Data\Heatmap\EfficiencyMeasurement`. No Eloquent, no clock.
+  3. **`App\Support\Heatmap\BuildAerobicEfficiency`** (pure) — turns the measurement into `App\Data\Heatmap\AerobicEfficiency`: card state, headline and note strings, y ticks (reuse `TrendTick`), x labels (same four as Weekly distance), dot positions (`EfficiencyDot`), median and last-year polyline segments, weekly table rows (`EfficiencyWeek`), SVG title and table caption. Blade does no arithmetic.
+  4. **Wiring** — `HeatmapGrid` gains `public AerobicEfficiency $efficiency`; `HeatmapBuilder` builds it beside the trend; `DashboardController` calls `EfficiencyRuns` inside the existing cache-miss closure. The cache key goes `v6` → `v7` and every new Data class / enum joins `cache.serializable_classes`. Import and sync already call `HeatmapGridCache::forgetAthlete`, so FR-017 freshness comes for free; rendering stays read-only.
+  5. **`<x-aerobic-efficiency>`** — markup only, mirrors `.larapilot/mockups/US-024/index.html`, `dark.html`, `states.html`; CSS Part 2 of `.larapilot/mockups/US-024/efficiency.css` ported into `resources/css/app.css` right after the "Weekly trend" block.
+
+  ### Calculation contract (FR-023 + decisions)
+
+  - **Qualifying:** `distance_meters >= 3000`, pace and heart rate both non-null, climb = `total_ascent_meters / (distance_meters / 1000)` ≤ 10 m/km. A null ascent counts as 0 m/km (flat).
+  - **Reference HR:** median `average_heart_rate` of the **shown window's** qualifying runs (lead-in and last-year runs excluded), rounded half-up to whole bpm. One value per window; used for every pace-at-reference, both tile points, and last year's line.
+  - **Outlier guard:** any run with HR > reference + 10 is neither drawn nor counted (window, lead-in and last year alike).
+  - **Speed** comes from the stored pace: `1000 / pace` m/s — the column the qualifying rule requires — not from `moving_time_seconds`. Climb 5–10 m/km → flat-equivalent: speed × (distance + 8 × ascent) / distance. Acceptance example: 5.0 km, 40 m, 30:00, 150 bpm → 5.32 km at 30:00.
+  - **Steep runs (> 10 m/km)** with pace, HR, ≥ 3 km and within the outlier guard are drawn as a cross at their **8×-adjusted** pace at the reference HR, and never enter a median (decision `8a053a5ea5155d84`).
+  - **Pace at reference HR** = `pace_adjusted × run_HR / reference_HR` seconds per km (algebraically 1 km ÷ (efficiency × reference HR)). Floats inside; rounded half-up to whole seconds only at the edge.
+  - **Line point per week** = median over that week and the three before it (lead-in weeks included) of flat runs (< 5 m/km); when those 4 weeks hold fewer than 4 flat runs, the adjusted hilly runs join; fewer than 3 usable runs → no point. Even counts take the mean of the two middle values. The in-progress week gets a point like any other (the mockup's last week has one).
+  - **Last year:** the same computation over the weeks exactly 52 weeks earlier (+ their 3 lead-in weeks) with the shown window's reference HR. Absent (no line, no key entry, no table column) when no run at all is stored in those 16 weeks.
+  - **Card states:** `Empty` (window has no stored run — same sentence as Weekly distance) · `NotEnoughRuns` (< 8 qualifying runs; count shown) · `NoMedian` (≥ 8 qualifying but no line point: headline replaced by `No 4-week median yet: no 4 weeks hold 3 usable runs.`, dots + table still drawn — decision `7b05de091be150ce`, recorded as a mockup deviation) · `Measured`.
+  - **Headline/note:** latest point as `m:ss` + ` /km` + `at N bpm`. Change = first point − latest point on the **rounded** paces, so the note agrees with the figures printed: `25 s/km faster than 16 weeks ago (6:54 /km)`, `… slower …`, `same pace as 16 weeks ago`; the week count = latest position − first position + 1. A single point prints the headline with no comparison. Always followed by ` · N bpm is this window's median heart rate`.
+
+  ### Chart geometry (mockup README "Geometry")
+
+  viewBox `0 0 160 100`, `preserveAspectRatio="none"`; slot i = x 10i..10i+10; line point x = 10i + 5; dot `left = (10i + 1.5 + weekday × 7/6) / 160 × 100 %`; y = (pace − top) / (bottom − top) × 100, faster at the top; gridlines every 15 s; top = fastest value floored to 15 s, bottom = slowest ceiled to 15 s over dots, median line and last-year line (bottom = top + 15 when equal). Only the top tick carries ` /km`. Lines split into segments at every missing point; a lone point is a 4-unit tick (same rule as `BuildWeeklyTrend::closeSegment`). Two-decimal coordinate strings (same `decimal()` form as the weekly trend).
+
+  ### Performance & queries
+  Two extra grouped-free selects per **cache miss** only (~100–250 rows); cache hits cost nothing. No index needed beyond `(user_id, activity_date)`. Expected query shape: `select activity_date, start_date_local, distance_meters, average_pace_seconds_per_km, average_heart_rate, total_ascent_meters from activities where user_id = ? and activity_date >= ? and activity_date < ?`.
+
+  ### Open items for implement
+  None blocking. Any visible difference from the mockups beyond decision `7b05de091be150ce` is agreed in chat first (Mockup fidelity).
+
+  ## Git & Branching
+  - Mode: GITFLOW (no automatic push)
+  - Release: **3.2.0** — TASK-00 runs `php artisan larapilot:release-feature --semver=3.2.0 --spec=US-024 --slug=aerobic-efficiency` (opens `release/3.2.0` from `develop` while the version is still `planned`)
+  - Branch: `feature/US-024-aerobic-efficiency` from `release/3.2.0`; PR base `release/3.2.0`, never `develop`
+  - Per task: one Conventional Commit `type(US-024): TASK-NN …`; code, tests and domain doc in the same commit; push/remote PR only if the user asks
+  - The uncommitted `.larapilot/` changes on `develop` (backlog, PRD, decisions, mockups, spec) are committed on `develop` or carried onto the branch before TASK-00, so `release-feature` finds a clean tree
+  - Merge into `release/3.2.0` after review approval
+
+  ## Test Data Strategy
+  - No schema change: `Activity` and its factory keep their columns. `ActivityFactory` gains climb/heart-rate states (`flat()`, `hilly()`, `steep()`, `atHeartRate(int)`) so tests read as the rules they cover.
+  - `TrainingBlockSeeder` gives the 16-week block plausible, correlated pace / heart rate / ascent (mostly flat, ~20 % hilly 5–10 m/km, one steep run, one run > 10 bpm above the block's median, one run under 3 km) and seeds the **same weeks one year earlier** (plus 3 lead-in weeks) with metrics, so the demo shows the dots, both lines and every key entry.
+  - Verification runs through `tests/Feature/Database/TrainingBlockSeederTest.php` on the in-memory test database. **Never run `migrate:fresh` / `db:seed` against the dev database** — it is the default SQLite file holding the owner's real runs.
+
+  ## Test Strategy
+  - Bar: **NORMAL** — Pest unit + feature tests; no Playwright, Dusk, Pest browser or viewport suites.
+  - Interleaved: calculation tests (TASK-03) right after the calculation, chart-builder tests (TASK-05) right after the builder, dashboard feature tests (TASK-08) after the component.
+  - Unit: every FR-023 rule as its own named test, including the 5.32 km example, the 148 bpm reference, the 10-bpm guard, flat-first fallback, breaks without interpolation, last year's absence, rounding of the change.
+  - Feature: card placement and states on `/`, window navigation recomputes everything (`?to=`), import and sync make a cached window show new data, rendering writes nothing (query log holds no insert/update/delete on `activities`), accessible name + text-alternative table, shape classes per run kind.
+  - `vendor/bin/pint --dirty --format agent` and `php artisan larapilot:quality` before handoff.
+  - **Manual test handoff:** open the dashboard at 320 / 375 / 768 / 1024 / 1280 px in light and dark, compare with `.larapilot/mockups/US-024/breakpoints.html`; confirm no horizontal scroll at 375 px and that the `Weekly figures` summary is keyboard-reachable with a visible focus ring.
+tasks:
+  -
+    id: TASK-00
+    title: 'Bootstrap feature branch on release/3.2.0'
+    type: Impl
+    status: DONE
+    assignee: Sarah
+    estimate_hours: 0.5
+    dependencies: {}
+    body: |
+      ## Description
+      Bootstrap Gitflow for US-024 on release `3.2.0`: create `feature/US-024-aerobic-efficiency` from `release/3.2.0` and prepare the internal PR description toward `release/3.2.0`. Do **not** push unless the user asks.
+
+      ## Files Involved
+      - (git only — no application files)
+
+      ## Steps
+      1. Make the tree clean first: the pending `.larapilot/` changes (backlog, PRD, decisions, releases, usage ledger, `mockups/US-024/`, `specs/US-024.yaml`) are committed on `develop` as `chore(US-024): spec, mockups and plan` (or carried by the user's choice) — `release-feature` refuses a dirty tree
+      2. `php artisan larapilot:release-feature --semver=3.2.0 --spec=US-024 --slug=aerobic-efficiency`
+      3. Read `branch`, `base`, `checked_out` from the JSON. Stop and surface `reason` if `checked_out` is false
+      4. Draft the internal PR title/body toward `base` (`release/3.2.0`)
+
+      ## Completion Criteria
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] Release 3.2.0 is `in_progress` with branch `release/3.2.0`
+      - [x] PR title/body drafted toward `release/3.2.0` (not `develop`)
+
+      ## Test Data
+      - N/A — no model, schema, factory or seeder change in this task
+
+      ## Domain Docs
+      - N/A — no behaviour change
+
+      ## Git Deliverables
+      - Commit: `chore(US-024): TASK-00 bootstrap feature branch for release/3.2.0` (only if the command did not already leave a commit — an empty commit is optional)
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: prepare locally toward `release/3.2.0` — open remote only if the user asks
+    commit:
+      sha: 9c4e285eb68aca2fca91260c6343c0bda07c2d09
+      short_sha: 9c4e285
+      subject: 'chore(US-024): TASK-00 bootstrap feature branch for release/3.2.0'
+      committed_at: '2026-11-14T18:43:07+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9c4e285eb68aca2fca91260c6343c0bda07c2d09'
+  -
+    id: TASK-01
+    title: 'EfficiencyRuns query and EfficiencyRun DTO'
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 2
+    dependencies:
+      - TASK-00
+    body: |
+      ## Description
+      Read the runs the efficiency card needs — the shown window plus its 3 lead-in weeks, and the same 19 weeks exactly 52 weeks earlier — in two selective queries, as readonly DTOs that keep missing metrics null.
+
+      ## Files Involved
+      - app/Support/Heatmap/EfficiencyRuns.php (new, `final readonly`, invokable)
+      - app/Data/Heatmap/EfficiencyRun.php (new, `final readonly`)
+      - app/Data/Heatmap/EfficiencySample.php (new: `runs` + `lastYearRuns`, both `array<int, EfficiencyRun>`)
+      - tests/Unit/Data/Heatmap/EfficiencyRunTest.php (new)
+
+      ## Steps
+      1. `php artisan make:class Support/Heatmap/EfficiencyRuns --no-interaction` and the two Data classes; follow `LeadInDistance` / `DailyRuns` for structure and the `/* why */` block-comment convention (`.ai/rules/app.md`)
+      2. `EfficiencyRun`: `CarbonImmutable $date`, `int $distanceMeters`, `?int $paceSecondsPerKm`, `?int $heartRate`, `?int $ascentMeters`; named factory `fromActivity(Activity)` that never turns null into 0; helper `climbMetersPerKm(): float` (null ascent → 0.0) and `weekday(): int` (Mon = 0)
+      3. `EfficiencyRuns::__invoke(User $athlete, HeatmapWindow $window): EfficiencySample` — two queries through `->onDaysBetween(...)` (never `whereDate`), `select` only the six columns listed in the plan, ordered by `start_date_local`. Ranges: `[window.startsOn − 3 weeks, window.endsOn]` and the same range shifted back 52 weeks
+      4. No eager loading needed (no relation read); document the expected query shape in the class docblock
+      5. `php artisan test --filter=EfficiencyRun`
+
+      ## Completion Criteria
+      - [x] Two queries per call, each served by the `(user_id, activity_date)` index (no function on the column)
+      - [x] A run with null pace, heart rate or ascent comes back with null, never 0
+      - [x] The window's last Sunday and the lead-in's first Monday are inside the ranges; the day before is not
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model, schema, factory or seeder change in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: the two efficiency reads, their date ranges and why they are separate from DailyRunningDistance / LeadInDistance
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-024): TASK-01 read runs for aerobic efficiency`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: d043812dab9b4231d73ee5f31f52ba31a59b37b0
+      short_sha: d043812
+      subject: 'feat(US-024): TASK-01 read runs for aerobic efficiency'
+      committed_at: '2026-11-14T18:44:20+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d043812dab9b4231d73ee5f31f52ba31a59b37b0'
+  -
+    id: TASK-02
+    title: 'MeasureAerobicEfficiency: FR-023 calculation'
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 5
+    dependencies:
+      - TASK-01
+    body: |
+      ## Description
+      Implement every FR-023 rule as a pure calculation: qualifying runs, the window's reference heart rate, outlier guard, hill adjustment, pace at reference HR, rolling 4-week medians with the flat-first fallback, and last year's series with the same reference.
+
+      ## Files Involved
+      - app/Support/Heatmap/MeasureAerobicEfficiency.php (new, `final readonly`, invokable, no Eloquent, no clock)
+      - app/Data/Heatmap/EfficiencyMeasurement.php (new)
+      - app/Data/Heatmap/MeasuredRun.php (new: date, weekday, week position, kind, paceAtReference float)
+      - app/Enums/EfficiencyRunKind.php (new: `Flat`, `Hilly`, `Steep`)
+
+      ## Steps
+      1. Signature: `__invoke(HeatmapWindow $window, EfficiencySample $sample): EfficiencyMeasurement`
+      2. Constants with docblocks: `MIN_DISTANCE_METERS = 3000`, `FLAT_MAX_CLIMB = 5`, `HILLY_MAX_CLIMB = 10`, `HILL_FACTOR = 8`, `OUTLIER_BPM = 10`, `MEDIAN_WEEKS = 4`, `MIN_FLAT_RUNS = 4`, `MIN_USABLE_RUNS = 3`, `MIN_QUALIFYING_RUNS = 8`
+      3. Qualifying (window runs only) → `qualifyingCount`; reference HR = median HR of those, rounded half-up (`(int) floor($median + 0.5)`); null when none qualify
+      4. Classify each run with pace + HR + ≥ 3 km and HR ≤ reference + 10: climb < 5 → `Flat`; 5–10 → `Hilly`; > 10 → `Steep`. Pace at reference = `pace × distance / (distance + 8 × ascent)` for Hilly **and Steep** (decision `8a053a5ea5155d84`), plain pace for Flat; then `× runHR / referenceHR`
+      5. Line points per window week (positions 0–15): collect Flat runs of that week and the 3 before (lead-in included); if fewer than 4, add Hilly; fewer than 3 → null; else median (mean of two middles on even counts). Steep runs never enter
+      6. Last year: same week loop over `lastYearRuns` (window − 52 weeks) with the **window's** reference HR; `hasLastYear` = any run stored in the 16 last-year weeks (any metrics); outlier guard applied with the same reference
+      7. Per window week also carry the count of runs drawn that week (Flat + Hilly + Steep dots) for the table's `Runs` column
+      8. Measurement exposes: `referenceHeartRate`, `qualifyingCount`, `hasRuns` (any stored window run), `runs` (window `MeasuredRun`s only — lead-in runs are never drawn), `linePoints` and `lastYearPoints` (`array<int, float|null>` by position), `runsPerWeek`, `hasLastYear`
+      9. Block comments on the non-obvious choices: speed from stored pace not moving time; reference from window only; rounding at the edge; steep adjusted but excluded
+      10. `php artisan test --filter=MeasureAerobicEfficiency` (TASK-03 adds the full suite; add a smoke test here so the class is covered in this commit)
+
+      ## Completion Criteria
+      - [x] 5.0 km / 40 m / 30:00 / 150 bpm is treated as 5.32 km at 30:00
+      - [x] One reference HR per window, used by the window line, the steep/hilly dots and last year's line
+      - [x] A run < 3 km, without pace or HR, steep, or > reference + 10 never moves a line point; null metrics never read as 0
+      - [x] Breaks are nulls, never interpolated
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model, schema, factory or seeder change in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — new `### Aerobic efficiency (US-024, FR-023)` under Functional flow with the rules step by step; Architectural choices: median not mean, reference HR from the window only, speed from stored pace, 10 m/km cap and 8× factor (FR-023 source), steep runs drawn adjusted but excluded (decision 8a053a5ea5155d84); Key invariants: one reference HR per window, steep never moves the line
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-024): TASK-02 measure aerobic efficiency`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: ab0a993dc72895e4797d6a9d8c82b84461ec9876
+      short_sha: ab0a993
+      subject: 'feat(US-024): TASK-02 measure aerobic efficiency'
+      committed_at: '2026-11-14T18:45:55+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ab0a993dc72895e4797d6a9d8c82b84461ec9876'
+  -
+    id: TASK-03
+    title: 'Pest coverage for the efficiency calculation'
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-02
+    body: |
+      ## Description
+      Cover every FR-023 rule of `MeasureAerobicEfficiency` with one named unit test each, built from `EfficiencyRun` values (no database).
+
+      ## Files Involved
+      - tests/Unit/Support/Heatmap/MeasureAerobicEfficiencyTest.php (new)
+
+      ## Steps
+      1. Read the `testing-best-practices` skill and `tests/Unit/Support/Heatmap/BuildWeeklyTrendTest.php` for the house style; a small local builder for `EfficiencyRun` keeps cases readable
+      2. Cases:
+         - reference HR is the rounded median of the window's qualifying runs (148 bpm case); lead-in and last-year runs do not move it
+         - each exclusion: 2.9 km run, null pace, null HR, 10.1 m/km climb (drawn Steep, not in any median), HR = reference + 11 (not drawn, not counted), HR = reference + 10 (kept)
+         - hill adjustment: 5.0 km, 40 m, 360 s/km, 150 bpm → flat-equivalent 5.32 km; pace at reference computed from it
+         - 4.9 m/km is Flat, 5.0 is Hilly, 10.0 is Hilly, 10.1 is Steep
+         - line point uses lead-in weeks; flat-only when ≥ 4 flat runs; hilly join when < 4 flat; < 3 usable → null; even count takes mean of middles
+         - a gap week in the middle yields null between two points (no interpolation)
+         - last year uses the window's reference HR; `hasLastYear` false when no run in the 16 weeks 52 weeks earlier, true with runs that produce no point
+         - fewer than 8 qualifying runs → `qualifyingCount` reports the number found
+         - `runsPerWeek` counts flat + hilly + steep dots
+      3. `php artisan test --filter=MeasureAerobicEfficiencyTest`
+      4. Do **not** add Playwright, Dusk, Pest browser or viewport suites
+
+      ## Completion Criteria
+      - [x] Every rule in the plan's Calculation contract has a test that fails when the rule is broken
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar
+
+      ## Git Deliverables
+      - Commit: `test(US-024): TASK-03 cover the aerobic efficiency calculation`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: remote update only if the user asks
+    commit:
+      sha: 17bd53090986d924263d5c9b010905a86145db4e
+      short_sha: 17bd530
+      subject: 'test(US-024): TASK-03 cover the aerobic efficiency calculation'
+      committed_at: '2026-11-14T18:47:05+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/17bd53090986d924263d5c9b010905a86145db4e'
+  -
+    id: TASK-04
+    title: 'BuildAerobicEfficiency: card strings, axis and chart geometry'
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 5
+    dependencies:
+      - TASK-02
+    body: |
+      ## Description
+      Turn an `EfficiencyMeasurement` into the `AerobicEfficiency` DTO that carries every string and coordinate the card prints — state, headline, note, ticks, x labels, dots, median and last-year segments, table rows, SVG title and caption — so the Blade component does no arithmetic.
+
+      ## Files Involved
+      - app/Support/Heatmap/BuildAerobicEfficiency.php (new, `final readonly`, invokable)
+      - app/Data/Heatmap/AerobicEfficiency.php (new)
+      - app/Data/Heatmap/EfficiencyDot.php (new: kind, left %, top %)
+      - app/Data/Heatmap/EfficiencyWeek.php (new: range label, runs, median, last year — `?string`)
+      - app/Enums/AerobicEfficiencyState.php (new: `Empty`, `NotEnoughRuns`, `NoMedian`, `Measured`)
+      - app/Data/Heatmap/TrendTick.php (reused as is)
+
+      ## Mirrors
+      - `.larapilot/mockups/US-024/index.html` (Measured, with last year), `.larapilot/mockups/US-024/states.html` (NotEnoughRuns, Empty, no last year, steep run), `.larapilot/mockups/US-024/README.md` "The card, element by element" + "Geometry"
+
+      ## Steps
+      1. Signature: `__invoke(EfficiencyMeasurement $m, array $weeks /* WeekRow[] */, string $windowLabel): AerobicEfficiency` — week labels come from the same `WeekRow`s as the grid, like `BuildWeeklyTrend`
+      2. State: no stored window run → `Empty`; `qualifyingCount < 8` → `NotEnoughRuns` with `Not enough runs to measure efficiency: {n} in this window, 8 needed. A run counts when it is at least 3 km with pace and heart rate recorded.`; no line point → `NoMedian` with `No 4-week median yet: no 4 weeks hold 3 usable runs.` (decision `7b05de091be150ce`); else `Measured`
+      3. Paces rounded half-up to whole seconds, formatted `m:ss`; headline parts `6:29` / ` /km` / `at 148 bpm`
+      4. Note: change = first point − latest point on rounded seconds → `25 s/km faster than 16 weeks ago (6:54 /km)` / `… slower …` / `same pace as 16 weeks ago`; weeks = latest position − first position + 1; single point → no comparison clause; always ` · 148 bpm is this window's median heart rate` (exact mockup wording, middle dot spacing included)
+      5. Y axis: 15-s steps; top = fastest of dots ∪ median ∪ last year floored to 15, bottom = slowest ceiled to 15 (+15 when equal); y = (pace − top)/(bottom − top) × 100; only the top tick reads `6:15 /km`
+      6. X labels at positions 0, 4, 8, 12 via `WeekRow::weekLabel()`
+      7. Dots: left = (10i + 1.5 + weekday × 7/6) / 160 × 100, top = y; two-decimal strings (port `decimal()` from `BuildWeeklyTrend`; extract a tiny shared helper only if it stays readable)
+      8. Segments for median and last year: split at nulls, lone point → 4-unit tick (same rule as `BuildWeeklyTrend::closeSegment`)
+      9. Key flags: `hasHilly`, `hasSteep`, `hasLastYear`
+      10. SVG title: `Pace at 148 bpm per run, 6 Jul – 25 Oct 2026, faster at the top; 4-week median 6:54 to 6:29 per km. Weekly figures below.`; caption `Pace at 148 bpm by week, 6 Jul – 25 Oct 2026`; week rows range labels exactly as the weekly trend's (`6 – 12 Jul`, `27 Jul – 2 Aug`)
+      11. `php artisan test --filter=BuildAerobicEfficiency` (smoke here; TASK-05 is the suite)
+
+      ## Completion Criteria
+      - [x] Every string in the mockup's card is produced by the builder, word for word
+      - [x] Faster paces sit higher (smaller y); axis covers dots and both lines
+      - [x] Copy has no colour, verdict, praise, warning or advice — numbers, units, faster / slower only
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model, schema, factory or seeder change in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: BuildAerobicEfficiency, its DTOs and the card states; the geometry formulas; the NoMedian state as an agreed mockup deviation (decision 7b05de091be150ce)
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-024): TASK-04 build the aerobic efficiency card`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: 56568dae039575c2352a3acd9bcfab28083e574c
+      short_sha: 56568da
+      subject: 'feat(US-024): TASK-04 build the aerobic efficiency card'
+      committed_at: '2026-11-14T18:50:14+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/56568dae039575c2352a3acd9bcfab28083e574c'
+  -
+    id: TASK-05
+    title: 'Pest coverage for the efficiency card builder'
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 3
+    dependencies:
+      - TASK-04
+    body: |
+      ## Description
+      Pin the strings and geometry of `BuildAerobicEfficiency` with unit tests built from hand-made `EfficiencyMeasurement`s.
+
+      ## Files Involved
+      - tests/Unit/Support/Heatmap/BuildAerobicEfficiencyTest.php (new)
+
+      ## Steps
+      1. Cases:
+         - headline `6:29` + ` /km` + `at 148 bpm`; note `25 s/km faster than 16 weeks ago (6:54 /km) · 148 bpm is this window's median heart rate`
+         - slower wording, `same pace as 16 weeks ago`, and the week count when the first point is at position 3
+         - rounding: change computed on rounded paces (e.g. 413.6 → 6:54 and 388.4 → 6:28 gives 26 s)
+         - single line point → headline without comparison
+         - states: Empty sentence, NotEnoughRuns with 6 found, NoMedian sentence with dots and rows kept
+         - axis: 15-s steps, top/bottom floored/ceiled over dots and last year, only top label has ` /km`, equal top/bottom widened
+         - dot left/top for a Wednesday run in slot 5; faster pace has smaller top
+         - segments break at nulls, lone point becomes a tick
+         - last year absent → no last-year segments, `hasLastYear` false, table rows without last year
+         - key flags follow presence of hilly / steep runs
+         - copy contains none of: good, great, well done, warning, should, try
+      2. `php artisan test --filter=BuildAerobicEfficiencyTest`
+      3. Do **not** add Playwright, Dusk, Pest browser or viewport suites
+
+      ## Completion Criteria
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar
+
+      ## Git Deliverables
+      - Commit: `test(US-024): TASK-05 cover the aerobic efficiency card builder`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: remote update only if the user asks
+    commit:
+      sha: 2512ace09b2ce8a212fb61d12a8819af8f46b6f2
+      short_sha: 2512ace
+      subject: 'test(US-024): TASK-05 cover the aerobic efficiency card builder'
+      committed_at: '2026-11-14T18:51:03+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/2512ace09b2ce8a212fb61d12a8819af8f46b6f2'
+  -
+    id: TASK-06
+    title: 'Wire efficiency into the cached grid and the dashboard controller'
+    type: Impl
+    status: DONE
+    assignee: Alex
+    estimate_hours: 3
+    dependencies:
+      - TASK-04
+    body: |
+      ## Description
+      Build the efficiency card with the grid, cache it inside the same `HeatmapGrid` entry, and retire the old cache shape — so navigation recomputes it per window and every import or sync refreshes it with no new invalidation path.
+
+      ## Files Involved
+      - app/Data/Heatmap/HeatmapGrid.php (add `public AerobicEfficiency $efficiency`)
+      - app/Support/Heatmap/HeatmapBuilder.php (inject `MeasureAerobicEfficiency` + `BuildAerobicEfficiency`; new optional `?EfficiencySample $efficiencySample = null` parameter, empty sample when null so existing callers/tests keep working)
+      - app/Http/Controllers/DashboardController.php (type-hint `EfficiencyRuns` as an `__invoke` parameter; call it **inside** the `$build` closure)
+      - app/Support/Heatmap/HeatmapGridCache.php (key `v6` → `v7`; extend the "v" comment: v7 retired grids without `efficiency`)
+      - config/cache.php (`serializable_classes`: AerobicEfficiency, EfficiencyDot, EfficiencyWeek, AerobicEfficiencyState)
+      - tests/Feature/Dashboard/HeatmapGridCacheTest.php (keys v6 → v7; the "old version ignored" case uses v6)
+
+      ## Steps
+      1. Builder builds the measurement from the window and sample, then the card from the same `WeekRow`s and `HeatmapGrid::labelFor(...)` — one source for labels
+      2. Controller: the extra queries run only on a cache miss, inside the closure (extend the existing block comment)
+      3. Check every other `new HeatmapGrid(` / `HeatmapBuilder` call in `app/` and `tests/` and update it
+      4. Confirm `ApplyGarminImport` and `SyncGarminActivities` still call `forgetAthlete` after a write (no code change expected)
+      5. `php artisan test` (full suite — grid shape touches many tests)
+
+      ## Completion Criteria
+      - [x] A cached `v6` grid is never read; `v7` entries round-trip through the database cache store with every new class
+      - [x] Cache hit runs no efficiency query; miss runs exactly two
+      - [x] Rendering the dashboard writes nothing
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model, schema, factory or seeder change in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: efficiency rides in the cached HeatmapGrid; cache key v7 and why; Extension points & gotchas: add new card DTOs to cache.serializable_classes and bump the key
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-024): TASK-06 cache aerobic efficiency with the grid`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: 5d02c728ec3e65d2f8aa147b8abbf05021295b95
+      short_sha: 5d02c72
+      subject: 'feat(US-024): TASK-06 cache aerobic efficiency with the grid'
+      committed_at: '2026-11-14T18:52:54+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5d02c728ec3e65d2f8aa147b8abbf05021295b95'
+  -
+    id: TASK-07
+    title: 'Aerobic efficiency card: Blade component, CSS port, rail placement'
+    type: Impl
+    status: DONE
+    assignee: Joe
+    estimate_hours: 5
+    dependencies:
+      - TASK-06
+    body: |
+      ## Description
+      Render the card in the dashboard rail directly under Weekly distance, mirroring the mockups in light and dark, mobile first, from the existing Tailwind 4 tokens only.
+
+      ## Mirrors
+      - `.larapilot/mockups/US-024/index.html` (primary, light), `.larapilot/mockups/US-024/dark.html`, `.larapilot/mockups/US-024/states.html`, `.larapilot/mockups/US-024/breakpoints.html`
+      - Design system: **Tailwind CSS as shipped** (PRD `## Technical Architecture`; mockup README "Design system") — existing tokens `--lv-2`, `--ink`, `--ink-muted`, `--surface-card`; **no new colour token**
+      - CSS: **Part 2** of `.larapilot/mockups/US-024/efficiency.css` only; the "mockup shell" block is not ported
+
+      ## Files Involved
+      - resources/views/components/aerobic-efficiency.blade.php (new, `@props(['efficiency'])`, markup only)
+      - resources/views/dashboard.blade.php (insert `<x-aerobic-efficiency :efficiency="$grid->efficiency" />` after `<x-weekly-trend>`; aside `aria-label` gains "aerobic efficiency")
+      - resources/css/app.css (new block `/* ---- Aerobic efficiency ---- */` right after the "Weekly trend" block)
+      - CHANGELOG.md (Unreleased → Added: aerobic efficiency card)
+
+      ## Steps
+      1. Read the mockup README Fidelity contract and every screen above before writing markup
+      2. Reuse the Weekly distance frame classes (`card p-4 trend`, `trend-title`, `trend-note`, `trend-chart`, `trend-y`, `trend-plot`, `trend-x`, `trend-key`, `trend-figures`, `trend-table`, `trend-empty`) and add `eff-*` from Part 2
+      3. `<section aria-labelledby="eff-heading">` + `h3`; SVG `role="img"` named by its `<title>`; gridlines, lines and dots `aria-hidden`; dots as `<span class="eff-dot eff-dot--{flat|hilly|steep}">` positioned in percent over the SVG
+      4. Median line `.trend-line-halo` + `.trend-line` per segment; last year `.eff-lastyear` polylines drawn under the median
+      5. Key: Run always; Hilly / Steep / Same weeks last year only when present; 4-week median when a line exists
+      6. `<details>` "Weekly figures": `sr-only` caption, `th scope="col"`, `th scope="row"`, missing value `<span aria-hidden="true">—</span><span class="sr-only">none</span>`; Last year column only when `hasLastYear`
+      7. States: Empty / NotEnoughRuns sentence in `.trend-empty`, no headline, no chart; NoMedian sentence replaces the headline and the chart + table still render
+      8. Add a `## Deviations` row to `.larapilot/mockups/US-024/README.md` for the NoMedian sentence (decision `7b05de091be150ce`)
+      9. `npm run build`; smoke at 320, 375, 768, 1024, 1280 px, light and dark, against `.larapilot/mockups/US-024/breakpoints.html`
+      10. `php artisan test`
+
+      ## Completion Criteria
+      - [x] Card sits directly under Weekly distance in the rail at every width; two columns from 1024 px
+      - [x] Flat filled / hilly ring / steep cross, median solid / last year dashed — never told apart by colour alone
+      - [x] No horizontal scroll at 375 px; `summary` 44 px row with the layout's focus ring
+      - [x] Light and dark match the mockups; contrast as the README measures (no new token)
+      - [x] Every visible difference from the mockups was agreed in chat first
+      - [x] Tests pass
+
+      ## Test Data
+      - N/A — no model, schema, factory or seeder change in this task
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Functional flow: where the card sits and what each state shows; Technical design: the aerobic-efficiency component and its CSS block
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-024): TASK-07 render the aerobic efficiency card`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: a66b2201470cfa4616e88d637444e2330dace2f2
+      short_sha: a66b220
+      subject: 'feat(US-024): TASK-07 render the aerobic efficiency card'
+      committed_at: '2026-11-14T18:55:02+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/a66b2201470cfa4616e88d637444e2330dace2f2'
+  -
+    id: TASK-08
+    title: 'Feature tests: dashboard card, navigation, freshness, accessibility'
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 4
+    dependencies:
+      - TASK-07
+      - TASK-09
+    body: |
+      ## Description
+      Cover the card end to end on `/` with factory data: placement, states, window navigation, freshness after import and sync, read-only rendering, and the accessible structure.
+
+      ## Files Involved
+      - tests/Feature/Dashboard/AerobicEfficiencyTest.php (new)
+
+      ## Steps
+      1. `signInOwner()` from `Tests\TestCase` (`.ai/rules/tests.md`); runs via `ActivityFactory` states from TASK-09 (`flat()`, `hilly()`, `steep()`, `atHeartRate()`, `onDate()`); freeze time with `travelTo`
+      2. Cases:
+         - the card renders after Weekly distance with `Aerobic efficiency`, the headline and `at N bpm`
+         - a window of qualifying runs with median HR 148 shows `at 148 bpm` in the headline, the SVG title and the caption
+         - `?to=` of an earlier window recomputes the reference HR, the points and last year's column (assert different values for two windows)
+         - fewer than 8 qualifying runs → the not-enough sentence with the count; no `<svg` inside the card
+         - a navigated window with no stored run → `No runs in this window, so there is nothing to chart.`
+         - no runs 52 weeks earlier → no `Same weeks last year` key and no Last year column
+         - a run with null pace and a run with null HR are never drawn (dot count) and never print `0:00`
+         - after a confirmed CSV import (reuse the Garmin import flow helpers) and after a writing sync (`Http::fake()` + `Http::preventStrayRequests()`), a previously cached window shows the new run
+         - rendering issues no insert/update/delete (DB query log)
+         - markup: `role="img"` + `<title>`, `<caption class="sr-only">`, `th scope="row"`, dot classes `eff-dot--flat|hilly|steep`, `.eff-lastyear` present only with last-year data
+      3. `php artisan test --filter=AerobicEfficiencyTest`, then `php artisan test`
+      4. Do **not** add Playwright, Dusk, Pest browser or viewport suites
+
+      ## Completion Criteria
+      - [x] Every acceptance criterion of US-024 testable at the HTTP level has a test
+      - [x] Tests pass locally
+      - [x] Manual test handoff notes (widths and themes, see plan Test Strategy) written into the PR description
+
+      ## Git Deliverables
+      - Commit: `test(US-024): TASK-08 cover the aerobic efficiency card on the dashboard`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: remote update only if the user asks
+    commit:
+      sha: cf74fc8f7416136734eb2d0f0b0c6dedd3e0c8ad
+      short_sha: cf74fc8
+      subject: 'test(US-024): TASK-08 cover the aerobic efficiency card on the dashboard'
+      committed_at: '2026-11-14T19:00:14+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cf74fc8f7416136734eb2d0f0b0c6dedd3e0c8ad'
+  -
+    id: TASK-09
+    title: 'Factory states and demo data for aerobic efficiency'
+    type: Impl
+    status: DONE
+    assignee: Mike
+    estimate_hours: 3
+    dependencies:
+      - TASK-00
+    body: |
+      ## Description
+      Give tests and the demo dataset runs that exercise every efficiency rule: climb and heart-rate factory states, a block with correlated pace and heart rate, and the same weeks one year earlier.
+
+      ## Files Involved
+      - database/factories/ActivityFactory.php
+      - database/seeders/TrainingBlockSeeder.php
+      - tests/Feature/Database/TrainingBlockSeederTest.php
+
+      ## Steps
+      1. Factory states (no column change): `flat()` (ascent < 5 m/km of the run's distance), `hilly()` (5–10 m/km), `steep()` (11–15 m/km), `atHeartRate(int $bpm)`; each derives ascent from the distance already built (state closure reads `$attributes`, as `withExtendedMetrics()` does)
+      2. Seeder: block runs with metrics get a heart rate correlated with pace (faster ↔ higher HR, with a slow improvement across the 16 weeks), ~20 % hilly, exactly one steep run, one run more than 10 bpm above the block's median, and one run under 3 km; keep `WITHOUT_HEART_RATE_PERCENT` behaviour
+      3. Seeder: the same 16 weeks + 3 lead-in weeks exactly 52 weeks earlier, with metrics and slightly slower efficiency, so last year's line and its key entry appear; keep it guarded to `local` / `testing` like the rest
+      4. Extend `TrainingBlockSeederTest`: ≥ 8 qualifying runs in the current window, a steep run and an outlier exist, runs exist 52 weeks earlier
+      5. Verify through `php artisan test --filter=TrainingBlockSeederTest` on the in-memory test DB. **Do not run `migrate:fresh` or `db:seed` against the dev database** — it is the owner's real data
+
+      ## Completion Criteria
+      - [x] Factory states produce runs that classify as Flat / Hilly / Steep under the FR-023 thresholds
+      - [x] Seeded demo shows dots, the median line, last year's line, and every key entry
+      - [x] Existing seeder assertions still hold (weekly totals, double-run days, rest week)
+      - [x] Tests pass
+
+      ## Test Data
+      - [x] `database/factories/ActivityFactory.php` gains `flat()`, `hilly()`, `steep()`, `atHeartRate()`
+      - [x] `TrainingBlockSeeder` seeds correlated metrics and the year-earlier weeks
+      - [x] Verified by `TrainingBlockSeederTest`, not by seeding the dev database
+
+      ## Domain Docs
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — Extension points & gotchas: the demo data shape the efficiency card relies on
+      - [x] English, committed with this task
+
+      ## Git Deliverables
+      - Commit: `feat(US-024): TASK-09 seed runs for aerobic efficiency`
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: ae106133663053d1107e2a324e173236a159757f
+      short_sha: ae10613
+      subject: 'feat(US-024): TASK-09 seed runs for aerobic efficiency'
+      committed_at: '2026-11-14T18:58:42+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ae106133663053d1107e2a324e173236a159757f'
+  -
+    id: TASK-10
+    title: 'Quality gate and handoff checks'
+    type: Test
+    status: DONE
+    assignee: Anne
+    estimate_hours: 1
+    dependencies:
+      - TASK-03
+      - TASK-05
+      - TASK-08
+    body: |
+      ## Description
+      Run the project gates over the whole branch and confirm the domain doc and README index describe what shipped.
+
+      ## Files Involved
+      - (verification only; fixes land in the task that owns the file)
+
+      ## Steps
+      1. `vendor/bin/pint --dirty --format agent`
+      2. `php artisan larapilot:quality` (Pint + Larastan level ≥ 5) — no new errors
+      3. `php artisan test` — full suite green
+      4. Re-read `.larapilot/docs/devs/heatmap-dashboard.md` and `.larapilot/docs/devs/README.md` against the diff: no section still describes the dashboard without the efficiency card
+      5. Confirm the mockup README `## Deviations` row for the NoMedian state exists
+
+      ## Completion Criteria
+      - [x] Pint clean, Larastan clean, full suite green
+      - [x] Domain doc and index current
+
+      ## Git Deliverables
+      - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
+      - Push: **skip** (`git_mode: GITFLOW`)
+      - PR: remote update only if the user asks
+    commit:
+      sha: 45bde52a86a9b183228f0430626c7b7f4ca9bf58
+      short_sha: 45bde52
+      subject: 'chore(US-024): TASK-10 domain doc and index current'
+      committed_at: '2026-11-14T19:00:34+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/45bde52a86a9b183228f0430626c7b7f4ca9bf58'
+updated_at: '2026-11-14T18:00:34+00:00'

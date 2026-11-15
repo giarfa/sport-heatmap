@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Heatmap">
+  <title>Heatmap</title>
+  <!-- Four cells from the validated intensity ramp, read light to dark.
+       No background plate: the mark works on light and dark browser chrome. -->
+  <rect x="3"  y="17" width="12" height="12" rx="3" fill="#86b6ef"/>
+  <rect x="17" y="17" width="12" height="12" rx="3" fill="#2a78d6"/>
+  <rect x="3"  y="3"  width="12" height="12" rx="3" fill="#3987e5"/>
+  <rect x="17" y="3"  width="12" height="12" rx="3" fill="#104281"/>
+</svg>

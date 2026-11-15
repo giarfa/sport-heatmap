@@ -1429,4 +1429,186 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-11-14T14:56:27+00:00'
+  -
+    id: 391b360ce89d8ca6
+    ts: '2026-11-14T17:16:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'derived metrics scope'
+    label: 'derived metrics scope'
+    value: "Descriptive trend metrics computed from the owner's own runs are allowed; training-load scores, targets, advice and recommendations stay out of scope"
+    question: null
+    rationale: 'Aerobic efficiency tile states numbers, never verdicts'
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: af67131fcfcf21d9
+    ts: '2026-11-14T17:16:40+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'aerobic efficiency moscow'
+    label: 'aerobic efficiency moscow'
+    value: Should
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 9ca3dc0f4802fbfb
+    ts: '2026-11-14T17:16:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'aerobic efficiency mockup'
+    label: 'aerobic efficiency mockup'
+    value: 'Yes - /larapilot-design before planning'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+  -
+    id: 7224fecb22a3f238
+    ts: '2026-11-14T17:16:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'aerobic efficiency reference heart rate'
+    label: 'aerobic efficiency reference heart rate'
+    value: "Automatic: median average HR of the window's qualifying runs, one reference for both ends of the comparison"
+    question: null
+    rationale: 'Owner runs mostly easy at a steady ~150 bpm'
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 113e3a9c6a47a26a
+    ts: '2026-11-14T17:16:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'aerobic efficiency hard-run filter'
+    label: 'aerobic efficiency hard-run filter'
+    value: 'No zone/training-effect filter; drop runs whose average HR is more than 10 bpm above the reference HR'
+    question: null
+    rationale: 'Owner runs mostly easy runs'
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 54c9ecc0c0f7ed1e
+    ts: '2026-11-14T17:16:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'aerobic efficiency last year line'
+    label: 'aerobic efficiency last year line'
+    value: "Show last year's same weeks as a reference line, using this window's reference HR, broken where there are no runs"
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 62fa7ce63ab33b39
+    ts: '2026-11-14T17:16:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'aerobic efficiency hill adjustment'
+    label: 'aerobic efficiency hill adjustment'
+    value: 'Flat runs (<5 m/km) drive the line; runs 5-15 m/km adjusted at 1 m climb = 8 m flat and used only when a 4-week span has fewer than 4 flat runs; runs above 15 m/km shown but never counted; hilly runs drawn distinctly'
+    question: null
+    rationale: 'Validated on 11 hilly runs: k=8 within ~1% of nearby flat runs'
+    source: chat
+    spec: null
+    supersedes: null
+  -
+    id: 6d42df8d2a7b218e
+    ts: '2026-11-14T17:18:09+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-feature
+    topic: 'us-024 target version'
+    label: 'US-024 target version'
+    value: '3.2.0 Aerobic efficiency (new minor release)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-024
+    supersedes: null
+  -
+    id: e310bc929d245788
+    ts: '2026-11-14T17:23:27+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-design
+    topic: 'aerobic efficiency hill adjustment'
+    label: 'aerobic efficiency hill adjustment'
+    value: 'Flat runs (<5 m/km) drive the line; runs 5-10 m/km adjusted at 1 m climb = 8 m flat and used only when a 4-week span has fewer than 4 flat runs; runs above 10 m/km shown as a cross, never counted'
+    question: null
+    rationale: 'Whole-history check: k=8 fits 5-10 m/km (+0.3%) but over-corrects 10-15 m/km by +7.9% (best k~2, twice the spread); the summer 2025 hilly block read ~30 s/km too fast'
+    source: askquestion
+    spec: US-024
+    supersedes: 62fa7ce63ab33b39
+  -
+    id: 1c69a7a8b079b9e5
+    ts: '2026-11-14T17:25:38+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-design
+    topic: 'design system'
+    label: 'design system'
+    value: 'Tailwind as shipped (PRD); US-024 matches the existing mockups and the Weekly distance card'
+    question: null
+    rationale: 'Gate skipped: PRD and existing mockups settle it'
+    source: chat
+    spec: US-024
+    supersedes: null
+  -
+    id: fec21b2fe5d63766
+    ts: '2026-11-14T17:30:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-design
+    topic: 'us-024 mockups approval'
+    label: 'US-024 mockups approval'
+    value: 'Approved: .larapilot/mockups/US-024 is the visual contract'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-024
+    supersedes: null
+  -
+    id: 8a053a5ea5155d84
+    ts: '2026-11-14T17:38:19+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'us-024 steep run marker pace'
+    label: 'US-024 steep run marker pace'
+    value: 'Steep runs (>10 m/km) are drawn at their flat-equivalent pace (distance + 8 × ascent) at the reference heart rate; they still never move the line'
+    question: null
+    rationale: "Matches the mockup's steep cross position and shows the over-correction that excludes them"
+    source: askquestion
+    spec: US-024
+    supersedes: null
+  -
+    id: 7b05de091be150ce
+    ts: '2026-11-14T17:38:19+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-plan
+    topic: 'mockup deviation us-024 no median point'
+    label: 'mockup deviation US-024 no median point'
+    value: "When the window has 8+ qualifying runs but no 4-week median point, the headline is replaced by 'No 4-week median yet: no 4 weeks hold 3 usable runs.' and the dots and table are still drawn"
+    question: null
+    rationale: 'State not drawn in the mockup'
+    source: askquestion
+    spec: US-024
+    supersedes: null
+  -
+    id: d21b0ad1d07b6683
+    ts: '2026-11-15T10:04:16+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-review
+    topic: 'us-024 review verdict'
+    label: 'US-024 review verdict'
+    value: Approve
+    question: null
+    rationale: null
+    source: askquestion
+    spec: US-024
+    supersedes: null
+updated_at: '2026-11-15T10:04:16+00:00'

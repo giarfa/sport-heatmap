@@ -1488,3 +1488,69 @@ specs:
       subject: 'docs(US-023): review artifact and manual test handoff'
       committed_at: '2026-11-14T15:37:26+01:00'
       url: 'https://github.com/giarfa/sport-heatmap/commit/71804ec1793b72086ada7ea08917a451549016b4'
+  -
+    code: US-024
+    title: "Aerobic efficiency: pace at the usual heart rate across the window, with last year's line"
+    epic:
+      code: EP-003
+      title: 'Heatmap dashboard'
+    priority: MEDIUM
+    points: 8
+    status: DONE
+    body: |
+      #### US-024: Aerobic efficiency: pace at the usual heart rate across the window, with last year's line
+
+      **Epic:** EP-003 | **Priority:** MEDIUM | **Points:** 8 | **Status:** DONE
+      **Blocked by:** -
+      **Type:** Feature
+      **Release:** 3.2.0
+      **Traces to:** FR-023 (MoSCoW: Should) · FR-003 · FR-009 · FR-017 · FR-019 · FR-020
+      **Prior art:** custom — a calculation over the runs already stored (`average_pace_seconds_per_km`, `average_heart_rate`, `total_ascent_meters`, `distance_meters`); no package computes it, and the chart follows the server-rendered style of the weekly mileage trend (FR-020) with no JavaScript charting library
+      **Mockup:** `.larapilot/mockups/US-024/` — the visual contract (README → Fidelity contract)
+
+      **User Story**
+      As The Committed Amateur Runner,
+      I want to see how fast I run at my usual heart rate, and how that moved across the 16 weeks on screen and against the same weeks a year earlier,
+      so that I can tell at a glance whether my training is making me fitter, not only whether I am training.
+
+      **Demonstrates**
+      After implementing this spec, opening the current window shows a tile such as "6:29 /km at 148 bpm · 25 s/km faster than 16 weeks ago" and, beside the weekly mileage trend, a chart with one dot per qualifying run, the 4-week rolling median line, and last year's same weeks as a dashed line; Previous / Next moves all three with the window.
+
+      **Rules (FR-023)**
+      - **Qualifying run:** distance ≥ 3 km, average pace and average heart rate both present, climb (total ascent ÷ distance) ≤ 10 m per km.
+      - **Reference heart rate:** the median average heart rate of the shown window's qualifying runs, rounded to whole bpm. One value per window, used for the window, its first and latest line points, and last year's line.
+      - **Outlier guard:** a qualifying run whose average heart rate is more than 10 bpm above the reference is left out of the dots and the line.
+      - **Efficiency:** speed ÷ average heart rate. A run climbing 5–10 m per km uses flat-equivalent distance = distance + 8 × total ascent.
+      - **Pace at reference HR:** 1 km ÷ (efficiency × reference heart rate), shown as m:ss per km.
+      - **Line point (per week):** the median pace at reference HR over that week and the three before it, weeks before the window included. Flat runs (< 5 m per km) only; when those four weeks hold fewer than 4 flat runs, the adjusted hilly runs join. Fewer than 3 usable runs → no point.
+      - **Last year's line:** the same computation over the weeks exactly 52 weeks earlier, with the shown window's reference heart rate.
+
+      **Acceptance Criteria**
+      - [x] The tile reads the latest line point as "m:ss /km at N bpm", N being the window's reference heart rate, and the difference from the window's first line point in whole seconds per km, worded "faster" or "slower"; it uses no colour, verdict, or score to say whether that is good
+      - [x] The reference heart rate is computed once per window and the tile's two points and last year's line all use it; a window whose qualifying runs average 148 bpm median shows "at 148 bpm"
+      - [x] A run under 3 km, a run without a pace or a heart rate, a run climbing more than 10 m per km, and a run more than 10 bpm above the reference never move the line; a run without pace or heart rate is never drawn and never reads as 0
+      - [x] A run climbing 5–10 m per km is converted with distance + 8 × ascent: a 5.0 km run with 40 m of climb at 30:00 and 150 bpm counts as 5.32 km at 30:00
+      - [x] Each line point is the median of the flat runs of its week and the three before, including weeks before the window; when those four weeks hold fewer than 4 flat runs the adjusted hilly runs join; with fewer than 3 usable runs there is no point and the line breaks, never interpolated
+      - [x] Every drawn run is a dot at its pace at the reference heart rate: flat runs filled, adjusted hilly runs hollow, runs above 10 m per km a third marker shape that never moves the line; faster paces sit higher on the chart
+      - [x] Last year's line is dashed, uses the shown window's reference heart rate, breaks where it has no point, and is absent when no run is stored in the weeks 52 weeks earlier
+      - [x] With fewer than 8 qualifying runs in the window, the tile and the chart state that there are not enough runs to measure efficiency, with the count found; a window with no stored run shows the empty state
+      - [x] The tile and the chart follow window navigation (FR-019): Previous and Next recompute the reference heart rate, the points, and last year's line for the shown window
+      - [x] After a confirmed CSV import or a Garmin sync that writes, every window's tile and chart show the new data; rendering them writes nothing (FR-017)
+      - [x] The chart has an accessible name and a text alternative listing, per week, its dates, its line pace, last year's pace, and its run count; markers and lines are distinguished by shape and dash, never by colour alone
+      - [x] No horizontal page scroll at 375 px; light and dark themes meet WCAG 2.2 AA for text and non-text contrast (FR-009)
+      - [x] Copy is terse and factual in the register of the dashboard: numbers, units, and "faster" / "slower" — no congratulation, warning, or advice
+
+      **Out of this spec**
+      Total descent or point-to-point adjustment; a calibration readout suggesting a hill factor; temperature or weather; VO2max or race predictions; training-load scores, targets, or advice; changing the window length (FR-014); any JavaScript charting library.
+    status_history:
+      - { status: PLANNED, at: '2026-11-14T17:40:50+00:00' }
+      - { status: 'IN PROGRESS', at: '2026-11-14T17:42:53+00:00' }
+      - { status: REVIEW, at: '2026-11-14T18:02:30+00:00' }
+      - { status: DONE, at: '2026-11-15T10:04:12+00:00' }
+    rework: false
+    merge_commit:
+      sha: 8511cede3f204cd86475394dca6e6a3b154b7ba8
+      short_sha: 8511ced
+      subject: 'chore(US-024): log the implement session'
+      committed_at: '2026-11-14T19:02:37+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/8511cede3f204cd86475394dca6e6a3b154b7ba8'

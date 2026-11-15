@@ -456,7 +456,7 @@ class GarminImportFlowTest extends TestCase
             'distance_meters' => 8_290,
             'moving_time_seconds' => 3_263,
         ]);
-        $cacheKey = "heatmap:grid:v6:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $cacheKey = "heatmap:grid:v7:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
         $generationKey = "heatmap:grid:generation:{$this->owner->id}";
 
         $this->actingAs($this->owner)->get(route('dashboard'))->assertOk();
@@ -552,7 +552,7 @@ class GarminImportFlowTest extends TestCase
 
     public function test_confirming_forgets_the_cached_grid_for_today(): void
     {
-        $cacheKey = "heatmap:grid:v6:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
+        $cacheKey = "heatmap:grid:v7:{$this->owner->id}:g0:".HeatmapWindow::current()->startsOn->toDateString().':2026-10-11';
         $generationKey = "heatmap:grid:generation:{$this->owner->id}";
 
         // An owner with no run gets the empty state, which builds no grid to cache.

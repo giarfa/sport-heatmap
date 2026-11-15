@@ -89,7 +89,7 @@ class SyncStatusTest extends TestCase
 
         $this->assertMatchesRegularExpression('/<dt>Last sync<\/dt>\s*<dd class="import-detail-value">\s*14 Nov 2026, 05:00/', $html);
         $this->assertStringContainsString('<dt>Last import</dt>', $html);
-        $this->assertStringContainsString('Legend, weekly trend and sync detail', $html);
+        $this->assertStringContainsString('Legend, weekly trend, aerobic efficiency and sync detail', $html);
     }
 
     /**
@@ -174,7 +174,7 @@ class SyncStatusTest extends TestCase
         $this->assertStringNotContainsString('role="alert"', $html);
         $this->assertStringNotContainsString('Garmin key rejected', $html);
         $this->assertStringContainsString('Last import 3 days ago', $html);
-        $this->assertStringContainsString('Legend, weekly trend and import detail', $html);
+        $this->assertStringContainsString('Legend, weekly trend, aerobic efficiency and import detail', $html);
     }
 
     public function test_with_no_key_the_empty_state_is_exactly_as_before(): void
