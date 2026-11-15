@@ -27,4 +27,9 @@ versions:
   3.1.0:
     title: 'Garmin Connect sync'
     summary: 'Runs arrive from Garmin Connect on their own, daily or on demand, and keep the richer values Garmin records.'
-updated_at: '2026-11-14T15:08:24+00:00'
+  3.2.0:
+    summary: 'See how fast you run at your usual heart rate across the window, against the same weeks a year earlier.'
+    items:
+      US-024:
+        title: "Aerobic efficiency: pace at your usual heart rate, with last year's line"
+updated_at: '2026-11-15T10:07:36+00:00'

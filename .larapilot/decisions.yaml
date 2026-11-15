@@ -1611,4 +1611,17 @@ decisions:
     source: askquestion
     spec: US-024
     supersedes: null
-updated_at: '2026-11-15T10:04:16+00:00'
+  -
+    id: afd1964338de9d36
+    ts: '2026-11-15T10:07:41+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-release
+    topic: 'v3.2.0 release action'
+    label: 'v3.2.0 release action'
+    value: 'Notes + ship (merge to main, tag v3.2.0, no push)'
+    question: null
+    rationale: null
+    source: askquestion
+    spec: null
+    supersedes: null
+updated_at: '2026-11-15T10:07:41+00:00'
