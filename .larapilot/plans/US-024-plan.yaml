@@ -62,7 +62,7 @@ tasks:
     id: TASK-00
     title: 'Bootstrap feature branch on release/3.2.0'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Sarah
     estimate_hours: 0.5
     dependencies: {}
@@ -80,9 +80,9 @@ tasks:
       4. Draft the internal PR title/body toward `base` (`release/3.2.0`)
 
       ## Completion Criteria
-      - [ ] `release-feature` returned `ok: true` and `checked_out: true`
-      - [ ] Release 3.2.0 is `in_progress` with branch `release/3.2.0`
-      - [ ] PR title/body drafted toward `release/3.2.0` (not `develop`)
+      - [x] `release-feature` returned `ok: true` and `checked_out: true`
+      - [x] Release 3.2.0 is `in_progress` with branch `release/3.2.0`
+      - [x] PR title/body drafted toward `release/3.2.0` (not `develop`)
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
@@ -94,11 +94,17 @@ tasks:
       - Commit: `chore(US-024): TASK-00 bootstrap feature branch for release/3.2.0` (only if the command did not already leave a commit — an empty commit is optional)
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: prepare locally toward `release/3.2.0` — open remote only if the user asks
+    commit:
+      sha: 9c4e285eb68aca2fca91260c6343c0bda07c2d09
+      short_sha: 9c4e285
+      subject: 'chore(US-024): TASK-00 bootstrap feature branch for release/3.2.0'
+      committed_at: '2026-11-14T18:43:07+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/9c4e285eb68aca2fca91260c6343c0bda07c2d09'
   -
     id: TASK-01
     title: 'EfficiencyRuns query and EfficiencyRun DTO'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 2
     dependencies:
@@ -121,28 +127,34 @@ tasks:
       5. `php artisan test --filter=EfficiencyRun`
 
       ## Completion Criteria
-      - [ ] Two queries per call, each served by the `(user_id, activity_date)` index (no function on the column)
-      - [ ] A run with null pace, heart rate or ascent comes back with null, never 0
-      - [ ] The window's last Sunday and the lead-in's first Monday are inside the ranges; the day before is not
-      - [ ] Tests pass
+      - [x] Two queries per call, each served by the `(user_id, activity_date)` index (no function on the column)
+      - [x] A run with null pace, heart rate or ascent comes back with null, never 0
+      - [x] The window's last Sunday and the lead-in's first Monday are inside the ranges; the day before is not
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: the two efficiency reads, their date ranges and why they are separate from DailyRunningDistance / LeadInDistance
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: the two efficiency reads, their date ranges and why they are separate from DailyRunningDistance / LeadInDistance
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-01 read runs for aerobic efficiency`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: d043812dab9b4231d73ee5f31f52ba31a59b37b0
+      short_sha: d043812
+      subject: 'feat(US-024): TASK-01 read runs for aerobic efficiency'
+      committed_at: '2026-11-14T18:44:20+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/d043812dab9b4231d73ee5f31f52ba31a59b37b0'
   -
     id: TASK-02
     title: 'MeasureAerobicEfficiency: FR-023 calculation'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
@@ -170,29 +182,35 @@ tasks:
       10. `php artisan test --filter=MeasureAerobicEfficiency` (TASK-03 adds the full suite; add a smoke test here so the class is covered in this commit)
 
       ## Completion Criteria
-      - [ ] 5.0 km / 40 m / 30:00 / 150 bpm is treated as 5.32 km at 30:00
-      - [ ] One reference HR per window, used by the window line, the steep/hilly dots and last year's line
-      - [ ] A run < 3 km, without pace or HR, steep, or > reference + 10 never moves a line point; null metrics never read as 0
-      - [ ] Breaks are nulls, never interpolated
-      - [ ] Tests pass
+      - [x] 5.0 km / 40 m / 30:00 / 150 bpm is treated as 5.32 km at 30:00
+      - [x] One reference HR per window, used by the window line, the steep/hilly dots and last year's line
+      - [x] A run < 3 km, without pace or HR, steep, or > reference + 10 never moves a line point; null metrics never read as 0
+      - [x] Breaks are nulls, never interpolated
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — new `### Aerobic efficiency (US-024, FR-023)` under Functional flow with the rules step by step; Architectural choices: median not mean, reference HR from the window only, speed from stored pace, 10 m/km cap and 8× factor (FR-023 source), steep runs drawn adjusted but excluded (decision 8a053a5ea5155d84); Key invariants: one reference HR per window, steep never moves the line
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — new `### Aerobic efficiency (US-024, FR-023)` under Functional flow with the rules step by step; Architectural choices: median not mean, reference HR from the window only, speed from stored pace, 10 m/km cap and 8× factor (FR-023 source), steep runs drawn adjusted but excluded (decision 8a053a5ea5155d84); Key invariants: one reference HR per window, steep never moves the line
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-02 measure aerobic efficiency`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: ab0a993dc72895e4797d6a9d8c82b84461ec9876
+      short_sha: ab0a993
+      subject: 'feat(US-024): TASK-02 measure aerobic efficiency'
+      committed_at: '2026-11-14T18:45:55+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ab0a993dc72895e4797d6a9d8c82b84461ec9876'
   -
     id: TASK-03
     title: 'Pest coverage for the efficiency calculation'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
@@ -220,19 +238,25 @@ tasks:
       4. Do **not** add Playwright, Dusk, Pest browser or viewport suites
 
       ## Completion Criteria
-      - [ ] Every rule in the plan's Calculation contract has a test that fails when the rule is broken
-      - [ ] Tests pass locally
-      - [ ] Coverage matches the NORMAL bar
+      - [x] Every rule in the plan's Calculation contract has a test that fails when the rule is broken
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-024): TASK-03 cover the aerobic efficiency calculation`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
+    commit:
+      sha: 17bd53090986d924263d5c9b010905a86145db4e
+      short_sha: 17bd530
+      subject: 'test(US-024): TASK-03 cover the aerobic efficiency calculation'
+      committed_at: '2026-11-14T18:47:05+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/17bd53090986d924263d5c9b010905a86145db4e'
   -
     id: TASK-04
     title: 'BuildAerobicEfficiency: card strings, axis and chart geometry'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 5
     dependencies:
@@ -266,28 +290,34 @@ tasks:
       11. `php artisan test --filter=BuildAerobicEfficiency` (smoke here; TASK-05 is the suite)
 
       ## Completion Criteria
-      - [ ] Every string in the mockup's card is produced by the builder, word for word
-      - [ ] Faster paces sit higher (smaller y); axis covers dots and both lines
-      - [ ] Copy has no colour, verdict, praise, warning or advice — numbers, units, faster / slower only
-      - [ ] Tests pass
+      - [x] Every string in the mockup's card is produced by the builder, word for word
+      - [x] Faster paces sit higher (smaller y); axis covers dots and both lines
+      - [x] Copy has no colour, verdict, praise, warning or advice — numbers, units, faster / slower only
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: BuildAerobicEfficiency, its DTOs and the card states; the geometry formulas; the NoMedian state as an agreed mockup deviation (decision 7b05de091be150ce)
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: BuildAerobicEfficiency, its DTOs and the card states; the geometry formulas; the NoMedian state as an agreed mockup deviation (decision 7b05de091be150ce)
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-04 build the aerobic efficiency card`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: 56568dae039575c2352a3acd9bcfab28083e574c
+      short_sha: 56568da
+      subject: 'feat(US-024): TASK-04 build the aerobic efficiency card'
+      committed_at: '2026-11-14T18:50:14+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/56568dae039575c2352a3acd9bcfab28083e574c'
   -
     id: TASK-05
     title: 'Pest coverage for the efficiency card builder'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 3
     dependencies:
@@ -316,18 +346,24 @@ tasks:
       3. Do **not** add Playwright, Dusk, Pest browser or viewport suites
 
       ## Completion Criteria
-      - [ ] Tests pass locally
-      - [ ] Coverage matches the NORMAL bar
+      - [x] Tests pass locally
+      - [x] Coverage matches the NORMAL bar
 
       ## Git Deliverables
       - Commit: `test(US-024): TASK-05 cover the aerobic efficiency card builder`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
+    commit:
+      sha: 2512ace09b2ce8a212fb61d12a8819af8f46b6f2
+      short_sha: 2512ace
+      subject: 'test(US-024): TASK-05 cover the aerobic efficiency card builder'
+      committed_at: '2026-11-14T18:51:03+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/2512ace09b2ce8a212fb61d12a8819af8f46b6f2'
   -
     id: TASK-06
     title: 'Wire efficiency into the cached grid and the dashboard controller'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Alex
     estimate_hours: 3
     dependencies:
@@ -352,28 +388,34 @@ tasks:
       5. `php artisan test` (full suite — grid shape touches many tests)
 
       ## Completion Criteria
-      - [ ] A cached `v6` grid is never read; `v7` entries round-trip through the database cache store with every new class
-      - [ ] Cache hit runs no efficiency query; miss runs exactly two
-      - [ ] Rendering the dashboard writes nothing
-      - [ ] Tests pass
+      - [x] A cached `v6` grid is never read; `v7` entries round-trip through the database cache store with every new class
+      - [x] Cache hit runs no efficiency query; miss runs exactly two
+      - [x] Rendering the dashboard writes nothing
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: efficiency rides in the cached HeatmapGrid; cache key v7 and why; Extension points & gotchas: add new card DTOs to cache.serializable_classes and bump the key
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Technical design: efficiency rides in the cached HeatmapGrid; cache key v7 and why; Extension points & gotchas: add new card DTOs to cache.serializable_classes and bump the key
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-06 cache aerobic efficiency with the grid`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: 5d02c728ec3e65d2f8aa147b8abbf05021295b95
+      short_sha: 5d02c72
+      subject: 'feat(US-024): TASK-06 cache aerobic efficiency with the grid'
+      committed_at: '2026-11-14T18:52:54+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/5d02c728ec3e65d2f8aa147b8abbf05021295b95'
   -
     id: TASK-07
     title: 'Aerobic efficiency card: Blade component, CSS port, rail placement'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Joe
     estimate_hours: 5
     dependencies:
@@ -406,30 +448,36 @@ tasks:
       10. `php artisan test`
 
       ## Completion Criteria
-      - [ ] Card sits directly under Weekly distance in the rail at every width; two columns from 1024 px
-      - [ ] Flat filled / hilly ring / steep cross, median solid / last year dashed — never told apart by colour alone
-      - [ ] No horizontal scroll at 375 px; `summary` 44 px row with the layout's focus ring
-      - [ ] Light and dark match the mockups; contrast as the README measures (no new token)
-      - [ ] Every visible difference from the mockups was agreed in chat first
-      - [ ] Tests pass
+      - [x] Card sits directly under Weekly distance in the rail at every width; two columns from 1024 px
+      - [x] Flat filled / hilly ring / steep cross, median solid / last year dashed — never told apart by colour alone
+      - [x] No horizontal scroll at 375 px; `summary` 44 px row with the layout's focus ring
+      - [x] Light and dark match the mockups; contrast as the README measures (no new token)
+      - [x] Every visible difference from the mockups was agreed in chat first
+      - [x] Tests pass
 
       ## Test Data
       - N/A — no model, schema, factory or seeder change in this task
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Functional flow: where the card sits and what each state shows; Technical design: the aerobic-efficiency component and its CSS block
-      - [ ] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` updated — Functional flow: where the card sits and what each state shows; Technical design: the aerobic-efficiency component and its CSS block
+      - [x] `.larapilot/docs/devs/README.md` index row for heatmap-dashboard: last touched by US-024
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-07 render the aerobic efficiency card`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: a66b2201470cfa4616e88d637444e2330dace2f2
+      short_sha: a66b220
+      subject: 'feat(US-024): TASK-07 render the aerobic efficiency card'
+      committed_at: '2026-11-14T18:55:02+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/a66b2201470cfa4616e88d637444e2330dace2f2'
   -
     id: TASK-08
     title: 'Feature tests: dashboard card, navigation, freshness, accessibility'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 4
     dependencies:
@@ -459,19 +507,25 @@ tasks:
       4. Do **not** add Playwright, Dusk, Pest browser or viewport suites
 
       ## Completion Criteria
-      - [ ] Every acceptance criterion of US-024 testable at the HTTP level has a test
-      - [ ] Tests pass locally
-      - [ ] Manual test handoff notes (widths and themes, see plan Test Strategy) written into the PR description
+      - [x] Every acceptance criterion of US-024 testable at the HTTP level has a test
+      - [x] Tests pass locally
+      - [x] Manual test handoff notes (widths and themes, see plan Test Strategy) written into the PR description
 
       ## Git Deliverables
       - Commit: `test(US-024): TASK-08 cover the aerobic efficiency card on the dashboard`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
+    commit:
+      sha: cf74fc8f7416136734eb2d0f0b0c6dedd3e0c8ad
+      short_sha: cf74fc8
+      subject: 'test(US-024): TASK-08 cover the aerobic efficiency card on the dashboard'
+      committed_at: '2026-11-14T19:00:14+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/cf74fc8f7416136734eb2d0f0b0c6dedd3e0c8ad'
   -
     id: TASK-09
     title: 'Factory states and demo data for aerobic efficiency'
     type: Impl
-    status: TODO
+    status: DONE
     assignee: Mike
     estimate_hours: 3
     dependencies:
@@ -493,29 +547,35 @@ tasks:
       5. Verify through `php artisan test --filter=TrainingBlockSeederTest` on the in-memory test DB. **Do not run `migrate:fresh` or `db:seed` against the dev database** — it is the owner's real data
 
       ## Completion Criteria
-      - [ ] Factory states produce runs that classify as Flat / Hilly / Steep under the FR-023 thresholds
-      - [ ] Seeded demo shows dots, the median line, last year's line, and every key entry
-      - [ ] Existing seeder assertions still hold (weekly totals, double-run days, rest week)
-      - [ ] Tests pass
+      - [x] Factory states produce runs that classify as Flat / Hilly / Steep under the FR-023 thresholds
+      - [x] Seeded demo shows dots, the median line, last year's line, and every key entry
+      - [x] Existing seeder assertions still hold (weekly totals, double-run days, rest week)
+      - [x] Tests pass
 
       ## Test Data
-      - [ ] `database/factories/ActivityFactory.php` gains `flat()`, `hilly()`, `steep()`, `atHeartRate()`
-      - [ ] `TrainingBlockSeeder` seeds correlated metrics and the year-earlier weeks
-      - [ ] Verified by `TrainingBlockSeederTest`, not by seeding the dev database
+      - [x] `database/factories/ActivityFactory.php` gains `flat()`, `hilly()`, `steep()`, `atHeartRate()`
+      - [x] `TrainingBlockSeeder` seeds correlated metrics and the year-earlier weeks
+      - [x] Verified by `TrainingBlockSeederTest`, not by seeding the dev database
 
       ## Domain Docs
-      - [ ] `.larapilot/docs/devs/heatmap-dashboard.md` — Extension points & gotchas: the demo data shape the efficiency card relies on
-      - [ ] English, committed with this task
+      - [x] `.larapilot/docs/devs/heatmap-dashboard.md` — Extension points & gotchas: the demo data shape the efficiency card relies on
+      - [x] English, committed with this task
 
       ## Git Deliverables
       - Commit: `feat(US-024): TASK-09 seed runs for aerobic efficiency`
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: update the local PR notes toward `release/3.2.0` — open/update remote only if the user asks
+    commit:
+      sha: ae106133663053d1107e2a324e173236a159757f
+      short_sha: ae10613
+      subject: 'feat(US-024): TASK-09 seed runs for aerobic efficiency'
+      committed_at: '2026-11-14T18:58:42+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/ae106133663053d1107e2a324e173236a159757f'
   -
     id: TASK-10
     title: 'Quality gate and handoff checks'
     type: Test
-    status: TODO
+    status: DONE
     assignee: Anne
     estimate_hours: 1
     dependencies:
@@ -537,11 +597,17 @@ tasks:
       5. Confirm the mockup README `## Deviations` row for the NoMedian state exists
 
       ## Completion Criteria
-      - [ ] Pint clean, Larastan clean, full suite green
-      - [ ] Domain doc and index current
+      - [x] Pint clean, Larastan clean, full suite green
+      - [x] Domain doc and index current
 
       ## Git Deliverables
       - Commit: `chore(US-024): TASK-10 quality gate` only if the gate required a formatting fix; otherwise no commit
       - Push: **skip** (`git_mode: GITFLOW`)
       - PR: remote update only if the user asks
-updated_at: '2026-11-14T17:40:50+00:00'
+    commit:
+      sha: 45bde52a86a9b183228f0430626c7b7f4ca9bf58
+      short_sha: 45bde52
+      subject: 'chore(US-024): TASK-10 domain doc and index current'
+      committed_at: '2026-11-14T19:00:34+01:00'
+      url: 'https://github.com/giarfa/sport-heatmap/commit/45bde52a86a9b183228f0430626c7b7f4ca9bf58'
+updated_at: '2026-11-14T18:00:34+00:00'

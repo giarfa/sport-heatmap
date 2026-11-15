@@ -183,7 +183,7 @@ final readonly class BuildWeeklyTrend
         $kilometres = $week->kilometres();
 
         return new TrendBar(
-            rangeLabel: $this->rangeLabel($week->weekStart, false),
+            rangeLabel: $week->rangeLabel(),
             accessibleName: $this->accessibleName($week, $kilometres, $averageTenths),
             kilometres: $kilometres,
             averageKilometres: $averageTenths === null ? null : $this->kilometresOf($averageTenths),
@@ -199,7 +199,7 @@ final readonly class BuildWeeklyTrend
 
     private function accessibleName(WeekRow $week, string $kilometres, ?int $averageTenths): string
     {
-        $range = $this->rangeLabel($week->weekStart, true);
+        $range = $week->rangeLabel(true);
 
         if ($week->isPartial) {
             return $range.': '.$kilometres.' km so far, partial week';
@@ -208,27 +208,6 @@ final readonly class BuildWeeklyTrend
         return $averageTenths === null
             ? $range.': '.$kilometres.' km; no 4-week average yet'
             : $range.': '.$kilometres.' km; 4-week average '.$this->kilometresOf($averageTenths).' km';
-    }
-
-    /**
-     * A week's Monday-to-Sunday range: "18 – 24 May", "29 Jun – 5 Jul", and with the
-     * year "29 Dec 2025 – 4 Jan 2026" when it crosses one.
-     */
-    private function rangeLabel(CarbonImmutable $weekStart, bool $withYear): string
-    {
-        $weekEnd = $weekStart->addDays(6);
-
-        if ($weekStart->year !== $weekEnd->year) {
-            return $withYear
-                ? $weekStart->format('j M Y').' – '.$weekEnd->format('j M Y')
-                : $weekStart->format('j M').' – '.$weekEnd->format('j M');
-        }
-
-        $range = $weekStart->month === $weekEnd->month
-            ? $weekStart->format('j').' – '.$weekEnd->format('j M')
-            : $weekStart->format('j M').' – '.$weekEnd->format('j M');
-
-        return $withYear ? $range.' '.$weekEnd->format('Y') : $range;
     }
 
     /**

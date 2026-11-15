@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\Garmin\ResolveImportStatus;
 use App\Support\Heatmap\DailyRunningDistance;
 use App\Support\Heatmap\DailyRuns;
+use App\Support\Heatmap\EfficiencyRuns;
 use App\Support\Heatmap\HeatmapBuilder;
 use App\Support\Heatmap\HeatmapGridCache;
 use App\Support\Heatmap\HeatmapWindow;
@@ -29,6 +30,7 @@ class DashboardController extends Controller
         DailyRunningDistance $dailyDistance,
         DailyRuns $dailyRuns,
         LeadInDistance $leadInDistance,
+        EfficiencyRuns $efficiencyRuns,
         HeatmapBuilder $buildGrid,
         HeatmapGridCache $gridCache,
         OldestRunDate $oldestRunDate,
@@ -61,7 +63,9 @@ class DashboardController extends Controller
          * query — the lead-in weeks the first 4-week averages reach back into — runs only
          * on a cache miss, inside this closure. A hit costs the chart nothing, and an
          * import that forgets the grid forgets the chart with it: there is no second
-         * cache that could outlive a write.
+         * cache that could outlive a write. The aerobic-efficiency card rides the same way: its
+         * two reads (the window with its lead-in weeks, and the same weeks 52 weeks earlier)
+         * run only here, on a miss.
          */
         $build = fn () => $buildGrid(
             $window,
@@ -70,6 +74,7 @@ class DashboardController extends Controller
             $dailyRuns($athlete, $window),
             $leadInDistance($athlete, $window),
             $oldestRun,
+            $efficiencyRuns($athlete, $window),
         );
 
         /*

@@ -1,14 +1,19 @@
 <?php
 
+use App\Data\Heatmap\AerobicEfficiency;
 use App\Data\Heatmap\DayCell;
 use App\Data\Heatmap\DayRun;
+use App\Data\Heatmap\EfficiencyDot;
+use App\Data\Heatmap\EfficiencyWeek;
 use App\Data\Heatmap\HeatmapGrid;
 use App\Data\Heatmap\IntensityScale;
 use App\Data\Heatmap\TrendBar;
 use App\Data\Heatmap\TrendTick;
 use App\Data\Heatmap\WeeklyTrend;
 use App\Data\Heatmap\WeekRow;
+use App\Enums\AerobicEfficiencyState;
 use App\Enums\DayCellState;
+use App\Enums\EfficiencyRunKind;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
@@ -154,6 +159,11 @@ return [
         WeeklyTrend::class,
         TrendBar::class,
         TrendTick::class,
+        AerobicEfficiency::class,
+        EfficiencyDot::class,
+        EfficiencyWeek::class,
+        AerobicEfficiencyState::class,
+        EfficiencyRunKind::class,
         DayCellState::class,
         CarbonImmutable::class,
     ],

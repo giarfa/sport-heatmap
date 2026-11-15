@@ -4,6 +4,7 @@ namespace App\Support\Heatmap;
 
 use App\Data\Heatmap\DayCell;
 use App\Data\Heatmap\DayRun;
+use App\Data\Heatmap\EfficiencySample;
 use App\Data\Heatmap\HeatmapGrid;
 use App\Data\Heatmap\IntensityScale;
 use App\Data\Heatmap\WeekRow;
@@ -20,6 +21,8 @@ final readonly class HeatmapBuilder
     public function __construct(
         private CalibrateIntensityScale $calibrate,
         private BuildWeeklyTrend $buildTrend,
+        private MeasureAerobicEfficiency $measureEfficiency,
+        private BuildAerobicEfficiency $buildEfficiency,
     ) {}
 
     /**
@@ -27,8 +30,9 @@ final readonly class HeatmapBuilder
      * @param  array<string, array<int, DayRun>>  $dailyRuns  keyed by "Y-m-d" => that day's runs in start order
      * @param  array<int, int>  $leadInWeekMeters  the three weeks before the window in metres, oldest first
      * @param  CarbonInterface|null  $oldestRun  the athlete's oldest stored run, which bounds how far back the 4-week average reaches
+     * @param  EfficiencySample|null  $efficiencySample  the runs the efficiency card reads; none reads as a window with no runs
      */
-    public function __invoke(HeatmapWindow $window, array $dailyMeters, CarbonInterface $today, array $dailyRuns = [], array $leadInWeekMeters = [0, 0, 0], ?CarbonInterface $oldestRun = null): HeatmapGrid
+    public function __invoke(HeatmapWindow $window, array $dailyMeters, CarbonInterface $today, array $dailyRuns = [], array $leadInWeekMeters = [0, 0, 0], ?CarbonInterface $oldestRun = null, ?EfficiencySample $efficiencySample = null): HeatmapGrid
     {
         $today = CarbonImmutable::instance($today)->startOfDay();
 
@@ -51,9 +55,18 @@ final readonly class HeatmapBuilder
          * The trend is built from the WeekRows just assembled, never from a second read of
          * the data, so a bar cannot disagree with the total printed on its row.
          */
-        $trend = ($this->buildTrend)($weeks, $leadInWeekMeters, $oldestRun, HeatmapGrid::labelFor($window->startsOn, $window->endsOn));
+        $windowLabel = HeatmapGrid::labelFor($window->startsOn, $window->endsOn);
+        $trend = ($this->buildTrend)($weeks, $leadInWeekMeters, $oldestRun, $windowLabel);
 
-        return new HeatmapGrid($weeks, $window->startsOn, $window->endsOn, $scale, $trend);
+        /*
+         * The efficiency card takes its week labels from the same rows and its window label
+         * from the same helper, so it names every week and the window exactly as the grid and
+         * the weekly trend do.
+         */
+        $measurement = ($this->measureEfficiency)($window, $efficiencySample ?? new EfficiencySample);
+        $efficiency = ($this->buildEfficiency)($measurement, $weeks, $windowLabel);
+
+        return new HeatmapGrid($weeks, $window->startsOn, $window->endsOn, $scale, $trend, $efficiency);
     }
 
     /**
