@@ -1624,4 +1624,17 @@ decisions:
     source: askquestion
     spec: null
     supersedes: null
-updated_at: '2026-11-15T10:07:41+00:00'
+  -
+    id: 407b204c986be548
+    ts: '2026-11-15T10:11:51+00:00'
+    user: 'git:giarfa <giarfa@outlook.com>'
+    phase: larapilot-ship
+    topic: 'v3.2.0 production deploy'
+    label: 'v3.2.0 production deploy'
+    value: 'Deployed v3.2.0 (19ace07) to Cipi app heatmap, release 4; SQLite backed up as database.pre-3.2.0.sqlite'
+    question: null
+    rationale: null
+    source: chat
+    spec: null
+    supersedes: null
+updated_at: '2026-11-15T10:11:51+00:00'
