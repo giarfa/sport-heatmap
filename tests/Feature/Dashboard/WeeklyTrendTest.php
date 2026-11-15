@@ -59,7 +59,7 @@ class WeeklyTrendTest extends TestCase
         $this->assertNotFalse($legend);
         $this->assertGreaterThan($legend, $trend);
         $this->assertGreaterThan($trend, $import);
-        $this->assertStringContainsString('aria-label="Legend, weekly trend and import detail"', $html);
+        $this->assertStringContainsString('aria-label="Legend, weekly trend, aerobic efficiency and import detail"', $html);
 
         $card = $this->trendCard();
 
@@ -184,11 +184,12 @@ class WeeklyTrendTest extends TestCase
         $warm = $this->queriesOfRequest();
 
         // Every day range ends on `"activity_date" < ?` (Activity::onDaysBetween): the daily totals,
-        // the day detail's runs, the trend's lead-in weeks, and the import card's run count.
-        $this->assertSame(4, $this->countMatching($cold, '"activity_date" < ?'), 'four ranged queries');
+        // the day detail's runs, the trend's lead-in weeks, the import card's run count, and the
+        // aerobic-efficiency card's two reads (the window with its lead-in, and the year before).
+        $this->assertSame(6, $this->countMatching($cold, '"activity_date" < ?'), 'six ranged queries');
         $this->assertSame(2, $this->countMatching($cold, 'sum(distance_meters)'), 'daily totals + lead-in');
         $this->assertSame(0, $this->countMatching($warm, 'sum(distance_meters)'), 'a warm request runs no aggregate');
-        $this->assertSame(count($warm) + 3, count($cold));
+        $this->assertSame(count($warm) + 5, count($cold));
     }
 
     /**

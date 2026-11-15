@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Aerobic efficiency** card under Weekly distance: how fast you run at your usual heart rate. It shows the latest
+  4-week median pace at your window's median heart rate ("6:29 /km at 148 bpm"), how it changed across the
+  16 weeks, one dot per run, and the same weeks a year earlier as a dashed line. Only runs of at least 3 km
+  with a pace and a heart rate count; hilly runs are adjusted and steep ones are shown but never counted.
+  With fewer than 8 qualifying runs the card says so. Previous and Next move it with the map.
+
 ## [3.1.0] - 2026-11-14
 
 ### Added

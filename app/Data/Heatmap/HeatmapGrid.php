@@ -7,7 +7,8 @@ use Carbon\CarbonImmutable;
 
 /**
  * The assembled 16-week heatmap: every WeekRow the dashboard renders, plus the
- * window's own bounds for the page subtitle and the weekly trend built from the same rows.
+ * window's own bounds for the page subtitle, and the weekly trend and the aerobic-efficiency
+ * card built beside it.
  */
 final readonly class HeatmapGrid
 {
@@ -20,6 +21,7 @@ final readonly class HeatmapGrid
         public CarbonImmutable $endsOn,
         public IntensityScale $scale,
         public WeeklyTrend $trend,
+        public AerobicEfficiency $efficiency,
     ) {}
 
     /**

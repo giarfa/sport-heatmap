@@ -132,6 +132,7 @@ Not part of the contract: the placeholder grid, legend and sync cards, and the "
 
 | Date | Screen | What | Why | Decision |
 | --- | --- | --- | --- | --- |
+| 2026-11-14 | `states.html` (state not drawn) | A window with 8 or more qualifying runs but no week holding 3 usable runs in 4 weeks (**NoMedian**) prints "No 4-week median yet: no 4 weeks hold 3 usable runs." in place of the headline; the dots, the key and the weekly figures are still drawn, without the 4-week median line | The mockups drew the Measured, NotEnoughRuns and Empty states only; this one follows from FR-023's rule that fewer than 3 usable runs leave no point, and a headline with no number to read would be wrong | `7b05de091be150ce` |
 
 ## Revisions
 

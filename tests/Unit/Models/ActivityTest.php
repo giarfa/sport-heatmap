@@ -2,10 +2,15 @@
 
 namespace Tests\Unit\Models;
 
+use App\Data\Heatmap\EfficiencyRun;
+use App\Data\Heatmap\EfficiencySample;
 use App\Enums\ActivitySource;
+use App\Enums\EfficiencyRunKind;
 use App\Enums\SportType;
 use App\Models\Activity;
 use App\Models\User;
+use App\Support\Heatmap\HeatmapWindow;
+use App\Support\Heatmap\MeasureAerobicEfficiency;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -273,5 +278,30 @@ class ActivityTest extends TestCase
         $found = Activity::query()->onDaysBetween(Carbon::parse('2026-10-05'), Carbon::parse('2026-10-11'))->count();
 
         $this->assertSame(2, $found);
+    }
+
+    public function test_the_climb_states_classify_as_flat_hilly_and_steep_whatever_the_distance(): void
+    {
+        $window = HeatmapWindow::current(Carbon::parse('2026-10-13'));
+        $measure = new MeasureAerobicEfficiency;
+
+        foreach ([3_000, 4_321, 8_000, 21_097] as $distanceMeters) {
+            foreach (['flat' => EfficiencyRunKind::Flat, 'hilly' => EfficiencyRunKind::Hilly, 'steep' => EfficiencyRunKind::Steep] as $state => $expected) {
+                $activity = Activity::factory()->state(['distance_meters' => $distanceMeters])->{$state}()->atHeartRate(148)->make(['user_id' => 1]);
+                $run = EfficiencyRun::fromActivity($activity);
+
+                /*
+                 * A reference run in the window anchors the heart rate; the run under test sits
+                 * in the same week, so the measurement classifies it exactly as the card does.
+                 */
+                $anchor = new EfficiencyRun($window->startsOn, 8_000, 330, 148, 0);
+                $under = new EfficiencyRun($window->startsOn->addDay(), $run->distanceMeters, $run->paceSecondsPerKm, $run->heartRate, $run->ascentMeters);
+
+                $measurement = $measure($window, new EfficiencySample([$anchor, $under]));
+
+                $this->assertSame(148, $activity->average_heart_rate);
+                $this->assertSame($expected, $measurement->runs[1]->kind, "{$state} at {$distanceMeters} m");
+            }
+        }
     }
 }

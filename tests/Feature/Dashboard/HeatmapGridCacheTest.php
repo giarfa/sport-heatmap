@@ -4,9 +4,13 @@ namespace Tests\Feature\Dashboard;
 
 use __PHP_Incomplete_Class;
 use App\Data\Heatmap\DayRun;
+use App\Data\Heatmap\EfficiencyDot;
+use App\Data\Heatmap\EfficiencyWeek;
 use App\Data\Heatmap\HeatmapGrid;
 use App\Data\Heatmap\TrendBar;
 use App\Data\Heatmap\TrendTick;
+use App\Enums\AerobicEfficiencyState;
+use App\Enums\EfficiencyRunKind;
 use App\Models\Activity;
 use App\Models\User;
 use App\Support\Heatmap\HeatmapBuilder;
@@ -64,13 +68,13 @@ class HeatmapGridCacheTest extends TestCase
         $suffix = "{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString();
         $builds = 0;
 
-        // What the deploy before US-021 left behind: a grid whose runs still carried a Strava link.
+        // What the deploy before US-024 left behind: a grid with no aerobic-efficiency card.
         $this->rememberWindow($athlete, $window, $builds);
-        Cache::put("heatmap:grid:v5:{$suffix}", Cache::pull("heatmap:grid:v6:{$suffix}"), 3_600);
+        Cache::put("heatmap:grid:v6:{$suffix}", Cache::pull("heatmap:grid:v7:{$suffix}"), 3_600);
 
         $this->rememberWindow($athlete, $window, $builds);
 
-        $this->assertSame(2, $builds, 'The v5 entry is ignored and the grid is rebuilt under v6.');
+        $this->assertSame(2, $builds, 'The v6 entry is ignored and the grid is rebuilt under v7.');
     }
 
     public function test_a_different_calendar_day_produces_a_different_cache_key(): void
@@ -126,7 +130,7 @@ class HeatmapGridCacheTest extends TestCase
         $this->useTheDatabaseCacheStore();
         $athlete = $this->athleteWithOneRun();
         $window = HeatmapWindow::current();
-        $key = "heatmap:grid:v6:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString();
+        $key = "heatmap:grid:v7:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString();
 
         Cache::put($key, new stdClass, 3_600);
         $this->assertInstanceOf(__PHP_Incomplete_Class::class, Cache::get($key));
@@ -169,7 +173,7 @@ class HeatmapGridCacheTest extends TestCase
 
         $this->getDashboard()->assertOk();
 
-        $cached = Cache::get("heatmap:grid:v6:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString());
+        $cached = Cache::get("heatmap:grid:v7:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString());
         $this->assertInstanceOf(HeatmapGrid::class, $cached);
 
         $ranCells = collect($cached->weeks)->flatMap(fn ($week) => $week->days)->filter(fn ($cell) => $cell->hasDetail());
@@ -179,6 +183,48 @@ class HeatmapGridCacheTest extends TestCase
         $this->assertSame('9.0 km', $run->kilometres());
         $this->assertInstanceOf(TrendBar::class, $cached->trend->bars[0]);
         $this->assertInstanceOf(TrendTick::class, $cached->trend->ticks[0]);
+    }
+
+    public function test_the_efficiency_card_survives_a_serializing_store_inside_the_cached_grid(): void
+    {
+        $this->useTheDatabaseCacheStore();
+        $athlete = $this->signInOwner();
+        $window = HeatmapWindow::current();
+
+        /*
+         * Eleven qualifying flat runs over eleven weeks, one hilly and one steep run, and a
+         * run 52 weeks earlier: every class and enum the card holds ends up in the entry.
+         */
+        foreach (range(4, 14) as $week) {
+            Activity::factory()->for($athlete)->onDate($window->startsOn->addWeeks($week))->create([
+                'distance_meters' => 8_000,
+                'average_pace_seconds_per_km' => 330,
+                'average_heart_rate' => 148,
+                'total_ascent_meters' => 0,
+            ]);
+        }
+
+        foreach ([70 => 1, 150 => 2] as $ascent => $weekday) {
+            Activity::factory()->for($athlete)->onDate($window->startsOn->addWeeks(14)->addDays($weekday))->create([
+                'distance_meters' => 10_000,
+                'average_pace_seconds_per_km' => 340,
+                'average_heart_rate' => 148,
+                'total_ascent_meters' => $ascent,
+            ]);
+        }
+
+        Activity::factory()->for($athlete)->onDate($window->startsOn->subWeeks(52))->create();
+
+        $this->getDashboard()->assertOk();
+
+        $cached = Cache::get("heatmap:grid:v7:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString());
+        $this->assertInstanceOf(HeatmapGrid::class, $cached);
+        $this->assertSame(AerobicEfficiencyState::Measured, $cached->efficiency->state);
+        $this->assertTrue($cached->efficiency->hasLastYear);
+        $this->assertInstanceOf(EfficiencyDot::class, $cached->efficiency->dots[0]);
+        $this->assertInstanceOf(EfficiencyWeek::class, $cached->efficiency->weeks[0]);
+        $this->assertContains(EfficiencyRunKind::Hilly, array_map(fn (EfficiencyDot $dot) => $dot->kind, $cached->efficiency->dots));
+        $this->assertContains(EfficiencyRunKind::Steep, array_map(fn (EfficiencyDot $dot) => $dot->kind, $cached->efficiency->dots));
     }
 
     public function test_a_grid_cached_before_the_day_detail_existed_is_never_read(): void
@@ -193,7 +239,7 @@ class HeatmapGridCacheTest extends TestCase
 
         $this->getDashboard()->assertOk()->assertSee('9.0 km');
 
-        $this->assertTrue(Cache::has("heatmap:grid:v6:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString()));
+        $this->assertTrue(Cache::has("heatmap:grid:v7:{$athlete->id}:g0:{$window->startsOn->toDateString()}:".now()->toDateString()));
         $this->assertInstanceOf(__PHP_Incomplete_Class::class, Cache::get($oldKey), 'The old entry is left to expire, untouched.');
     }
 

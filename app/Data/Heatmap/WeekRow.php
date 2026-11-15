@@ -40,4 +40,26 @@ final readonly class WeekRow
     {
         return $this->weekStart->format('j M');
     }
+
+    /**
+     * The week's Monday-to-Sunday range: "18 – 24 May", "29 Jun – 5 Jul", and with the
+     * year "29 Dec 2025 – 4 Jan 2026" when it crosses one. Shared by the weekly trend and
+     * the aerobic-efficiency card so both name a week the same way.
+     */
+    public function rangeLabel(bool $withYear = false): string
+    {
+        $weekEnd = $this->weekStart->addDays(6);
+
+        if ($this->weekStart->year !== $weekEnd->year) {
+            return $withYear
+                ? $this->weekStart->format('j M Y').' – '.$weekEnd->format('j M Y')
+                : $this->weekStart->format('j M').' – '.$weekEnd->format('j M');
+        }
+
+        $range = $this->weekStart->month === $weekEnd->month
+            ? $this->weekStart->format('j').' – '.$weekEnd->format('j M')
+            : $this->weekStart->format('j M').' – '.$weekEnd->format('j M');
+
+        return $withYear ? $range.' '.$weekEnd->format('Y') : $range;
+    }
 }
